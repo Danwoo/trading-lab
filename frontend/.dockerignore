@@ -1,0 +1,15 @@
+**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/.vscode
+**/.next
+**/Dockerfile*
+**/node_modules
+**/prisma/generated
+**/npm-debug.log
+# 대소문자 구분 FS(Linux 빌더)에서 실제 파일명이 소문자(license)면 이 항목이 매칭에
+# 실패해 빌드 컨텍스트에 그대로 실린다(#220 에서 실측 — 템플릿 복사로 딸려온 소문자
+# license 파일이 안 걸러졌다). 대소문자를 가리지 않도록 문자 클래스로 표기한다(#288).
+[Ll][Ii][Cc][Ee][Nn][Ss][Ee]
+README.md

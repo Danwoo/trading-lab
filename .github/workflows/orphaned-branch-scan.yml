@@ -1,0 +1,87 @@
+# orphaned-branch-scan — 위로 합쳐진 스택 PR 브랜치에 나중에 커밋이 착륙해 조용히 고립되는
+# 사례를 주기 탐지한다 (#330).
+#
+# 배경: squash 머지된 브랜치는 `git log main..branch` 로는 못 가린다 — 머지된 브랜치도 전부
+# "main 에 없는 커밋 N개"로 보여 신호 대 잡음이 0에 가깝다. 정확한 신호는 "자기 PR 이 머지된
+# 시각 이후 그 head 브랜치 자체에 커밋이 더 들어왔는가" 뿐이고, 그 로직은
+# scripts/detect_orphaned_merged_branches.py 에 있다.
+#
+# **오탐이 있다 (실측 — #330 이슈 본문 + 이 워크플로 도입 시 재확인)**: 같은 변경이 다른 제목의
+# squash 커밋으로 이미 main 에 별도 착륙한 경우도 후보로 잡힌다(브랜치 자체에는 머지 후 커밋이
+# 있으므로). 그래서 이 워크플로는 **아무것도 자동으로 막거나 삭제하지 않는다** — 후보를 사람이
+# 보는 곳(워크플로 요약 + 이슈 코멘트)에 낼 뿐이고, 실제 고립 여부(다른 경로로 이미 착륙했는지)
+# 판정은 사람이 `git log main --grep=...` 등으로 대조해서 한다.
+#
+# ㉠(위로 합친 브랜치 즉시 삭제, 예방)은 이 워크플로가 아니라 레포 설정
+# "Automatically delete head branches" 로 구현했다 — 착륙할 자리 자체를 없애는 GitHub 내장
+# 기능이라, 이 잡이 잡아야 할 후보 모수 자체가 앞으로는 줄어든다. 이 잡은 ㉡(사후 그물)만 맡는다.
+
+name: orphaned-branch-scan
+
+on:
+  schedule:
+    - cron: "0 21 * * 1"   # 매주 월요일 06:00 KST (UTC+9) — 낮은 빈도(주 1회)로 충분한 사후 그물
+  workflow_dispatch: {}     # 수동 실행 — 결과를 바로 보고 싶을 때
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write   # 후보 있을 때만 이슈 코멘트
+
+# 후보가 실제로 벌어졌을 때 사람이 보는 앵커 — #330 코멘트에 매 회차 결과를 남긴다.
+# #330 이 닫힌 뒤에도(이슈는 다시 열지 않는다 — GitHub 는 닫힌 이슈에도 코멘트를 허용한다)
+# 이 스캔이 계속 그 스레드에 쌓인다. 대상 이슈를 바꾸려면 아래 TRACKING_ISSUE 만 고치면 된다.
+env:
+  TRACKING_ISSUE: 330
+
+jobs:
+  scan:
+    name: "scan: orphaned-merged-branches"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # git log --since 로 브랜치별 커밋 날짜를 봐야 한다 (얕은 클론 불가)
+
+      - name: 탐지기 실행
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/detect_orphaned_merged_branches.py --repo "${{ github.repository }}" \
+            | tee scan-output.txt
+          if grep -q '^후보 [1-9]' scan-output.txt; then
+            echo "found=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 워크플로 요약에 남기기
+        if: always()
+        run: |
+          {
+            echo "## 고립 브랜치 탐지 결과 (#330)"
+            echo '```'
+            cat scan-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 후보 있으면 이슈 코멘트로 알리기
+        if: steps.detect.outputs.found == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          {
+            echo "**자동 탐지 — 고립 후보 발견** (주기 스캔, ${{ github.run_id }})"
+            echo
+            echo "아래는 자동 후보다 — **자동 판정이 아니다.** 오탐이 있다(같은 변경이 다른 제목으로"
+            echo "이미 main 에 착륙했을 수 있다). 사람이 브랜치 내용을 확인해야 한다."
+            echo
+            echo '```'
+            cat scan-output.txt
+            echo '```'
+          } > comment-body.md
+          gh issue comment "$TRACKING_ISSUE" --repo "${{ github.repository }}" --body-file comment-body.md

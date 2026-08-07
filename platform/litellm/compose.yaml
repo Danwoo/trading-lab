@@ -1,0 +1,108 @@
+services:
+  model-downloader:
+    container_name: sglang-model-downloader
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    volumes:
+      - sglang-models:/models
+      - ./download-model.sh:/usr/app/download-model.sh
+    environment:
+      MODEL_DIR: "/models"
+      MODEL_NAMES: "Qwen/Qwen3.6-27B-FP8"
+      HF_XET_HIGH_PERFORMANCE: "1"
+      HF_TOKEN: ${HF_TOKEN}
+    entrypoint: /bin/bash
+    command: /usr/app/download-model.sh
+    restart: "no"
+
+  sglang-llm:
+    container_name: sglang-llm
+    image: lmsysorg/sglang:v0.5.12.post1-cu130
+    volumes:
+      - sglang-models:/models
+    environment:
+      NCCL_TIMEOUT: "600"
+      NCCL_DEBUG: "WARN"
+      SGLANG_ENABLE_SPEC_V2: 1
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set in platform/litellm/.env}
+    cap_add:
+      - SYS_NICE
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              device_ids: ["0", "1"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:30000/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 5
+      start_period: 300s
+    restart: always
+    depends_on:
+      model-downloader:
+        condition: service_completed_successfully
+    entrypoint: sglang serve
+    command:
+      - --model-path=/models/Qwen/Qwen3.6-27B-FP8
+      - --served-model-name=Qwen/Qwen3.6-27B-FP8
+      - --tp-size=2
+      - --tool-call-parser=qwen3_coder
+      - --reasoning-parser=qwen3
+      - --mem-fraction-static=0.88
+      - --context-length=262144
+      - --kv-cache-dtype=fp8_e4m3
+      - --chunked-prefill-size=4096
+      - --max-running-requests=4
+      - --enable-multimodal
+      - --mm-attention-backend=fa3
+      - --speculative-algorithm=NEXTN
+      - --speculative-num-steps=2
+      - --speculative-eagle-topk=1
+      - --speculative-num-draft-tokens=3
+      - --mamba-scheduler-strategy=extra_buffer
+      - --page-size=64
+      - --trust-remote-code
+      - --host=0.0.0.0
+      - --port=30000
+      - --watchdog-timeout=600
+
+  litellm:
+    container_name: litellm-proxy
+    build: .
+    image: litellm:latest
+    ports:
+      - "4000:4000"
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY must be set in platform/litellm/.env}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set in platform/litellm/.env}
+    command:
+      - --config
+      - /app/config.yaml
+      - --port
+      - "4000"
+      - --num_workers
+      - "2"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(''http://localhost:4000/health/readiness'').status==200 else 1)"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    restart: always
+    depends_on:
+      sglang-llm:
+        condition: service_healthy
+
+volumes:
+  sglang-models:
+    name: sglang-models

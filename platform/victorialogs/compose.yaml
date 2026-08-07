@@ -1,0 +1,22 @@
+services:
+  victorialogs:
+    image: victoriametrics/victoria-logs:v1.50.0
+    container_name: victorialogs
+    restart: always
+    networks:
+      - victorialogs
+    ports:
+      - 9428:9428
+    volumes:
+      - vlogs_data:/victoria-logs-data
+    command:
+      - -storageDataPath=/victoria-logs-data
+      - -httpListenAddr=:9428
+
+volumes:
+  vlogs_data:
+    name: victorialogs_data
+
+networks:
+  victorialogs:
+    name: victorialogs

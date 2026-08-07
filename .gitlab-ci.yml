@@ -1,0 +1,91 @@
+variables:
+  DEPLOY_BRANCH: main
+  DEPLOY_PATH: /srv/app/full-stack-template
+
+stages:
+  # - validate
+  - deploy
+
+workflow:
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $DEPLOY_BRANCH"
+
+default:
+  image: alpine:3.23.2
+  tags:
+    - docker
+
+# 활성화: 앞의 . 제거 + stages 의 validate 주석 해제
+.validate-platform-images:
+  stage: validate
+  interruptible: true
+  timeout: 5m
+  retry:
+    max: 2
+    when:
+      - script_failure
+      - runner_system_failure
+  before_script:
+    - apk add --no-cache skopeo yq
+  script:
+    - |
+      set -u
+      EXCLUDE='(node_modules|\.venv|\.next|\.git)'
+      IMAGES=$(
+        {
+          find . -name 'Dockerfile' 2>/dev/null | grep -vE "$EXCLUDE" | while read -r f; do
+            stages=$(awk 'toupper($3)=="AS"{print $4}' "$f")
+            awk '/^FROM /{print $2}' "$f" | while read -r base; do
+              echo "$stages" | grep -qFx "$base" || echo "$base"
+            done
+          done
+          find . \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null | grep -vE "$EXCLUDE" | while read -r f; do
+            yq eval '.services[]? | select(has("build") | not) | .image' "$f" 2>/dev/null
+          done | grep -vE '^(null|---)$'
+        } | grep -vE '^(scratch|\s*)$' | sort -u
+      )
+      [ -z "$IMAGES" ] && { echo "ERROR: no images found" >&2; exit 1; }
+      FAIL=0
+      for img in $IMAGES; do
+        if skopeo inspect --no-tags "docker://$img" > /dev/null 2>&1; then
+          echo "OK    $img"
+        else
+          echo "FAIL  $img" >&2
+          FAIL=1
+        fi
+      done
+      exit $FAIL
+
+.deploy-job:
+  stage: deploy
+  interruptible: false
+  timeout: 15m
+  environment:
+    name: staging
+    url: http://$DEPLOY_HOST:$DEPLOY_PORT
+  before_script:
+    - apk add --no-cache openssh-client git curl
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts
+  script:
+    - ssh "$DEPLOY_USER"@"$DEPLOY_HOST" "cd $DEPLOY_PATH && git pull origin $DEPLOY_BRANCH && docker compose -f $COMPOSE_FILE up -d --build"
+    - |
+      echo "Waiting for service to be ready..."
+      for i in 1 2 3 4 5 6; do
+        sleep 10
+        if curl -fsS --max-time 5 "http://$DEPLOY_HOST:$DEPLOY_PORT" -o /dev/null; then
+          echo "Health check OK (attempt $i)"
+          exit 0
+        fi
+      done
+      echo "Health check FAIL — service not responding after 60s" >&2
+      exit 1
+
+deploy-to-ai02:
+  extends: .deploy-job
+  variables:
+    DEPLOY_HOST: 192.0.2.34
+    DEPLOY_PORT: 1080
+    COMPOSE_FILE: compose.staging.yaml

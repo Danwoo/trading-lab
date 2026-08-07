@@ -1,0 +1,151 @@
+# review-labels — 리뷰 판정 라벨의 위생을 지킨다 (커밋 상태는 더 이상 쓰지 않는다)
+#
+# 파일명은 review-gate.yml 을 유지한다 (문서·릴리스 스크립트의 워크플로 목록이 이 이름을
+# 가리킨다). 워크플로 이름과 체크 이름은 실제 하는 일에 맞춰 바꿨다.
+#
+# ── 2026-08-06: `review-gate` 커밋 상태를 없앴다 ─────────────────────────────
+# 종전 이 파일은 판정 라벨을 `review-gate` 라는 **커밋 상태**로 동기화했고, 그것이 main 보호의
+# required status check 라는 전제 위에 서 있었다. 그 전제가 사실이 아니었다:
+#
+#   ① 이 레포는 **private + Free 플랜**이라 브랜치 보호를 쓸 수 없다.
+#      `GET /repos/{o}/{r}/branches/main/protection` → 403 "Upgrade to GitHub Pro or make this
+#      repository public to enable this feature." (rulesets 도 같은 403.)
+#   ② 실물 증거: `review-gate` 가 failure 인 PR 의 `mergeStateStatus` 가 **BLOCKED 가 아니라
+#      UNSTABLE** 이었다 (PR #417 · #413 실측). required check 였다면 BLOCKED 여야 한다.
+#
+# 즉 이 상태는 **아무것도 막지 않으면서 PR 만 빨갛게·노랗게 칠하고 있었다.** 그런데 그 색은
+# 실제로 일을 세웠다: 최근 PR 8건 중 7건에서 **비-초록 항목이 이 상태 하나뿐**이었고
+# (Actions 체크는 전부 초록), Orca 의 머지 버튼은 GitHub 이 mergeStateStatus 를 아직 계산하지
+# 않은(UNKNOWN) 흔한 상황에서 **모든 체크가 passed 여야만** 열린다 (아래 「Orca 판정 규칙」).
+# 코드가 맞아도 빨간 체크는 체크가 아니라 작업 정지 장치다 — 그래서 없앴다.
+#
+# ── Orca 판정 규칙 (app.asar 실측, 2026-08-06) ─────────────────────────────
+# 머지 버튼 활성 여부 = `presentGitHubPRMergeState().directMergeAvailable`.
+#   · mergeStateStatus 를 GitHub 이 준 경우: DIRTY·BEHIND·**BLOCKED** 이면 비활성.
+#     UNSTABLE(비필수 체크가 빨강)은 mergeable=MERGEABLE 이라 **활성**이다.
+#   · mergeStateStatus 가 UNKNOWN 인 경우(=대다수): `checksPassed(item)` 로 떨어져
+#     **모든 체크가 passed 여야** 활성이다.
+# 체크 분류(`classifyCheckOutcome`):
+#   passed  = conclusion ∈ {success, **skipped**}
+#   failed  = conclusion ∈ {failure, error, startup_failure, timed_out, cancelled, action_required}
+#   pending = conclusion == "pending" **또는 status != "completed"** (실행 중·큐 대기 포함)
+#   neutral = 그 외 (막지 않는다)
+# 커밋 상태(commit status)는 conclusion 자리에 state 가 들어가므로 `pending` 도 `failure` 도
+# 그대로 막는다. **끝나지 않는 pending 상태가 최악**이라 이 파일이 첫 정리 대상이었다.
+#
+# ── 그럼 리뷰 없는 머지는 무엇이 막나 ───────────────────────────────────────
+# 실질 통제는 두 곳이고 둘 다 그대로다:
+#   · **자동 머지 경로** — merge-router.yml 이 `review: passed` 라벨 + cross-review 판정
+#     코멘트의 기계 마커(현재 head SHA) + 연결 이슈의 risk 라벨을 전부 재확인해야 머지한다.
+#   · **사람 머지 경로** — 사람이 판정 코멘트와 라벨을 읽고 누른다.
+# 커밋 상태는 이 둘 중 어느 것의 입력도 아니었다 (레포 전수 grep — 코드 참조 0건, 주석뿐).
+#
+# ── 이 파일이 지금 하는 일 ─────────────────────────────────────────────────
+#   ① **판정 라벨 회수** — push(synchronize)·base 변경(edited)이 오면 승인·판정 라벨을 회수해
+#      재리뷰를 강제한다. 리뷰 통과 뒤 푸시된 코드가 라벨 잔존으로 무검증 머지되는 창을 닫는다
+#      (PR#111 실측). **이것이 이 파일의 유일한 실질 기능이다.**
+#   ② **문서 전용 PR 라우팅** — cross-review 는 paths-ignore(**.md·docs/**)로 문서 PR 을
+#      리뷰하지 않아 판정 라벨이 영영 안 붙는다. 문서는 사람이 읽는 것이 리뷰이므로
+#      `human: merge` 로 사람 대기열에 올린다. **부정 판정(needs-work·unable)이 있으면
+#      적용하지 않는다** — 리뷰어가 반대한 PR 을 사람 대기열로 올리면 반대가 지워진다.
+#
+# 이 잡은 **어떤 경우에도 빨갛게 끝나지 않는다.** 하는 일이 라벨 위생(best-effort)뿐이고,
+# 실패해도 다음 이벤트가 재동기화한다. 실패는 로그와 잡 요약(::warning::)으로 남는다.
+# 라벨은 이벤트 페이로드가 아니라 gh 로 직접 조회한다 (페이로드 labels 불안정 — 실측).
+#
+# 판정 라벨 규약(#285, 2026-08-03 개정)은 그대로다: 수동 리뷰도 기계 마커를 남기되 끝에
+# `source=manual` 을 붙인다 — merge-router 의 arm 가드 정규식과 정확히 일치하지 않게 해서
+# 사람이 친 한 줄이 자동 머지 권한을 얻지 못하게 한다.
+#
+# 배포: 대상 레포 .github/workflows/ 에 복사.
+#       라벨 필요: `human: merge` `review: passed` `review: needs-work` `review: unable`
+#       `review: fallback-claude` (+ risk 라벨은 merge-router 참조).
+
+name: review-labels
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, edited]   # edited: base 변경 시 판정 라벨 회수
+
+permissions:
+  pull-requests: write   # 라벨 회수·부착
+
+jobs:
+  sync-review-labels:
+    name: "chore: review-labels (비게이트)"
+    # 제목·본문 편집(`edited` 인데 base 미변경)은 라벨과 무관하다 — 아래 스텝의 첫 조기
+    # 종료가 그것이고, 러너를 잡아 한 줄 찍고 끝났다. Actions 는 잡을 분 단위로 올림
+    # 과금하므로 그 한 줄이 1분이다. 에이전트가 PR 본문을 여러 번 고치는 이 레포에선
+    # 잦다 (실측 2026-08-03~08-07: 이 워크플로 163 run 중 로그 표본 24건에서 6건, 25%).
+    #
+    # ⚠ 아래 run 스텝의 첫 조기 종료와 **한 벌(lockstep)** 이다 — 같은 식을 그대로 썼다.
+    #   스텝 쪽 조건을 고치면 여기도 같이 고쳐라.
+    if: ${{ github.event.action != 'edited' || github.event.changes.base.ref.from != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 판정 라벨 회수 · 문서 전용 PR 라우팅
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          ACTION: ${{ github.event.action }}
+          # edited 이벤트에서 base 가 바뀐 경우에만 값이 실린다 (이전 base ref 이름)
+          BASE_FROM: ${{ github.event.changes.base.ref.from }}
+        run: |
+          set -uo pipefail
+          # ⚠ Actions 기본 셸은 `bash -e {0}` 다. `set -uo pipefail` 은 이미 켜진 -e 를 끄지
+          #   않으므로 명시적으로 끈다 (cross-review 「셸 플래그 함정」 실측 — 같은 함정으로
+          #   폴백이 통째로 죽은 전례. tests/cross-review/shellflags.sh 가 이 정합을 검사한다).
+          set +e
+
+          # 이 잡은 실패로 끝나지 않는다 — 라벨 위생은 best-effort 이고, 실패해도 다음 이벤트가
+          # 재동기화한다. 문제는 ::warning:: 으로 남겨 Actions 요약에서 보이게 한다.
+          warn() { echo "::warning::$*"; }
+
+          if [ "$ACTION" = "edited" ] && [ -z "$BASE_FROM" ]; then
+            echo "제목·본문 편집 — 라벨 무관, 무행동"
+            exit 0
+          fi
+
+          # ── ① 판정 라벨 회수 (새 커밋·base 변경 = 리뷰가 본 적 없는 코드) ──────
+          if [ "$ACTION" = "synchronize" ] || [ "$ACTION" = "edited" ]; then
+            for L in "human: merge" "review: passed" "review: needs-work" "review: unable" "review: fallback-claude"; do
+              # 폴백 표식(fallback-claude)도 함께 회수한다 — 낡은 head 에서 붙은 딱지가 남으면
+              # 폴백 없이 끝난 재리뷰를 폴백으로 오독하게 한다 (계수기로서의 신뢰도 훼손).
+              gh pr edit "$PR" --repo "$REPO" --remove-label "$L" 2>/dev/null \
+                || warn "라벨 회수 실패(무해 — 다음 이벤트가 재시도): $L"
+            done
+            echo "판정 라벨 회수 시도 완료 (사유: $ACTION${BASE_FROM:+ — base 변경 ${BASE_FROM} → 현재})"
+          fi
+
+          LABELS=$(gh pr view "$PR" --repo "$REPO" --json labels --jq '[.labels[].name] | join("|")')
+          if [ $? -ne 0 ]; then
+            warn "라벨 조회 실패 — 문서 전용 PR 라우팅을 건너뛴다 (게이트가 아니므로 머지는 막히지 않는다)"
+            exit 0
+          fi
+          echo "라벨: [$LABELS]"
+
+          # ── ② 문서 전용 PR → 사람 대기열 ────────────────────────────────────
+          # 부정 판정이 있으면 적용하지 않는다 (2026-07-30, #57 동류): "아직 안 봄" 과
+          # "보고 반대함" 이 섞여 있는데 후자를 사람 대기열로 올리면 반대가 지워진다.
+          case "|$LABELS|" in
+            *"|review: needs-work|"*|*"|review: unable|"*|*"|review: passed|"*|*"|human: merge|"*)
+              echo "판정 라벨 존재 — 문서 전용 라우팅 대상 아님"; exit 0 ;;
+          esac
+
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+          if [ -z "$files" ]; then
+            echo "변경 파일 조회 결과 없음 — 무행동"
+            exit 0
+          fi
+          # 문서 아닌 파일 목록 (대소문자 무시 -i — README.MD 같은 엣지 포함). 이 목록이 비어야
+          # 문서 전용이다. (이중부정 grep -q 는 플래그 조합 엣지가 있어 피한다.)
+          nondoc=$(printf '%s\n' "$files" | grep -ivE '\.md$|^docs/')
+          if [ -z "$nondoc" ]; then
+            gh pr edit "$PR" --repo "$REPO" --add-label "human: merge" 2>/dev/null \
+              || warn "human: merge 부착 실패 — 문서 전용 PR 이 사람 대기열에 안 잡힌다"
+            echo "문서 전용 PR — 사람 머지 대기열로 라우팅 (교차 리뷰 스킵, 문서 루브릭 공백)"
+          else
+            echo "코드 변경 포함 — 교차 리뷰 경로 (무행동)"
+          fi
+          exit 0

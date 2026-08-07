@@ -1,0 +1,291 @@
+# merge-router — 리뷰 판정 후 위험도별 머지 경로를 가른다 (결정 15 Q2, 2026-07-23)
+#
+# 결정: 저위험은 리뷰 통과 시 자동 머지, 사람은 예외만 (고위험 · "수정 필요" 판정 · 정책 결정).
+# 이 워크플로는 `review: passed` 라벨(독립 리뷰 "머지 가능" 판정 — cross-review CI 또는
+# 지휘자가 부착)이 붙는 순간 위험도를 판독해 두 경로로 가른다:
+#
+#   저위험 (연결 이슈 전부 `risk: low`)          → 테스트 전수 초록 확인 후 자동 머지
+#                                                   (arm 시도 → 거부되면 직접 머지. 아래 참조)
+#   고위험 (`risk: high`) · 미선언(라벨 없음)      → `human: merge` 부착 = 사람 머지 대기열
+#   · 연결 이슈 없음
+#
+# 보수 기본값 (fail-closed): 위험 라벨이 없는 이슈·이슈 미연결 PR 은 고위험으로 취급한다.
+# 위험 선언의 SoT 는 **이슈의 risk 라벨** (gate declare 가 방출 — hooks/gate). PR 의 risk
+# 라벨은 이 워크플로가 붙이는 **가시화 미러**일 뿐 판정 입력이 아니다 — 판정 시점마다
+# 이슈에서 fresh 조회한다 (미러 낡음이 오통과로 이어지지 않게).
+#
+# 이슈 연결 판독의 경계 (R2 1차 문서화, 2026-07-23 — 결함 아님): closingIssuesReferences 는
+# **closing 키워드(Closes/Fixes/Resolves)만** 잡는다. "Refs #N" 만 쓴 PR 은 이슈 없음 →
+# 미선언 → 사람 대기열로 간다 — fail-closed 의 의도된 안전 방향이다. 자동 경로에 태우려면
+# PR 본문에 Closes #N 을 쓴다 (worker 스킬 PR 규약에 동일 명시).
+#
+# 킬 스위치: 레포 변수 AUTO_MERGE 가 'on' 이 아니면 자동 머지를 arm 하지 않고 전부
+# 사람 대기열로 보낸다 (현행 동작으로 강등). 끄기: gh variable set AUTO_MERGE --body off
+# 이미 arm 된 PR 의 일괄 해제는 roles/revert-playbook.md §킬 스위치 절차 참조.
+# 머지 방식: 레포 변수 AUTO_MERGE_METHOD (merge|squash 만, 기본 merge). rebase 는 화이트리스트
+# 제외 — rebase 머지는 PR 커밋들이 개별로 base 에 올라가 단일 revert 앵커(mergeCommit)가 없고,
+# hooks/revert-pr 의 단일 커밋 revert 로는 되돌림이 불완전하다 (로컬 재현 2026-07-23).
+#
+# 알려진 한계 (설계 문서 diagnosis/2026-07-23-q2-d2-design.md 에 근거 기록):
+#   - arm 이후 이슈가 high 로 재선언돼도 자동 해제되지 않는다 (issues 이벤트 미청취).
+#     재선언은 드물고, gate declare high 가 사람에게 열린 PR 재확인을 상기시킨다.
+#   - GITHUB_TOKEN 으로 arm 한 자동 머지의 머지 커밋은 github-actions[bot] 명의이며,
+#     GITHUB_TOKEN 발 이벤트는 후속 워크플로를 트리거하지 않는다 — main push 트리거
+#     워크플로가 있는 레포는 배포 전 확인 (preflight).
+#   - arm(enablePullRequestAutoMerge)에는 레포 설정 allow_auto_merge 필요 — 실패 시
+#     fail-safe 로 사람 대기열에 넣고 코멘트로 알린다.
+#   - **이 레포는 required status check 가 0개다** (private + Free 플랜이라 브랜치 보호
+#     자체를 못 쓴다 — `GET /repos/{o}/{r}/branches/main/protection` → 403). 그래서 ㉠ GitHub
+#     네이티브 자동 머지는 "기다릴 것" 이 없어 테스트가 빨개도 머지할 수 있고 ㉡ 머지 가능한
+#     PR 은 CLEAN 이라 arm 자체가 거부된다. 처방 둘: **테스트 전수 초록 게이트를 이 워크플로가
+#     직접 확인**하고(아래 MIN_TEST_CHECKS 블록), arm 이 거부되면 **직접 머지**한다.
+#     브랜치 보호를 쓸 수 있게 되면(레포 공개 또는 Pro) 그 게이트를 required checks 로
+#     옮기고 여기 블록은 이중 확인으로 남기면 된다.
+#   - 판정 라벨(review: passed)도 자기 신고 표면이다 — 라벨을 붙일 수 있는 누구든 만들 수 있다.
+#     arm 전에 cross-review 판정 코멘트의 기계 마커(verdict=merge_ok + 현재 head SHA)를
+#     결정론적으로 재확인해, 라벨 수동 부착 단독으로는 arm 되지 않게 한다 (마커 부재 →
+#     human: merge 대기열. **지휘자 로컬 리뷰 부착분은 #285 규약대로 CI 와 같은 마커를
+#     남기지만, 끝에 `source=manual` 필드가 붙어(2026-08-03 개정, PR #354 리뷰 차단급 지적
+#     — review-gate.yml 머리 주석 참조) 아래 앵커 정규식과 정확히 일치하지 않는다. 그래서
+#     사람이 규약대로 마커를 남겨도 여전히 사람 경로로 남는다.** (구형 — `source=manual` 없이
+#     CI 형식 그대로 타이핑한 수동 마커가 남아 있다면 그건 이 정규식에 매칭돼 arm 될 수 있다
+#     — review-gate.yml 의 마커 규약을 따르고 있는지 다시 확인한다.)
+#
+# 토큰 연쇄 (중요): GITHUB_TOKEN 으로 만든 이벤트는 다른 워크플로를 트리거하지 않는다
+# (GitHub 의 재귀 방지). 그래서:
+#   - 이 워크플로가 붙이는 `human: merge` 가 board-status(Human Decision 컬럼)에 잡히려면
+#     PAT 가 필요하다 → secrets.PROJECT_TOKEN (board-status 가 이미 쓰는 classic PAT,
+#     repo+project 스코프 — 재사용, 신규 발급 없음) 이 있으면 그것을 쓰고, 없으면 GITHUB_TOKEN
+#     으로 폴백한다. 폴백 시 안전성은 유지되나 보드 대기열 반영이 누락된다.
+#   - 같은 이유로 cross-review.yml(D1)의 `review: passed` 부착도 PROJECT_TOKEN 필수 —
+#     GITHUB_TOKEN 으로 붙이면 이 워크플로가 아예 깨어나지 않는다 (인터페이스 계약).
+#   - 라벨 부착·제거는 **REST(issues/labels) 경유**다 — PROJECT_TOKEN 은 classic PAT
+#     (repo+project, read:org 없음)라 `gh pr edit --add-label` 의 GraphQL 라벨 조회가
+#     read:org 스코프 오류로 실패한다 (실측: run 29984682991, R2 1차 2026-07-23).
+#     REST 라벨 API 는 repo 스코프만으로 동작한다. cross-review(publish)도 동일 교체.
+#   - push 시 disarm 은 unlabeled 이벤트에 의존하지 않는다 — 이 워크플로 자신의
+#     synchronize 트리거가 같은 push 를 독립 수신해 disarm 한다.
+#
+# 배포: 대상 레포 .github/workflows/ 에 복사 + 라벨(risk: low/high · review: passed/
+#       needs-work · human: merge) 정의 + 레포 설정 allow_auto_merge 활성 +
+#       레포 변수 AUTO_MERGE 생성 (초기값 off — 관찰 후 사람이 on).
+
+name: merge-router
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, synchronize, edited]   # edited: base 변경 시 disarm (diff 전체가 바뀜 — synchronize 와 동일 처리)
+
+permissions:
+  contents: write        # 자동 머지 arm/disarm (gh pr merge --auto / --disable-auto)
+  pull-requests: write   # 라벨·코멘트
+
+concurrency:
+  group: merge-router-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  # 잡 id 는 merge-route — cross-review.yml 의 entry 잡도 'route' 라, 같은 SHA 에 route 체크런이
+  # 두 줄로 겹치는 혼동을 피한다 (cross-review 쪽 route 는 더 널리 참조돼 유지).
+  merge-route:
+    name: "merge: auto-router (비게이트)"
+    # review: passed 의 부착/회수·push·base 변경만 관심 대상 — 나머지 라벨 이벤트는 스킵
+    # (값 전체를 따옴표로 감싼다 — 표현식 내 'review: passed' 의 콜론이 YAML 평문 스칼라를 깨뜨림)
+    if: "${{ github.event.action == 'synchronize' || github.event.action == 'edited' || github.event.label.name == 'review: passed' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: 위험도 판독 → 자동 머지 arm 또는 사람 대기열
+        env:
+          # PROJECT_TOKEN(PAT — board-status 용 재사용) 우선 — 라벨 부착이 board-status 등 후속 워크플로를 깨워야 한다 (머리 주석)
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN || github.token }}
+          # arm 전용 토큰 — 자동 머지 액터를 github-actions[bot] 으로 유지한다 (PAT arm 이면 머지가
+          # 사용자 명의가 되고 후속 트리거 연쇄도 사용자 발로 열린다). GITHUB_TOKEN arm 가부는
+          # 라이브 검증 항목 (D2 §7) — 불가로 판명되면 아래 fail-safe 가 human: merge 로 강등한다.
+          ARM_TOKEN: ${{ github.token }}
+          # edited 이벤트에서 base 가 바뀐 경우에만 값이 실린다 (이전 base ref 이름)
+          BASE_FROM: ${{ github.event.changes.base.ref.from }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_NODE: ${{ github.event.pull_request.node_id }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          ACTION: ${{ github.event.action }}
+          AUTO_MERGE: ${{ vars.AUTO_MERGE }}
+          AUTO_MERGE_METHOD: ${{ vars.AUTO_MERGE_METHOD }}
+        run: |
+          # ⚠ Actions 기본 셸은 `bash -e {0}` 다. 이 스텝은 gh 실패를 **직접 분류**하므로
+          #   (arm 거부를 정상 분기로 다루는 것이 대표) -e 를 명시적으로 끈다. `set -uo pipefail`
+          #   은 이미 켜진 -e 를 끄지 않는다 — cross-review 「셸 플래그 함정」 실측.
+          #   -e 를 켠 채 두면 `ARM_OUT=$(gh pr merge --auto)` 한 줄이 잡을 통째로 죽인다.
+          # 이 잡은 **어떤 경우에도 빨갛게 끝나지 않는다** (비게이트). 판독 불가는 침묵이 아니라
+          #   `human: merge` 강등 + 코멘트로 표현한다 (fail-closed 는 동작으로, 색으로가 아니라).
+          set +e
+
+          # 라벨 부착·코멘트는 best-effort — 실패해도 잡을 죽이지 않고 경고만 남긴다.
+          add_label()  { gh api -X POST "repos/$REPO/issues/$PR/labels" -f "labels[]=$1" >/dev/null \
+                           || echo "::warning::라벨 부착 실패: $1"; }
+          say()        { gh pr comment "$PR" --repo "$REPO" --body "$1" \
+                           || echo "::warning::코멘트 게시 실패"; }
+
+          # ── edited: base 변경만 관심 — 제목·본문 편집은 게이트 무관 ────────────
+          if [ "$ACTION" = "edited" ] && [ -z "$BASE_FROM" ]; then
+            echo "제목·본문 편집 — 게이트 무관, 무행동"
+            exit 0
+          fi
+
+          # ── disarm 경로: push(재리뷰 강제)·base 변경(diff 전체가 바뀜)·판정 회수 ──
+          if [ "$ACTION" = "synchronize" ] || [ "$ACTION" = "edited" ] || [ "$ACTION" = "unlabeled" ]; then
+            gh pr merge "$PR" --repo "$REPO" --disable-auto 2>/dev/null \
+              && echo "자동 머지 disarm (사유: $ACTION${BASE_FROM:+ — base 변경 ${BASE_FROM} → 현재})" \
+              || echo "disarm 불요 (arm 상태 아님)"
+            exit 0
+          fi
+
+          # ── arm 후보 경로: labeled review: passed ─────────────────────────────
+          # 라벨은 페이로드가 아니라 fresh 조회 (review-gate 와 동일 원칙 — 페이로드 불안정 실측)
+          LABELS=$(gh pr view "$PR" --repo "$REPO" --json labels --jq '[.labels[].name] | join("|")')
+          if [ $? -ne 0 ]; then
+            echo "::warning::라벨 조회 실패 — 라우팅 중단 (자동 머지 arm 없음. 다음 라벨 이벤트가 재시도)"
+            exit 0
+          fi
+          case "|$LABELS|" in
+            *"|review: passed|"*) : ;;
+            *) echo "review: passed 이미 회수됨 — 중단"; exit 0 ;;
+          esac
+          case "|$LABELS|" in
+            *"|review: needs-work|"*) echo "needs-work 병존 — 보수 기본으로 라우팅 중단"; exit 0 ;;
+          esac
+
+          # ── 위험도 판독: 연결 이슈(Closes #N)의 risk 라벨을 fresh 조회 ────────
+          # 판정 전체를 gh 내장 jq 한 방으로 (러너의 시스템 jq 무의존 — 기존 워크플로들과 동일 패턴).
+          # 이슈 하나에 risk: high·low 가 모순 병존하면 high 가 이긴다 (index 검사 순서 — 보수).
+          # 연결 이슈가 first:10 을 넘치면(pageInfo.hasNextPage) 전수 판독 불가 — 미선언 취급
+          # (fail-closed, 회의론 지적 5. 이슈 10개 초과 연결 자체가 분할 대상 신호다).
+          OUT=$(gh api graphql \
+            -f query='query($id:ID!){ node(id:$id){ ... on PullRequest { closingIssuesReferences(first:10){ pageInfo { hasNextPage } nodes { number labels(first:30){ nodes { name } } } } } } }' \
+            -f id="$PR_NODE" \
+            --jq '.data.node.closingIssuesReferences as $c
+                  | [$c.nodes[]
+                     | {number,
+                        risk: (if ([.labels.nodes[].name] | index("risk: high")) then "high"
+                               elif ([.labels.nodes[].name] | index("risk: low")) then "low"
+                               else "undeclared" end)}] as $r
+                  | (if $c.pageInfo.hasNextPage then "undeclared"
+                     elif ($r | length) == 0 then "no-issue"
+                     elif ([$r[] | select(.risk == "high")] | length) > 0 then "high"
+                     elif ([$r[] | select(.risk == "undeclared")] | length) > 0 then "undeclared"
+                     else "low" end) as $verdict
+                  | $verdict + "\t" + (($r | map("#\(.number)=\(.risk)") | join(", "))
+                      + (if $c.pageInfo.hasNextPage then " …(연결 이슈 10개 초과 — 전수 판독 불가, 미선언 취급)" else "" end))')
+          if [ $? -ne 0 ] || [ -z "$OUT" ]; then
+            echo "::warning::위험도 판독 실패 — 고위험 취급 (fail-closed)"
+            add_label "human: merge"
+            say "**사람 머지 대기열 등록** (\`human: merge\`) — 연결 이슈의 위험 라벨을 조회하지 못했다(GitHub API 오류). 위험도를 모르면 고위험으로 취급한다 (보수 기본)."
+            exit 0
+          fi
+          VERDICT=${OUT%%$'\t'*}
+          EVIDENCE=${OUT#*$'\t'}
+          echo "위험도 판정: $VERDICT (${EVIDENCE:-연결 이슈 없음})"
+
+          # ── 가시화 미러: PR 에 risk 라벨 (판정 입력 아님 — 사람 스캔용) ────────
+          # 라벨 부착·제거는 REST 경유 — gh pr edit --add-label 은 GraphQL 라벨 조회를 거쳐
+          # PROJECT_TOKEN(read:org 없음)에서 스코프 오류로 실패한다 (머리 주석 · run 29984682991)
+          if [ "$VERDICT" = low ]; then
+            gh api -X POST "repos/$REPO/issues/$PR/labels" -f "labels[]=risk: low" >/dev/null 2>&1 || true
+            gh api -X DELETE "repos/$REPO/issues/$PR/labels/risk%3A%20high" >/dev/null 2>&1 || true
+          elif [ "$VERDICT" = high ]; then
+            gh api -X POST "repos/$REPO/issues/$PR/labels" -f "labels[]=risk: high" >/dev/null 2>&1 || true
+            gh api -X DELETE "repos/$REPO/issues/$PR/labels/risk%3A%20low" >/dev/null 2>&1 || true
+          fi
+
+          # ── 라우팅 ────────────────────────────────────────────────────────────
+          # 머지 방식 화이트리스트: merge|squash 만 — rebase 는 revert 앵커 부재로 제외 (머리 주석)
+          METHOD=merge
+          case "$AUTO_MERGE_METHOD" in
+            merge|squash) METHOD="$AUTO_MERGE_METHOD" ;;
+            rebase) echo "::warning::AUTO_MERGE_METHOD=rebase 는 화이트리스트 밖 — rebase 머지는 단일 revert 앵커가 없어 되돌림이 불완전하다 (로컬 재현 2026-07-23). merge 로 강제." ;;
+          esac
+
+          if [ "$VERDICT" = low ] && [ "$AUTO_MERGE" = "on" ]; then
+            # ── 결정론적 가드 (회의론 지적 4): 판정 라벨은 자기 신고 표면 — cross-review
+            #    판정 코멘트의 기계 마커(verdict=merge_ok + 현재 head SHA, 워크플로가 생성)가
+            #    있어야만 arm 한다. 라벨 수동 부착·지휘자 로컬 리뷰 부착(마커 없음)은 사람 대기열로.
+            # 저자 필터 필수 (OWNER/MEMBER/COLLABORATOR) — public 레포에서 제3자가 위조 마커를
+            # 달아 수동 review:passed 부착 경로의 자동머지 arm 을 탈취하는 fail-open 을 막는다.
+            # cross-review 의 다른 4개 마커 소비자(리뷰 폴러·publish 폴백·멱등 가드)와 동일 필터.
+            if ! gh api "repos/$REPO/issues/$PR/comments" --paginate \
+                 --jq '.[] | select(.author_association=="OWNER" or .author_association=="MEMBER" or .author_association=="COLLABORATOR") | .body' \
+                 | grep -qE "^<!-- cross-review v1 model=(claude|kimi|codex) verdict=merge_ok sha=${SHA} -->$"; then
+              add_label "human: merge"
+              say "**사람 머지 대기열 등록** (\`human: merge\`) — 저위험이나 cross-review 판정 코멘트의 기계 마커(merge_ok · ${SHA}) 부재. 판정 라벨 단독으로는 arm 하지 않는다 (라벨은 자기 신고 표면 — 수동·로컬 리뷰 부착분은 사람 경로). 위험 판독: ${EVIDENCE:-연결 이슈 없음}"
+              echo "판정 마커 부재 — human: merge 강등 (라벨 단독 arm 금지)"
+              exit 0
+            fi
+            # ── 테스트 전수 초록 게이트 (2026-08-06 신설, fail-closed) ────────────
+            # 이 레포는 private + Free 플랜이라 **브랜치 보호를 쓸 수 없다**
+            # (GET .../branches/main/protection → 403 "Upgrade to GitHub Pro …").
+            # 즉 **required status check 가 0개**다. 그래서 GitHub 네이티브 자동 머지는
+            # 기다릴 것이 없어 테스트가 빨개도 머지해 버릴 수 있었다 — `review-gate` 커밋
+            # 상태가 required 라는 전제가 사실이 아니었으므로 종전 구성의 실구멍이다.
+            # 여기서 워크플로가 스스로 확인한다: head SHA 의 `test: ` 접두 체크런이
+            #   ① 전부 completed 이고 ② conclusion 이 success|skipped 이며
+            #   ③ 개수가 하한 이상 (repo-scans.yml 은 경로 필터가 없어 항상 3잡이 돈다 —
+            #      "0건 = 위반 없음"으로 읽히는 구멍을 막는다)
+            # 이어야 한다. 같은 이름이 여러 번 있으면(재실행) **id 가 가장 큰 것**만 본다.
+            MIN_TEST_CHECKS=3
+            CHECKS=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" --paginate \
+                     --jq '.check_runs[] | select(.name | startswith("test: ")) | [.id, .name, .status, .conclusion] | @tsv') \
+                     || CHECKS=""   # 조회 실패 = 0건 = 하한 미만 → 아래에서 사람 대기열 (fail-closed)
+            GATE=$(printf '%s\n' "$CHECKS" | awk -F'\t' '
+              NF >= 3 { if ($1 + 0 >= seen[$2]) { seen[$2] = $1 + 0; st[$2] = $3; cc[$2] = $4 } }
+              END {
+                total = 0; bad = ""
+                for (n in st) {
+                  total++
+                  if (st[n] != "completed" || (cc[n] != "success" && cc[n] != "skipped"))
+                    bad = bad sprintf("%s(%s/%s) ", n, st[n], (cc[n] == "" ? "-" : cc[n]))
+                }
+                printf "%d\t%s", total, bad
+              }')
+            TEST_TOTAL=${GATE%%$'\t'*}
+            TEST_BAD=${GATE#*$'\t'}
+            if [ "${TEST_TOTAL:-0}" -lt "$MIN_TEST_CHECKS" ]; then
+              TEST_BAD="테스트 체크 ${TEST_TOTAL:-0}개 — 하한(${MIN_TEST_CHECKS}) 미만. 검사가 아예 안 돌았을 수 있다"
+            fi
+            if [ -n "$TEST_BAD" ]; then
+              add_label "human: merge"
+              say "**사람 머지 대기열 등록** (\`human: merge\`) — 저위험·리뷰 통과이나 **테스트 체크가 전부 초록이 아니다**: ${TEST_BAD}. 판정 대상 ${SHA} · 검사한 테스트 체크 ${TEST_TOTAL}개(하한 ${MIN_TEST_CHECKS}). 자동 머지는 테스트 전수 초록에서만 돈다 — 이 레포는 브랜치 보호를 쓸 수 없어 GitHub 이 대신 막아 주지 않는다."
+              echo "테스트 미초록 — human: merge 강등: $TEST_BAD"
+              exit 0
+            fi
+            echo "테스트 체크 ${TEST_TOTAL}개 전부 초록 — 자동 머지 진행"
+
+            # arm 만 GITHUB_TOKEN(ARM_TOKEN) — 자동 머지 액터를 bot 으로 유지 (env 주석·회의론 지적 6)
+            if ARM_OUT=$(GH_TOKEN="$ARM_TOKEN" gh pr merge "$PR" --repo "$REPO" --auto --"$METHOD" 2>&1); then
+              say "**자동 머지 arm** (저위험 경로 — 결정 15 Q2). 판정 대상 ${SHA} · 위험 판독: ${EVIDENCE} · 방식: ${METHOD} · 테스트 체크 ${TEST_TOTAL}개 전수 초록. 끄기: \`gh variable set AUTO_MERGE --body off\` / 되돌림: \`roles/revert-playbook.md\`"
+              echo "자동 머지 arm 완료"
+            elif GH_TOKEN="$ARM_TOKEN" gh pr merge "$PR" --repo "$REPO" --"$METHOD"; then
+              # required check 가 0개인 레포에서는 머지 가능한 PR 이 CLEAN 이라 GitHub 이 arm 을
+              # 거부한다 ("Pull request is in clean status"). 기다릴 것이 없으니 arm 이 애초에
+              # 성립하지 않는 것이지 결함이 아니다 — 위 테스트 게이트를 이미 통과했으므로
+              # 직접 머지한다. 그 외 사유(allow_auto_merge 꺼짐·권한 부족)면 아래로 떨어진다.
+              say "**자동 머지 완료** (저위험 경로 — 결정 15 Q2). 판정 대상 ${SHA} · 위험 판독: ${EVIDENCE} · 방식: ${METHOD} · 테스트 체크 ${TEST_TOTAL}개 전수 초록. GitHub 네이티브 auto-merge arm 은 거부됐다(\`${ARM_OUT}\`) — 이 레포는 required check 가 0개라 머지 가능한 PR 이 CLEAN 이고, arm 은 기다릴 것이 있을 때만 성립한다."
+              echo "직접 머지 완료 (arm 거부: $ARM_OUT)"
+            else
+              add_label "human: merge"
+              say "⚠️ **자동 머지 실패** — 사람 대기열로 강등 (\`human: merge\`). arm 도 직접 머지도 실패했다. arm 오류: \`${ARM_OUT}\`. 레포 설정 allow_auto_merge·머지 방식 허용 여부를 확인하라. 판정 대상 ${SHA} · 위험 판독: ${EVIDENCE}"
+              echo "arm·직접 머지 모두 실패 — human: merge 강등"
+            fi
+          else
+            case "$VERDICT" in
+              low)       WHY="저위험이나 킬 스위치 off (AUTO_MERGE=${AUTO_MERGE:-미설정})" ;;
+              high)      WHY="고위험 선언 — 사람 머지 게이트 유지 (결정 15)" ;;
+              undeclared) WHY="위험도 미선언 — 고위험 취급 (보수 기본, fail-closed)" ;;
+              no-issue)  WHY="연결 이슈 없음 — 위험도 판독 불가, 고위험 취급 (보수 기본)" ;;
+            esac
+            add_label "human: merge"
+            say "**사람 머지 대기열 등록** (\`human: merge\`) — ${WHY}. 판정 대상 ${SHA} · 위험 판독: ${EVIDENCE:-연결 이슈 없음}"
+            echo "사람 대기열: $WHY"
+          fi
+          # `set +e` 라 스텝의 종료 코드는 마지막 명령의 것이다 — 명시적으로 0 으로 끝낸다
+          # (이 잡은 비게이트: 판독 불가·머지 실패는 색이 아니라 `human: merge` 강등으로 표현한다).
+          exit 0

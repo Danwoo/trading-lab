@@ -1,0 +1,81 @@
+# plan-label — PR 이 계획 국면을 종료하면 `human: plan` 을 자동 회수한다 (레버 2)
+#
+# 구조 (2026-07-24, CI 체크 정리): 이슈 코멘트 전용 잡(add-waiting-label·remove-on-approval)은
+# plan-label-issue.yml 로 분리했다 — 그것들이 pull_request 트리거 때문에 모든 PR 에 상시 SKIPPED
+# 두 줄로 뜨던 노이즈를 근본 제거하기 위함. 이 파일은 PR 이 트리거하는 레버 2 만 담는다.
+#
+# 레버 2: PR 이 Closes/Fixes/Resolves 로 이슈를 참조하며 열리면, 그 이슈의 `human: plan` 을 자동
+#   회수한다. PR 의 존재 = 구현이 시작됐다 = 계획 국면 종료. 세션 승인(out-of-band)·저위험 자동
+#   진행 모두 이 실물 트리거로 GitHub 이 스스로 화해한다. 진짜 사람 게이트는 머지다.
+#
+# 2026-08-06 — **이 잡은 빨갛게 끝나지 않는다 (비게이트)**. 라벨 회수 실패는 「코드가 틀렸다」가
+#   아니라 GitHub API 사정인데, 체크가 빨가면 Orca 머지 버튼이 잠긴다(체크 하나라도 failed 면
+#   merge 불가 — review-gate.yml 머리의 「Orca 판정 규칙」). 그래서 실패는 **::error:: 주석과
+#   잡 요약**으로 시끄럽게 남기되 잡은 0 으로 끝낸다 — 「초록으로 죽은 그물」을 피하려던 원래
+#   의도(아래 스텝 주석)는 주석 출력이 대신 진다.
+#
+# 배포: 이 파일 + plan-label-issue.yml 을 대상 레포의 .github/workflows/ 에 복사한다.
+# 전제: 레포에 `human: plan` 라벨이 정의되어 있어야 한다.
+
+name: plan-label
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  reconcile-on-pr:
+    name: "chore: plan-reconcile (비게이트)"
+    # PR 이 Closes 로 이슈를 참조하며 열리면 그 이슈들의 human: plan 을 자동 회수한다.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reconcile plan-waiting on linked issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # 실패를 **삼키지 않고** 드러내되, 잡의 종료 코드로는 표현하지 않는다 (머리 주석).
+          # 조용히 넘어가면 라벨이 안 붙은 채 초록이 되어 「초록으로 죽은 그물」이 되므로,
+          # 회수 실패는 ::error:: 로 남긴다 — 사람이 Actions 요약에서 즉시 본다.
+          set -uo pipefail
+          set +e
+          FAILED=0
+          NAME="${REPO#*/}"
+          # PR 이 닫는 이슈들 (closing 키워드 — Refs 는 안 잡힘, worker 규약이 Closes 필수)
+          issues=$(gh api graphql -f query='
+            query($o:String!,$n:String!,$pr:Int!){ repository(owner:$o,name:$n){
+              pullRequest(number:$pr){ closingIssuesReferences(first:20){ nodes{ number } } } } }' \
+            -f o="$OWNER" -f n="$NAME" -F pr="$PR" \
+            --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].number' 2>/dev/null || true)
+          [ -z "$issues" ] && { echo "닫는 이슈 없음 (Closes 미참조) — 무행동"; exit 0; }
+          for N in $issues; do
+            has=$(gh issue view "$N" --repo "$REPO" --json labels \
+              --jq '[.labels[].name] | index("human: plan")' 2>/dev/null || echo null)
+            if [ "$has" != "null" ] && [ -n "$has" ]; then
+              # ⚠ `cmd && echo` 로 묶으면 **-e 가 켜져 있어도 cmd 실패로 죽지 않는다**
+              #   (AND-list 의 마지막이 아닌 명령은 -e 면제 — 2026-07-29 실측:
+              #    `bash -e -c 'false && echo yes; echo 도달'` → "도달" 출력, exit 0).
+              #   회수 실패를 실패로 만들려면 분리해야 한다.
+              # ⚠ `cmd && echo` 로 묶으면 -e 가 켜져 있어도 cmd 실패로 죽지 않는다 (AND-list 의
+              #   마지막이 아닌 명령은 -e 면제 — 2026-07-29 실측). 여기서는 -e 를 껐으므로
+              #   종료 코드를 직접 본다.
+              gh issue edit "$N" --repo "$REPO" --remove-label "human: plan"
+              if [ $? -ne 0 ]; then
+                echo "::error::이슈 #$N 의 human: plan 회수 실패 — 계획 국면이 끝났는데 라벨이 남는다. 손으로 회수하거나 Actions 를 재실행하라."
+                FAILED=1
+              else
+                echo "이슈 #$N: PR #$PR 열림 → human: plan 자동 회수 (계획 국면 종료)"
+              fi
+            else
+              echo "이슈 #$N: human: plan 없음 — 무행동"
+            fi
+          done
+          [ "$FAILED" -eq 1 ] && echo "::error::라벨 회수 실패가 있었다 (위 주석 참조). 잡은 게이트가 아니므로 0 으로 끝낸다."
+          exit 0

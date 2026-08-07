@@ -1,0 +1,342 @@
+name: CI
+
+# 서비스별 계약 검증 스위트를 돌린다.
+#
+# ── 왜 잡이 아니라 스위트인가 (2026-08-06 재구성) ─────────────────────────
+# 종전엔 **검증 스크립트 하나당 잡 하나**였다 (35잡). 잡마다 checkout + uv 설치를 다시 해
+# 보일러플레이트만 ~700줄, 셋업 비용 35배였고, 잡 이름이 과거 버그 하나씩이라
+# (upload-file-count · config-positive-values · bsns-year-bounds …) 버그가 늘 때마다 잡이
+# 늘었다. 무엇이 깨졌는지는 잡 이름이 아니라 테스트 출력이 알려준다.
+#
+# 이제는 **서비스 × 셋업 클래스**로 묶는다. 단언은 하나도 줄지 않았다 — 스위트 안으로
+# 들어갔을 뿐이고, 그 사실을 repo-scans.yml 의 `test: ci-coverage` 잡이 매 PR 마다
+# 기계적으로 대조한다 (scripts/verify_ci_check_coverage.py — 레포에 실재하는 검증 단위
+# 전수 ↔ 워크플로가 실제로 실행하는 것. 하나라도 안 돌면 빨강).
+#
+# 묶기의 유일한 실질 비용이었던 **fail-fast 가림**(앞 검증이 실패하면 뒤 검증 결과를 못 봄)은
+# 두 겹으로 없앴다:
+#   ① 스위트 러너(run_verify_scripts.py · run_standalone_tests.py)는 첫 실패에서 멈추지 않고
+#      전부 돌린 뒤 "N개 중 M개 통과" 를 출력한다.
+#   ② 스텝마다 `if: ${{ !cancelled() }}` — 앞 스텝이 실패해도 뒤 스텝이 돈다.
+# 두 러너 모두 **대상 0건이면 실패**한다 (fail-closed) — 검사한 파일 수를 출력에 남겨,
+# 초록이 "위반 없음" 인지 "아무것도 안 봤음" 인지 읽는 사람이 구분할 수 있게 한다.
+#
+# ── 격리를 유지한 둘 (근거) ──────────────────────────────────────────────
+#   · backend-db     — frontend 스키마를 DROP·재생성하는 파괴적 스크립트 3종. 서비스 컨테이너가
+#                      잡별 격리라 셋이 한 잡을 공유해도 안전하다(각 스크립트가 tables.sql 로
+#                      스키마를 자기가 다시 세운다). 다만 비파괴 잡과는 섞지 않는다.
+#   · alembic-drift  — 유일하게 `alembic_version` 을 쓰는 잡. 다른 잡과 DB 를 공유하면 서로
+#                      덮어써 #179 를 CI 가 그대로 재현한다. 또 이 잡만 frontend 스키마 부재를
+#                      의도로 선언한다(ALEMBIC_ALLOW_MISSING_FRONTEND_SCHEMA=1) — backend-db 와
+#                      합치면 그 선언이 거짓이 된다.
+#
+# ── repo-scans.yml 과 왜 나눴나 (#302) ────────────────────────────────────
+# 이 파일의 잡은 **특정 서비스에 종속된 계약**(그 서비스가 안 바뀌면 검사할 것도 없다)이라
+# 서비스 단위 on.paths 가 맞다. 반대로 레포 전수 스캔(서비스 이름을 안 가리고 대상을 찾는 것)은
+# 그 글롭이 모르는 새 서비스를 놓치므로 repo-scans.yml 에서 경로 필터 없이 매번 돈다.
+#
+# 워크플로 파일이 바뀔 때는 전 잡을 돌린다 — 게이트를 고치는 변경이 자기 검증을 못 받으면
+# 러너 위 동작은 머지 후에야 드러난다 (#217).
+# pull_request 에 branches(base) 제한을 안 두는 이유는 스택 PR (#281).
+#
+# ⚠ 아래 두 paths 목록은 같아야 한다 (GitHub Actions 는 YAML 앵커를 지원하지 않아 두 벌로
+#   적는다). 어긋나면 PR 에서는 돌고 main push 에서는 안 도는(또는 그 반대) 구멍이 난다.
+on:
+  pull_request:
+    paths:
+      - "multi-agent-service/**"
+      - "*-mcp-service/**"
+      - "backend-service/**"
+      - "*/app/core/security.py"
+      - "*/app/core/auth_context.py"
+      - "*/app/core/config.py"
+      - "scripts/verify_auth_lockstep.py"
+      - "*-service/CLAUDE.md"
+      - "scripts/verify_backend_claude_md.py"
+      # 스위트 러너 — 고치면 이 파일의 전 잡에 영향
+      - "scripts/run_standalone_tests.py"
+      - "scripts/run_verify_scripts.py"
+      # frontend Prisma 생성물 — backend-db 잡이 tables.sql 로 scratch DB 를 세운다.
+      # 생성기·생성물만 바뀌면 트리거가 안 걸려 그 그물이 조용히 안 도는 상태였다.
+      - "frontend/prisma/init/tables.sql"
+      - "frontend/prisma/table-generator.cjs"
+      # backend-tests 의 test_alembic_head_freshness.py 가 이 루트 스크립트의 판정 함수를
+      # 검증한다 — 체커만 고치고 검사가 안 도는 구멍을 막는다 (#387)
+      - "scripts/verify_alembic_head_freshness.py"
+      - ".github/workflows/**"
+  push:
+    branches: [main]
+    paths:
+      - "multi-agent-service/**"
+      - "*-mcp-service/**"
+      - "backend-service/**"
+      - "*/app/core/security.py"
+      - "*/app/core/auth_context.py"
+      - "*/app/core/config.py"
+      - "scripts/verify_auth_lockstep.py"
+      - "*-service/CLAUDE.md"
+      - "scripts/verify_backend_claude_md.py"
+      - "scripts/run_standalone_tests.py"
+      - "scripts/run_verify_scripts.py"
+      - "frontend/prisma/init/tables.sql"
+      - "frontend/prisma/table-generator.cjs"
+      - "scripts/verify_alembic_head_freshness.py"
+      - ".github/workflows/**"
+
+# ── 낡은 실행을 끊는다 (PR 한정) ──────────────────────────────────────────
+# PR 에 새 커밋이 올라가면 직전 head 에 대한 이 워크플로의 결과는 아무도 안 읽는다 —
+# 판정은 항상 최신 head 기준이다. 그런데도 종전엔 이전 실행이 6잡을 끝까지 다 돌렸다.
+#
+# group 키를 이렇게 고른 이유:
+#   · PR 은 `pull_request.number` — 서로 다른 PR 이 서로를 취소하지 않게 PR 단위로 가른다.
+#     (`github.ref` 는 PR 에서 refs/pull/N/merge 라 역시 유일하지만, 아래 push 분기와
+#      한 식으로 합칠 때 의도가 안 읽힌다.)
+#   · main push 는 `github.sha` — **커밋마다 다른 그룹**이라 서로 큐잉조차 하지 않는다.
+#     여기서 `github.ref`(=refs/heads/main)를 쓰면 안 된다: cancel-in-progress 가 false 여도
+#     연속 머지 때 A 실행 중 B 대기 상태에서 C 가 오면 GitHub 이 **대기 중인 B 를 취소**해
+#     머지된 커밋의 검증 기록이 사라진다.
+#   · cancel-in-progress 도 PR 일 때만 참으로 둔다 (group 이 이미 갈라 두 겹).
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # ── multi-agent-service (uv) ────────────────────────────────────────────
+  # 린트 + 계약 검증 13종 + standalone 테스트 15종.
+  # 린트를 같은 잡에 넣어도 "스타일 nit 이 계약 결과를 가린다"가 성립하지 않는다 —
+  # 스텝이 !cancelled() 로 전부 돌기 때문이다 (종전 격리 근거의 전제가 사라졌다).
+  multi-agent:
+    name: "test: multi-agent"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: multi-agent-service
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Ruff
+        if: ${{ !cancelled() }}
+        run: uv run ruff check app/
+
+      # scripts/verify_*.py 전수 (fail-closed). MCP lockstep(verify_mcp_lockstep.py)도 여기
+      # 포함된다 — 그 스크립트는 Path(__file__).parents[2] 로 레포 루트를 잡으므로 cwd 무관.
+      - name: 계약 검증 스크립트 (scripts/verify_*.py, fail-closed)
+        if: ${{ !cancelled() }}
+        run: uv run python ../scripts/run_verify_scripts.py scripts
+
+      - name: Standalone tests (tests/test_*.py, fail-closed)
+        if: ${{ !cancelled() }}
+        run: uv run python ../scripts/run_standalone_tests.py tests
+
+  # ── backend-service — DB 불필요분 (uv) ──────────────────────────────────
+  backend:
+    name: "test: backend"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-service
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      # --skip 3종은 아래 backend-db 잡 소관 (서비스 컨테이너 + 파괴 동의 플래그 필요).
+      # 러너는 --skip 이름이 실제로 존재하지 않으면 실패한다 — 이름이 바뀌면 조용히
+      # "아무것도 안 뺀" 상태가 되는 대신 시끄럽게 깨진다.
+      - name: 계약 검증 스크립트 (scripts/verify_*.py, fail-closed)
+        if: ${{ !cancelled() }}
+        run: |
+          uv run python ../scripts/run_verify_scripts.py scripts \
+            --skip verify_workspace_member_default_unique.py \
+            --skip verify_no_orphan_personal_workspaces.py \
+            --skip verify_frontend_fk_referential_actions.py
+
+      - name: Standalone tests (tests/test_*.py, fail-closed)
+        if: ${{ !cancelled() }}
+        run: uv run python ../scripts/run_standalone_tests.py tests
+
+  # ── backend-service — frontend 스키마를 세우는 파괴적 검증 3종 ────────────
+  # 셋 다 커밋된 Prisma 생성물(frontend/prisma/init/tables.sql)을 적용해 frontend 스키마를
+  # DROP·재생성한다 — 그래서 서로의 뒤처리를 기다릴 필요 없이 한 컨테이너를 순차로 쓸 수 있다.
+  # dbname 화이트리스트(ci) + --i-know-this-drops-tables 이중 가드는 스크립트 쪽에 있고,
+  # CI 서비스 컨테이너는 매 잡마다 새로 뜨는 격리 인스턴스라 안전하다.
+  backend-db:
+    name: "test: backend-db"
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend-service
+    env:
+      WORKSPACE_MEMBER_TEST_DB_URL: postgresql://ci:ci@localhost:5432/ci
+      ORPHAN_WORKSPACE_TEST_DB_URL: postgresql://ci:ci@localhost:5432/ci
+      FRONTEND_FK_TEST_DB_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      # workspace_member is_default 유일성 (#253 — alembic 0006 의 raw SQL 이 SQLAlchemy 모델
+      # 대조 대상 밖이라 별도로 본다)
+      - name: is_default 유일성 검증
+        if: ${{ !cancelled() }}
+        run: uv run python scripts/verify_workspace_member_default_unique.py --i-know-this-drops-tables
+
+      # 개인 워크스페이스 고아 감사 SQL 의 정밀도·재현율 (#280). deleteUserCascade(TypeScript)
+      # 자체의 회귀는 frontend-ci.yml 의 frontend-db 잡이 잡는다 (#357 리뷰 [B]).
+      - name: 개인 워크스페이스 고아 정합성 검사
+        if: ${{ !cancelled() }}
+        run: uv run python scripts/verify_no_orphan_personal_workspaces.py --i-know-this-drops-tables
+
+      # frontend 스키마를 세우는 두 길(prisma db push / tables.sql)의 FK 참조 동작 계약 (#238)
+      - name: frontend FK 참조 동작 계약 검증
+        if: ${{ !cancelled() }}
+        run: uv run python scripts/verify_frontend_fk_referential_actions.py --i-know-this-drops-tables
+
+  # ── 격리 유지: 마이그레이션 드리프트 (#185) ──────────────────────────────
+  # 빈 Postgres 에 `upgrade head` 로 스키마를 세우고 `alembic check` 로 모델과 대조한다.
+  # 위 backend-db 와 합치지 않는 이유는 머리 주석 참조 (alembic_version 공유 금지 + 이 잡만
+  # frontend 스키마 부재를 의도로 선언한다).
+  alembic-drift:
+    name: "test: alembic-drift"
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend-service/alembic
+    env:
+      # env.py 는 이 값이 있으면 서비스 설정(.env.*)을 거치지 않는다 → CI 에 시크릿이 필요 없다.
+      ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+      # 이 잡은 의도적으로 prisma db push 를 돌리지 않는다(backend-service 만 격리 검증).
+      # 0005·0006 은 frontend 스키마가 없으면 예외로 죽는다(#333 fail-closed) — 여기서는 그
+      # 부재가 결함이 아니라 의도이므로 명시적으로 건너뛴다.
+      ALEMBIC_ALLOW_MISSING_FRONTEND_SCHEMA: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply migrations to empty DB
+        run: uv run python -m alembic upgrade head
+
+      # 안내는 이 스텝에만 붙인다 — 앞 스텝(upgrade) 실패는 드리프트가 아니라 마이그레이션
+      # 자체의 오류다. 그래서 이 스텝에는 !cancelled() 를 붙이지 않는다(빈 DB 가 안 세워졌으면
+      # 드리프트 판정 자체가 무의미하다 — 이 잡의 두 스텝은 순서 종속이다).
+      - name: Alembic drift check
+        run: |
+          uv run python -m alembic check || {
+            echo "::error::모델(backend-service/app/models/schema.py)과 마이그레이션(backend-service/alembic/versions/)이 어긋났습니다."
+            echo "::error::모델을 바꿨으면 리비전을 추가하세요: (cd backend-service/alembic && APP_ENV=development uv run python -m alembic revision --autogenerate -m \"설명\")"
+            exit 1
+          }
+
+  # ── MCP 서비스 5종 (uv — 서비스마다 venv 가 다르지만 한 잡에서 순차로 돈다) ──
+  # portfolio(계산·redaction·테넌트 격리 계약 3종 + mock 신선도) · disclosure(사업연도 경계 +
+  # mock fixture 신선도) · news · market-data(mock 신선도) · doc-search(파라미터 은폐·청킹·
+  # 서비스 토큰·재적재 중복 6종).
+  # 서비스마다 잡을 쪼개면 checkout+uv 셋업이 5중복인데, 검증 자체는 각 수 초~수십 초다.
+  mcp-services:
+    name: "test: mcp-services"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: portfolio — 계약 검증 스크립트 (fail-closed)
+        if: ${{ !cancelled() }}
+        working-directory: portfolio-mcp-service
+        run: uv run python ../scripts/run_verify_scripts.py scripts
+
+      - name: portfolio — standalone tests (fail-closed)
+        if: ${{ !cancelled() }}
+        working-directory: portfolio-mcp-service
+        run: uv run python ../scripts/run_standalone_tests.py tests
+
+      - name: disclosure — standalone tests (fail-closed)
+        if: ${{ !cancelled() }}
+        working-directory: disclosure-mcp-service
+        run: uv run python ../scripts/run_standalone_tests.py tests
+
+      - name: news — standalone tests (fail-closed)
+        if: ${{ !cancelled() }}
+        working-directory: news-mcp-service
+        run: uv run python ../scripts/run_standalone_tests.py tests
+
+      - name: market-data — standalone tests (fail-closed)
+        if: ${{ !cancelled() }}
+        working-directory: market-data-mcp-service
+        run: uv run python ../scripts/run_standalone_tests.py tests
+
+      - name: doc-search — standalone tests (fail-closed)
+        if: ${{ !cancelled() }}
+        working-directory: doc-search-mcp-service
+        run: uv run python ../scripts/run_standalone_tests.py tests
+
+  # ── 서비스 간 lockstep 계약 (stdlib 전용 — uv 설치 불필요) ────────────────
+  # 전 서비스의 core/security.py·auth_context.py == backend-service + config.py 강화 델타,
+  # 전 backend 서비스 CLAUDE.md 의 공통부 == backend-service (#245 — review-backend·
+  # scaffold-backend 가 이 파일을 규율 소스로 읽는다. 복제본이 갈리면 서비스마다 다른
+  # 기준으로 리뷰하게 된다).
+  repo-contracts:
+    name: "test: repo-contracts"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth lockstep check
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_auth_lockstep.py
+
+      - name: Backend CLAUDE.md common section check
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_backend_claude_md.py

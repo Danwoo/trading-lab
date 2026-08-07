@@ -1,0 +1,170 @@
+# board-status — 보드 Status 를 작업 흐름의 실제 신호에 물린다 (하네스 진단 갭 10)
+#
+#   소유자 '승인' 코멘트 (이슈)   → 그 이슈를 In Progress 로  (승인 = 디스패치 직전)
+#   PR 열림 / draft 해제          → PR 이 Closes 로 참조하는 이슈들을 In Review 로
+#   사람-차례(human:) 라벨 부착           → 그 이슈/PR 을 "Human Decision" 로  (human: decision ·
+#                                    human: plan · human: merge — 사람 진입점 단일화)
+#   사람-차례(human:) 라벨 해제 (열린 것) → 이슈는 In Progress, PR 은 In Review 로 복귀
+#   닫힘·머지 → Done              → 내장 자동화가 담당 (이 파일 범위 밖)
+#
+# 구조 (2026-07-23 통합): 위 세 규칙은 PROJECT_TOKEN 게이팅·projectItems 조회·
+#   updateProjectV2ItemFieldValue 뮤테이션이 동일하다. 예전엔 잡 3개(approve-to-in-progress·
+#   pr-to-in-review·human-wait-sync)로 나뉘어 PR 이벤트마다 셋이 다 체크로 뜨고 둘은 스킵
+#   노이즈였다. 이제 **단일 잡 board-status** 가 github.event_name/action 으로 분기해 세 동작을
+#   그대로 수행한다 (분기는 이벤트·액션으로 상호 배타 — 한 이벤트당 최대 한 분기만 실행).
+#   결과: PR 이벤트당 board-status 체크가 3→1. 동작은 통합 전과 동일하다.
+#
+# 전제: PROJECT_TOKEN 시크릿 (classic PAT, **repo + project 두 스코프**). 기본 GITHUB_TOKEN 은
+#       사용자 소유 Projects v2 를 조작할 수 없고, private 레포에선 이슈 노드 읽기에 repo 가
+#       필요하다 — project 단독이면 "Could not resolve to a node" 로 실패한다 (2026-07-21 실측).
+#       시크릿 미설정·만료 시 조용히 건너뛴다 (fail-open — 보드는 관제 보조 장치라
+#       코드·라벨 흐름을 막으면 안 된다).
+# 배포: 대상 레포 .github/workflows/ 에 복사하고, env 의 프로젝트·필드·옵션 id 를
+#       그 레포 보드의 실측값으로 교체한다 (gh project field-list 로 확인).
+# ⚠ 옵션 추가는 반드시 보드 UI 로 하라. updateProjectV2Field 로 옵션 목록을 교체하면
+#   기존 옵션까지 **ID 가 전부 재발급**되어 모든 아이템의 Status 값이 초기화된다
+#   (2026-07-22 실측 — 102개 아이템 값 소실, 규칙 기반 복원으로 수습).
+
+name: board-status
+
+on:
+  issue_comment:
+    types: [created]
+  issues:
+    types: [labeled, unlabeled]
+  pull_request:
+    types: [opened, ready_for_review, labeled, unlabeled]
+
+permissions: {}          # 기본 토큰 미사용 — PROJECT_TOKEN 만 쓴다
+
+# 보드 노드 ID 는 레포별로 다르다 — 재사용 템플릿이라 하드코딩하지 않고 레포 변수로 외부화한다.
+# 설정(대상 레포): gh variable set BOARD_PROJECT_ID/BOARD_STATUS_FIELD_ID/BOARD_IN_PROGRESS_ID/
+#   BOARD_IN_REVIEW_ID/BOARD_HUMAN_WAIT_ID  (Projects v2 GraphQL 로 조회 — templates/github/README.md).
+# 미설정이면 아래 run 스텝이 조용히 건너뛴다(fail-open — 보드는 관제 보조).
+env:
+  PROJECT_ID: ${{ vars.BOARD_PROJECT_ID }}
+  STATUS_FIELD_ID: ${{ vars.BOARD_STATUS_FIELD_ID }}
+  IN_PROGRESS_ID: ${{ vars.BOARD_IN_PROGRESS_ID }}
+  IN_REVIEW_ID: ${{ vars.BOARD_IN_REVIEW_ID }}
+  HUMAN_WAIT_ID: ${{ vars.BOARD_HUMAN_WAIT_ID }}
+
+jobs:
+  board-status:
+    name: "chore: board-sync (비게이트)"
+    # ── 어느 분기에도 안 걸리는 이벤트는 러너를 잡지 않는다 ────────────────────
+    # 이 워크플로는 레포의 **모든** 이슈 코멘트·라벨 변경·PR 이벤트에 깨어나는데, 실제로
+    # 보드를 건드리는 것은 아래 세 분기에 걸리는 소수다. 종전엔 나머지도 전부 러너를 잡아
+    # "해당 board-status 분기 없음" 한 줄을 찍고 끝났다 (Actions 는 잡 하나를 분 단위로
+    # 올림 과금하므로, 9초짜리 무행동도 1분이다).
+    # 실측(2026-08-03~08-07, 최근 1000 run): board-status 는 303 run 으로 레포 최다였고
+    # skipped 는 0건, 로그를 뜬 29건 표본은 **29건 전부** 무행동이었다. 잡 수준 if 가
+    # 이미 있는 plan-label-issue 는 같은 창에서 119 run 전부 skipped(=과금 0)다.
+    #
+    # ⚠ 이 조건은 아래 run 스텝의 분기 1·2·3 과 **한 벌(lockstep)** 이다. 분기 조건을 고치면
+    #   여기도 같이 고쳐라 — 여기가 더 좁으면 그 분기가 조용히 안 돈다. 표현식은 스텝이 쓰는
+    #   env 식과 같은 것을 그대로 썼다(예: issue.pull_request.url 의 공백 여부).
+    if: >-
+      (github.event_name == 'issue_comment'
+        && github.event.issue.pull_request.url == ''
+        && github.event.comment.author_association == 'OWNER'
+        && startsWith(github.event.comment.body, '승인'))
+      || (github.event_name == 'pull_request'
+        && (github.event.action == 'opened' || github.event.action == 'ready_for_review'))
+      || ((github.event_name == 'issues' || github.event_name == 'pull_request')
+        && (github.event.action == 'labeled' || github.event.action == 'unlabeled')
+        && (github.event.label.name == 'human: decision'
+            || github.event.label.name == 'human: plan'
+            || github.event.label.name == 'human: merge'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: 이벤트별 보드 Status 동기화
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          # 분기 1 (issue_comment) — 소유자 '승인' 코멘트 → In Progress
+          ISSUE_NODE: ${{ github.event.issue.node_id }}
+          ISSUE_IS_PR: ${{ github.event.issue.pull_request.url }}   # PR 코멘트면 URL, 이슈 코멘트면 빈 값
+          COMMENT_ASSOC: ${{ github.event.comment.author_association }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          # 분기 2 (pull_request opened/ready_for_review) — 연결 이슈 → In Review
+          PR_NODE: ${{ github.event.pull_request.node_id }}
+          # 분기 3 (labeled/unlabeled) — human: 라벨 ↔ Human Decision
+          LABEL_NAME: ${{ github.event.label.name }}
+          NODE_ID: ${{ github.event.issue.node_id || github.event.pull_request.node_id }}
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          STATE: ${{ github.event.issue.state || github.event.pull_request.state }}
+          REPO: ${{ github.repository }}
+          NUM: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          # ── 셸 플래그 (2026-08-06) ─────────────────────────────────────────────
+          # Actions 기본 셸은 `bash -e {0}` 라, GraphQL 호출 하나가 실패하면 잡이 빨개졌다.
+          # 보드 동기화는 관제 보조 장치이고 그 실패는 「코드가 틀렸다」가 아닌데, 빨간 체크는
+          # Orca 머지 버튼을 잠근다 (review-gate.yml 머리의 「Orca 판정 규칙」). 머리 주석의
+          # fail-open 방침을 체크 색까지 일관되게 지킨다 — 실패는 ::error:: 로 남기고 0 으로 끝낸다.
+          set -uo pipefail
+          set +e
+
+          # ── 공통: PROJECT_TOKEN·보드 ID 미설정 시 조용히 건너뜀 (fail-open — 보드는 관제 보조) ──
+          if [ -z "$GH_TOKEN" ]; then echo "PROJECT_TOKEN 미설정 — 건너뜀"; exit 0; fi
+          if [ -z "$PROJECT_ID" ]; then echo "BOARD_PROJECT_ID 변수 미설정 — 보드 동기화 건너뜀"; exit 0; fi
+
+          # ── 공통 헬퍼: 노드(Issue·PR)의 이 보드 아이템 id ──────────────────────────
+          #   분기 1·3 공용 — 두 원본 잡의 projectItems 쿼리·jq 가 동일했다. PullRequest 프래그먼트가
+          #   붙은 결합 쿼리는 Issue 노드엔 무해하므로, 항상 Issue 인 분기 1도 같은 결과를 얻는다.
+          project_item() {   # $1 = node_id → 보드 아이템 id (없으면 빈 출력)
+            gh api graphql -f query='query($id:ID!){ node(id:$id){ ... on Issue { projectItems(first:10){ nodes { id project { id } } } } ... on PullRequest { projectItems(first:10){ nodes { id project { id } } } } } }' -f id="$1" \
+              --jq ".data.node.projectItems.nodes[] | select(.project.id==\"$PROJECT_ID\") | .id"
+          }
+
+          # ── 공통 헬퍼: 보드 아이템 Status 를 옵션으로 세팅 (세 원본 잡의 뮤테이션이 동일) ──
+          set_status() {   # $1 = item_id  $2 = status_option_id
+            gh api graphql -f query='mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){ updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){ projectV2Item { id } } }' -f p="$PROJECT_ID" -f i="$1" -f f="$STATUS_FIELD_ID" -f o="$2" \
+              || echo "::error::보드 Status 갱신 실패 (item=$1 option=$2) — 보드가 실제 상태와 어긋난다. 손으로 옮기거나 Actions 를 재실행하라."
+          }
+
+          # ── 분기 1: 소유자 '승인' 코멘트 (이슈) → In Progress ─────────────────────────
+          #   원본 approve-to-in-progress. 조건: issue_comment · 이슈(≠PR) · OWNER · 본문 '승인' 접두.
+          if [ "$EVENT" = "issue_comment" ] && [ -z "$ISSUE_IS_PR" ] \
+             && [ "$COMMENT_ASSOC" = "OWNER" ] && [[ "$COMMENT_BODY" == 승인* ]]; then
+            ITEM=$(project_item "$ISSUE_NODE")
+            if [ -z "$ITEM" ]; then echo "보드 아이템 없음 — 건너뜀"; exit 0; fi
+            set_status "$ITEM" "$IN_PROGRESS_ID"
+            exit 0
+          fi
+
+          # ── 분기 2: PR 열림·draft 해제 → Closes 로 참조하는 이슈들을 In Review ──────────
+          #   원본 pr-to-in-review. 조건: pull_request · opened|ready_for_review.
+          #   PR → closingIssuesReferences 순회는 이 분기 전용 쿼리 (분기 1·3 의 projectItems 와 다름).
+          if [ "$EVENT" = "pull_request" ] && { [ "$ACTION" = "opened" ] || [ "$ACTION" = "ready_for_review" ]; }; then
+            for ITEM in $(gh api graphql -f query='query($id:ID!){ node(id:$id){ ... on PullRequest { closingIssuesReferences(first:10){ nodes { projectItems(first:10){ nodes { id project { id } } } } } } } }' -f id="$PR_NODE" --jq ".data.node.closingIssuesReferences.nodes[].projectItems.nodes[] | select(.project.id==\"$PROJECT_ID\") | .id"); do
+              set_status "$ITEM" "$IN_REVIEW_ID"
+            done
+            exit 0
+          fi
+
+          # ── 분기 3: 사람-차례(human:) 라벨 부착/해제 ↔ "Human Decision" 동기화 ──────────
+          #   원본 human-wait-sync. 조건: issues|pull_request · labeled|unlabeled · human:{decision,plan,merge}.
+          #   라벨이 붙는 순간이 "사람이 답해야 하는 순간"이라는 각 역할 규약(planner 계획 라벨, 지휘자
+          #   정책 라벨, 리뷰어 머지 라벨)을 보드의 단일 진입점으로 모은다.
+          if { [ "$EVENT" = "issues" ] || [ "$EVENT" = "pull_request" ]; } \
+             && { [ "$ACTION" = "labeled" ] || [ "$ACTION" = "unlabeled" ]; } \
+             && { [ "$LABEL_NAME" = "human: decision" ] || [ "$LABEL_NAME" = "human: plan" ] || [ "$LABEL_NAME" = "human: merge" ]; }; then
+            if [ "$STATE" != "open" ]; then echo "닫힌 대상 — 내장 자동화(Done)에 맡김"; exit 0; fi
+            ITEM=$(project_item "$NODE_ID")
+            if [ -z "$ITEM" ]; then echo "보드 아이템 없음 — 건너뜀"; exit 0; fi
+            if [ "$ACTION" = "labeled" ]; then
+              TARGET="$HUMAN_WAIT_ID"
+            else
+              # 해제 복귀 전에 다른 사람-차례(human:) 라벨이 남아 있으면 유지
+              REMAIN=$(gh api "repos/$REPO/issues/$NUM/labels" --jq '[.[].name] | map(select(. == "human: decision" or . == "human: plan" or . == "human: merge")) | length')
+              if [ "$REMAIN" -gt 0 ]; then echo "다른 사람-차례(human:) 라벨 잔존 — 유지"; exit 0; fi
+              if [ "$IS_PR" = "true" ]; then TARGET="$IN_REVIEW_ID"; else TARGET="$IN_PROGRESS_ID"; fi
+            fi
+            set_status "$ITEM" "$TARGET"
+            exit 0
+          fi
+
+          # 어느 분기에도 해당 없음 (예: human: 아닌 라벨 이벤트, 승인 아닌 코멘트) — 무행동
+          echo "해당 board-status 분기 없음 — 무행동 (event=$EVENT action=${ACTION:-none} label=${LABEL_NAME:-none})"
+          exit 0

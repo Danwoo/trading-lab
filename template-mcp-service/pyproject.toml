@@ -1,0 +1,58 @@
+# ── [가이드 1/8] pyproject.toml — 의존성·lint 설정 ──────────────────
+#
+# 이 서비스는 신규 MCP tool 서비스 개발의 교본이다. template-mcp-service/ 를 통째로 복사한 뒤
+# 각 파일의 [신규 서비스 개발 가이드 N/10] 블록을 1→10 순서로 따라가면 새 서비스가 완성된다.
+# 전체 절차 체크리스트(복사→rename→구현→검증→통합→커밋)는 README.md.
+#
+# 무엇을 하는 파일: uv 가 읽는 의존성·빌드·ruff 설정. name 은 모든 backend 가 "app" 고정 —
+#   서비스 이름은 폴더명(template-mcp-service)으로 구분하고 여기서 바꾸지 않는다.
+# 복사 후 바꿀 것:
+#   - [project] dependencies 에 새 도메인이 쓰는 라이브러리만 추가 (예: XML API 면 xmltodict).
+#     기본 셋(dependency-injector·httpx·tenacity·uvicorn·fastapi·pydantic-settings·pyjwt·sqlalchemy)은
+#     core/ 템플릿(예외핸들러가 sqlalchemy 예외 매핑, security 가 pyjwt)과 묶여 있으니 빼지 않는다.
+#   - [dependency-groups] main 의 fastmcp 는 MCP 서버의 핵심 — 버전 핀을 타 MCP 서비스와 맞춘다.
+# 의존성 추가 절차: dependencies 에 한 줄 추가 → `uv lock` (uv.lock 갱신) → `uv sync` (.venv 반영).
+#   uv.lock 은 커밋 대상이다 — Dockerfile 이 `uv sync --locked` 로 빌드하므로 lock 누락 시 빌드 실패.
+# 지킬 규칙: ruff 설정(line-length 120, select/ignore)은 전 backend 공통 — 서비스별 변경 금지.
+# ──────────────────────────────────────────────────────────────────────────────────────
+
+[project]
+name = "app"
+version = "0.1.0"
+license = "MIT"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # 웹 프레임워크
+    "dependency-injector~=4.49.0",
+    "httpx~=0.28.1",
+    "tenacity~=9.0.0",
+    "uvicorn[standard]~=0.47.0",
+    "fastapi~=0.136.1",
+    "pydantic-settings~=2.14.1",
+    "pyjwt~=2.12.1",
+    "sqlalchemy~=2.0.49",
+]
+
+[dependency-groups]
+main = ["fastmcp~=3.4.1"]
+dev = ["ruff~=0.15.13"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+default-groups = ["main", "dev"]
+package = false
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["F", "I", "FAST", "W", "E", "B", "UP"]
+ignore = [
+    "B008",    # FastAPI Depends 기본값 함수 호출 허용
+    "E501",    # 라인 길이 88자 초과 무시 (black 기준)
+    "E402",    # 동적 import 허용 (FastAPI lazy loading)
+    "FAST002", # 선택적 의존성 타입 어노테이션 무시
+]

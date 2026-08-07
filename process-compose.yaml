@@ -1,0 +1,164 @@
+processes:
+  # 로컬 Postgres (#166 S0) — 관계형 + pgvector(#160) 통합 단일 인스턴스.
+  # docker 데몬 필요. 데이터는 named volume 에 영속(재기동해도 유지).
+  postgres:
+    command: >
+      docker run --rm --name fintech-pg -p 5432:5432
+      -e POSTGRES_USER=fintech -e POSTGRES_PASSWORD=fintech
+      -e POSTGRES_DB=fintech
+      -v fintech-pg-data:/var/lib/postgresql/data
+      pgvector/pgvector:pg16
+    readiness_probe:
+      exec:
+        command: "docker exec fintech-pg pg_isready -U fintech -d fintech"
+      initial_delay_seconds: 3
+      period_seconds: 2
+      failure_threshold: 15
+    availability:
+      restart: "on_failure"
+
+  # 스키마 적재 (일회성) — postgres healthy 후. DB 는 `fintech` 하나이고 소유를 스키마로 가른다:
+  # 파이썬 서비스 alembic 이 `public` 에, frontend Prisma 가 `frontend` 스키마에 자기 소유
+  # 14 테이블(tn_user·ba_session·tc_code …)을 만든다. 스키마를 가른 이유는 `prisma db push` 가
+  # 연결된 스키마 전체를 자기 모델과 동기화해 남의 테이블을 지우기 때문이다 (#166).
+  # `frontend` 스키마는 `prisma db push` 가 없으면 만들어 주므로 별도 생성 단계가 없다.
+  # 통합 앱이 마이그레이션 이력(alembic/versions) 하나로 `public` 스키마를 소유한다
+  # → `alembic upgrade head` (#166 S3). 흡수 전 devactivity·file 이 쓰던 이력 없는
+  # push(db_push.py)는 폐기됐다.
+  # 초기 데이터(메뉴·권한·코드·데모 계정)는 여기서 넣지 않는다 — seed.sql 이 전체 DELETE 로
+  # 시작해 재실행 시 개발 중 만든 계정까지 지운다. 최초 1회 수동 적용
+  #   docker exec -i fintech-pg psql -U fintech -d fintech < frontend/prisma/init/seed.sql
+  # (.docs/5-인프라셋팅/로컬-postgres.md 참조)
+  # YAML 은 `>`(folded)가 줄바꿈을 공백으로 접어 `set -e (cd …)` 한 줄이 되면서 bash 문법
+  # 에러가 났다 — 줄바꿈을 보존하는 `|`(literal) 이어야 한다.
+  # 순서 고정: prisma db push 가 먼저다 (#333). alembic 의 0005·0006 이 frontend 스키마
+  # 테이블을 건드리는데, alembic 을 먼저 돌리면 그 시점엔 테이블이 없어 조용히 건너뛰고
+  # head 로 기록돼 다음 실행에도 다시 안 돈다. 되돌리면 안 된다.
+  # `upgrade head` 의 `head` 는 **이 체크아웃의 versions/ 안에서 가장 끝**이지 레포의 최신이
+  # 아니다 — 낡은 트리에서 돌리면 오류 없이 덜 적용되고 종료 코드는 0 이다(#387 실측: 0007 에서
+  # 멈췄는데 `alembic current` 도 그 트리 기준으로는 "head" 라고 답한다). 코드만 최신이고 DB 가
+  # 뒤처지면 한참 뒤 런타임에서 `column does not exist` 로 터진다(#370). 그래서 적용 전에
+  # origin/main(마이그레이션의 정본)의 head 리비전을 이 트리가 가졌는지 먼저 확인하고, 없으면
+  # 여기서 멈춘다 — 조용한 부분 적용 대신 시끄러운 실패.
+  db-migrate:
+    command: |
+      bash -c 'set -e
+      python3 scripts/verify_alembic_head_freshness.py --fetch
+      (cd frontend                    && npm run dev:prisma:push)
+      (cd backend-service/alembic     && APP_ENV=development uv run python -m alembic upgrade head)'
+    depends_on:
+      postgres:
+        condition: process_healthy
+    availability:
+      restart: "no"
+
+  # #308 — 이 파일의 모든 서비스가 예전엔 `fuser -k {{.PORT}}/tcp 2>/dev/null;` 로 시작했다.
+  # "포트가 점유돼 있으면 죽이고 뺏는다"는 뜻인데, 그 포트를 쓰는 게 자기 이전 인스턴스인지
+  # 남의 프로세스(다른 프로젝트·다른 워크트리)인지 구분하지 않았다 — 실제로 frontend 의
+  # 3000번이 다른 프로젝트 컨테이너를 죽이는 사고가 났다. 8000번대는 우연히 안 겹쳤을 뿐
+  # 같은 위험을 안고 있었다.
+  # 처방: fuser -k 를 전부 없앴다(fail-closed) — 포트가 점유돼 있으면 uvicorn/npm 이 바인딩에
+  # 실패해 정상적으로 죽는다. 트레이드오프: 이전 인스턴스가 비정상 종료돼 포트를 물고 있으면
+  # (예: process-compose 자체가 강제 종료된 경우) 재기동 전에 사람이 직접 정리해야 한다 —
+  # `ss -ltnp` 로 그 PID 가 자기 것인지 확인한 뒤 그 PID 를 종료한다(포트 번호만 보고 죽이는
+  # 명령을 다시 들이지 말 것). 개발 편의를 조금 잃는 대신 남의 프로세스를 죽이지 않는 쪽을
+  # 택했다 — 자동 정리의 이득보다 오탐 시 피해(남의 서비스 다운)가 크다.
+  backend:
+    vars:
+      PORT: 8000
+    command: "uv run python -m uvicorn main:app --reload --host 0.0.0.0 --port {{.PORT}}"
+    working_dir: "backend-service/app"
+    environment:
+      - "APP_ENV=development"
+    depends_on:
+      db-migrate:
+        condition: process_completed_successfully
+    availability:
+      restart: "on_failure"
+
+  portfolio-mcp:
+    vars:
+      PORT: 8002
+    command: "uv run python -m uvicorn main:app --reload --host 0.0.0.0 --port {{.PORT}}"
+    working_dir: "portfolio-mcp-service/app"
+    environment:
+      - "APP_ENV=development"
+    availability:
+      restart: "on_failure"
+
+  multi-agent:
+    vars:
+      PORT: 8003
+    command: "uv run python -m uvicorn main:app --reload --host 0.0.0.0 --port {{.PORT}}"
+    working_dir: "multi-agent-service/app"
+    environment:
+      - "APP_ENV=development"
+    availability:
+      restart: "on_failure"
+
+  market-data-mcp:
+    vars:
+      PORT: 8004
+    command: "uv run python -m uvicorn main:app --reload --host 0.0.0.0 --port {{.PORT}}"
+    working_dir: "market-data-mcp-service/app"
+    environment:
+      - "APP_ENV=development"
+    availability:
+      restart: "on_failure"
+
+  disclosure-mcp:
+    vars:
+      PORT: 8005
+    command: "uv run python -m uvicorn main:app --reload --host 0.0.0.0 --port {{.PORT}}"
+    working_dir: "disclosure-mcp-service/app"
+    environment:
+      - "APP_ENV=development"
+    availability:
+      restart: "on_failure"
+
+  news-mcp:
+    vars:
+      PORT: 8006
+    command: "uv run python -m uvicorn main:app --reload --host 0.0.0.0 --port {{.PORT}}"
+    working_dir: "news-mcp-service/app"
+    environment:
+      - "APP_ENV=development"
+    availability:
+      restart: "on_failure"
+
+  web-mcp:
+    vars:
+      PORT: 8007
+    command: "uv run python -m uvicorn main:app --reload --host 0.0.0.0 --port {{.PORT}}"
+    working_dir: "web-mcp-service/app"
+    environment:
+      - "APP_ENV=development"
+    availability:
+      restart: "on_failure"
+
+  doc-search-mcp:
+    vars:
+      PORT: 8008
+    command: "uv run python -m uvicorn main:app --reload --host 0.0.0.0 --port {{.PORT}}"
+    working_dir: "doc-search-mcp-service/app"
+    environment:
+      - "APP_ENV=development"
+    availability:
+      restart: "on_failure"
+
+  # 3000 은 Node 생태계의 사실상 기본 포트라 다른 프로젝트와 겹친다 — 이 개발 머신에서는 실제로
+  # 다른 프로젝트의 컨테이너가 물고 있다(#308). 이 레포의 로컬 프론트 포트는 3010 이고, 이 값이
+  # 로컬 프론트 origin 의 SoT 다: 전 backend 서비스(app/core/config.py)의 CORS_ALLOW_ORIGINS
+  # 기본값과 frontend/.env.example 의 BETTER_AUTH_URL 이 같은 포트여야 하며 그 lockstep 은
+  # scripts/verify_dev_port_hygiene.py 가 검사한다. 컨테이너 배포(compose.*.yaml·nginx upstream)의
+  # 3000 은 컨테이너 안쪽 포트라 이 값과 무관하다.
+  frontend:
+    vars:
+      PORT: 3010
+    command: "PORT={{.PORT}} npm run dev"
+    working_dir: "frontend"
+    depends_on:
+      db-migrate:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"

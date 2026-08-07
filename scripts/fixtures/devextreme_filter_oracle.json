@@ -1,0 +1,50 @@
+{
+  "//": [
+    "DevExtreme 24.2.15 평가기(devextreme/cjs/data/query.js)가 각 필터 식에서 고른 행 — verify_filter_negation.mjs 의 정답표.",
+    "#341 로 devextreme 을 레포에서 제거하면서, 그 평가기를 런타임에 부를 수 없게 되어 출력만 여기에 얼렸다.",
+    "손으로 적은 기대값이 아니다 — 제거 직전 실제 라이브러리를 돌려 받은 값이다(생성기: 커밋 메시지 참조).",
+    "케이스를 새로 추가하려면 이 표에도 정답을 넣어야 한다. 스크립트가 표에 없는 케이스를 만나면 실패한다."
+  ],
+  "devextremeVersion": "24.2.15",
+  "cases": {
+    "헤더필터 제외 (C24)": "AAPL",
+    "헤더필터 포함": "005930,035720",
+    "부정 · 단일 조건": "005930,035720",
+    "부정 · 단일 조건 (숫자)": "AAPL,035720",
+    "부정 · contains": "AAPL",
+    "부정 · and 그룹": "AAPL,035720",
+    "부정의 부정": "AAPL",
+    "부정을 품은 and 그룹": "005930",
+    "부정을 품은 or 그룹": "AAPL,035720",
+    "부정이 오른쪽에": "035720",
+    "부정 · 중첩 그룹 안": "005930,035720",
+    "부정 · 3단 중첩": "035720",
+    "단일 조건": "AAPL",
+    "and 그룹": "005930",
+    "or 그룹": "AAPL,035720",
+    "contains": "005930,035720",
+    "notcontains": "AAPL",
+    "startswith": "AAPL",
+    "endswith": "005930,035720",
+    "<>": "AAPL",
+    ">=": "005930",
+    "<=": "AAPL,035720"
+  },
+  "headerFilterExclude": "AAPL",
+  "nullBoundaryRowCount": 1,
+  "malformedSanityWellFormedRows": 1,
+  "malformedJudge": {
+    "389-operator-is-list": 1,
+    "389-operator-is-null": "throws",
+    "389-operator-is-number": "throws",
+    "389-operator-token-only": 0,
+    "389-condition-missing-value": 0,
+    "389-field-not-string": "throws",
+    "389-flat-five-terms": 1,
+    "389-negation-operand-not-array": 0,
+    "389-dangling-operator-no-operand": 0,
+    "389-leading-operator": 0,
+    "389-unparseable-json-string": 0,
+    "389-json-object-not-array": "throws"
+  }
+}

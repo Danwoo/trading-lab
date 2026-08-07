@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-commit-guard.sh",
+            "timeout": 300,
+            "statusMessage": "pre-commit 선실행 중...",
+            "if": "Bash(git commit*)"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "defaultMode": "auto",
+    "deny": [
+      "Bash(npm run prod:*)",
+      "Bash(npm run staging:*)",
+      "Bash(alembic *)",
+      "Bash(uv run alembic *)",
+      "Bash(npx prisma migrate*)",
+      "Bash(prisma migrate*)",
+      "Bash(npm run dev:prisma:push*)",
+      "Bash(npx prisma db push*)",
+      "Bash(prisma db push*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -rf .git*)",
+      "Bash(dropdb*)"
+    ],
+    "ask": []
+  }
+}

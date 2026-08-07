@@ -1,0 +1,138 @@
+@import url("fonts.css");
+@import "katex/dist/katex.min.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 스크롤바 스타일 */
+:root {
+  --primary: #f1f1f1;
+  --secondary: #888;
+  --tertiary: #555;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--secondary) var(--primary);
+}
+
+/* Chrome, Edge, and Safari */
+*::-webkit-scrollbar {
+  width: 1px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--primary);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--tertiary);
+}
+
+/* 터미널 — 패널 시스템 디자인 토큰 (#242 O3 착수 코멘트, 터미널-프론트엔드-구조.md §5).
+   값은 "R G B" 채널(스페이스 구분, 헤더 없음) 문자열이다 — 순수 hex/`#rrggbb` 가 아니다.
+   Tailwind(tailwind.config.mjs)가 `rgb(var(--x) / <alpha-value>)` 로 감싸 opacity modifier
+   (`/40` 등)를 지원하려면 이 형태가 필요하다(#313). 이 변수를 직접 읽는 다른 소비자는
+   반드시 `rgb(var(--x))` 로 감싸야 한다 — 아래 .terminal-placeholder-hatch,
+   .auth-backdrop, .auth-backdrop--hero, lib/terminal/candleChart.ts,
+   lib/terminal/marketColorPreset.ts 다섯 곳이 그 계약을 따른다(2026-08-03 실측 — 이 열거는
+   PR 마다 손으로 갱신해야 해서 두 번 stale 해졌다(§3 "7곳→8곳"과 이 항목); 갱신을 놓쳐도
+   빌드·테스트가 조용히 통과해 CI 가 못 잡는다 — 자동 검사로 옮기는 편이 낫다는 판단은
+   PR 코멘트 참조, 이번 변경 범위 밖). */
+:root {
+  --slate-void: 11 14 19;
+  --slate-panel: 20 25 34;
+  --slate-line: 35 42 54;
+  --ink-primary: 201 209 220;
+  --ink-muted: 107 118 134;
+  --signal-warn: 217 164 65;
+
+  /* 상승/하락 의미 토큰 — 관습 프리셋(lib/terminal/marketColorPreset.ts)이 값을 채운다.
+     기본은 한국식(적=상승·청=하락). 패널은 시장색을 직접 쓰지 않고 이 두 변수만 참조한다. */
+  --market-up: 240 70 90;
+  --market-down: 59 130 246;
+}
+
+/* 인증 화면 배경 — 출처 불명 스톡 배경 이미지(#287) 대체. 터미널 패널 시스템과 같은
+   토큰(slate-void/slate-panel/slate-line)을 써서 로그인 화면이 제품과 하나로 읽히게 한다.
+   CSS background-image 라 원래도 접근성 트리에 안 잡힌다 — 별도 aria-hidden 처리 불필요.
+
+   레이어 순서 주의: 대각선 베이스(마지막 레이어)는 불투명 색 2정지(panel→void, 알파 없음)라
+   자기 밑으로는 아무것도 안 비친다 — background-image 는 먼저 적은 레이어가 위에 쌓이므로,
+   격자(repeating-linear-gradient)를 반드시 대각선보다 앞에 적어야 화면에 실제로 보인다.
+   과거엔 대각선이 맨 위였고, 그 알파 없는 불투명 레이어가 격자 두 장을 완전히 가려 코드엔
+   있으나 화면엔 없는 상태였다(#287 후속 실측).
+
+   격자 2장 + 대각선 베이스를 `--auth-layers` 커스텀 프로퍼티로 한 벌만 정의해 .auth-backdrop과
+   .auth-backdrop--hero가 공유한다(간격·색·각도를 한쪽만 고치면 갈라지는 것을 막는다). 두 클래스는
+   항상 같은 엘리먼트에 함께 붙는다(Login.tsx만 --hero를 더함) — 커스텀 프로퍼티는 상속이 아니라
+   같은 엘리먼트의 계산값 캐스케이드로 전달되므로 순서 상관없이 공유된다. */
+.auth-backdrop {
+  --auth-layers:
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, rgb(var(--slate-line)) 70%, transparent) 0,
+      color-mix(in srgb, rgb(var(--slate-line)) 70%, transparent) 1px,
+      transparent 1px,
+      transparent 96px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, rgb(var(--slate-line)) 70%, transparent) 0,
+      color-mix(in srgb, rgb(var(--slate-line)) 70%, transparent) 1px,
+      transparent 1px,
+      transparent 96px
+    ),
+    linear-gradient(165deg, rgb(var(--slate-panel)) 0%, rgb(var(--slate-void)) 60%);
+  background-color: rgb(var(--slate-void));
+  background-image: var(--auth-layers);
+}
+
+/* 로그인 화면 전용 — 히어로 카피가 얹히는 자리라 좌상단에 signal-warn 을 옅게 얹어 한 곳에만
+   힘을 준다(오더 "과하지 않게, 한 곳에만"). 나머지 7개 화면은 .auth-backdrop 만 쓴다.
+   격자·대각선은 `--auth-layers`(위 .auth-backdrop 정의)를 그대로 재사용 — radial 한 장만 앞에
+   얹는다. */
+.auth-backdrop--hero {
+  background-image:
+    radial-gradient(circle at 14% 20%, color-mix(in srgb, rgb(var(--signal-warn)) 16%, transparent), transparent 42%),
+    var(--auth-layers);
+}
+
+/* 토스트 알림(#381, components/shared/Feedback/ToastNotification.tsx) — 등장 시 살짝 슬라이드+
+   페이드. prefers-reduced-motion: reduce 환경에선 애니메이션을 아예 걸지 않는다(즉시 나타남). */
+@media (prefers-reduced-motion: no-preference) {
+  .toast-notification {
+    animation: toast-slide-in 0.2s ease-out;
+  }
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* placeholder 시그니처 — 패널 전면 대각선 해칭(측량 테이프). prefers-reduced-motion 과 무관하게
+   정적이다 — 임시 데이터가 편안해 보이면 사람이 그걸 믿는다. 배지 하나가 아니라 재질이다. */
+.terminal-placeholder-hatch {
+  background-color: color-mix(in srgb, rgb(var(--signal-warn)) 7%, transparent);
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, rgb(var(--signal-warn)) 35%, transparent) 0,
+    color-mix(in srgb, rgb(var(--signal-warn)) 35%, transparent) 1px,
+    transparent 1px,
+    transparent 10px
+  );
+}

@@ -1,0 +1,74 @@
+"use client";
+
+import { useServerTable } from "@/hooks/shared/useServerTable";
+import { useQuoteBatch } from "@/hooks/terminal/useQuoteBatch";
+import { selectWatchlistList } from "@/services/watchlist/watchlistService";
+import type { WatchlistOut } from "@/schemas/watchlist/watchlist";
+import type { SymbolRef } from "@/types/terminal/context";
+import { PanelSkeleton } from "./PanelSkeleton";
+import { PanelUnavailable } from "./PanelUnavailable";
+import { ProvenanceBadge } from "./ProvenanceBadge";
+import { SidebarSymbolRow } from "./SidebarSymbolRow";
+
+export interface WatchlistTabProps {
+  activeTicker: string | undefined;
+  onSelect: (symbol: SymbolRef) => void;
+}
+
+// 사이드바는 페이저를 두지 않는다 — 관심종목 전체를 한 화면에서 훑는 목록이라 그리드 페이지
+// 사이즈(`PAGE_SIZE.MASTER` 20)보다 넉넉히 잡는다. 그래도 상한은 상한이다 — 201번째부터는
+// 화면에 안 보인다. `table.totalCount`(절단 전 전체 건수, `applyClientQuery` 가 슬라이스 전
+// 길이로 반환)와 `table.rows.length`(실제 표시 건수)를 비교해 절단됐으면 그 사실을 표시한다
+// (#326 교차 리뷰 지적 — 조용한 절단 금지).
+const SIDEBAR_LIST_PAGE_SIZE = 200;
+
+/**
+ * 관심종목 탭(FR-006) — `selectWatchlistList`(O5) 실데이터. 다종목 시세는 `useQuoteBatch`
+ * (FR-048) 하나로만 조회한다.
+ */
+export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
+  const table = useServerTable<WatchlistOut>({
+    fetchGrid: selectWatchlistList,
+    clientSide: true,
+    pageSize: SIDEBAR_LIST_PAGE_SIZE,
+  });
+  // 시장을 모르는 행은 일괄 조회에서 뺀다 — 같은 티커가 국내·미국에 함께 있을 수 있어
+  // 시장 없이는 어느 소스에 물어야 할지 정해지지 않는다. 뺀 행은 시세 칸이 비는데, 그 사유는
+  // `resolveRegion`(UNKNOWN)이 이미 화면에 표시한다.
+  const symbols = table.rows.flatMap((row) => (row.market ? [{ ticker: row.ticker, market: row.market }] : []));
+  const { quotes, provenance } = useQuoteBatch(symbols);
+
+  if (table.isLoading) {
+    return <PanelSkeleton />;
+  }
+
+  if (table.rows.length === 0) {
+    return <PanelUnavailable reason="관심종목이 없습니다 — 관심종목 화면에서 먼저 등록하세요." />;
+  }
+
+  const isTruncated = table.totalCount > table.rows.length;
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex-shrink-0 border-b border-slate-line px-2 py-1">
+        <ProvenanceBadge provenance={provenance} />
+      </div>
+      <ul className="min-h-0 flex-1 overflow-auto">
+        {table.rows.map((row) => (
+          <SidebarSymbolRow
+            key={row.ticker}
+            symbol={{ ticker: row.ticker, market: row.market ?? "", name: row.issuer_nm }}
+            isActive={row.ticker === activeTicker}
+            quote={quotes[row.ticker]}
+            onSelect={onSelect}
+          />
+        ))}
+      </ul>
+      {isTruncated && (
+        <div role="status" className="flex-shrink-0 border-t border-slate-line px-2 py-1 text-ink-muted">
+          {table.totalCount}건 중 {table.rows.length}건 표시
+        </div>
+      )}
+    </div>
+  );
+}

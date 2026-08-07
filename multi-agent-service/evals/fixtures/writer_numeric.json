@@ -1,0 +1,157 @@
+{
+  "meta": {
+    "eval": "E-196W",
+    "purpose": "sub-agent writer 의 수치·식별자 보존 (#196) — 재현 6문 + 회귀 6문 × K=3 샘플",
+    "k_samples": 3,
+    "budget": "generator 36회 호출, 추정 6만~9만 토큰 — 제공자·쿼터 확인 선행 (05-evalset §E-196W)",
+    "pass_rule": "재현: 18샘플 중 >=15 수치 보존 AND 전 3샘플 실패 문항 0 · 회귀: 18샘플 미근거 수치 0",
+    "provenance": "재현 evidence 는 #196 실사례(한빛반도체 목표주가 128,000원)를 합성 재구성한 픽스처 — #188 Phase C 산출물 원문 확보 불가로 합성 대체 (05-evalset 허용 조항에 따라 합성임을 명기)",
+    "scoring": "required_numbers 는 utils/agent/numeric_guard._norm 정규화 매칭, 회귀는 find_ungrounded_numbers 재사용 — 전 항목 결정론 스코어러 (LLM 판정자 없음)"
+  },
+  "items": [
+    {
+      "id": "R1-target-price",
+      "kind": "recall",
+      "task": "업로드한 리서치 보고서에서 한빛반도체의 목표주가와 투자의견을 찾아줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=한빛반도체_2026Q2_리서치노트.pdf] 한빛반도체 2026년 2분기 실적 리뷰. HBM4 양산 수율 개선과 북미 고객사 물량 확대를 반영해 목표주가 128,000원, 투자의견 매수(Buy)를 유지한다. 2분기 매출은 전년 동기 대비 34% 증가했으며, 하반기 신규 팹 가동에 따른 감가상각 부담은 마진에 부분적으로 반영될 전망이다. 밸류에이션은 2027년 예상 실적 기준 PER 밴드 하단으로, 경쟁사 대비 할인 요인이 축소되는 구간이다."
+        }
+      ],
+      "required_numbers": ["128,000"]
+    },
+    {
+      "id": "R2-price",
+      "kind": "recall",
+      "task": "업로드한 문서에서 대한전자 종가를 찾아줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=데일리_마켓노트.pdf] 대한전자는 외국인 순매수 유입으로 전일 대비 2.1% 상승한 종가 71,300원에 마감했다. 거래량은 20일 평균을 상회했으며, 수급 주체별로는 기관이 3거래일 연속 순매도를 이어갔다."
+        }
+      ],
+      "required_numbers": ["71,300"]
+    },
+    {
+      "id": "R3-ratio",
+      "kind": "recall",
+      "task": "업로드한 실적 자료에서 서울반도체의 영업이익률을 찾아줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=서울반도체_실적요약.pdf] 서울반도체 2026년 1분기 매출액 3,420억원, 영업이익 424억원으로 영업이익률 12.4%를 기록했다. 전분기 대비 수익성 개선은 고부가 제품 비중 확대에 기인한다."
+        }
+      ],
+      "required_numbers": ["12.4"]
+    },
+    {
+      "id": "R4-receipt-no",
+      "kind": "recall",
+      "task": "업로드한 공시 정리 노트에서 미래바이오 유상증자 공시의 접수번호를 찾아줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=공시_트래킹_노트.pdf] 미래바이오는 시설자금 조달 목적의 주주배정 유상증자를 결정했다 (주요사항보고서, 접수번호 20260512000123, 접수일 2026-05-12). 발행 규모와 할인율은 이사회 결의 기준이며 최종 발행가는 청약일 전 확정된다."
+        }
+      ],
+      "required_numbers": ["20260512000123"]
+    },
+    {
+      "id": "R5-base-date",
+      "kind": "recall",
+      "task": "업로드한 배당 자료에서 한국식품의 배당 기준일을 찾아줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=배당정책_메모.pdf] 한국식품은 중간배당 기준일을 20260630 으로 공시했으며, 주당배당금은 전년과 동일한 수준을 유지할 것으로 예상된다. 배당성향은 최근 3개년 평균 대비 소폭 상승 추세다."
+        }
+      ],
+      "required_numbers": ["20260630"]
+    },
+    {
+      "id": "R6-multi-figures",
+      "kind": "recall",
+      "task": "업로드한 실적 리뷰에서 동방중공업의 매출액과 영업이익을 모두 찾아줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=동방중공업_2026Q2_리뷰.pdf] 동방중공업 2026년 2분기 잠정 실적: 매출액 79,100억원, 영업이익 10,440억원. 신규 수주 잔고는 3년치 물량을 상회하며, 후판 가격 안정화로 하반기 마진 개선 여지가 있다."
+        }
+      ],
+      "required_numbers": ["79,100", "10,440"]
+    },
+    {
+      "id": "G1-per-concept",
+      "kind": "regression",
+      "task": "PER(주가수익비율)이 무엇인지 일반 원리로 설명해줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=투자용어_노트.pdf] 밸류에이션 지표는 기업의 이익 창출력 대비 시장 가격 수준을 비교하는 도구다. 지표 해석은 산업 특성과 이익의 질을 함께 고려해야 한다."
+        }
+      ],
+      "required_numbers": []
+    },
+    {
+      "id": "G2-dividend-concept",
+      "kind": "regression",
+      "task": "배당성향이라는 개념을 정리해줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=배당정책_메모.pdf] 배당 정책은 이익의 재투자와 주주 환원 사이의 배분 결정이다. 성숙 산업일수록 환원 비중이 높아지는 경향이 있다."
+        }
+      ],
+      "required_numbers": []
+    },
+    {
+      "id": "G3-doc-topic",
+      "kind": "regression",
+      "task": "업로드한 문서가 어떤 주제를 다루는지 알려줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=산업전망_요약.pdf] 이 자료는 반도체 소재 산업의 공급망 재편과 주요 업체들의 증설 동향, 그리고 수요처 다변화 전략을 다룬다. 결론에서는 중장기 수급 균형 전망을 제시한다."
+        }
+      ],
+      "required_numbers": []
+    },
+    {
+      "id": "G4-margin-concept",
+      "kind": "regression",
+      "task": "영업이익률과 순이익률의 차이를 설명해줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=재무분석_기초.pdf] 수익성 지표는 손익계산서의 어느 단계 이익을 기준으로 하느냐에 따라 의미가 달라진다. 영업 단계 이익은 본업의 효율을, 최종 이익은 금융비용과 세금까지 반영한 결과를 보여준다."
+        }
+      ],
+      "required_numbers": []
+    },
+    {
+      "id": "G5-short-selling",
+      "kind": "regression",
+      "task": "공매도가 무엇인지 알려줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=시장제도_노트.pdf] 공매도는 주식을 빌려 먼저 매도하고 이후 매수해 상환하는 매매 기법으로, 가격 발견 기능과 변동성 확대 논쟁이 공존한다."
+        }
+      ],
+      "required_numbers": []
+    },
+    {
+      "id": "G6-rating-system",
+      "kind": "regression",
+      "task": "리서치 보고서의 투자의견 등급 체계를 설명해줘",
+      "evidence": [
+        {
+          "tool": "doc_search_topic_workspace",
+          "output": "[file_nm=리서치_가이드.pdf] 증권사 리서치의 투자의견은 통상 매수·중립·매도 3단계 체계를 쓰며, 목표주가와 현재 주가의 괴리율로 등급을 정의하는 경우가 많다."
+        }
+      ],
+      "required_numbers": []
+    }
+  ]
+}

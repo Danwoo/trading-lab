@@ -1,0 +1,324 @@
+services:
+
+  fullstack-backend:
+    container_name: fullstack-backend
+    build:
+      context: ./backend-service
+    image: fullstack-backend:latest
+    env_file:
+      - ./backend-service/app/.env.production
+    networks:
+      - fullstack
+      - sftp
+      - victorialogs
+    environment:
+      APP_ENV: production
+      SERVICE_LOGGING_LEVEL: WARNING
+      VICTORIALOGS_URL: http://victorialogs:9428
+      TZ: Asia/Seoul
+    shm_size: 8gb
+    command: uv run uvicorn main:app --workers=1 --host=0.0.0.0 --port=8000
+    depends_on:
+      fullstack-portfolio-mcp:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  fullstack-portfolio-mcp:
+    container_name: fullstack-portfolio-mcp
+    build:
+      context: ./portfolio-mcp-service
+    image: fullstack-portfolio-mcp:latest
+    env_file:
+      - ./portfolio-mcp-service/app/.env.production
+    networks:
+      - fullstack
+      - victorialogs
+    environment:
+      APP_ENV: production
+      SERVICE_LOGGING_LEVEL: WARNING
+      VICTORIALOGS_URL: http://victorialogs:9428
+      TZ: Asia/Seoul
+    command: uv run uvicorn main:app --workers=1 --host=0.0.0.0 --port=8000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  fullstack-multi-agent:
+    container_name: fullstack-multi-agent
+    build:
+      context: ./multi-agent-service
+    image: fullstack-multi-agent:latest
+    env_file:
+      - ./multi-agent-service/app/.env.production
+    networks:
+      - fullstack
+      - victorialogs
+    environment:
+      APP_ENV: production
+      SERVICE_LOGGING_LEVEL: WARNING
+      VICTORIALOGS_URL: http://victorialogs:9428
+      TZ: Asia/Seoul
+    command: uv run uvicorn main:app --workers=1 --host=0.0.0.0 --port=8000
+    depends_on:
+      fullstack-market-data-mcp:
+        condition: service_healthy
+      fullstack-disclosure-mcp:
+        condition: service_healthy
+      fullstack-news-mcp:
+        condition: service_healthy
+      fullstack-web-mcp:
+        condition: service_healthy
+      fullstack-doc-search-mcp:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  fullstack-market-data-mcp:
+    container_name: fullstack-market-data-mcp
+    build:
+      context: ./market-data-mcp-service
+    image: fullstack-market-data-mcp:latest
+    env_file:
+      - ./market-data-mcp-service/app/.env.production
+    networks:
+      - fullstack
+      - victorialogs
+    environment:
+      APP_ENV: production
+      SERVICE_LOGGING_LEVEL: WARNING
+      VICTORIALOGS_URL: http://victorialogs:9428
+      TZ: Asia/Seoul
+    command: uv run uvicorn main:app --workers=1 --host=0.0.0.0 --port=8000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  fullstack-disclosure-mcp:
+    container_name: fullstack-disclosure-mcp
+    build:
+      context: ./disclosure-mcp-service
+    image: fullstack-disclosure-mcp:latest
+    env_file:
+      - ./disclosure-mcp-service/app/.env.production
+    networks:
+      - fullstack
+      - victorialogs
+    environment:
+      APP_ENV: production
+      SERVICE_LOGGING_LEVEL: WARNING
+      VICTORIALOGS_URL: http://victorialogs:9428
+      TZ: Asia/Seoul
+    command: uv run uvicorn main:app --workers=1 --host=0.0.0.0 --port=8000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  fullstack-news-mcp:
+    container_name: fullstack-news-mcp
+    build:
+      context: ./news-mcp-service
+    image: fullstack-news-mcp:latest
+    env_file:
+      - ./news-mcp-service/app/.env.production
+    networks:
+      - fullstack
+      - victorialogs
+    environment:
+      APP_ENV: production
+      SERVICE_LOGGING_LEVEL: WARNING
+      VICTORIALOGS_URL: http://victorialogs:9428
+      TZ: Asia/Seoul
+    command: uv run uvicorn main:app --workers=1 --host=0.0.0.0 --port=8000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  fullstack-web-mcp:
+    container_name: fullstack-web-mcp
+    build:
+      context: ./web-mcp-service
+    image: fullstack-web-mcp:latest
+    env_file:
+      - ./web-mcp-service/app/.env.production
+    networks:
+      - fullstack
+      - victorialogs
+    environment:
+      APP_ENV: production
+      SERVICE_LOGGING_LEVEL: WARNING
+      VICTORIALOGS_URL: http://victorialogs:9428
+      TZ: Asia/Seoul
+    command: uv run uvicorn main:app --workers=1 --host=0.0.0.0 --port=8000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  fullstack-doc-search-mcp:
+    container_name: fullstack-doc-search-mcp
+    build:
+      context: ./doc-search-mcp-service
+    image: fullstack-doc-search-mcp:latest
+    env_file:
+      - ./doc-search-mcp-service/app/.env.production
+    networks:
+      - fullstack
+      - victorialogs
+    environment:
+      APP_ENV: production
+      SERVICE_LOGGING_LEVEL: WARNING
+      VICTORIALOGS_URL: http://victorialogs:9428
+      TZ: Asia/Seoul
+    command: uv run uvicorn main:app --workers=1 --host=0.0.0.0 --port=8000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/openapi.json').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  fullstack-web:
+    container_name: fullstack-web
+    build:
+      context: ./frontend
+      args:
+        APP_ENV: production
+    image: fullstack-web:latest
+    networks:
+      - fullstack
+      - victorialogs
+    environment:
+      VICTORIALOGS_URL: http://victorialogs:9428
+      TZ: Asia/Seoul
+      MULTI_AGENT_SERVICE_URL: http://fullstack-multi-agent:8000
+      MARKET_DATA_MCP_SERVICE_URL: http://fullstack-market-data-mcp:8000
+      DISCLOSURE_MCP_SERVICE_URL: http://fullstack-disclosure-mcp:8000
+      NEWS_MCP_SERVICE_URL: http://fullstack-news-mcp:8000
+      WEB_MCP_SERVICE_URL: http://fullstack-web-mcp:8000
+      DOC_SEARCH_MCP_SERVICE_URL: http://fullstack-doc-search-mcp:8000
+    depends_on:
+      fullstack-backend:
+        condition: service_healthy
+      fullstack-portfolio-mcp:
+        condition: service_healthy
+      fullstack-multi-agent:
+        condition: service_healthy
+      fullstack-market-data-mcp:
+        condition: service_healthy
+      fullstack-disclosure-mcp:
+        condition: service_healthy
+      fullstack-news-mcp:
+        condition: service_healthy
+      fullstack-web-mcp:
+        condition: service_healthy
+      fullstack-doc-search-mcp:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: always
+
+  fullstack-nginx:
+    container_name: fullstack-nginx
+    build:
+      context: ./platform/nginx
+    image: fullstack-nginx:latest
+    networks:
+      - fullstack
+    ports:
+      - 1080:80
+    depends_on:
+      fullstack-web:
+        condition: service_healthy
+        restart: true
+      fullstack-backend:
+        condition: service_healthy
+        restart: true
+
+networks:
+  fullstack:
+    name: fullstack
+  sftp:
+    external: true
+  victorialogs:
+    external: true

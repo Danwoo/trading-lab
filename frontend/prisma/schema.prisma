@@ -1,0 +1,309 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+generator table_sql {
+  provider = "node ./prisma/table-generator.cjs"
+  output   = "./init"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// 사용자
+model User {
+  id            String    @id @db.VarChar(36)          /// 사용자 ID
+  email         String    @unique @db.VarChar(100)     /// 이메일
+  name          String?   @db.VarChar(100)             /// 사용자명
+  dept          String?   @db.VarChar(50)              /// 부서
+  workspace_id  Int?                                   /// 워크스페이스 ID
+  use_at        String    @default("Y") @db.VarChar(5) /// 사용여부
+  appr_at       String    @default("N") @db.VarChar(5) /// 승인여부
+  emailVerified Boolean   @default(false)              /// 이메일 인증 여부
+  image         String?   @db.VarChar(500)             /// 프로필 이미지
+  reg_id        String?   @db.VarChar(100)             /// 생성자 ID
+  reg_dt        DateTime? @db.Timestamp(3)             /// 생성일시
+  reg_ip        String?   @db.VarChar(45)              /// 생성 IP
+  reg_pid       String?   @db.VarChar(30)              /// 생성 프로그램 ID
+  mod_id        String?   @db.VarChar(100)             /// 수정자 ID
+  mod_dt        DateTime? @db.Timestamp(3)             /// 수정일시
+  mod_ip        String?   @db.VarChar(45)              /// 수정 IP
+  mod_pid       String?   @db.VarChar(30)              /// 수정 프로그램 ID
+  @@map("tn_user")
+
+  sessions          BaSession[]
+  accounts          BaAccount[]
+  author_members    AuthorMember[]
+  workspace_members WorkspaceMember[]
+  workspace         Workspace?        @relation(fields: [workspace_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// 워크스페이스
+model Workspace {
+  id             Int       @id @default(autoincrement()) /// 워크스페이스 ID
+  workspace_code String    @unique @db.VarChar(30)       /// 워크스페이스 코드
+  workspace_nm   String    @db.VarChar(200)              /// 워크스페이스명
+  use_at         String    @default("Y") @db.VarChar(5)  /// 사용여부
+  is_personal    Boolean   @default(false)               /// 개인 워크스페이스 여부 (사용자 1명 소유 — 공용 워크스페이스 수를 세는 곳에서 제외된다)
+  reg_dt         DateTime? @db.Timestamp(3)              /// 생성일시
+  reg_id         String?   @db.VarChar(100)              /// 생성자 ID
+  mod_dt         DateTime? @db.Timestamp(3)              /// 수정일시
+  mod_id         String?   @db.VarChar(100)              /// 수정자 ID
+
+  @@map("tn_workspace")
+
+  users   User[]
+  members WorkspaceMember[]
+  domains WorkspaceDomain[]
+  menus   WorkspaceMenu[]
+}
+
+/// 워크스페이스 구성원 (사용자↔워크스페이스 다대다)
+model WorkspaceMember {
+  workspace_id Int                                            /// 워크스페이스 ID
+  user_id      String    @db.VarChar(36)                      /// 사용자 ID
+  role         String    @default("member") @db.VarChar(20)   /// 구성원 역할 (owner|member|viewer)
+  is_default   Boolean   @default(false)                      /// 로그인 시 선택되는 기본 워크스페이스 여부
+  reg_dt       DateTime? @db.Timestamp(3)                     /// 생성일시
+  reg_id       String?   @db.VarChar(100)                     /// 생성자 ID
+  mod_dt       DateTime? @db.Timestamp(3)                     /// 수정일시
+  mod_id       String?   @db.VarChar(100)                     /// 수정자 ID
+
+  @@id([workspace_id, user_id])
+  /// Postgres 는 FK 컬럼을 자동 인덱스하지 않는다 — "내 워크스페이스 목록" 조회 축
+  @@index([user_id])
+  @@map("tn_workspace_member")
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id])
+  user      User      @relation(fields: [user_id], references: [id])
+}
+
+/// 워크스페이스별 메뉴
+model WorkspaceMenu {
+  workspace_id Int                        /// 워크스페이스 ID
+  menu_id      String    @db.VarChar(20)  /// 메뉴 ID
+  reg_dt       DateTime? @db.Timestamp(3) /// 생성일시
+  reg_id       String?   @db.VarChar(100) /// 생성자 ID
+  mod_dt       DateTime? @db.Timestamp(3) /// 수정일시
+  mod_id       String?   @db.VarChar(100) /// 수정자 ID
+
+  @@id([workspace_id, menu_id])
+  @@map("tn_workspace_menu")
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id])
+}
+
+/// 워크스페이스 이메일 도메인 매핑
+model WorkspaceDomain {
+  domain       String    @id @db.VarChar(100) /// 이메일 도메인
+  workspace_id Int                            /// 워크스페이스 ID
+  reg_dt       DateTime? @db.Timestamp(3)     /// 생성일시
+  reg_id       String?   @db.VarChar(100)     /// 생성자 ID
+  mod_dt       DateTime? @db.Timestamp(3)     /// 수정일시
+  mod_id       String?   @db.VarChar(100)     /// 수정자 ID
+
+  @@index([workspace_id])
+  @@map("tn_workspace_domain")
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id])
+}
+
+/// 인증 세션
+model BaSession {
+  id          String   @id @db.VarChar(36)
+  expiresAt   DateTime @db.Timestamp(3)
+  token       String   @unique @db.VarChar(500)
+  createdAt   DateTime @db.Timestamp(3)
+  updatedAt   DateTime @db.Timestamp(3)
+  ipAddress   String?  @db.VarChar(45)
+  userAgent   String?  @db.VarChar(500)
+  userId      String   @db.VarChar(36)
+  authorId    String?  @db.VarChar(20)
+  /// 지금 선택된 워크스페이스 (소속이 아니라 선택 — 다대다에서 하나를 가리킨다)
+  workspaceId Int?
+
+  @@index([userId])
+  @@map("ba_session")
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+/// 인증 계정
+model BaAccount {
+  id                    String    @id @db.VarChar(36)
+  accountId             String    @db.VarChar(100)
+  providerId            String    @db.VarChar(100)
+  userId                String    @db.VarChar(36)
+  accessToken           String?   @db.VarChar(500)
+  refreshToken          String?   @db.VarChar(500)
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime? @db.Timestamp(3)
+  refreshTokenExpiresAt DateTime? @db.Timestamp(3)
+  scope                 String?   @db.VarChar(500)
+  password              String?   @db.VarChar(255)
+  createdAt             DateTime  @db.Timestamp(3)
+  updatedAt             DateTime  @db.Timestamp(3)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("ba_account")
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+/// 인증 토큰
+model BaVerification {
+  id         String    @id @db.VarChar(36)
+  identifier String    @db.VarChar(200)
+  value      String    @db.Text
+  expiresAt  DateTime  @db.Timestamp(3)
+  createdAt  DateTime? @db.Timestamp(3)
+  updatedAt  DateTime? @db.Timestamp(3)
+
+  @@map("ba_verification")
+}
+
+/// 권한
+model Author {
+  author_id  String    @id @db.VarChar(20) /// 권한 ID
+  author_nm  String    @db.VarChar(200)    /// 권한명
+  reg_dt     DateTime? @db.Timestamp(3)    /// 생성일시
+  reg_id     String?   @db.VarChar(100)    /// 생성자 ID
+  mod_dt     DateTime? @db.Timestamp(3)    /// 수정일시
+  mod_id     String?   @db.VarChar(100)    /// 수정자 ID
+
+  @@map("tn_author")
+  
+  author_members AuthorMember[]
+  author_menus   AuthorMenu[]
+}
+
+/// 권한별 사용자
+model AuthorMember {
+  author_id String    @db.VarChar(20)  /// 권한 ID
+  user_id   String    @db.VarChar(100) /// 사용자 ID
+  reg_dt    DateTime? @db.Timestamp(3) /// 생성일시
+  reg_id    String?   @db.VarChar(100) /// 생성자 ID
+  mod_dt    DateTime? @db.Timestamp(3) /// 수정일시
+  mod_id    String?   @db.VarChar(100) /// 수정자 ID
+
+  @@id([author_id, user_id])
+  @@map("tn_author_member")
+  
+  author Author @relation(fields: [author_id], references: [author_id])
+  user   User   @relation(fields: [user_id], references: [email])
+}
+
+/// 메뉴
+model Menu {
+  menu_id       String    @id @db.VarChar(20)          /// 메뉴 ID
+  menu_nm       String    @db.VarChar(200)             /// 메뉴명
+  upper_menu_id String?   @db.VarChar(20)              /// 상위 메뉴 ID
+  menu_level    Int?      @default(1)                  /// 메뉴 레벨
+  sort_ordr     Int?      @default(1)                  /// 정렬순서
+  url           String?   @db.VarChar(400)             /// URL
+  use_at        String?   @default("Y") @db.VarChar(5) /// 사용여부
+  icon          String?   @db.VarChar(50)              /// 아이콘
+  reg_dt        DateTime? @db.Timestamp(3)             /// 생성일시
+  reg_id        String?   @db.VarChar(100)             /// 생성자 ID
+  mod_dt        DateTime? @db.Timestamp(3)             /// 수정일시
+  mod_id        String?   @db.VarChar(100)             /// 수정자 ID
+
+  @@index([upper_menu_id, sort_ordr])
+  @@map("tn_menu")
+  
+  parent       Menu?        @relation("MenuHierarchy", fields: [upper_menu_id], references: [menu_id], onDelete: NoAction, onUpdate: NoAction)
+  children     Menu[]       @relation("MenuHierarchy")
+  author_menus AuthorMenu[]
+}
+
+/// 권한별 메뉴
+model AuthorMenu {
+  author_id String    @db.VarChar(20)  /// 권한 ID
+  menu_id   String    @db.VarChar(20)  /// 메뉴 ID
+  reg_dt    DateTime? @db.Timestamp(3) /// 생성일시
+  reg_id    String?   @db.VarChar(100) /// 생성자 ID
+  mod_dt    DateTime? @db.Timestamp(3) /// 수정일시
+  mod_id    String?   @db.VarChar(100) /// 수정자 ID
+
+  @@id([author_id, menu_id])
+  @@map("tn_author_menu")
+  
+  author Author @relation(fields: [author_id], references: [author_id])
+  menu   Menu   @relation(fields: [menu_id], references: [menu_id])
+}
+
+/// 그룹코드
+model GroupCode {
+  group_code    String    @id @db.VarChar(5) /// 그룹코드
+  group_code_nm String    @db.VarChar(200)   /// 그룹코드명
+  group_code_dc String?   @db.VarChar(200)   /// 그룹코드 설명
+  use_at        String    @default("Y") @db.VarChar(5) /// 사용여부
+  reg_dt        DateTime? @db.Timestamp(3)   /// 생성일시
+  reg_id        String?   @db.VarChar(100)   /// 생성자 ID
+  mod_dt        DateTime? @db.Timestamp(3)   /// 수정일시
+  mod_id        String?   @db.VarChar(100)   /// 수정자 ID
+
+  @@map("tc_group_code")
+  
+  codes Code[]
+}
+
+/// 상세코드
+model Code {
+  group_code  String    @db.VarChar(5)   /// 그룹코드
+  code        String    @db.VarChar(20)  /// 코드
+  code_nm     String    @db.VarChar(200) /// 코드명
+  code_nm_eng String?   @db.VarChar(200) /// 영문 코드명
+  code_dc     String?   @db.VarChar(200) /// 코드 설명
+  sort_ordr   Int?      @default(1)      /// 정렬순서
+  use_at      String    @default("Y") @db.VarChar(5) /// 사용여부
+  reg_dt      DateTime? @db.Timestamp(3) /// 생성일시
+  reg_id      String?   @db.VarChar(100) /// 생성자 ID
+  mod_dt      DateTime? @db.Timestamp(3) /// 수정일시
+  mod_id      String?   @db.VarChar(100) /// 수정자 ID
+
+  @@id([group_code, code])
+  @@map("tc_code")
+  
+  group_code_ref GroupCode @relation(fields: [group_code], references: [group_code])
+}
+
+// multi-agent-service 가 `(email, gid, flag=1)` 로 조회해 LLM 컨텍스트에 주입하고, 매 턴 종료 시
+// insert 도 한다 (repositories/chat_history/chat_history_repository.py — 남의 스키마라 그쪽 쿼리는
+// `frontend.` 로 수식한다, #213 리드 결정으로 서버측 히스토리 저장을 도입하며 read-only 에서 바뀜).
+// 테이블 정의(스키마·마이그레이션) 소유는 frontend Prisma 몫이라 여기 산다 (.docs/4-아키텍처/경량msa.md
+// — 그 문서도 이 write 전환을 반영해 갱신했다).
+/// AI 챗 대화 이력 (멀티턴)
+model AiChatHistory {
+  id       Int       @id @default(autoincrement()) /// 이력 ID
+  email    String    @db.VarChar(100)              /// 사용자 이메일 (tn_user.email)
+  gid      BigInt                                  /// 대화 세션 ID (프론트가 Date.now() 로 생성 — int4 범위를 넘어 BigInt)
+  sort     Int                                     /// 대화 내 순서 (오름차순 = 시간순)
+  question String    @db.Text                      /// 사용자 질문
+  answer   String?   @db.Text                      /// AI 답변 (스트리밍 중·중단 시 비어 있을 수 있음)
+  flag     Int       @default(1)                   /// 유효 플래그 (1=유효, 그 외=조회 제외)
+  reg_dt   DateTime? @db.Timestamp(3)              /// 생성일시
+  reg_id   String?   @db.VarChar(100)              /// 생성자 ID
+  mod_dt   DateTime? @db.Timestamp(3)              /// 수정일시
+  mod_id   String?   @db.VarChar(100)              /// 수정자 ID
+
+  /// 조회 조건(email·gid·flag) + 정렬(sort) 그대로 — 히스토리 조회가 인덱스만으로 끝나게
+  @@index([email, gid, flag, sort])
+  @@map("ai_chat_history")
+}
+
+/// 이메일 발송 로그
+model EmailLog {
+  id        Int      @id @default(autoincrement()) /// 로그 ID
+  to        String   @db.VarChar(100) /// 수신자 이메일
+  subject   String   @db.VarChar(200) /// 제목
+  status    String   @db.VarChar(10)  /// 발송 상태
+  error_msg String?  @db.VarChar(500) /// 에러 메시지
+  reg_dt    DateTime @db.Timestamp(3) /// 발송일시
+
+  @@map("th_email_log")
+}
+

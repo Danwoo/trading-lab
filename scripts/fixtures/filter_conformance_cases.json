@@ -1,0 +1,299 @@
+{
+  "_comment": [
+    "#295·#306 — 필터 문법 파서 두 벌(backend-service/app/utils/common/devextreme_utils.py,",
+    "frontend/lib/grid/filters.ts) 이 같은 입력을 같은 방향으로 읽는지 검사하는 공유 입력",
+    "세트. 두 언어라 산출물(SQL 문자열 vs Prisma where 객체)을 문자 그대로 비교할 수 없다 —",
+    "그래서 '결과가 같다'를 이 파일이 못박은 행동 분류(expect)로 조작화한다:",
+    "  reject : 양쪽 다 예외를 던져야 한다 (Python BadRequestError → 400 / TS invalidFilter → 400)",
+    "  false  : 양쪽 다 '항상 거짓' 조건을 내야 한다 (Python \"(1 = 0)\" / TS {OR:[]})",
+    "  accept : 양쪽 다 예외 없이 파싱에 성공해야 한다 (형태 비교는 하지 않음 — 그건",
+    "           scripts/verify_filter_negation.mjs·backend-service/tests/test_devextreme_filter_parser.py",
+    "           의 몫이다)",
+    "이 파일을 backend-service/tests/test_filter_conformance.py 와 scripts/verify_filter_conformance.mjs",
+    "가 각자 읽어 자기 언어의 파서를 검사한다 — 두 검사 모두 이 파일의 같은 expect 값과",
+    "비교하므로, 서로 값이 다르면(둘 다 이 파일과는 일치해도 서로는 갈리면) 있을 수 없다:",
+    "둘 다 같은 제3의 값(이 파일)과 같으면 서로도 같다.",
+    "ref 필드는 이슈 #295 의 발산 표(M-2~M-7)·#306 코멘트를 가리킨다.",
+    "",
+    "#389 축(ref: #389)은 '형식 오류'다 — 두 파서가 **같은 방향으로** 틀려서(둘 다 '필터 없음'",
+    "으로 삼켜 전건 반환) 서로 대조하는 것만으로는 구조적으로 못 잡던 모양들이다. 그래서 이 축의",
+    "기대값은 두 파서의 합의가 아니라 **DevExtreme 자신의 평가기**가 정한다: 아래 judge 필드는",
+    "`devextreme/cjs/data/query.js` 에 같은 입력을 먹여 실측한 결과이고(rows0=한 건도 안 고름,",
+    "throws=평가기가 예외), scripts/verify_filter_negation.mjs 의 malformed_never_returns_all_rows",
+    "검사가 매 실행마다 그 실측을 다시 확인한다. 어느 쪽도 '전건'이 아니므로 '필터 없음'은 오답이고,",
+    "#295 리드 결정('잘못된 입력은 양쪽 다 거절')을 이 모양들에도 적용해 expect 를 reject 로 둔다.",
+    "",
+    "#401 축(ref: #401)은 '재귀 깊이 상한'이다 — 상한이 없어 두 파서 모두 깊게 중첩된 필터 하나에",
+    "스택이 무너졌다(TS RangeError · Py RecursionError, 둘 다 500). 두 파서가 **같은 상한**(32)을",
+    "써야 같은 필터가 한쪽만 통과하는 발산이 안 생기므로, 상한과 같은 깊이(32=accept)와 한 단 넘긴",
+    "깊이(33=reject)를 쌍으로 둔다 — 한쪽 상한만 바꾸면 둘 중 하나가 빨강이 된다."
+  ],
+  "cases": [
+    {
+      "id": "m2-mixed-and-then-or",
+      "ref": "M-2",
+      "name": "혼합 and/or — and 먼저",
+      "input": [["a", "=", 1], "and", ["b", "=", 2], "or", ["c", "=", 3]],
+      "expect": "reject"
+    },
+    {
+      "id": "m2-mixed-or-then-and",
+      "ref": "M-2",
+      "name": "혼합 and/or — or 먼저",
+      "input": [["a", "=", 1], "or", ["b", "=", 2], "and", ["c", "=", 3]],
+      "expect": "reject"
+    },
+    {
+      "id": "m2-uniform-and-control",
+      "ref": "M-2 control",
+      "name": "균일 and 체인 — 거절 로직이 정상 경로를 갉아먹지 않는지 대조",
+      "input": [["a", "=", 1], "and", ["b", "=", 2], "and", ["c", "=", 3]],
+      "expect": "accept"
+    },
+    {
+      "id": "m3-unknown-operator",
+      "ref": "M-3",
+      "name": "미지원 연산자",
+      "input": ["a", "like", "x"],
+      "expect": "reject"
+    },
+    {
+      "id": "m3-unknown-operator-nested",
+      "ref": "M-3",
+      "name": "미지원 연산자 — 중첩 안",
+      "input": [["a", "=", 1], "and", ["b", "wat", 2]],
+      "expect": "reject"
+    },
+    {
+      "id": "m4-invalid-field-injection-shaped",
+      "ref": "M-4",
+      "name": "필드명 검증 — SQL 인젝션 모양",
+      "input": ["a; DROP TABLE t", "=", 1],
+      "expect": "reject"
+    },
+    {
+      "id": "m4-invalid-field-leading-digit",
+      "ref": "M-4",
+      "name": "필드명 검증 — 숫자로 시작",
+      "input": ["1bad", "=", 1],
+      "expect": "reject"
+    },
+    {
+      "id": "m4-valid-field-control",
+      "ref": "M-4 control",
+      "name": "정상 필드명 — 거절 로직이 정상 경로를 갉아먹지 않는지 대조",
+      "input": ["valid_field_1", "=", 1],
+      "expect": "accept"
+    },
+    {
+      "id": "m5-between-one-element",
+      "ref": "M-5",
+      "name": "between 값이 1원소",
+      "input": ["a", "between", [1]],
+      "expect": "reject"
+    },
+    {
+      "id": "m5-between-three-elements",
+      "ref": "M-5",
+      "name": "between 값이 3원소",
+      "input": ["a", "between", [1, 2, 3]],
+      "expect": "reject"
+    },
+    {
+      "id": "m5-between-scalar",
+      "ref": "M-5",
+      "name": "between 값이 배열이 아님",
+      "input": ["a", "between", 5],
+      "expect": "reject"
+    },
+    {
+      "id": "m5-between-valid-control",
+      "ref": "M-5 control",
+      "name": "정상 between — 거절 로직이 정상 경로를 갉아먹지 않는지 대조",
+      "input": ["a", "between", [1, 2]],
+      "expect": "accept"
+    },
+    {
+      "id": "m7-in-scalar",
+      "ref": "M-7",
+      "name": "in 값이 배열이 아님",
+      "input": ["a", "in", 1],
+      "expect": "reject"
+    },
+    {
+      "id": "m7-notin-string",
+      "ref": "M-7",
+      "name": "notin 값이 배열이 아님(문자열)",
+      "input": ["a", "notin", "x"],
+      "expect": "reject"
+    },
+    {
+      "id": "m7-in-array-control",
+      "ref": "M-7 control",
+      "name": "정상 in — 거절 로직이 정상 경로를 갉아먹지 않는지 대조",
+      "input": ["a", "in", [1, 2, 3]],
+      "expect": "accept"
+    },
+    {
+      "id": "m7-in-empty-array-control",
+      "ref": "M-7 control",
+      "name": "in 값이 빈 배열 — 무매칭(거절 대상 아님, 값 자체는 배열)",
+      "input": ["a", "in", []],
+      "expect": "accept"
+    },
+    {
+      "id": "m7-noneof-empty-array-control",
+      "ref": "M-7 control",
+      "name": "noneof 값이 빈 배열 — 전체매칭(거절 대상 아님)",
+      "input": ["a", "noneof", []],
+      "expect": "accept"
+    },
+    {
+      "id": "m6-whole-date-string",
+      "ref": "M-6",
+      "name": "전체가 날짜꼴인 문자열 — TS 는 Date 로, 파이썬은 문자열 그대로",
+      "input": ["a", "=", "2024-01-01"],
+      "expect": "accept",
+      "dateShape": "date"
+    },
+    {
+      "id": "m6-date-substring-false-positive",
+      "ref": "M-6",
+      "name": "날짜꼴을 부분 포함할 뿐인 문자열 — 앵커 없는 정규식이면 오탐 coercion (회귀 통제)",
+      "input": ["a", "=", "12024-01-011"],
+      "expect": "accept",
+      "dateShape": "string"
+    },
+    {
+      "id": "306-empty-array",
+      "ref": "#306",
+      "name": "빈 배열 — DevExtreme 의 '아무것도 안 맞음'",
+      "input": [],
+      "expect": "false"
+    },
+    {
+      "id": "306-empty-negation",
+      "ref": "#306",
+      "name": "항 없는 부정 — 검색 패널이 실제로 도달시키는 형태",
+      "input": ["!"],
+      "expect": "false"
+    },
+    {
+      "id": "306-negation-of-false-control",
+      "ref": "#306 control",
+      "name": "빈 배열의 부정 — 항상 거짓의 부정은 항상 참(예외 없이 파싱은 성공해야 한다)",
+      "input": ["!", []],
+      "expect": "accept"
+    },
+    {
+      "id": "389-operator-is-list",
+      "ref": "#389",
+      "name": "연산자 자리에 리스트 — 파이썬만 TypeError → 500 이었다",
+      "input": ["a", ["="], 1],
+      "expect": "reject",
+      "judge": "rows-not-all"
+    },
+    {
+      "id": "389-operator-is-null",
+      "ref": "#389",
+      "name": "연산자 자리에 null",
+      "input": ["a", null, 1],
+      "expect": "reject",
+      "judge": "throws"
+    },
+    {
+      "id": "389-operator-is-number",
+      "ref": "#389",
+      "name": "연산자 자리에 숫자",
+      "input": ["a", 5, 1],
+      "expect": "reject",
+      "judge": "throws"
+    },
+    {
+      "id": "389-operator-token-only",
+      "ref": "#389",
+      "name": "연산자 토큰만 있는 필터 — 두 파서 다 전건을 냈다",
+      "input": ["and"],
+      "expect": "reject",
+      "judge": "rows-not-all"
+    },
+    {
+      "id": "389-condition-missing-value",
+      "ref": "#389",
+      "name": "값이 빠진 단일 조건 — 두 파서 다 전건을 냈다",
+      "input": ["a", "="],
+      "expect": "reject",
+      "judge": "rows-not-all"
+    },
+    {
+      "id": "389-field-not-string",
+      "ref": "#389",
+      "name": "필드 자리에 숫자 — 단일 조건 분기를 비껴가 두 파서 다 전건을 냈다",
+      "input": [1, "=", 1],
+      "expect": "reject",
+      "judge": "throws"
+    },
+    {
+      "id": "389-flat-five-terms",
+      "ref": "#389",
+      "name": "평면 5항 — 조건을 배열로 감싸지 않아 두 파서 다 전건을 냈다",
+      "input": ["a", "=", 1, "and", 2],
+      "expect": "reject",
+      "judge": "rows-not-all"
+    },
+    {
+      "id": "389-negation-operand-not-array",
+      "ref": "#389",
+      "name": "부정 피연산자가 배열이 아님 — 부정이 통째로 사라져 두 파서 다 전건을 냈다",
+      "input": ["!", "x"],
+      "expect": "reject",
+      "judge": "rows-not-all"
+    },
+    {
+      "id": "389-dangling-operator-no-operand",
+      "ref": "#389",
+      "name": "조건 없이 연산자로 끝남",
+      "input": ["a", "=", 1, "and"],
+      "expect": "reject",
+      "judge": "rows-not-all"
+    },
+    {
+      "id": "389-leading-operator",
+      "ref": "#389",
+      "name": "좌항 없는 연산자 — 토큰을 삼켜 심판(0건)보다 넓은 결과를 냈다",
+      "input": ["and", ["a", "=", 1]],
+      "expect": "reject",
+      "judge": "rows-not-all"
+    },
+    {
+      "id": "389-unparseable-json-string",
+      "ref": "#389",
+      "name": "JSON 으로 읽을 수 없는 문자열 — 두 파서 다 조용히 '필터 없음'으로 읽었다",
+      "input": "{not json",
+      "expect": "reject",
+      "judge": "rows-not-all"
+    },
+    {
+      "id": "389-json-object-not-array",
+      "ref": "#389",
+      "name": "배열이 아닌 JSON — 두 파서 다 조용히 '필터 없음'으로 읽었다",
+      "input": { "a": 1 },
+      "expect": "reject",
+      "judge": "throws"
+    },
+    {
+      "id": "401-depth-at-limit",
+      "ref": "#401 control",
+      "name": "상한과 같은 깊이(32) — 상한 도입이 정상 입력을 갉아먹지 않는지 대조",
+      "input": ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["a", "=", 1]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],
+      "expect": "accept"
+    },
+    {
+      "id": "401-depth-over-limit",
+      "ref": "#401",
+      "name": "상한을 한 단 넘긴 깊이(33) — 예전엔 상한이 없어 스택이 무너질 때까지 내려갔다(TS RangeError·Py RecursionError → 500)",
+      "input": ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["!", ["a", "=", 1]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]],
+      "expect": "reject"
+    }
+  ]
+}
