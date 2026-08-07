@@ -1,4 +1,4 @@
-"""#173 — 동일 atch_file_id 재인제스트 시 청크 중복 방지(삽입 전 삭제, 멱등 재색인).
+"""#1 — 동일 atch_file_id 재인제스트 시 청크 중복 방지(삽입 전 삭제, 멱등 재색인).
 
 이 레포는 아직 pytest 를 도입하지 않았으므로(전 서비스 공통) standalone 실행 겸용으로 작성한다:
     uv run python tests/test_workspace_reingest_dedup.py

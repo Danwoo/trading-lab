@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { EMAIL_VERIFICATION_OTP_PREFIX, emailVerificationOtpIdentifier } from "@/lib/auth/verificationIdentifier";
 
 // 이 조립 규칙은 세 경로가 공유하는 계약이다 — 발송(app/api/common/email/route.ts)이 쓰고,
-// 검증(.../email/verify/route.ts)이 읽고, 탈퇴 삭제(deleteUserCascade, #414)가 지운다.
+// 검증(.../email/verify/route.ts)이 읽고, 탈퇴 삭제(deleteUserCascade, #3)가 지운다.
 // 셋이 각자 문자열을 조립하던 시절에는 한 곳만 바꿔도 나머지가 조용히 어긋난다 — 특히 삭제는
 // 0건 삭제로 성공하므로 어긋난 것이 드러나지 않는다.
 describe("emailVerificationOtpIdentifier — OTP 저장 키의 단일 조립 규칙", () => {

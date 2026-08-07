@@ -1,4 +1,4 @@
-// #243 — 시세 계층이 프론트까지 오는 길의 그물 세 겹.
+// #2 — 시세 계층이 프론트까지 오는 길의 그물 세 겹.
 //
 // 이 파일이 막는 것은 셋 다 "조용한" 실패다 — 화면은 멀쩡해 보이는데 내용이 틀린 부류:
 //
@@ -59,7 +59,7 @@ function proxyBackendPaths(): Array<{ file: string; backendPath: string }> {
   });
 }
 
-describe("#243 ① 프록시 경로가 backend prefix 와 lockstep", () => {
+describe("#2 ① 프록시 경로가 backend prefix 와 lockstep", () => {
   it("모든 external/backend 프록시의 경로 선두가 실재하는 backend prefix 다", () => {
     const prefixes = backendPrefixes();
     const proxies = proxyBackendPaths();
@@ -83,7 +83,7 @@ describe("#243 ① 프록시 경로가 backend prefix 와 lockstep", () => {
   });
 });
 
-describe("#243 ② 빈 응답이 사유를 들고 온다", () => {
+describe("#2 ② 빈 응답이 사유를 들고 온다", () => {
   beforeEach(() => vi.resetModules());
 
   it("unavailable_reason 이 있으면 그대로 올린다 — 빈 배열로 뭉개지 않는다", async () => {
@@ -155,7 +155,7 @@ describe("#243 ② 빈 응답이 사유를 들고 온다", () => {
   });
 });
 
-describe("#243 ③ 샘플 캔들은 placeholder 분기에서만 쓰인다 (룰 17)", () => {
+describe("#2 ③ 샘플 캔들은 placeholder 분기에서만 쓰인다 (룰 17)", () => {
   it("ChartPanel 이 unavailable 사유를 임시 캔들로 덮지 않는다", () => {
     const source = fs.readFileSync(path.join(FRONTEND_ROOT, "components/features/ChartPanel/ChartPanel.tsx"), "utf8");
     expect(source, "SAMPLE_CANDLES 를 쓰지 않게 바뀌었다면 이 그물의 전제가 사라진 것이다").toContain("SAMPLE_CANDLES");

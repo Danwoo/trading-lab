@@ -78,7 +78,7 @@ class WorkspaceService:
         ]
         await self.repository.ensure_table()
         # 삽입 전 삭제 — 동일 atch_file_id 재인제스트 시 이전 청크가 남아 검색 결과가 중복되는
-        # 문제의 멱등 재색인 (#173). insert 뒤 삭제하면 방금 넣은 청크까지 지워질 위험이 있어 순서 고정.
+        # 문제의 멱등 재색인 (#1). insert 뒤 삭제하면 방금 넣은 청크까지 지워질 위험이 있어 순서 고정.
         await self.repository.delete_by_file(atch_file_id, workspace_id)
         await self.repository.insert_chunks(rows)
         return IngestOut(job_ref=atch_file_id, chunk_count=len(rows), status="indexed")

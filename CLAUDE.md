@@ -127,8 +127,8 @@ process-compose up        # staging+ 는 docker-compose (compose.staging.yaml + 
   사라졌었다). 착륙할 자리를 없애는 것이 가장 싸고 확실한 예방이다.
 - 구현은 레포 설정 **"Automatically delete head branches"**(Settings → General → Pull Requests)
   다 — PR 머지 시 GitHub 가 그 head 브랜치만 지운다(스택의 부모 브랜치가 나중에 머지될 때도 같은
-  규칙이 다시 적용돼 체인이 순차적으로 정리된다). 이 설정을 켜는 것 자체는 이 CLAUDE.md 커밋의
-  범위 밖이다 — 레포 관리자 권한이 필요한 즉시 적용 변경이라 사람이 직접 켠다.
+  규칙이 다시 적용돼 체인이 순차적으로 정리된다). **이 레포에서는 켜져 있다** — 이사 때 다시
+  적용했다(`gh api repos/Danwoo/trading-lab --jq .delete_branch_on_merge` → `true`).
 - 사후 그물(이미 벌어진 고립을 잡는 것)은 `scripts/detect_orphaned_merged_branches.py` +
   `.github/workflows/orphaned-branch-scan.yml`(주기 스캔) 이 맡는다. **오탐이 있어 자동 차단은
   하지 않는다** — 후보만 뽑아 워크플로 요약 + 이슈 코멘트로 사람에게 낸다.
@@ -163,4 +163,13 @@ process-compose up        # staging+ 는 docker-compose (compose.staging.yaml + 
 
 <!-- 매 세션 재주입층 — 베팅 교체 시 갱신 -->
 
-M1 로컬 완주: 리드가 직접 bootstrap→up→로그인→업로드→근거답변 확인하면 완료. no-go: 배포·실데이터·멀티턴. (#188)
+M2 터미널 골조: 리드가 직접 기동→로그인→터미널 진입→종목 선택→패널 전체 전환→배치 변경 후 새로고침 유지→적재 실행→차트가 실데이터로 그려지는 것까지 확인하면 완료.
+no-go: 실주문·호스팅 SaaS 운영·봇 실행 엔진·백테스트·AI 콘솔·스크리너·에이전트 답변 품질. 범위와 진행 상태의 원본은 [마일스톤 2](https://github.com/Danwoo/trading-lab/milestone/2) 다.
+
+---
+
+## 이슈 번호 표기
+
+<!-- 2026-08-07 완전 이사 — 옛 번호가 문서·주석에 그대로 남아 있다 -->
+
+문서·주석의 `#N` 은 **기본적으로 옛 비공개 레포(`Danwoo/fintech-ai-platform`) 번호**이며 이 레포에서 열리지 않는다. **자릿수로는 못 가른다** — `#8`·`#85`·`#360` 이 전부 옛 번호다. 이사 때 살아 있던 3건만 새 번호를 받았고(`#1` RAG 후속 하드닝 · `#2` M2 시세 적재 · `#3` 탈퇴자 PII), 닫힌 229건은 보관용 레포에 남아 그 밖의 대조표는 없다. 앞으로 이 레포 이슈를 인용할 때는 번호만 적지 말고 링크를 걸어 옛 번호와 섞이지 않게 한다.
