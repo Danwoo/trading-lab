@@ -30,6 +30,13 @@
 
 **현행 코드가 정본이다.** 이 문서와 어긋나면 코드가 이긴다 — 어긋난 자리를 PR 본문에 적어라.
 
+> **이 문서는 진행 상태를 추적하지 않는다.** 어느 task 가 끝났는지는 **이슈 #23 의 진행 표**가
+> 정본이다. 이 문서에 완료 배너를 달아 봤자 다음 task 가 착륙하는 순간 다시 낡는다 — 실제로
+> Task 1·2·3 이 각각 머지될 때마다 같은 지적이 세 번 반복됐다. **문서가 리뷰받는 동안 구현이
+> 계속 착륙하므로 문서는 영영 못 따라잡는다.** 그래서 추적을 옮긴다.
+>
+> **task 를 받으면 먼저 이슈 #23 의 진행 표를 보고 그 task 가 이미 끝났는지 확인하라.**
+>
 > **위치는 줄 번호로 주지 않는다.** 초안이 `cross-review.yml:1148` 처럼 적었다가 #26 이 그 파일에
 > 84줄을 더하면서 인용이 전부 밀렸다 — 저자 필터는 2곳에서 **3곳**이 됐는데 문서는 2곳만 알았다.
 > 이 계획은 **찾는 명령**으로 준다. 명령은 파일이 바뀌어도 맞는 곳을 가리킨다.
@@ -79,13 +86,9 @@
 
 ---
 
-## Task 1: 리뷰어 배정을 순수 판정 스크립트로 추출 — **완료 · PR #25 머지됨 (2026-08-08)**
+## Task 1: 리뷰어 배정을 순수 판정 스크립트로 추출
 
-> **이 task 는 끝났다.** PR #25 가 `decide()` 를 `scripts/review_route.py` 로 꺼냈다.
-> `cross-review.yml` 의 `route` 잡이 그 스크립트를 부른다. **다시 만들지 마라** —
-> 정본은 머지된 `scripts/review_route.py` 이고, 이 절은 무엇을 왜 했는지의 기록이다.
-
-**바뀐 자리**: `scripts/review_route.py` · `scripts/test_review_route.py` 신설,
+**바뀌는 자리**: `scripts/review_route.py` · `scripts/test_review_route.py` 신설,
 `cross-review.yml` 의 `route` 잡이 그것을 호출.
 outputs 목록만 보고 옮기지 마라 — 초안이 그렇게 해서 3자리를 틀렸다.
 
@@ -122,12 +125,9 @@ outputs 목록만 보고 옮기지 마라 — 초안이 그렇게 해서 3자리
 
 ---
 
-## Task 2: 터미널 준비·접수 판정을 교체한다 (구 #11) — **완료 · PR #26 머지됨 (2026-08-08)**
+## Task 2: 터미널 준비·접수 판정을 교체한다 (구 #11)
 
-> **이 task 는 끝났다.** PR #26 이 판정부를 `scripts/terminal_state.py` 로 꺼내고
-> `term_cursor()` 를 없앴다. 아래는 무엇을 왜 했는지의 기록이다 — 다시 하지 마라.
-
-**바뀐 자리**: `scripts/terminal_state.py` · `scripts/test_terminal_state.py` ·
+**바뀌는 자리**: `scripts/terminal_state.py` · `scripts/test_terminal_state.py` ·
 `scripts/fixtures/terminal_screens.json` 신설, `cross-review.yml` 의 `terminal_ready()` ·
 `wait_agent_ready()` · `send_review_prompt()` 가 그 판정부를 부른다.
 
