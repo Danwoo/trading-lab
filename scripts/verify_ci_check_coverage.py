@@ -78,6 +78,7 @@ INVENTORY_AXES: list[tuple[str, str, int]] = [
     ("*/scripts", "verify_*.py", 26),  # 서비스별 계약 검증
     ("scripts", "verify_*.py", 10),  # 루트 계약 검증
     ("scripts", "verify_*.mjs", 2),  # 루트 계약 검증 (node)
+    ("scripts", "test_*.py", 2),  # 루트 standalone 테스트 (서비스 밖 판정·게이트)
     ("*/tests", "test_*.py", 35),  # 서비스별 standalone 테스트 (#335)
     ("frontend/scripts", "check-*.js", 3),  # frontend 정적 스캔
     ("frontend/scripts", "generate-*.js", 1),  # 생성물 재현 대조 (--check 모드, #361)
