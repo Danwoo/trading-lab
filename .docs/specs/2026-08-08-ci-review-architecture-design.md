@@ -213,6 +213,34 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 2. `Approve` 리뷰가 있고, 그 `commit_id` 가 현재 head 와 같다
 3. `risk: low` — 또는 **저자가 봇이면서 major 상승이 아니다** (§2-1)
 
+**그리고 arm 을 푸는 자리가 반드시 있어야 한다 — 초안이 이것을 빠뜨렸다.**
+
+arm 조건만 정하고 disarm 을 안 만들면 이렇게 뚫린다: 승인 → `commit_id == head` 대조 통과 →
+arm. **이때 게이트 잡이 아직 도는 중.** 저자가 sha B 를 push. auto-merge 는 살아 있고, B 에서
+게이트가 초록이 되는 순간 **B 가 머지된다 — B 를 본 사람이 아무도 없다.**
+
+가상이 아니다. automation 계획의 재작업 워커가 **설계상 같은 브랜치에 push** 한다. 루프가
+닫히는 순간 이 push 가 상시화된다.
+
+지금은 `merge-router.yml` 이 `synchronize`·`edited`·`unlabeled` 에서 `--disable-auto` 로 푼다.
+세 갈래를 새 설계에서 각각 누가 받는지 보면 **push 만 비어 있다**:
+
+| 갈래 | 새 설계에서 |
+| --- | --- |
+| base 변경 | GitHub 이 네이티브로 해제한다 |
+| 판정 회수(`unlabeled`) | 라벨이 없어지므로 정당하게 소멸 |
+| **push(`synchronize`)** | **없음 — 만들어야 한다** |
+
+받는 곳이 없는 이유가 셋 겹친다. ① 기록기는 `issue_comment` 트리거라 push 에 안 뜬다.
+② GitHub 은 **쓰기 권한 없는** 사람의 push 에만 auto-merge 를 해제한다 — 우리 워커는 권한자다.
+③ 네이티브 stale-approval 회수도 못 쓴다: `required_approving_review_count = 0` 이라
+`require_last_push_approval` 을 켜도 무효이고, 승인을 required 로 안 켜는 것이 결정이다.
+
+**따라서 `pull_request: [synchronize]` 를 듣는 disarm 경로를 기록기에 함께 둔다.**
+`commit_id == head` 대조는 **arm 시점 1회** 판정이라 그것만으로는 부족하다 — 지금 규칙은
+push 마다 재평가되는 disarm 이 함께 지탱하고 있었다. 한쪽만 옮기면 그물이 실패하는 게 아니라
+**조용히 통과**한다.
+
 **경로 필터 처리**: 워크플로 레벨 `on.paths` 를 **잡 레벨 `if:`** 로 바꾼다. 워크플로째 건너뛴
 체크는 영영 pending 이라 머지를 막지만, 조건으로 건너뛴 잡은 `skipped` 를 보고하고 GitHub 은
 `success`·`skipped`·`neutral` 을 통과로 센다.
@@ -246,7 +274,7 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 | --- | --- |
 | `merge-router.yml` (291줄) | 존재 이유가 「GitHub 이 안 막으니 흉내」였다 |
 | `review-gate.yml` (151줄) | 라벨 위생 — 라벨이 상태가 아니게 되면 대상이 없다 |
-| 헤드리스 이중 경로 (30 실코드) | **관측된 판정 17건 전부 `orca`**(실측). 단 cross-review 총 실행은 23건이라 판정 코멘트가 안 달린 6건은 이 방법으로 안 보인다 — 「미사용」이 아니라 「관측 범위 내 미사용」이다 |
+| 헤드리스 이중 경로 (30 실코드) | **게시된 판정 코멘트 21건 전부 `orca`**(2026-08-09 전수 재집계). 판정 코멘트가 안 달린 실행은 이 방법으로 안 보이므로 「미사용」이 아니라 「관측 범위 내 미사용」이다 |
 | ~~폴백 체인·한도 감지~~ | **철회 (2026-08-08 리드 정정)** — kimi·codex 한도 시 claude 가 이어받는 것이 의도된 설계다. 실제 판정자는 하나이므로 「한 리뷰를 여러 모델이 이어받아 계속 손대는 것」과 다르다 |
 | 워크트리 생명주기 bash (36) + **시작 스윕** (`grep -n '고아 리뷰 워크트리 시작 청소' .github/workflows/cross-review.yml`) | **아래 「스윕 사건」 참조** — CI 가 에이전트 살림을 관장하면 안 된다. 정리는 automation 계획 Task 4 가 연결 PR 상태로 맡는다 |
 | `plan-*` 3파일 | 1파일로 통합 (로직 유지) |

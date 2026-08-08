@@ -73,7 +73,7 @@
 | **리뷰 루브릭은 PR 의 base 커밋에서 읽는다** | `.github/review-prompt.md` 머리 주석 | PR 이 자기 리뷰 기준을 변조한다 |
 | **리뷰어는 PR 코드를 체크아웃하지 않는다** (`--base-branch origin/main`) | `grep -n 'base-branch origin/main' .github/workflows/cross-review.yml` | 남의 코드가 self-hosted 러너에서 실행될 표면이 생긴다 |
 | **fork PR 은 리뷰어를 띄우지 않는다** | `grep -n 'head.repo.full_name' .github/workflows/cross-review.yml` | 같음 |
-| **저자 ≠ 리뷰어** | `decide()` 의 리뷰어 라우팅 블록 — `grep -n 'decide() {' …` 로 함수를 찾아 읽어라 | 자기리뷰 |
+| **저자 ≠ 리뷰어** | `scripts/review_route.py` 의 `decide()` (Task 1 이 여기로 옮겼다) | 자기리뷰 |
 | **판정 코멘트는 배정값이 아니라 실제 판정자를 적는다** | 루브릭: 「`reviewer` 는 route 가 정한 **배정값**이라 폴백이 일어나면 실제 판정자와 다르다」 | 누가 판정했는지가 기록과 어긋난다 |
 | **리뷰어는 고치지 않는다.** 판정과 근거만 낸다 | `.github/review-prompt.md` | 심판이 선수가 된다. 발견 → **저자가** 고침 → 리뷰어가 재판정 순서만 쓴다 |
 
@@ -295,13 +295,18 @@ gh api repos/Danwoo/trading-lab/rulesets/<id>
   `commit_id` 가 현재 head 와 같다 ③ `risk: low` **또는** 저자가 봇이면서 **major 상승이 아니다**
 - **`source=manual` 마커는 arm 하지 않는다** — 사람이 타이핑한 한 줄일 수 있다
 - 봇 PR 의 상승 종류는 PR 제목에서 읽는다. **읽지 못하면 arm 하지 않는다** (fail-closed)
+- **disarm 경로를 반드시 함께 만든다.** `pull_request: [synchronize]` 를 듣고 `--disable-auto`
+  로 arm 을 푼다. arm 조건만 옮기면 「승인 → arm → push → 아무도 안 본 커밋이 머지」가 뚫린다
+  (설계 §4 참조). 지금 그 일을 `merge-router.yml` 이 하고 있고 Task 8 이 그 파일을 지운다 —
+  **지우기 전에 이 경로가 서 있어야 한다.** Task 8 은 그것을 확인하고 지운다
 - **라벨을 붙이는 쪽도 함께 지운다.** 설계 결정 3 은 `review: passed`·`review: unable`·
   `review: needs-work`·`human: merge` 를 **없앤다**고 정했는데, 초안은 **읽는 쪽**(Task 8 의
   `merge-router`·`review-gate`)만 지우고 **붙이는 쪽**을 안 건드렸다. 그러면 아무도 안 읽는
   라벨이 계속 붙는다. 붙이는 자리를 전수로 찾아라:
   `grep -n 'review: passed\|review: unable\|review: needs-work\|human: merge' .github/workflows/*.yml`
-  (2026-08-08 기준 `cross-review.yml` 과 `board-status.yml` 에 있다. `board-status.yml` 은
-  Task 8 이 지우므로 그쪽은 자동 해소된다)
+  (2026-08-09 실측 **4파일**: `cross-review.yml` · `board-status.yml` · `review-gate.yml` ·
+  `merge-router.yml`. 뒤 셋은 Task 8 이 지우므로 자동 해소되고, **`cross-review.yml` 만 손으로
+  지워야 한다.** 곳 수를 이 문서에서 읽지 말고 위 명령으로 직접 세라)
 
 **검증**
 
