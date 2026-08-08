@@ -1152,6 +1152,9 @@ jobs:
           # 텍스트를 보내자 상자가 그 자리에 돌아왔다. 이 글자는 아래 접수 단계가 지운다.
           wait_agent_ready() {   # $1=핸들 → 0=준비됨
             local deadline
+            # 판정부가 번들에 없으면 준비를 판정할 근거가 없다. 60초를 태우며 살아 있는
+            # 에이전트의 입력 상자에 프로브 글자만 쌓지 않는다 — 즉시 실패로 끝낸다.
+            [ -s "$TERM_STATE" ] || return 1
             orca-ide terminal send --terminal "$1" --enter $ORCA_ENV >/dev/null 2>&1
             deadline=$(( $(date +%s) + READY_TIMEOUT ))
             while [ "$(date +%s)" -lt "$deadline" ]; do
@@ -1321,7 +1324,12 @@ jobs:
             fi
             # ── TUI 준비 (프라이머 1회 + 버퍼 성장 확인) ──────────────────────────────────
             if ! wait_agent_ready "$AGENT_HANDLE"; then
-              echo "에이전트 TUI 준비 실패(${READY_TIMEOUT}s — 프라이머 후 터미널 무반응)" > err.txt
+              # 두 원인을 구분해 적는다 — 「무반응」 한 줄로 뭉치면 판정부 부재를 TUI 문제로 오진한다.
+              if [ -s "$TERM_STATE" ]; then
+                echo "에이전트 TUI 준비 실패(${READY_TIMEOUT}s — 입력 상자가 화면에 나타나지 않았다)" > err.txt
+              else
+                echo "준비·접수 판정부(ctx/terminal_state.py)가 번들에 없어 준비를 판정할 수 없다" > err.txt
+              fi
               keep_worker_for_inspection "$WT_SEL" "TUI 준비 실패"
               return 1
             fi
