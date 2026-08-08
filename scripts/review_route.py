@@ -39,6 +39,60 @@ def _read_risk(issue_risks):
     return "high", "undeclared-fail-closed"
 
 
+def _identity_note(
+    author_kind,
+    author_models,
+    identity_source,
+    branch_vendor,
+    unknown_agentish,
+    author_tier,
+    claude_tiers_seen,
+):
+    """판정 코멘트에 `주의:` 로 실리는 사람 대상 신호 — 사실과 다르면 엉뚱한 곳을 고치러 간다."""
+    parts = []
+    if author_kind == "agent" and identity_source == "commit-email":
+        if branch_vendor and branch_vendor != author_models:
+            parts.append(
+                f"브랜치명({branch_vendor})과 커밋 신원({author_models}) 불일치 — "
+                "§6.1 일관성 점검 실패, 커밋 신원 우선"
+            )
+    elif author_kind == "mixed":
+        parts.append(
+            "복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, "
+            "판정 라벨 미부착(사람 경로)"
+        )
+    elif identity_source == "branch-name":
+        parts.append(
+            "커밋에 에이전트 신원 없음 — 브랜치명 단독 판별 "
+            "(§6.1 디스패치 계약 미이행, 실수 방지 점검 요망. "
+            "라우팅·표기 전용 — 판정 라벨 미부착)"
+        )
+    else:
+        parts.append("에이전트 신원 없음 — 사람 저자 취급, 판정 라벨 미부착(사람 경로)")
+
+    if unknown_agentish:
+        parts.append(f"목록 밖 에이전트형 이메일 관측: {','.join(unknown_agentish)}")
+
+    # 티어 미상 주의는 claude 저자일 때만 의미가 있다 (폴백이 발동하면 라벨이 안 붙는다).
+    if author_kind == "agent" and author_models == "claude" and not author_tier:
+        if identity_source == "branch-name":
+            parts.append(
+                "브랜치명 단독 판별이라 작성 티어를 알 수 없다 "
+                "(커밋에 claude 신원 자체가 없다) — 폴백 리뷰 시 판정 라벨 미부착"
+            )
+        elif len(claude_tiers_seen) > 1:
+            parts.append(
+                f"claude 작성 티어 혼재({','.join(sorted(claude_tiers_seen))}) — "
+                "티어 미상 처리 (폴백 리뷰 시 판정 라벨 미부착)"
+            )
+        else:
+            parts.append(
+                "claude 작성 티어 미기록(구형식 claude-agent@) — "
+                "폴백 리뷰 시 판정 라벨 미부착. §6.1 의 티어 신원을 쓰면 해소된다"
+            )
+    return "; ".join(parts)
+
+
 def decide(emails, head_ref, issue_risks, codex_on):
     vendors, claude_tiers_seen, unknown_agentish = set(), set(), []
     for raw in emails:
@@ -54,7 +108,7 @@ def decide(emails, head_ref, issue_risks, codex_on):
             unknown_agentish.append(raw)
 
     bm = _BRANCH.match(head_ref or "")
-    branch_model = bm.group("vendor") if bm else None
+    branch_vendor = bm.group("vendor") if bm else None
 
     author_tier = None
     if len(claude_tiers_seen) == 1 and "unknown" not in claude_tiers_seen:
@@ -68,14 +122,17 @@ def decide(emails, head_ref, issue_risks, codex_on):
         )
     elif len(vendors) > 1:
         author_kind, author_vendor, identity_source = "mixed", None, "commit-email"
-    elif branch_model:
+    elif branch_vendor:
         author_kind, author_vendor, identity_source = (
             "agent",
-            branch_model,
+            branch_vendor,
             "branch-name",
         )
     else:
         author_kind, author_vendor, identity_source = "human", None, "none"
+
+    # 저자 표기 — 혼재는 벤더 목록, 브랜치명 단독 판별은 그 벤더 (커밋 신원이 없다)
+    author_models = ",".join(sorted(vendors)) or (author_vendor or "")
 
     risk, risk_source = _read_risk(issue_risks)
 
@@ -102,9 +159,18 @@ def decide(emails, head_ref, issue_risks, codex_on):
         "author_kind": author_kind,
         "author_vendor": author_vendor,
         # 혼재 저자는 author_vendor 로 환원되지 않는다 — 저자 표기·자기벤더 판정이 목록을 쓴다
-        "author_vendors": sorted(vendors),
+        "author_models": author_models,
         "author_tier": author_tier,
         "identity_source": identity_source,
+        "identity_note": _identity_note(
+            author_kind,
+            author_models,
+            identity_source,
+            branch_vendor,
+            unknown_agentish,
+            author_tier,
+            claude_tiers_seen,
+        ),
         "risk": risk,
         "risk_source": risk_source,
         "label_allowed": label_allowed,

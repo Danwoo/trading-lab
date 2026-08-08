@@ -337,11 +337,13 @@ jobs:
           ISSUES_JSON=$(gh api graphql -f query='query($id:ID!){ node(id:$id){ ... on PullRequest { closingIssuesReferences(first:10){ nodes { number labels(first:30){ nodes { name } } } } } } }' -f id="$PR_NODE" --jq '.data.node.closingIssuesReferences.nodes')
           ISSUE_RISKS=$(printf '%s' "$ISSUES_JSON" | jq -r '.[] | [.labels.nodes[].name] | if index("risk: high") then "high" elif index("risk: low") then "low" else "none" end')
           printf '%s' "$ISSUES_JSON" | jq -r '.[].number' > issue-nums.txt
-          # 둘 다 여러 줄이라 구분자 형식으로 넘긴다 (이메일·라벨은 줄바꿈을 품을 수 없어
-          # 구분자 위조가 불가능하다).
+          # 둘 다 여러 줄이라 구분자 형식으로 넘긴다. 구분자는 **매 실행 무작위**다 — 커밋
+          # author email 은 신뢰 경계 밖 문자열이고, 줄 전체가 고정 구분자와 같은 이메일이면
+          # 히어독이 조기 종료된다 (git 은 개행·꺾쇠 말고 거의 다 허용한다).
+          DELIM="ROUTE_EOF_$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
           {
-            printf 'emails<<__ROUTE_EOF__\n%s\n__ROUTE_EOF__\n' "$EMAILS"
-            printf 'issue_risks<<__ROUTE_EOF__\n%s\n__ROUTE_EOF__\n' "$ISSUE_RISKS"
+            printf 'emails<<%s\n%s\n%s\n' "$DELIM" "$EMAILS" "$DELIM"
+            printf 'issue_risks<<%s\n%s\n%s\n' "$DELIM" "$ISSUE_RISKS" "$DELIM"
           } >> "$GITHUB_OUTPUT"
 
       # 판정 자체는 scripts/review_route.py 가 한다 (stdlib 전용 순수 함수 — 로컬에서
@@ -375,18 +377,12 @@ jobs:
               print(f"{key}={text}")
           PY
 
-          # route 잡의 출력 계약을 유지하는 파생값 — 판정이 아니라 판정의 표현이다.
-          # chain·fallback_tier 는 폴백 체인이 사라지는 시점에 함께 사라진다.
+          # 남은 셋은 판정이 아니라 판정값의 표현이다 (chain·fallback_tier 는 폴백 체인이
+          # 사라지는 시점에 함께 사라진다). 문구를 만드는 판정은 전부 스크립트가 낸다 —
+          # 여기서 조립하면 차등 대조가 못 보는 축이 생긴다.
           val() { sed -n "s/^$1=//p" route.env; }
-          REVIEWER=$(val reviewer)
-          AUTHOR_KIND=$(val author_kind)
-          AUTHOR_VENDOR=$(val author_vendor)
-          AUTHOR_VENDORS=$(val author_vendors)
           AUTHOR_TIER=$(val author_tier)
-          IDENTITY_SOURCE=$(val identity_source)
-          # 저자 모델 표기 — 혼재는 목록, 브랜치명 단독 판별은 그 모델 (커밋 신원이 없다)
-          AUTHOR_MODELS="${AUTHOR_VENDORS:-$AUTHOR_VENDOR}"
-          case "$REVIEWER" in
+          case "$(val reviewer)" in
             codex)  CHAIN="codex kimi claude" ;;
             kimi)   CHAIN="kimi claude" ;;
             claude) CHAIN="claude" ;;
@@ -394,24 +390,9 @@ jobs:
           esac
           if [ -n "$AUTHOR_TIER" ]; then TIER_SOURCE=commit-email; else TIER_SOURCE=none; fi
           if [ "$AUTHOR_TIER" = opus ]; then FALLBACK_TIER=sonnet; else FALLBACK_TIER=opus; fi
-          NOTE=""
-          case "${AUTHOR_KIND}/${IDENTITY_SOURCE}" in
-            agent/branch-name)
-              NOTE="커밋에 에이전트 신원 없음 — 브랜치명 단독 판별 (§6.1 디스패치 계약 미이행. 라우팅·표기 전용 — 판정 라벨 미부착)" ;;
-            mixed/*)
-              NOTE="복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, 판정 라벨 미부착(사람 경로)" ;;
-            human/*)
-              NOTE="에이전트 신원 없음(사람·봇·목록 밖 티어) — 사람 저자 취급, 판정 라벨 미부착(사람 경로)" ;;
-            agent/commit-email)
-              if [ "$AUTHOR_VENDOR" = claude ] && [ -z "$AUTHOR_TIER" ]; then
-                NOTE="claude 작성 티어 미상(구형식 claude-agent@ 또는 티어 혼재) — 폴백 리뷰 시 판정 라벨 미부착. §6.1 의 티어 신원을 쓰면 해소된다"
-              fi ;;
-          esac
           {
-            printf 'author_models=%s\n' "$AUTHOR_MODELS"
             printf 'tier_source=%s\n'   "$TIER_SOURCE"
             printf 'fallback_tier=%s\n' "$FALLBACK_TIER"
-            printf 'identity_note=%s\n' "$NOTE"
             printf 'chain=%s\n'         "$CHAIN"
             printf 'head_sha=%s\n'      "$HEAD_SHA"
           } >> route.env

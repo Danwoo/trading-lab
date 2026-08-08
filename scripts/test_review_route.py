@@ -31,7 +31,7 @@ CASES = [
             "reviewer": "kimi",
             "author_kind": "agent",
             "author_tier": "opus",
-            "author_vendors": ["claude"],
+            "author_models": "claude",
             "label_allowed": True,
         },
     ),
@@ -69,7 +69,7 @@ CASES = [
         {
             "reviewer": "codex",
             "author_kind": "mixed",
-            "author_vendors": ["claude", "kimi"],
+            "author_models": "claude,kimi",
             "label_allowed": False,
         },
     ),
@@ -82,7 +82,7 @@ CASES = [
         {
             "reviewer": "none",
             "author_kind": "mixed",
-            "author_vendors": ["claude", "kimi"],
+            "author_models": "claude,kimi",
         },
     ),
     (
@@ -95,7 +95,7 @@ CASES = [
             "reviewer": "kimi",
             "author_kind": "agent",
             "author_vendor": "claude",
-            "author_vendors": [],
+            "author_models": "claude",
             "identity_source": "branch-name",
             "label_allowed": False,
         },
@@ -109,7 +109,7 @@ CASES = [
         {
             "reviewer": "claude",
             "author_kind": "human",
-            "author_vendors": [],
+            "author_models": "",
             "label_allowed": False,
         },
     ),
@@ -122,7 +122,7 @@ CASES = [
         {
             "reviewer": "claude",
             "author_kind": "human",
-            "author_vendors": [],
+            "author_models": "",
             "label_allowed": False,
         },
     ),
@@ -156,7 +156,7 @@ CASES = [
         "",
         ["low"],
         False,
-        {"author_tier": None, "author_kind": "agent", "author_vendors": ["claude"]},
+        {"author_tier": None, "author_kind": "agent", "author_models": "claude"},
     ),
     (
         "목록 밖 에이전트형 이메일 → 라벨 금지",
@@ -180,7 +180,31 @@ CASES = [
         "",
         ["low"],
         False,
-        {"author_kind": "human", "author_vendors": [], "label_allowed": False},
+        {"author_kind": "human", "author_models": "", "label_allowed": False},
+    ),
+    (
+        "브랜치명과 커밋 신원 불일치 → 주의 문구를 남긴다",
+        [C],
+        "fix-42-kimi",
+        ["low"],
+        False,
+        {
+            "identity_note": "브랜치명(kimi)과 커밋 신원(claude) 불일치 — "
+            "§6.1 일관성 점검 실패, 커밋 신원 우선"
+        },
+    ),
+    (
+        "목록 밖 에이전트형 이메일 → 관측 문구를 남긴다",
+        [C, "Claude-Opus-Agent@noreply.local"],
+        "",
+        ["low"],
+        False,
+        {
+            "author_kind": "agent",
+            "label_allowed": False,
+            "identity_note": "목록 밖 에이전트형 이메일 관측: "
+            "Claude-Opus-Agent@noreply.local",
+        },
     ),
     (
         "위험 라벨에 빈 줄이 섞이면 미선언 → high",
