@@ -6,18 +6,25 @@
 
 **2026-08-04 갱신(#391 D3, O8-3/#341 이관 반영)** — radix-ui 이관 커널이 신규 프로덕션 패키지 73종(`@radix-ui/*` 60 + `radix-ui` 1 + `@floating-ui/*` 4 + `aria-hidden`·`detect-node-es`·`get-nonce`·`react-remove-scroll`·`react-remove-scroll-bar`·`react-style-singleton`·`use-callback-ref`·`use-sidecar` 8)을 들여와 550→623개로 늘었다. 아래 재현 명령의 실제 출력을 `main` 대비 `frontend/package-lock.json` diff(신규 76 항목 − 버전만 오른 기존 패키지 3 종 `axios`·`form-data`·`hasown` = 순증 73)와 대조해 신규분을 확정했다. **73종 전수를 `licenses-prod.json` 에서 개별 확인 — 전부 `MIT`, `licenseFile` 실재(파일 없음 0건).** 아래 §2 표에 반영했다.
 
-생성 명령(재현 가능, 이 목록은 손으로 옮기지 않고 아래 명령의 실제 출력에서 뽑았다):
+생성 명령(재현 가능 — §1·§2 의 목록은 이 명령의 실제 출력에서 생성기가 만든다):
 
 ```bash
 cd frontend && npm ci --ignore-scripts
 npx --yes license-checker-rseidelsohn --production --excludePrivatePackages --json --out /tmp/licenses-prod.json
 ```
 
-**이 문서의 숫자는 CI 가 매번 대조한다 (#365).** `scripts/verify_notice_counts.py` 가 위 명령을
-다시 돌려 **이 문서가 열거한 `이름@버전` 집합과 실측 집합을 양방향으로** 맞춰 보고, 절 머리의
-선언 개수·§3 의 폰트 파일 수까지 함께 본다 (`test: frontend` 잡). 개수만 맞추면 「하나 빠지고
-하나 더 들어온」 상태가 통과하므로 집합으로 본다. 그래서 **숫자를 손으로 고치는 것으로는
-초록이 되지 않는다** — 의존성이 바뀌면 위 명령의 새 출력을 정본으로 삼아 목록째 갱신해야 한다.
+**§1·§2 의 개수·목록·라이선스 원문은 손으로 세지 않는다.** 의존성이 바뀌면
+`python3 scripts/generate_notices.py` 를 돌려 다시 만들어 커밋한다. 어디까지가 생성기 소관이고
+어디부터가 사람이 쓴 산문인지(라이선스 **분류** 판단·각 절의 설명·§3 전체)는 그 스크립트의 머리
+주석이 경계로 적어 두었다 — 분류표에 없는 라이선스가 새로 들어오면 생성기는 그것을 §2
+permissive 로 흘려보내지 않고 멈춘다(사람이 판단할 자리다).
+
+**그리고 CI 가 매번 두 겹으로 대조한다 (#365, `test: frontend` 잡).**
+`scripts/generate_notices.py --check` 는 「생성기 출력 = 커밋된 문서」를 보고,
+`scripts/verify_notice_counts.py` 는 생성기 출력을 믿지 않고 **문서를 다시 파싱해** 「문서가
+열거한 `이름@버전` 집합 = 실측 집합」을 양방향으로 본다(절 머리의 선언 개수·§3 의 폰트 파일
+수까지 함께). 개수만 맞추면 「하나 빠지고 하나 더 들어온」 상태가 통과하므로 집합으로 본다 —
+**숫자를 손으로 고치는 것으로는 초록이 되지 않는다.**
 
 ---
 

@@ -86,6 +86,7 @@ INVENTORY_AXES: list[tuple[str, str, int]] = [
     ("*/tests", "test_*.py", 35),  # 서비스별 standalone 테스트 (#335)
     ("frontend/scripts", "check-*.js", 3),  # frontend 정적 스캔
     ("frontend/scripts", "generate-*.js", 1),  # 생성물 재현 대조 (--check 모드, #361)
+    ("scripts", "generate_*.py", 1),  # 루트 생성물 재현 대조 (--check 모드)
 ]
 
 # 파일 하나로 환원되지 않는 검사. 워크플로 어딘가에 이 문자열이 있어야 한다.
