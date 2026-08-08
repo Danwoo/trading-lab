@@ -40,7 +40,7 @@ import generate_notices as gen  # noqa: E402
 import verify_notice_counts as checker  # noqa: E402
 
 # 케이스가 이보다 적으면 수집이 깨진 것이다 (fail-closed — 「0건 통과」 방지).
-MIN_CASES = 15
+MIN_CASES = 16
 
 # 픽스처에 심는 사람 산문 — 생성기가 건드리면 안 되는 문장.
 PROSE_MARK = "사람이 쓴 설명 문장 (생성기 소관 아님)"
@@ -332,6 +332,16 @@ def run_cases() -> tuple[list[str], int]:
         cases += 1
         tiny = dict(list(scan.items())[:10])
         failures += expect_problem("⑭ 실측 하한", lambda: gen.build(built, tiny))
+
+        # ⑭-b fail-closed — 원문 파일 없는 패키지가 대량이면 「다들 원문을 뺐다」가 아니라
+        # 경로가 이 환경에서 안 풀린 것이다. 그대로 쓰면 예외 표에 수백 개를 실은 문서가 된다.
+        cases += 1
+        unresolved = {
+            package: {"licenses": entry["licenses"]} for package, entry in scan.items()
+        }
+        failures += expect_problem(
+            "⑭-b licenseFile 경로 미해소", lambda: gen.build(built, unresolved)
+        )
 
         # ⑮ `--check` — 어긋나면 1, 같으면 0. 그리고 **문서를 고치지 않는다**.
         cases += 1
