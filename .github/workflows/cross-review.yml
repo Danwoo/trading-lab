@@ -600,9 +600,21 @@ jobs:
           gh api "repos/$REPO/contents/.github/review-prompt.md?ref=$BASE_SHA" --jq .content | base64 -d > ctx/review-prompt.md
           test -s ctx/review-prompt.md
           # 터미널 준비·접수 판정부 — 리뷰 잡은 체크아웃이 없으므로(아래 review 잡 머리 「보안 자세」)
-          # 이 번들로 실어 나른다. 루브릭과 같은 신뢰선인 base 커밋 발이다 — PR 이 자기 리뷰어를
-          # 띄우는 판정을 변조하지 못하게. 없으면 실패 = fail-closed.
-          gh api "repos/$REPO/contents/scripts/terminal_state.py?ref=$BASE_SHA" --jq .content | base64 -d > ctx/terminal_state.py
+          # 이 번들로 실어 나른다. 루브릭과 같은 신뢰선인 **base 커밋을 먼저** 본다 — PR 이 자기
+          # 리뷰어를 띄우는 판정을 변조하지 못하게.
+          #
+          # base 에 없으면 head 로 되돌아간다. 이 파일이 main 에 없던 동안(또는 base 가 그보다
+          # 앞선 커밋일 때) base 조회는 404 이고, 그것을 fail-closed 로 두면 **모든 PR 의 route
+          # 잡이 죽는다** — 실제로 그렇게 죽는 것을 보고 넣은 갈래다. 되돌림이 새 신뢰 표면을
+          # 열지는 않는다: fork PR 은 review 잡 자체가 안 돌고(`head.repo.full_name` 가드),
+          # 같은 레포 PR 은 워크플로 정의 자체가 이미 head 판본이다. base 에 파일이 있는 한
+          # 이 갈래는 타지 않으므로 변조 방어도 그대로다. 양쪽 다 없으면 실패 = fail-closed.
+          gh api "repos/$REPO/contents/scripts/terminal_state.py?ref=$BASE_SHA" --jq '.content // empty' 2>/dev/null \
+            | base64 -d > ctx/terminal_state.py 2>/dev/null || true
+          if [ ! -s ctx/terminal_state.py ]; then
+            echo "::warning::준비·접수 판정부가 base 커밋(${BASE_SHA})에 없다 — head 판본으로 되돌아간다"
+            gh api "repos/$REPO/contents/scripts/terminal_state.py?ref=$HEAD_SHA" --jq .content | base64 -d > ctx/terminal_state.py
+          fi
           test -s ctx/terminal_state.py
 
       - name: 컨텍스트 업로드
