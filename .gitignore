@@ -6,3 +6,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# 브레인스토밍 시안 (세션 산출물 — 공유 대상 아님)
+.superpowers/
