@@ -83,6 +83,8 @@ CASES = [
             "reviewer": "none",
             "author_kind": "mixed",
             "author_models": "claude,kimi",
+            "identity_note": "복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, "
+            "판정 라벨 미부착(사람 경로)",
         },
     ),
     (
@@ -98,6 +100,11 @@ CASES = [
             "author_models": "claude",
             "identity_source": "branch-name",
             "label_allowed": False,
+            "identity_note": "커밋에 에이전트 신원 없음 — 브랜치명 단독 판별 "
+            "(§6.1 디스패치 계약 미이행, 실수 방지 점검 요망. "
+            "라우팅·표기 전용 — 판정 라벨 미부착); "
+            "브랜치명 단독 판별이라 작성 티어를 알 수 없다 "
+            "(커밋에 claude 신원 자체가 없다) — 폴백 리뷰 시 판정 라벨 미부착",
         },
     ),
     (
@@ -111,6 +118,8 @@ CASES = [
             "author_kind": "human",
             "author_models": "",
             "label_allowed": False,
+            "identity_note": "에이전트 신원 없음 — 사람 저자 취급, "
+            "판정 라벨 미부착(사람 경로)",
         },
     ),
     (
@@ -148,7 +157,13 @@ CASES = [
         "",
         ["low"],
         False,
-        {"author_tier": None, "reviewer": "kimi", "label_allowed": True},
+        {
+            "author_tier": None,
+            "reviewer": "kimi",
+            "label_allowed": True,
+            "identity_note": "claude 작성 티어 미기록(구형식 claude-agent@) — "
+            "폴백 리뷰 시 판정 라벨 미부착. §6.1 의 티어 신원을 쓰면 해소된다",
+        },
     ),
     (
         "claude 티어 혼재 → 티어 미상",
@@ -156,7 +171,13 @@ CASES = [
         "",
         ["low"],
         False,
-        {"author_tier": None, "author_kind": "agent", "author_models": "claude"},
+        {
+            "author_tier": None,
+            "author_kind": "agent",
+            "author_models": "claude",
+            "identity_note": "claude 작성 티어 혼재(opus,sonnet) — "
+            "티어 미상 처리 (폴백 리뷰 시 판정 라벨 미부착)",
+        },
     ),
     (
         "목록 밖 에이전트형 이메일 → 라벨 금지",
