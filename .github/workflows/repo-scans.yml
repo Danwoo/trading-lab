@@ -117,6 +117,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_public_release_gate.py
 
+      # 터미널 준비·접수 판정 (#23 Task 2) — 리뷰 워커 터미널에서 실제로 읽은 화면으로 판다.
+      # 종전 판정은 `latestCursor` 성장을 신호로 썼는데 Claude Code TUI 에서 그 값이 안 움직여
+      # 리뷰 경로가 통째로 죽었다. 화면은 우리가 못 고치는 런타임 산출물이라, 판정이 어느 화면을
+      # 무엇으로 읽는지를 케이스로 못박아 둔다. 케이스를 0건 수집하면 실패한다 (fail-closed).
+      - name: 터미널 준비·접수 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_terminal_state.py
+
   # ── 앱 모듈을 import 하는 전수 스캔 (uv 필요) ────────────────────────────
   repo-scan-app:
     name: "test: repo-scan-app"
