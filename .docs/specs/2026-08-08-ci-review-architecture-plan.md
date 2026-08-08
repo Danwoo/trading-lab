@@ -33,6 +33,12 @@
 > **위치는 줄 번호로 주지 않는다.** 초안이 `cross-review.yml:1148` 처럼 적었다가 #26 이 그 파일에
 > 84줄을 더하면서 인용이 전부 밀렸다 — 저자 필터는 2곳에서 **3곳**이 됐는데 문서는 2곳만 알았다.
 > 이 계획은 **찾는 명령**으로 준다. 명령은 파일이 바뀌어도 맞는 곳을 가리킨다.
+>
+> **단, 찾는 명령도 조용히 실패한다.** `grep` 은 0건일 때 아무 말 없이 끝난다 — 줄 번호는
+> 틀린 곳을 가리키고 grep 은 아무 곳도 안 가리키는데, 후자가 더 조용하다. 실제로 PR #25 가
+> 머지되면서 `grep 'decide() {' cross-review.yml` 이 0건이 됐다(코드가 `scripts/` 로 나갔다).
+> **그러니 찾는 명령이 0건이면 「없어졌다」로 읽고 멈춰서 지휘자에게 알려라.** 스스로 판단해
+> 새로 만들지 마라 — 이미 머지된 것을 다시 만들 수 있다.
 
 ---
 
@@ -73,9 +79,14 @@
 
 ---
 
-## Task 1: 리뷰어 배정을 순수 판정 스크립트로 추출
+## Task 1: 리뷰어 배정을 순수 판정 스크립트로 추출 — **완료 · PR #25 머지됨 (2026-08-08)**
 
-**읽어야 할 자리**: `cross-review.yml` 의 `decide()` **전문** — `grep -n 'decide() {' .github/workflows/cross-review.yml` 로 시작 줄을 찾아 같은 들여쓰기의 닫는 `}` 까지.
+> **이 task 는 끝났다.** PR #25 가 `decide()` 를 `scripts/review_route.py` 로 꺼냈다.
+> `cross-review.yml` 의 `route` 잡이 그 스크립트를 부른다. **다시 만들지 마라** —
+> 정본은 머지된 `scripts/review_route.py` 이고, 이 절은 무엇을 왜 했는지의 기록이다.
+
+**바뀐 자리**: `scripts/review_route.py` · `scripts/test_review_route.py` 신설,
+`cross-review.yml` 의 `route` 잡이 그것을 호출.
 outputs 목록만 보고 옮기지 마라 — 초안이 그렇게 해서 3자리를 틀렸다.
 
 **만드는 것**: `scripts/review_route.py`(순수 판정) · `scripts/test_review_route.py` ·
@@ -284,6 +295,13 @@ gh api repos/Danwoo/trading-lab/rulesets/<id>
   `commit_id` 가 현재 head 와 같다 ③ `risk: low` **또는** 저자가 봇이면서 **major 상승이 아니다**
 - **`source=manual` 마커는 arm 하지 않는다** — 사람이 타이핑한 한 줄일 수 있다
 - 봇 PR 의 상승 종류는 PR 제목에서 읽는다. **읽지 못하면 arm 하지 않는다** (fail-closed)
+- **라벨을 붙이는 쪽도 함께 지운다.** 설계 결정 3 은 `review: passed`·`review: unable`·
+  `review: needs-work`·`human: merge` 를 **없앤다**고 정했는데, 초안은 **읽는 쪽**(Task 8 의
+  `merge-router`·`review-gate`)만 지우고 **붙이는 쪽**을 안 건드렸다. 그러면 아무도 안 읽는
+  라벨이 계속 붙는다. 붙이는 자리를 전수로 찾아라:
+  `grep -n 'review: passed\|review: unable\|review: needs-work\|human: merge' .github/workflows/*.yml`
+  (2026-08-08 기준 `cross-review.yml` 과 `board-status.yml` 에 있다. `board-status.yml` 은
+  Task 8 이 지우므로 그쪽은 자동 해소된다)
 
 **검증**
 
