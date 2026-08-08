@@ -809,8 +809,11 @@ GitHub 은 자기 PR 자기 승인을 금지하므로 로컬 `gh`(리드 계정)
 
 **Interfaces:**
 - Consumes: Task 1 의 `label_allowed`
-- Produces: `decide_record(marker, head_sha, gate_ok, risk, author_login) -> dict` —
-  키는 `action`(`"approve"|"request_changes"|"none"`) · `arm_automerge`(`bool`) · `reason`(`str`)
+- Produces:
+  - `parse_marker(body: str) -> dict | None`
+  - `semver_update_type(title: str) -> "major" | "minor" | "patch" | None`
+  - `decide_record(marker, head_sha, gate_ok, risk, author_login, pr_title) -> dict` —
+    키는 `action`(`"approve"|"request_changes"|"none"`) · `arm_automerge`(`bool`) · `reason`(`str`)
 
 - [ ] **Step 1: 실패하는 테스트를 쓴다**
 
@@ -819,11 +822,13 @@ GitHub 은 자기 PR 자기 승인을 금지하므로 로컬 `gh`(리드 계정)
 ```python
 """판정 마커 → 리뷰 행동·자동 머지 arm 회귀 그물 — stdlib 전용.
 
-경계 셋을 못박는다:
+경계 넷을 못박는다:
   ① 마커 sha 가 head 와 다르면 낡은 판정이다 (승인을 켜지 않으므로 GitHub 의
      stale 무효화에 기댈 수 없다 — 우리가 대조한다).
   ② source=manual 마커는 사람이 타이핑한 한 줄일 수 있으므로 자동 머지를 arm 하지 않는다.
   ③ 봇 저자는 위험 선언이 없어도 자동 머지 대상이다 (2026-08-08 리드 결정).
+  ④ **단 major 상승은 사람 경로다.** 2026-08-07 실측에서 리뷰어가 첫 줄에 올린 두 사실이
+     전부 major 였다. 제목 형식이 바뀌어 판별이 안 되면 arm 하지 않는다 (fail-closed).
 """
 
 import sys
@@ -834,48 +839,81 @@ import review_record as rr
 
 HEAD = "a" * 40
 OLD = "b" * 40
+BOT = "dependabot[bot]"
+
+PATCH_TITLE = "build(deps): bump starlette from 1.3.0 to 1.3.1 in /template-mcp-service"
+MINOR_TITLE = "build(deps): bump mcp from 1.27.2 to 1.28.1 in /template-mcp-service"
+MAJOR_TITLE = "build(deps): bump cryptography from 48.0.1 to 50.0.0 in /template-mcp-service"
+HUMAN_TITLE = "fix(auth): 탈퇴자 이메일 잔류 제거"
+
+SEMVER_CASES = [
+    ("patch", PATCH_TITLE, "patch"),
+    ("minor", MINOR_TITLE, "minor"),
+    ("major", MAJOR_TITLE, "major"),
+    ("제목 형식이 다르면 None", HUMAN_TITLE, None),
+    ("버전이 숫자가 아니면 None",
+     "build(deps): bump x from abc to def in /y", None),
+]
 
 CASES = [
     ("merge_ok + 최신 + 저위험 → 승인·arm",
      {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, "low",
-     "danwoo", "approve", True),
+     "danwoo", HUMAN_TITLE, "approve", True),
     ("merge_ok + 낡은 sha → 아무것도 안 한다",
      {"verdict": "merge_ok", "sha": OLD, "source": None}, HEAD, True, "low",
-     "danwoo", "none", False),
+     "danwoo", HUMAN_TITLE, "none", False),
     ("needs_changes → 변경 요청, arm 안 함",
      {"verdict": "needs_changes", "sha": HEAD, "source": None}, HEAD, True, "low",
-     "danwoo", "request_changes", False),
+     "danwoo", HUMAN_TITLE, "request_changes", False),
     ("unable → 아무것도 안 한다",
      {"verdict": "unable", "sha": HEAD, "source": None}, HEAD, True, "low",
-     "danwoo", "none", False),
+     "danwoo", HUMAN_TITLE, "none", False),
     ("source=manual → 승인은 하되 arm 안 함",
      {"verdict": "merge_ok", "sha": HEAD, "source": "manual"}, HEAD, True, "low",
-     "danwoo", "approve", False),
+     "danwoo", HUMAN_TITLE, "approve", False),
     ("게이트 빨강 → 승인은 하되 arm 안 함",
      {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, False, "low",
-     "danwoo", "approve", False),
+     "danwoo", HUMAN_TITLE, "approve", False),
     ("고위험 → 승인은 하되 arm 안 함",
      {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, "high",
-     "danwoo", "approve", False),
+     "danwoo", HUMAN_TITLE, "approve", False),
     ("위험 미선언 + 사람 저자 → arm 안 함",
      {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
-     "danwoo", "approve", False),
-    ("위험 미선언 + 봇 저자 → arm 한다",
+     "danwoo", HUMAN_TITLE, "approve", False),
+    ("봇 + patch → arm 한다",
      {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
-     "dependabot[bot]", "approve", True),
+     BOT, PATCH_TITLE, "approve", True),
+    ("봇 + minor → arm 한다",
+     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
+     BOT, MINOR_TITLE, "approve", True),
+    ("봇 + major → 승인은 하되 arm 안 함 (사람 경로)",
+     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
+     BOT, MAJOR_TITLE, "approve", False),
+    ("봇 + 제목 파싱 실패 → arm 안 함 (fail-closed)",
+     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
+     BOT, "이상한 제목", "approve", False),
+    ("봇 + major 라도 risk: low 가 명시돼 있으면 arm 한다",
+     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, "low",
+     BOT, MAJOR_TITLE, "approve", True),
 ]
 
 
 def main() -> int:
     failures = 0
-    for desc, marker, head, gate_ok, risk, author, want_action, want_arm in CASES:
-        got = rr.decide_record(marker, head, gate_ok, risk, author)
+    for desc, title, want in SEMVER_CASES:
+        got = rr.semver_update_type(title)
+        if got != want:
+            print(f"FAIL [semver/{desc}] got {got!r}, want {want!r}")
+            failures += 1
+    for desc, marker, head, gate_ok, risk, author, title, want_action, want_arm in CASES:
+        got = rr.decide_record(marker, head, gate_ok, risk, author, title)
         if got["action"] != want_action or got["arm_automerge"] is not want_arm:
             print(f"FAIL [{desc}] got action={got['action']!r} "
                   f"arm={got['arm_automerge']!r}, want {want_action!r}/{want_arm!r}")
             failures += 1
-    print(f"review_record 케이스 {len(CASES)}건 검사 · 실패 {failures}건")
-    if not CASES:
+    total = len(SEMVER_CASES) + len(CASES)
+    print(f"review_record 케이스 {total}건 검사 · 실패 {failures}건")
+    if total == 0:
         print("FAIL 검사 대상 0건")
         return 1
     return 1 if failures else 0
@@ -913,6 +951,31 @@ MARKER = re.compile(
 
 BOT_SUFFIX = "[bot]"
 
+# Dependabot 제목 형식 (실측): `bump <패키지> from <A> to <B> in /<디렉터리>`
+_BUMP = re.compile(r"\bbump\s+\S+\s+from\s+(?P<a>\S+)\s+to\s+(?P<b>\S+)\b")
+
+
+def semver_update_type(title):
+    """제목에서 상승 종류를 읽는다. 형식이 다르거나 버전이 숫자가 아니면 None.
+
+    None 은 '모른다'이지 '안전하다'가 아니다 — 호출부가 fail-closed 로 다룬다.
+    """
+    m = _BUMP.search(title or "")
+    if not m:
+        return None
+    try:
+        a = [int(x) for x in m.group("a").split(".")[:3]]
+        b = [int(x) for x in m.group("b").split(".")[:3]]
+    except ValueError:
+        return None
+    a += [0] * (3 - len(a))
+    b += [0] * (3 - len(b))
+    if a[0] != b[0]:
+        return "major"
+    if a[1] != b[1]:
+        return "minor"
+    return "patch"
+
 
 def parse_marker(body):
     """코멘트 본문에서 마지막 마커를 읽는다. 없으면 None."""
@@ -923,7 +986,7 @@ def parse_marker(body):
     return last
 
 
-def decide_record(marker, head_sha, gate_ok, risk, author_login):
+def decide_record(marker, head_sha, gate_ok, risk, author_login, pr_title=""):
     if marker is None:
         return {"action": "none", "arm_automerge": False, "reason": "마커 없음"}
     if not head_sha.startswith(marker["sha"]):
@@ -943,8 +1006,17 @@ def decide_record(marker, head_sha, gate_ok, risk, author_login):
         reasons.append("수동 마커")
     if not gate_ok:
         reasons.append("게이트 미통과")
-    if not (risk == "low" or author_login.endswith(BOT_SUFFIX)):
-        reasons.append("저위험 아님" if risk else "위험 미선언")
+
+    if risk != "low":
+        # 봇 PR 은 위험 선언 자리가 없다 — 대신 상승 종류로 가른다 (2026-08-08 리드 결정)
+        if author_login.endswith(BOT_SUFFIX):
+            update = semver_update_type(pr_title)
+            if update == "major":
+                reasons.append("봇 major 상승 — 사람 경로")
+            elif update is None:
+                reasons.append("봇 PR 제목에서 상승 종류를 못 읽음")
+        else:
+            reasons.append("저위험 아님" if risk else "위험 미선언")
 
     return {"action": "approve", "arm_automerge": not reasons,
             "reason": "자동 머지 arm" if not reasons else " · ".join(reasons)}
@@ -953,7 +1025,8 @@ def decide_record(marker, head_sha, gate_ok, risk, author_login):
 - [ ] **Step 4: 테스트가 통과하는지 확인한다**
 
 Run: `python3 scripts/test_review_record.py`
-Expected: `review_record 케이스 9건 검사 · 실패 0건` · 종료코드 0
+Expected: `review_record 케이스 18건 검사 · 실패 0건` · 종료코드 0
+(semver 판별 5건 + 기록 판정 13건)
 
 - [ ] **Step 5: 기록기 워크플로를 만든다**
 
@@ -994,10 +1067,15 @@ jobs:
           BODY: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail
-          HEAD_SHA=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)
-          AUTHOR=$(gh pr view "$PR" --json author --jq .author.login)
-          RISK=$(gh pr view "$PR" --json labels --jq '[.labels[].name] | map(select(startswith("risk: "))) | first // ""' | sed 's/^risk: //')
-          GATE=$(gh pr checks "$PR" --json name,state --jq '[.[] | select(.name=="test: gate")] | first | .state // ""')
+          META=$(gh pr view "$PR" --json headRefOid,author,title,labels)
+          export HEAD_SHA=$(printf '%s' "$META" | python3 -c 'import json,sys;print(json.load(sys.stdin)["headRefOid"])')
+          export AUTHOR=$(printf '%s' "$META" | python3 -c 'import json,sys;print(json.load(sys.stdin)["author"]["login"])')
+          export TITLE=$(printf '%s' "$META" | python3 -c 'import json,sys;print(json.load(sys.stdin)["title"])')
+          export RISK=$(printf '%s' "$META" | python3 -c '
+import json,sys
+lb=[l["name"] for l in json.load(sys.stdin)["labels"]]
+print(next((x[len("risk: "):] for x in lb if x.startswith("risk: ")), ""))')
+          export GATE=$(gh pr checks "$PR" --json name,state --jq '[.[] | select(.name=="test: gate")] | first | .state // ""')
           DECISION=$(python3 - <<'PY'
           import json, os, sys
           sys.path.insert(0, "scripts")
@@ -1007,7 +1085,8 @@ jobs:
               marker, os.environ["HEAD_SHA"],
               os.environ.get("GATE") == "SUCCESS",
               os.environ.get("RISK") or None,
-              os.environ["AUTHOR"])))
+              os.environ["AUTHOR"],
+              os.environ.get("TITLE", ""))))
           PY
           )
           ACTION=$(printf '%s' "$DECISION" | python3 -c 'import json,sys;print(json.load(sys.stdin)["action"])')

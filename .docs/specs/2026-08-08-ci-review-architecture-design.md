@@ -121,13 +121,29 @@ CI 밖(Orca)에 둔다.
 **리뷰는 여전히 필요하다.** 봇 PR 도 `Approve` 가 있어야 자동 머지된다 — 위험 선언만 면제되는
 것이지 리뷰가 면제되는 것이 아니다.
 
-> **권고 (미채택 — 리드 판단 대기)**: **major 버전 상승은 사람 경로로 빼는 편이 낫다.**
-> 2026-08-07 실측에서 리뷰어가 판정 첫 줄에 올린 두 가지가 전부 major 였다 —
-> `cryptography 48→50` 이 x86_64 macOS·32비트 Windows 휠을 삭제했고(템플릿을 복사해 쓰는
-> 사람의 환경 요구가 올라감), `pyjwt 2.12→2.13` 이 빈 HMAC 시크릿을 거부하기 시작했다(dev 에서
-> `.env` 없이 띄우던 경로가 막힘). 둘 다 `merge_ok` 였지만 **리드가 읽고 넘어갈 값어치가 있는
-> 사실**이었고, 자동 머지였다면 아무도 읽지 않았을 것이다. Dependabot 은 `semver-patch` ·
-> `semver-minor` · `semver-major` 를 구분해 주므로 게이팅 비용은 거의 없다.
+**단, major 버전 상승은 사람 경로로 뺀다** (2026-08-08 리드 결정). patch·minor 는 자동으로
+흐르고 major 만 리드가 본다.
+
+근거는 2026-08-07 실측이다. 리뷰어가 판정 첫 줄에 올린 두 가지가 **전부 major** 였다 —
+`cryptography 48→50` 이 x86_64 macOS·32비트 Windows 휠을 삭제했고(템플릿을 복사해 쓰는 사람의
+환경 요구가 올라감), `pyjwt 2.12→2.13` 이 빈 HMAC 시크릿을 거부하기 시작했다(dev 에서 `.env`
+없이 띄우던 경로가 막힘). 둘 다 `merge_ok` 였지만 **리드가 읽고 넘어갈 값어치가 있는 사실**이었고,
+자동 머지였다면 아무도 읽지 않았을 것이다.
+
+비용은 낮다 — 2026-08-07 에 열린 9건 중 major 는 `cryptography` 하나뿐이었다. **대부분은 여전히
+자동으로 흐른다.**
+
+판별은 **PR 제목 파싱**으로 한다. Dependabot 제목 형식이 일정하다(실측):
+
+```
+build(deps): bump cryptography from 49.0.0 to 50.0.0 in /single-agent-service
+build(deps): bump pyjwt from 2.12.1 to 2.13.0 in /template-mcp-service
+```
+
+`from A to B` 의 major 자리를 비교한다. `dependabot/fetch-metadata` 액션을 쓰지 않는 이유는
+기록기가 `issue_comment` 이벤트로 돌아 그 액션이 기대하는 `pull_request` 컨텍스트가 없기
+때문이다. 제목 형식이 바뀌면 판별이 `None` 이 되고 **그때는 자동 머지를 arm 하지 않는다**
+(fail-closed).
 
 ### 3. 상태 — 라벨은 위험도만
 
@@ -155,7 +171,7 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 
 1. required 게이트 잡 초록
 2. `Approve` 리뷰가 있고, 그 `commit_id` 가 현재 head 와 같다
-3. `risk: low` — 또는 **저자가 봇**이다 (아래)
+3. `risk: low` — 또는 **저자가 봇이면서 major 상승이 아니다** (§2-1)
 
 **경로 필터 처리**: 워크플로 레벨 `on.paths` 를 **잡 레벨 `if:`** 로 바꾼다. 워크플로째 건너뛴
 체크는 영영 pending 이라 머지를 막지만, 조건으로 건너뛴 잡은 `skipped` 를 보고하고 GitHub 은
@@ -294,13 +310,13 @@ review-dep-6-10-claude   lastActivity=56,560s 전  created=56,560s 전  같은�
 | 항목 | 결정 |
 | --- | --- |
 | `board-status.yml` | **삭제** — fail-open 이라 초록이 「했다」를 보장하지 못했다 |
-| 봇 PR 위험 정책 | **자동 머지 대상** — 위험 선언만 면제, 리뷰는 그대로 필요 (§2-1) |
+| 봇 PR 위험 정책 | **자동 머지 대상, 단 major 는 사람 경로** — 위험 선언만 면제, 리뷰는 그대로 필요 (§2-1) |
 | 「Require approvals」 | **켜지 않는다 (㉠)** — 승인은 자동 머지 arm 신호일 뿐, 사람 머지는 테스트 초록에만 걸린다 |
 
 ## 남은 미결
 
-1. **major 버전 봇 PR 을 사람 경로로 뺄 것인가** — §2-1 권고. 미채택 상태
-2. **워커 기동 automation 의 착수 표식** — 구현 1단계에서 정한다 (§5 축 ①)
+1. **워커 기동 automation 의 착수 표식** — automation 계획 Task 2 에서 `agent: ready` 라벨로
+   확정했다. 다른 표식이 낫다고 보시면 그때 바꾼다
 
 ## 관련
 
