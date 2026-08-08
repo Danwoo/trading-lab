@@ -31,6 +31,7 @@ CASES = [
             "reviewer": "kimi",
             "author_kind": "agent",
             "author_tier": "opus",
+            "author_vendors": ["claude"],
             "label_allowed": True,
         },
     ),
@@ -65,7 +66,12 @@ CASES = [
         "",
         ["low"],
         True,
-        {"reviewer": "codex", "author_kind": "mixed", "label_allowed": False},
+        {
+            "reviewer": "codex",
+            "author_kind": "mixed",
+            "author_vendors": ["claude", "kimi"],
+            "label_allowed": False,
+        },
     ),
     (
         "혼재 + codex 불가 → none  (②)",
@@ -73,7 +79,11 @@ CASES = [
         "",
         ["low"],
         False,
-        {"reviewer": "none", "author_kind": "mixed"},
+        {
+            "reviewer": "none",
+            "author_kind": "mixed",
+            "author_vendors": ["claude", "kimi"],
+        },
     ),
     (
         "신원 없음 + 브랜치명 fix-42-claude → agent/claude  (③)",
@@ -85,6 +95,7 @@ CASES = [
             "reviewer": "kimi",
             "author_kind": "agent",
             "author_vendor": "claude",
+            "author_vendors": [],
             "identity_source": "branch-name",
             "label_allowed": False,
         },
@@ -95,7 +106,12 @@ CASES = [
         "some-branch",
         ["low"],
         False,
-        {"reviewer": "claude", "author_kind": "human", "label_allowed": False},
+        {
+            "reviewer": "claude",
+            "author_kind": "human",
+            "author_vendors": [],
+            "label_allowed": False,
+        },
     ),
     (
         "봇 저자 → human 취급",
@@ -103,7 +119,12 @@ CASES = [
         "",
         ["low"],
         False,
-        {"reviewer": "claude", "author_kind": "human", "label_allowed": False},
+        {
+            "reviewer": "claude",
+            "author_kind": "human",
+            "author_vendors": [],
+            "label_allowed": False,
+        },
     ),
     (
         "이슈 없음 → risk high (fail-closed)",
@@ -135,7 +156,7 @@ CASES = [
         "",
         ["low"],
         False,
-        {"author_tier": None, "author_kind": "agent"},
+        {"author_tier": None, "author_kind": "agent", "author_vendors": ["claude"]},
     ),
     (
         "목록 밖 에이전트형 이메일 → 라벨 금지",

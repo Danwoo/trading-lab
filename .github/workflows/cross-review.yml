@@ -365,6 +365,8 @@ jobs:
                   text = ""
               elif isinstance(value, bool):
                   text = str(value).lower()
+              elif isinstance(value, list):
+                  text = ",".join(value)
               else:
                   text = str(value)
               print(f"{key}={text}")
@@ -376,8 +378,11 @@ jobs:
           REVIEWER=$(val reviewer)
           AUTHOR_KIND=$(val author_kind)
           AUTHOR_VENDOR=$(val author_vendor)
+          AUTHOR_VENDORS=$(val author_vendors)
           AUTHOR_TIER=$(val author_tier)
           IDENTITY_SOURCE=$(val identity_source)
+          # 저자 모델 표기 — 혼재는 목록, 브랜치명 단독 판별은 그 모델 (커밋 신원이 없다)
+          AUTHOR_MODELS="${AUTHOR_VENDORS:-$AUTHOR_VENDOR}"
           case "$REVIEWER" in
             codex)  CHAIN="codex kimi claude" ;;
             kimi)   CHAIN="kimi claude" ;;
@@ -400,7 +405,7 @@ jobs:
               fi ;;
           esac
           {
-            printf 'author_models=%s\n' "$AUTHOR_VENDOR"
+            printf 'author_models=%s\n' "$AUTHOR_MODELS"
             printf 'tier_source=%s\n'   "$TIER_SOURCE"
             printf 'fallback_tier=%s\n' "$FALLBACK_TIER"
             printf 'identity_note=%s\n' "$NOTE"

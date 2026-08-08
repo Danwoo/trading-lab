@@ -98,6 +98,8 @@ def decide(emails, head_ref, issue_risks, codex_on):
         "reviewer": reviewer,
         "author_kind": author_kind,
         "author_vendor": author_vendor,
+        # 혼재 저자는 author_vendor 로 환원되지 않는다 — 저자 표기·자기벤더 판정이 목록을 쓴다
+        "author_vendors": sorted(vendors),
         "author_tier": author_tier,
         "identity_source": identity_source,
         "risk": risk,
