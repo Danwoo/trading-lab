@@ -22,7 +22,7 @@ dependencies = [
     # 워크스페이스 문서 인제스트 — pgvector 벡터 스토어(async pg) + 오픈소스 PDF 파서
     "asyncpg~=0.30.0",
     "pgvector~=0.4.0",
-    "pypdf~=6.0.0",
+    "pypdf~=6.15.0",
 ]
 
 [dependency-groups]
