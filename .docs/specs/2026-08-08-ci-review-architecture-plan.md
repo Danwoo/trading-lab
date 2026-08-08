@@ -148,7 +148,7 @@ claude 경로에서 영원히 참이 되지 않으므로 **타임아웃을 늘�
 ## Task 3: 죽은 경로를 지운다 — 헤드리스 · **스윕**
 
 **읽어야 할 자리**: `cross-review.yml` 의 `build_prompt`·`run_headless_once`·`synth_verdict` ·
-**`:723` 「고아 리뷰 워크트리 시작 청소」**. **한도 감지 6함수와 `try_candidate` 체인 루프는 남긴다.**
+**시작 스윕** — `grep -n '고아 리뷰 워크트리 시작 청소' .github/workflows/cross-review.yml`. **한도 감지 6함수와 `try_candidate` 체인 루프는 남긴다.**
 
 **왜 스윕도 지우나**: 2026-08-08 에 그 스윕이 **일하는 중인 리뷰어 다섯을 회수**했다. 안전 조항이
 읽는 `lastActivityAt` 이 생성 시각에 고정돼 갱신되지 않아 무력했다(`보존 0건`). 이 재설계의
@@ -263,8 +263,10 @@ gh api repos/Danwoo/trading-lab/rulesets/<id>
 
 ## Task 7: 판정을 GitHub 리뷰로 기록하는 기록기
 
-**읽어야 할 자리**: `cross-review.yml` 의 `publish` 잡 — 특히 **`:1148` 과 `:1707` 의 저자 필터**와
-`parse_marker`·`poll_verdict`.
+**읽어야 할 자리**: `cross-review.yml` 의 `publish` 잡, 그리고 **저자 필터가 걸린 자리 전부** —
+`grep -n author_association .github/workflows/cross-review.yml`. **곳 수를 세어라.** 초안이 2곳으로
+알고 있었는데 #26 이 한 곳을 더 만들어 3곳이 됐다. 「몇 곳인지」를 문서에서 읽지 말고 직접 세라.
+`parse_marker`·`poll_verdict` 도 같은 방식으로 찾는다.
 
 **만드는 것**: `scripts/review_record.py`(순수 판정) · 테스트 · `.github/workflows/review-record.yml` ·
 `repo-scans.yml` 배선.
