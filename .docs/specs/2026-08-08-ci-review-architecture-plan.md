@@ -1,1365 +1,313 @@
 # CI·리뷰 구조 재설계 구현 계획
 
-> **에이전트 워커에게:** 이 계획은 **task 단위로** 구현한다. 각 task 는 독립적으로 테스트되고
-> 리뷰어의 게이트를 통과할 수 있는 단위다. 단계는 체크박스(`- [ ]`)로 추적한다.
+> **에이전트 워커에게:** task 단위로 구현한다. 단계는 체크박스(`- [ ]`)로 추적한다.
 
 **목표:** CI 파이프라인에서 「에이전트가 판단하는 일」을 걷어내고, 리뷰를 GitHub 네이티브 PR
-리뷰로 옮긴다. 워크플로 11개·3,705줄 → 5개·약 1,000줄.
-
-**접근:** YAML 안의 bash 를 `scripts/` 의 테스트 가능한 파이썬으로 꺼내고(Task 1~2), 죽은
-경로를 지우고(Task 3), required check 가 성립하게 경로 필터를 바꾸고(Task 4), 판정을 GitHub
-리뷰로 기록하는 얇은 기록기를 세운 뒤(Task 5~6), 흉내 내던 워크플로를 삭제한다(Task 7~8).
-각 task 는 끝난 시점에 CI 가 깨지지 않은 상태를 남긴다.
-
-**기술 스택:** GitHub Actions · Python 3(stdlib 전용) · `gh` CLI · `orca-ide` CLI
+리뷰로 옮긴다.
 
 **설계 정본:** [`2026-08-08-ci-review-architecture-design.md`](2026-08-08-ci-review-architecture-design.md)
+**후속 계획:** [`2026-08-08-agent-loop-automation-plan.md`](2026-08-08-agent-loop-automation-plan.md)
+
+---
+
+## 이 계획이 코드를 미리 쓰지 않는 이유
+
+**초안은 각 task 에 완성형 코드를 넣었다가 두 라운드에 걸쳐 차단급 6건을 맞았다.**
+
+| 라운드 | 차단급 |
+| --- | --- |
+| 1 | 리뷰어 배정 로직 3자리 오역 · `frontend-ci` 경로 필터 5개 누락 |
+| 2 | 마커 코멘트 **저자 필터 누락**(공개 레포 위조 경로) · sha 접두사 매치 · 스윕 삭제 단계 없음 · 완료 수치 모순 |
+
+전부 **계획 저자가 `cross-review.yml` 2,020줄을 줄 단위로 읽지 않은 채 그 대체 코드를 쓴 결과**다.
+잘못 옮긴 자리마다 테스트를 같이 써서 **틀린 동작이 초록으로 굳었다** — 자기 일관성만 확인한 것이다.
+
+**그래서 이 계획은 코드를 주지 않는다.** 대신 task 마다 셋을 준다:
+
+1. **읽어야 할 자리** — 현행 코드의 정확한 위치. 여기부터 읽지 않고 시작하지 마라
+2. **지켜야 할 불변식** — 깨지면 안 되는 것과 그 근거 위치
+3. **검증** — 무엇을 어떻게 증명하는가. 자기가 만든 케이스를 도는 것은 검증이 아니다
+
+**현행 코드가 정본이다.** 이 문서와 어긋나면 코드가 이긴다 — 어긋난 자리를 PR 본문에 적어라.
+
+---
 
 ## 전역 제약
 
-이 절은 **모든 task 의 요구사항에 암묵적으로 포함된다.**
+모든 task 의 요구사항에 암묵적으로 포함된다.
 
-- **검증 스크립트는 stdlib 전용**이다. 서드파티 import 금지 (`verify_ci_check_coverage.py` 머리 주석).
-- **새 `scripts/verify_*.py` · `scripts/test_*.py` 는 워크플로에 배선해야 한다.** 배선 없이 두면
-  `verify_ci_check_coverage.py` 가 CI 를 빨갛게 만든다. 배선처는 `.github/workflows/repo-scans.yml`.
-- **검사 0건은 통과가 아니다.** 새로 짜는 검사는 검사한 대상 수를 세어 출력하고, 0이거나 기대치와
-  다르면 **실패**한다.
-- **커밋 신원**: 워크트리에서 작업하면 `git config --worktree user.name/user.email` 이
-  `claude-<티어>-agent` / `claude-<티어>-agent@noreply.local` 이어야 한다. 커밋 전에
-  `git config --worktree --get user.email` 로 확인한다.
-- **main 에 직접 커밋·머지 금지.** 브랜치 → PR 까지가 워커의 몫이다. pre-commit 훅
-  `no-commit-to-branch` 가 main 커밋을 막는다.
+- **검증 스크립트는 stdlib 전용.** 서드파티 import 금지.
+- **새 `scripts/verify_*.py`·`scripts/test_*.py` 는 워크플로에 배선해야 한다.** 배선 없이 두면
+  `scripts/verify_ci_check_coverage.py` 가 CI 를 빨갛게 만든다. 배선처는 `.github/workflows/repo-scans.yml`.
+- **검사 0건은 통과가 아니다.** 새 검사는 검사한 대상 수를 세어 출력하고, 0이거나 기대치와
+  다르면 실패한다.
+- **동작을 바꾸지 않는 추출에는 차등 테스트를 붙인다.** 원본(bash)과 대체본(파이썬)을 **같은
+  입력 집합으로 돌려 출력이 같음을 증명**한다. 「동작 동일」은 주장이 아니라 실측이어야 한다.
+- **커밋 신원**: `git config --worktree --get user.email` → `claude-<티어>-agent@noreply.local`.
+  첫 커밋 뒤 `git log -1 --format='%an <%ae>'` 로 실렸는지 확인한다.
+- **main 직접 커밋·머지 금지.** 브랜치 → PR 까지가 워커의 몫이다.
 - **`git stash` 금지 · force push 금지 · history 재작성 금지.** 부정 통제는
-  `git diff > /tmp/x.patch` → `git apply -R` → 확인 → `git apply` 로 한다.
+  `git diff > /tmp/x.patch` → `git apply -R` → 확인 → `git apply`.
 - **포트 3000·3010·8000·5432 불가침. 개발 DB `fintech` 는 읽기만.** `pkill`·`fuser -k` 금지.
-- **AI 자기 언급 금지** — 커밋 메시지·PR 본문에 `🤖 Generated with …`,
-  `Co-Authored-By: Claude` 를 쓰지 않는다.
+- **AI 자기 언급 금지.**
 - **주석 규칙**: 변경 이유·이력 설명 주석 금지. 코드만으로 드러나지 않는 제약·의도만 한 줄로.
 
-## 파일 구조
+## 전역 불변식 — 어느 task 도 깨면 안 되는 것
 
-| 파일 | 책임 |
-| --- | --- |
-| `scripts/review_route.py` (신규) | 커밋 신원 → 리뷰어 배정. **순수 판정** — I/O 없음 |
-| `scripts/test_review_route.py` (신규) | 위의 단위 테스트 |
-| `scripts/review_terminal.py` (신규) | 터미널 tail 텍스트 → 준비·접수 판정. **순수 판정** |
-| `scripts/test_review_terminal.py` (신규) | 위의 단위 테스트 (#11 회귀 그물) |
-| `scripts/review_record.py` (신규) | 판정 마커 + PR 상태 → 리뷰 행동·자동 머지 arm 여부. **순수 판정** |
-| `scripts/test_review_record.py` (신규) | 위의 단위 테스트 |
-| `.github/workflows/cross-review.yml` (수정) | 위 스크립트를 부르기만 한다 |
-| `.github/workflows/review-record.yml` (신규) | 기록기 — 마커를 읽어 `gh pr review` 대행 |
-| `.github/workflows/repo-scans.yml` (수정) | 새 테스트 배선 + required 게이트 잡 |
-| `.github/workflows/ci.yml` · `frontend-ci.yml` (수정) | `on.paths` → 잡 레벨 `if:` |
-| `.github/workflows/plan.yml` (신규) | `plan-check`·`plan-label`·`plan-label-issue` 통합 |
-| 삭제 | `merge-router.yml` · `review-gate.yml` · `board-status.yml` · `plan-*.yml` 3개 |
+리뷰 경로를 손대는 모든 task 에 적용된다.
 
-**순수 판정 3종이 이 계획의 핵심이다.** 지금 실패의 원인이 「YAML 안 bash 라 로컬에서 못
-돌린다」이므로, 판정 로직을 I/O 없는 함수로 꺼내 테스트를 붙이는 것이 곧 처방이다.
+| 불변식 | 근거 위치 | 깨지면 |
+| --- | --- | --- |
+| **판정 마커는 저자 필터를 통과한 코멘트에서만 읽는다** (`OWNER`·`MEMBER`·`COLLABORATOR`) | `cross-review.yml:1148` · `:1707` · 위협모델 주석 `:254` | 공개 레포에서 **누구든** 마커를 코멘트해 봇 승인·자동 머지를 일으킨다. head sha 는 공개 정보다 |
+| **마커 sha 는 head 와 40자 동등 비교** | — (초안 결함) | 접두사 매치면 앞 7자만 같은 다른 커밋의 판정이 통과한다 |
+| **리뷰 루브릭은 PR 의 base 커밋에서 읽는다** | `.github/review-prompt.md` 머리 주석 | PR 이 자기 리뷰 기준을 변조한다 |
+| **리뷰어는 PR 코드를 체크아웃하지 않는다** (`--base-branch origin/main`) | `cross-review.yml` 의 `run_orca` | 남의 코드가 self-hosted 러너에서 실행될 표면이 생긴다 |
+| **fork PR 은 리뷰어를 띄우지 않는다** | `cross-review.yml:289` · `:634` | 같음 |
+| **저자 ≠ 리뷰어** | `cross-review.yml:413-424` | 자기리뷰 |
+| **한 판정에는 한 모델만.** 리뷰어가 못 뜨면 **판정이 없는 것**이지 다른 모델이 이어받지 않는다 | 폴백 체인이 이것을 깼다 — 루브릭 자신이 경고: 「폴백이 일어나면 실제 판정자와 다르다」 | 한 판정에 저자가 둘이 된다 |
+| **리뷰어는 고치지 않는다.** 판정과 근거만 낸다 | `.github/review-prompt.md` | 심판이 선수가 된다. 발견 → **저자가** 고침 → 리뷰어가 재판정 순서만 쓴다 |
 
 ---
 
 ## Task 1: 리뷰어 배정을 순수 판정 스크립트로 추출
 
-지금 `cross-review.yml:324` 의 `decide()` 가 이 일을 한다. 주석에 이미
-`# ---- 순수 판정부 시작 (입력: EMAILS·HEAD_REF·ISSUE_RISKS·CODEX_ON — 로컬 단위 테스트 대상) ----`
-라고 적혀 있는데, bash 라 실제로는 단위 테스트가 없다.
+**읽어야 할 자리**: `.github/workflows/cross-review.yml:324-452` 의 `decide()` **전문**.
+outputs 목록만 보고 옮기지 마라 — 초안이 그렇게 해서 3자리를 틀렸다.
 
-**Files:**
-- Create: `scripts/review_route.py`
-- Create: `scripts/test_review_route.py`
-- Modify: `.github/workflows/repo-scans.yml` (배선)
-- Modify: `.github/workflows/cross-review.yml:318-628` (`decide()` 를 스크립트 호출로 교체)
+**만드는 것**: `scripts/review_route.py`(순수 판정) · `scripts/test_review_route.py` ·
+`repo-scans.yml` 배선 · `cross-review.yml` 의 `route` 잡이 스크립트를 호출.
 
-**Interfaces:**
-- Produces: `decide(emails: list[str], head_ref: str, issue_risks: list[str], codex_on: bool) -> dict`
-  — 반환 키는 `reviewer`(`"claude"|"kimi"|"codex"|"none"`) ·
-  `author_kind`(`"agent"|"human"|"mixed"`) · `author_vendor`(`str|None`) ·
-  `author_tier`(`str|None`) · `identity_source`(`"commit-email"|"branch-name"|"none"`) ·
-  `risk`(`"low"|"high"`) · `risk_source`(`str`) · `label_allowed`(`bool`).
-  **`risk` 는 인자가 아니라 반환값이다** — 현행 bash 가 `ISSUE_RISKS` 로 함수 안에서 계산한다.
-- `label_allowed` 의 소비자는 **리뷰어 디스패치**다. `False` 면(사람·봇·티어 미상·벤더 혼재)
-  교차 모델 리뷰가 성립했다고 볼 수 없으므로, 디스패처는 리뷰 오더에 **판정 마커 끝에
-  `source=manual` 을 붙이라**고 지시한다. Task 7 의 `decide_record` 가 그 필드를 보고
-  **자동 머지를 arm 하지 않는다.** 즉 `label_allowed` 는 `decide_record` 의 인자가 아니라
-  마커 생성 시점에 반영되는 값이다.
+**불변식** (전역 불변식 외에):
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- 반환은 `decide(emails, head_ref, issue_risks, codex_on) -> dict`. **`risk` 는 인자가 아니라
+  반환값**이다 — 현행이 `ISSUE_RISKS` 로 함수 안에서 계산한다.
+- 아래 넷은 초안이 틀렸던 자리다. 현행 코드로 각각 확인하고 그대로 옮겨라:
+  - 고위험 codex 는 **claude 저자**일 때다 (`:414-417`)
+  - 벤더 혼재 시 후보 소진으로 **`reviewer=none`** 이 될 수 있다 (`:419-424`)
+  - 커밋 신원이 없어도 **브랜치명 `fix-N-<model>`** 로 저자를 판별한다 (`:379-381`)
+  - 위험 미선언·이슈 없음은 **high** (fail-closed, `:404-408`)
 
-`scripts/test_review_route.py`:
+**검증**
 
-```python
-"""review_route.decide 회귀 그물 — cross-review.yml 의 bash decide() 동작 동일 확인.
+- [ ] `decide()` 를 워크플로에서 추출해 셸에서 실행 가능한 형태로 만든다
+- [ ] **차등 테스트**: 원본 bash 와 파이썬을 같은 입력으로 돌려 출력 대조.
+      입력에 최소 포함 — 벤더 3종 단독 · 티어 혼재 · 구형식 `claude-agent@` · 벤더 혼재
+      (codex on/off 양쪽) · 브랜치명 판별(3벤더) · 신원 없음 · 목록 밖 에이전트형 이메일 ·
+      대소문자 오타 · 이슈 라벨 없음/low/high/혼재 · 빈 입력
+- [ ] 불일치 0건을 **명령과 출력으로** PR 본문에 싣는다
+- [ ] `python3 scripts/test_review_route.py` 통과 (케이스 수를 출력하고 0건이면 실패)
+- [ ] `python3 scripts/verify_ci_check_coverage.py` 종료코드 0
 
-PR #24 리뷰(kimi)가 잡은 세 자리를 케이스로 못박는다:
-  ① 고위험 codex 는 **claude 저자**일 때다 (kimi 저자가 아니다) — :414-417
-  ② 벤더 혼재 + codex 불가 → reviewer=none (후보 소진) — :419-424
-  ③ 커밋 신원이 없어도 브랜치명(fix-N-<model>)으로 저자를 판별한다 — :379-381
-"""
-
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import review_route as rr
-
-C = "claude-opus-agent@noreply.local"
-C_BARE = "claude-agent@noreply.local"
-K = "kimi-agent@noreply.local"
-X = "codex-agent@noreply.local"
-HUMAN = "danwoo@example.com"
-BOT = "49699333+dependabot[bot]@users.noreply.github.com"
-
-CASES = [
-    # (설명, emails, head_ref, issue_risks, codex_on, 기대 dict 부분집합)
-    ("claude 저자 + 저위험 → kimi",
-     [C], "", ["low"], False, {"reviewer": "kimi", "author_kind": "agent",
-                               "author_tier": "opus", "label_allowed": True}),
-    ("claude 저자 + 고위험 + codex 가용 → codex  (①)",
-     [C], "", ["high"], True, {"reviewer": "codex", "risk": "high"}),
-    ("claude 저자 + 고위험 + codex 불가 → kimi",
-     [C], "", ["high"], False, {"reviewer": "kimi"}),
-    ("kimi 저자 + 고위험 + codex 가용 → claude  (① 반대 방향 확인)",
-     [K], "", ["high"], True, {"reviewer": "claude"}),
-    ("codex 저자 → claude",
-     [X], "", ["low"], False, {"reviewer": "claude"}),
-    ("혼재 + codex 가용 → codex  (②)",
-     [C, K], "", ["low"], True, {"reviewer": "codex", "author_kind": "mixed",
-                                 "label_allowed": False}),
-    ("혼재 + codex 불가 → none  (②)",
-     [C, K], "", ["low"], False, {"reviewer": "none", "author_kind": "mixed"}),
-    ("신원 없음 + 브랜치명 fix-42-claude → agent/claude  (③)",
-     [HUMAN], "fix-42-claude", ["low"], False,
-     {"reviewer": "kimi", "author_kind": "agent", "author_vendor": "claude",
-      "identity_source": "branch-name", "label_allowed": False}),
-    ("신원 없음 + 브랜치명 없음 → human/claude",
-     [HUMAN], "some-branch", ["low"], False,
-     {"reviewer": "claude", "author_kind": "human", "label_allowed": False}),
-    ("봇 저자 → human 취급",
-     [BOT], "", ["low"], False, {"reviewer": "claude", "author_kind": "human",
-                                 "label_allowed": False}),
-    ("이슈 없음 → risk high (fail-closed)",
-     [C], "", [], True, {"risk": "high", "risk_source": "no-issue-fail-closed",
-                         "reviewer": "codex"}),
-    ("이슈 라벨에 low·high 혼재 → high",
-     [C], "", ["low", "high"], False, {"risk": "high"}),
-    ("구형식 claude-agent@ → 티어 미상",
-     [C_BARE], "", ["low"], False, {"author_tier": None, "reviewer": "kimi",
-                                    "label_allowed": True}),
-    ("claude 티어 혼재 → 티어 미상",
-     [C, "claude-sonnet-agent@noreply.local"], "", ["low"], False,
-     {"author_tier": None, "author_kind": "agent"}),
-    ("목록 밖 에이전트형 이메일 → 라벨 금지",
-     ["claude-sonar-agent@noreply.local"], "", ["low"], False,
-     {"author_kind": "human", "label_allowed": False}),
-    ("커밋 신원과 브랜치명 불일치 → 커밋 신원 우선",
-     [C], "fix-7-kimi", ["low"], False,
-     {"author_vendor": "claude", "identity_source": "commit-email"}),
-]
-
-
-def main() -> int:
-    failures = 0
-    for desc, emails, head_ref, risks, codex_on, want in CASES:
-        got = rr.decide(emails, head_ref, risks, codex_on)
-        for k, v in want.items():
-            if got[k] != v:
-                print(f"FAIL [{desc}] {k}: got {got[k]!r}, want {v!r}")
-                failures += 1
-    print(f"review_route 케이스 {len(CASES)}건 검사 · 실패 {failures}건")
-    if not CASES:
-        print("FAIL 검사 대상 0건")
-        return 1
-    return 1 if failures else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-```
-
-- [ ] **Step 2: 실패를 확인한다**
-
-Run: `python3 scripts/test_review_route.py`
-Expected: `ModuleNotFoundError: No module named 'review_route'`
-
-- [ ] **Step 3: 최소 구현을 쓴다**
-
-`scripts/review_route.py`:
-
-```python
-"""커밋 신원으로 저자를 판별해 반대 모델 리뷰어를 배정한다 — 순수 판정, stdlib 전용.
-
-`cross-review.yml` 의 bash `decide()` (324~432) 를 **동작 동일**하게 옮긴 것이다.
-티어 어휘는 로컬에서 실재를 확인한 것만 받는다.
-"""
-
-import json
-import os
-import re
-import sys
-
-CLAUDE_TIERS = ("opus", "sonnet", "fable", "haiku")
-KIMI_TIERS = ("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed")
-CODEX_TIERS = ("gpt-5.6-terra",)
-
-_VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS}
-_IDENTITY = re.compile(
-    r"^(?P<vendor>claude|kimi|codex)(?:-(?P<tier>[a-z0-9.\-]+))?-agent@noreply\.local$"
-)
-_AGENTISH = re.compile(r"-agent@noreply\.local$", re.I)
-_BRANCH = re.compile(r"^fix-[0-9]+-(?P<vendor>claude|kimi|codex)$")
-
-
-def _read_risk(issue_risks):
-    """이슈 라벨에서 위험도를 읽는다 — 미선언·이슈 없음은 high (fail-closed)."""
-    vals = [r.strip() for r in issue_risks if r.strip()]
-    if not vals:
-        return "high", "no-issue-fail-closed"
-    if "high" in vals:
-        return "high", "issue-label"
-    if all(v == "low" for v in vals):
-        return "low", "issue-label"
-    return "high", "undeclared-fail-closed"
-
-
-def decide(emails, head_ref, issue_risks, codex_on):
-    vendors, claude_tiers_seen, unknown_agentish = set(), set(), []
-    for raw in emails:
-        e = raw.strip()
-        if not e:
-            continue
-        m = _IDENTITY.match(e)
-        if m and (m.group("tier") is None
-                  or m.group("tier") in _VENDOR_TIERS[m.group("vendor")]):
-            vendors.add(m.group("vendor"))
-            if m.group("vendor") == "claude":
-                claude_tiers_seen.add(m.group("tier") or "unknown")
-        elif _AGENTISH.search(e):
-            unknown_agentish.append(e)
-
-    bm = _BRANCH.match(head_ref or "")
-    branch_model = bm.group("vendor") if bm else None
-
-    author_tier = None
-    if len(claude_tiers_seen) == 1 and "unknown" not in claude_tiers_seen:
-        author_tier = next(iter(claude_tiers_seen))
-
-    if len(vendors) == 1:
-        author_kind, author_vendor, identity_source = "agent", next(iter(vendors)), "commit-email"
-    elif len(vendors) > 1:
-        author_kind, author_vendor, identity_source = "mixed", None, "commit-email"
-    elif branch_model:
-        author_kind, author_vendor, identity_source = "agent", branch_model, "branch-name"
-    else:
-        author_kind, author_vendor, identity_source = "human", None, "none"
-
-    risk, risk_source = _read_risk(issue_risks)
-
-    candidates = ["claude", "kimi"] + (["codex"] if codex_on else [])
-    if author_kind == "agent" and author_vendor == "kimi":
-        reviewer = "claude"
-    elif author_kind == "agent" and author_vendor == "claude":
-        reviewer = "codex" if (risk == "high" and codex_on) else "kimi"
-    elif author_kind == "agent" and author_vendor == "codex":
-        reviewer = "claude"
-    elif author_kind == "human":
-        reviewer = "claude"
-    else:
-        reviewer = next((c for c in candidates if c not in vendors), "none")
-
-    label_allowed = (author_kind == "agent"
-                     and identity_source == "commit-email"
-                     and not unknown_agentish)
-
-    return {"reviewer": reviewer, "author_kind": author_kind,
-            "author_vendor": author_vendor, "author_tier": author_tier,
-            "identity_source": identity_source, "risk": risk,
-            "risk_source": risk_source, "label_allowed": label_allowed}
-
-
-def main():
-    result = decide(
-        os.environ.get("EMAILS", "").splitlines(),
-        os.environ.get("HEAD_REF", ""),
-        os.environ.get("ISSUE_RISKS", "").splitlines(),
-        os.environ.get("CODEX_ON", "") == "on")
-    json.dump(result, sys.stdout)
-    print()
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-```
-
-- [ ] **Step 4: 테스트가 통과하는지 확인한다**
-
-Run: `python3 scripts/test_review_route.py`
-Expected: `review_route 케이스 16건 검사 · 실패 0건` · 종료코드 0
-
-- [ ] **Step 5: CI 에 배선한다**
-
-`.github/workflows/repo-scans.yml` 의 `repo-scan` 잡에 스텝을 추가한다. 기존 스텝과 같은 형식이다:
-
-```yaml
-      - name: 리뷰어 배정 판정 회귀 그물
-        run: python3 scripts/test_review_route.py
-```
-
-- [ ] **Step 6: 배선 대조가 통과하는지 확인한다**
-
-Run: `python3 scripts/verify_ci_check_coverage.py`
-Expected: 종료코드 0. 새 `scripts/test_review_route.py` 가 배선됐다고 나와야 한다.
-배선을 빼먹었으면 여기서 빨갛게 실패한다 — 그것이 이 스크립트의 목적이다.
-
-- [ ] **Step 7: 워크플로가 스크립트를 부르게 바꾼다**
-
-`.github/workflows/cross-review.yml` 의 `route` 잡에서 인라인 `decide()` 를 지우고 다음으로 바꾼다:
-
-```yaml
-      - name: 저자 판별·리뷰어 배정
-        id: decide
-        env:
-          EMAILS: ${{ steps.collect.outputs.emails }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          ISSUE_RISKS: ${{ steps.collect.outputs.issue_risks }}
-          CODEX_ON: ${{ vars.CROSS_REVIEW_CODEX }}
-        run: |
-          set -euo pipefail
-          OUT=$(python3 scripts/review_route.py)
-          echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); [print(f"{k}={v}") for k,v in d.items()]' >> "$GITHUB_OUTPUT"
-```
-
-- [ ] **Step 8: 커밋**
-
-```bash
-git add scripts/review_route.py scripts/test_review_route.py .github/workflows/repo-scans.yml .github/workflows/cross-review.yml
-git commit -m "refactor(ci): 리뷰어 배정을 순수 판정 스크립트로 꺼낸다
-
-bash decide() 는 '로컬 단위 테스트 대상'이라고 주석에 적혀 있었으나 YAML
-안에 있어 실제로는 테스트가 없었다. stdlib 전용 파이썬으로 옮기고 9개
-케이스의 회귀 그물을 붙인다."
-```
+> **참고**: 이 task 의 코드는 계획 초안 시점에 작성돼 차등 테스트(입력 22가지, 불일치 0건)를
+> 통과했고, 그 내용이 브랜치 `docs-ci-review-design` 의 이전 리비전에 있다. 참고해도 되지만
+> **현행 `decide()` 와 다시 대조하고 네 차등 테스트로 증명하라.**
 
 ---
 
-## Task 2: #11 — 터미널 준비·접수 판정을 교체하고 회귀 그물을 건다
+## Task 2: 터미널 준비·접수 판정을 교체한다 (구 #11)
 
-`wait_agent_ready`(`cross-review.yml:1093`)가 `latestCursor` 성장을 준비 신호로 쓴다. Claude Code
-TUI 는 화면을 제자리에서 다시 그려 이 값이 **영원히 안 움직인다**(설계 문서 「근거」 참조).
-판정을 **프롬프트 박스 상태**로 바꾼다.
+**읽어야 할 자리**: `cross-review.yml:1078-1130` — `term_cursor()` · `terminal_ready()` ·
+`wait_agent_ready()` · `send_review_prompt()`.
 
-**Files:**
-- Create: `scripts/review_terminal.py`
-- Create: `scripts/test_review_terminal.py`
-- Modify: `.github/workflows/repo-scans.yml` (배선)
-- Modify: `.github/workflows/cross-review.yml:1078-1130`
+**문제**: 준비·접수를 `latestCursor` 성장으로 판정하는데, Claude Code TUI 는 화면을 제자리에서
+다시 그려 이 값이 **움직이지 않는다**. 유휴 30초·완주한 워커 모두 `1` 이었다. `now > base` 는
+claude 경로에서 영원히 참이 되지 않으므로 **타임아웃을 늘려도 무효**다. 재현 7/7.
 
-**Interfaces:**
-- Consumes: 없음
-- Produces: `prompt_is_empty(tail: list[str]) -> bool` · `tui_is_ready(tail: list[str]) -> bool`
+**불변식**
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- 판정 근거를 **화면 내용**으로 바꾼다 — 프롬프트 박스의 잔여 입력 유무, TUI 배너 존재 여부.
+  판정부는 **I/O 없는 순수 함수**여야 한다 (터미널 tail 을 받아 bool 을 낸다)
+- **kimi 경로를 깨지 마라.** 지금 판정이 claude 에서만 깨졌다 — 고친 판정이 kimi 에서도
+  서는지 확인해야 한다
+- 접수 판정이 고쳐지면 **재전송 루프는 지운다** — 중복 송신의 근거가 사라진다
 
-`scripts/test_review_terminal.py`:
+**검증**
 
-```python
-"""터미널 준비·접수 판정 회귀 그물 (#11) — stdlib 전용.
-
-종전 판정은 `latestCursor` 성장이었고, Claude Code TUI 가 화면을 제자리에서 다시 그려
-그 값이 움직이지 않아 **항상 실패**했다 (2026-08-07 실측: 유휴 30초 · 완주한 워커 모두 1).
-아래 tail 은 그때 실제로 읽은 화면이다.
-"""
-
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import review_terminal as rt
-
-BANNER_IDLE = [
-    " ▐▛███▜▌   Claude Code v2.1.224",
-    "▝▜█████▛▘  Opus 5 (1M context) · Claude Max",
-    "  ▘▘ ▝▝    ~/orca/workspaces/trading-lab/review-6-claude",
-    "─" * 40,
-    "❯",
-    "─" * 40,
-    "  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents",
-]
-
-PENDING_INPUT = list(BANNER_IDLE)
-PENDING_INPUT[4] = "❯ 이 파일을 읽고 완주하라: /home/tjeksdn1/orders/x.md"
-
-WORKING = [
-    "● I'll start by reading the order file.",
-    "  Read 1 file",
-    "✢ Musing… (32s · ↓ 1.1k tokens · thinking)",
-    "─" * 40,
-    "❯",
-    "─" * 40,
-    "  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents",
-]
-
-SHELL_NOT_TUI = ["$ ls", "orders", "$ "]
-
-CASES = [
-    ("유휴 TUI — 프롬프트 비어 있음", rt.prompt_is_empty, BANNER_IDLE, True),
-    ("입력이 남아 있음 — 접수 안 됨", rt.prompt_is_empty, PENDING_INPUT, False),
-    ("작업 중 — 프롬프트는 비어 있음", rt.prompt_is_empty, WORKING, True),
-    ("유휴 TUI — 준비됨", rt.tui_is_ready, BANNER_IDLE, True),
-    ("작업 중 — 준비됨", rt.tui_is_ready, WORKING, True),
-    ("TUI 아님(맨 셸) — 준비 안 됨", rt.tui_is_ready, SHELL_NOT_TUI, False),
-]
-
-
-def main() -> int:
-    failures = 0
-    for desc, fn, tail, want in CASES:
-        got = fn(tail)
-        if got is not want:
-            print(f"FAIL [{desc}] got {got!r}, want {want!r}")
-            failures += 1
-    print(f"review_terminal 케이스 {len(CASES)}건 검사 · 실패 {failures}건")
-    if not CASES:
-        print("FAIL 검사 대상 0건")
-        return 1
-    return 1 if failures else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-```
-
-- [ ] **Step 2: 실패를 확인한다**
-
-Run: `python3 scripts/test_review_terminal.py`
-Expected: `ModuleNotFoundError: No module named 'review_terminal'`
-
-- [ ] **Step 3: 최소 구현을 쓴다**
-
-`scripts/review_terminal.py`:
-
-```python
-"""에이전트 TUI 의 준비·접수를 화면 내용으로 판정한다 — 순수 판정, stdlib 전용.
-
-`latestCursor` 를 쓰지 않는다. TUI 가 화면을 제자리에서 다시 그리면 그 값이 안 움직여
-살아 있는 에이전트를 죽은 것으로 읽는다 (#11).
-"""
-
-import re
-
-_PROMPT = re.compile(r"^\s*❯\s*(?P<rest>.*?)\s*$")
-# TUI 가 그렸다는 표식 — 배너 또는 하단 상태줄
-_TUI_MARKS = ("Claude Code v", "bypass permissions on", "for agents")
-
-
-def prompt_is_empty(tail):
-    """프롬프트 박스에 잔여 입력이 없으면 True. 접수 확인은 이 값으로 한다."""
-    for line in reversed(tail):
-        m = _PROMPT.match(line)
-        if m:
-            return m.group("rest") == ""
-    return False
-
-
-def tui_is_ready(tail):
-    """TUI 가 화면을 그렸으면 True. 출력 증가가 아니라 내용으로 본다."""
-    joined = "\n".join(tail)
-    if not any(mark in joined for mark in _TUI_MARKS):
-        return False
-    return any(_PROMPT.match(line) for line in tail)
-```
-
-- [ ] **Step 4: 테스트가 통과하는지 확인한다**
-
-Run: `python3 scripts/test_review_terminal.py`
-Expected: `review_terminal 케이스 6건 검사 · 실패 0건` · 종료코드 0
-
-- [ ] **Step 5: CI 에 배선한다**
-
-`.github/workflows/repo-scans.yml` 의 `repo-scan` 잡에 추가:
-
-```yaml
-      - name: 터미널 준비·접수 판정 회귀 그물 (#11)
-        run: python3 scripts/test_review_terminal.py
-```
-
-- [ ] **Step 6: 배선 대조**
-
-Run: `python3 scripts/verify_ci_check_coverage.py`
-Expected: 종료코드 0
-
-- [ ] **Step 7: 워크플로의 `wait_agent_ready`·`send_review_prompt` 를 교체한다**
-
-`.github/workflows/cross-review.yml` 에서 `term_cursor()`·`wait_agent_ready()`·
-`send_review_prompt()` 세 함수를 지우고 다음으로 바꾼다:
-
-```bash
-          term_tail() {   # $1=핸들 → tail 을 JSON 배열로
-            orca-ide terminal read --terminal "$1" $ORCA_ENV --json 2>/dev/null \
-              | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["result"]["terminal"]["tail"]))'
-          }
-          tui_ready() {   # $1=핸들 → 0=준비됨
-            local deadline; deadline=$(( $(date +%s) + READY_TIMEOUT ))
-            orca-ide terminal send --terminal "$1" --enter $ORCA_ENV >/dev/null 2>&1
-            while [ "$(date +%s)" -lt "$deadline" ]; do
-              sleep "$READY_INTERVAL"
-              term_tail "$1" | python3 -c '
-import json,sys,pathlib
-sys.path.insert(0, "scripts")
-import review_terminal as rt
-sys.exit(0 if rt.tui_is_ready(json.load(sys.stdin)) else 1)' && return 0
-            done
-            return 1
-          }
-          send_review_prompt() {   # $1=핸들 $2=프롬프트 → 0=접수 확인
-            orca-ide terminal send --terminal "$1" --text "$2" --enter $ORCA_ENV >/dev/null 2>&1
-            local deadline; deadline=$(( $(date +%s) + SEND_VERIFY_TIMEOUT ))
-            while [ "$(date +%s)" -lt "$deadline" ]; do
-              sleep 2
-              term_tail "$1" | python3 -c '
-import json,sys
-sys.path.insert(0, "scripts")
-import review_terminal as rt
-sys.exit(0 if rt.prompt_is_empty(json.load(sys.stdin)) else 1)' && return 0
-            done
-            return 1
-          }
-```
-
-재전송 루프는 지운다 — 접수 판정이 고쳐지면 중복 송신의 근거가 사라진다.
-
-- [ ] **Step 8: 실환경 재현 검증**
-
-**이것이 이 task 의 완료 조건이다.** 자기가 만든 케이스를 돌린 것은 재현 확인이지 검증이 아니다.
-
-1. 워크트리를 하나 만든다:
-   `orca-ide worktree create --repo id:619d5257-8682-4630-9b94-2ada6af355cb --name t11-verify --agent claude --no-parent --environment wsl-native --json`
-2. 응답의 `agentTerminalHandle` 로 위 `tui_ready` 를 손으로 돌려 **0 을 반환하는지** 확인한다.
-   종전 `wait_agent_ready` 는 같은 조건에서 60초 뒤 1 을 반환했다.
-3. `send_review_prompt` 로 아무 문장을 보내고 **접수가 확인되는지**, 그리고 **재전송이 일어나지
-   않는지** 본다.
-4. **kimi 경로도 같이 확인한다** — 지금 판정이 claude 에서만 깨졌으므로 고친 판정이 kimi 를
-   깨뜨리지 않는지 봐야 한다. `--agent` 가 kimi 를 받지 않으므로 워크트리를 만든 뒤
-   `orca-ide terminal create --worktree <셀렉터> --command kimi` 로 띄운다.
-5. 확인이 끝나면 워크트리를 지운다:
-   `orca-ide worktree rm --worktree id:<repoId>::<경로> --force --environment wsl-native`
-6. **돌린 명령과 그 출력을 PR 본문에 그대로 싣는다.**
-
-- [ ] **Step 9: 커밋**
-
-```bash
-git add scripts/review_terminal.py scripts/test_review_terminal.py .github/workflows/repo-scans.yml .github/workflows/cross-review.yml
-git commit -m "fix(ci): 터미널 준비·접수를 화면 내용으로 판정한다 (#11)
-
-종전 판정은 latestCursor 성장이었다. Claude Code TUI 는 화면을 제자리에서
-다시 그려 그 값이 움직이지 않으므로 살아 있는 에이전트를 죽은 것으로 읽었다
-— 재현 7/7. 타임아웃을 늘려도 무효인 종류다.
-
-판정을 프롬프트 박스 상태로 바꾸고, 그때 실제로 읽은 화면을 케이스로 박는다."
-```
+- [ ] 실제로 읽은 화면을 케이스로 박은 단위 테스트 (유휴 배너 · 미전송 입력이 남은 프롬프트 ·
+      작업 중 화면 · TUI 아닌 맨 셸)
+- [ ] **실환경 재현** — 워크트리를 띄워 새 판정이 준비·접수를 맞게 내는지 본다.
+      종전 함수는 같은 조건에서 60초 뒤 실패했다
+- [ ] **claude·kimi 두 경로에서 각각** 확인한다. kimi 는 `--agent` 가 받지 않으므로
+      `orca-ide terminal create --worktree <셀렉터> --command kimi` 로 띄운다
+- [ ] 확인이 끝나면 워크트리를 지운다
+- [ ] 돌린 명령과 출력을 PR 본문에 그대로 싣는다
 
 ---
 
-## Task 3: 헤드리스 이중 경로와 폴백 체인을 삭제한다
+## Task 3: 죽은 경로를 지운다 — 헤드리스 · 폴백 체인 · **스윕**
 
-**Files:**
-- Modify: `.github/workflows/cross-review.yml` — `build_prompt`·`run_headless_once`·`synth_verdict`
-  (984~1030) · 한도 감지 6함수(867~983) · `try_candidate` 와 체인 루프(1326~1421)
-- Modify: `.github/workflows/cross-review.yml` — `publish` 잡의 폴백 안내문(1683~1810 산재)
-- Modify: `.github/workflows/review-gate.yml:112` — `review: fallback-claude` 회수 목록에서 제거
+**읽어야 할 자리**: `cross-review.yml` 의 `build_prompt`·`run_headless_once`·`synth_verdict` ·
+한도 감지 6함수 · `try_candidate` 와 체인 루프 · **`:723` 「고아 리뷰 워크트리 시작 청소」**.
 
-**Interfaces:**
-- Consumes: Task 1 의 `decide()` 반환값 (`chain`·`fallback_tier` 는 더 이상 만들지 않는다)
+**왜 스윕도 지우나**: 2026-08-08 에 그 스윕이 **일하는 중인 리뷰어 다섯을 회수**했다. 안전 조항이
+읽는 `lastActivityAt` 이 생성 시각에 고정돼 갱신되지 않아 무력했다(`보존 0건`). 이 재설계의
+핵심 근거이므로 **원인 코드를 남기면 안 된다.** 정리는 automation 계획 Task 4 가 연결 PR 상태로
+판정해 맡는다.
 
-- [ ] **Step 1: 삭제 전에 소비자를 전수 조사한다**
+**불변식**
 
-Run:
-```bash
-grep -rn "CHAIN\|chain\|fallback_tier\|FALLBACK\|EXHAUSTED\|DEGRADED\|exec_path\|EXEC_PATH" .github/workflows/ | grep -v "^Binary"
-```
-Expected: `cross-review.yml` 과 `review-gate.yml` 두 파일에서만 나온다. **다른 파일이 나오면
-이 계획이 낡은 것이므로 멈추고 보고한다.**
+- **폴백 체인 삭제는 「한 판정에 한 모델」 불변식의 구현이다.** 리뷰어가 못 뜨면 판정이 없는
+  것으로 끝난다
+- 헤드리스 경로는 **이 레포에서 9/9 미사용**(게시된 판정 코멘트의 「실행 경로」 필드 전수).
+  옛 레포 이력은 확인 못 했다 — 지우기 전에 이 레포 기준 수치를 다시 세라
+- **스윕을 지우면 워크트리가 쌓인다.** automation 계획 Task 4 가 서기 전까지는 사람이 치운다.
+  그 사실을 PR 본문에 적어라
 
-- [ ] **Step 2: 헤드리스 실행부를 지운다**
+**검증**
 
-`build_prompt()` · `run_headless_once()` · `synth_verdict()` 와 그것을 부르는 자리를 삭제한다.
-`decide_mode()` 가 `orca|headless` 를 고르던 것을 없애고 Orca 경로만 남긴다.
-
-- [ ] **Step 3: 한도 감지·폴백 체인을 지운다**
-
-`remaining()` · `is_rate_limited()` · `is_transient()` · `classify()` · `terminal_hints_limit()` ·
-`probe_limit()` · `try_candidate()` 와 체인 루프를 삭제한다. 리뷰어 기동은 **1순위 하나만**
-시도하고, 실패하면 실패로 끝낸다.
-
-- [ ] **Step 4: `publish` 의 폴백 안내문을 지운다**
-
-`FALLBACK_NOTE`·`CAUSE` 를 만드는 블록과 그것을 쓰는 `printf` 를 지운다. `route` 잡의
-`chain`·`fallback_tier` 출력 선언도 지운다.
-
-- [ ] **Step 5: 남은 참조가 없는지 확인한다**
-
-Run:
-```bash
-grep -rn "fallback\|FALLBACK\|EXHAUSTED\|DEGRADED\|headless\|probe_limit" .github/workflows/ | grep -v "^Binary"
-```
-Expected: 0건. 하나라도 남으면 그 자리를 마저 지운다.
-
-- [ ] **Step 6: YAML 문법을 확인한다**
-
-Run: `python3 -c "import yaml,sys; [yaml.safe_load(open(f)) for f in sys.argv[1:]]; print('YAML OK')" .github/workflows/*.yml`
-Expected: `YAML OK`
-
-> `yaml` 은 stdlib 이 아니다. 없으면 `python3 -c "import json;print()"` 대신
-> `gh workflow list` 로 대체하지 말고 `pip install --user pyyaml` 없이
-> `git diff --check` 후 GitHub 이 파싱하는 것으로 확인한다 (push 후 Actions 탭).
-
-- [ ] **Step 7: 줄 수를 세어 기록한다**
-
-Run: `wc -l .github/workflows/cross-review.yml`
-Expected: 삭제 전 2,020줄 → **1,700줄 안팎**. PR 본문에 실제 숫자를 적는다.
-
-- [ ] **Step 8: 커밋**
-
-```bash
-git add .github/workflows/cross-review.yml .github/workflows/review-gate.yml
-git commit -m "refactor(ci): 헤드리스 이중 경로와 폴백 체인을 걷어낸다
-
-헤드리스 경로는 이 레포에서 9/9 안 탔다(게시된 판정 코멘트 전수의 '실행 경로'
-필드). 두 경로를 유지하느라 한도 감지·재시도·판정 합성이 전부 두 벌이었다.
-
-폴백 체인도 지운다. 리뷰어가 못 뜨면 자동 머지가 안 되는 것으로 정직하게
-드러나고, 사람 머지는 막히지 않는다."
-```
+- [ ] 삭제 **전에** 소비자를 전수 조사한다 (`chain`·`fallback_tier`·`EXHAUSTED`·`DEGRADED`·
+      `exec_path` 등). 조사 목록과 처리 결과를 PR 본문에 담는다
+- [ ] 삭제 **후에** 같은 grep 이 0건인지 확인한다
+- [ ] `review-gate.yml` 의 `review: fallback-claude` 라벨 회수 목록에서도 뺀다
+- [ ] 줄 수 변화를 `wc -l` 로 재어 PR 본문에 적는다
 
 ---
 
-## Task 4: 경로 필터를 잡 레벨 조건으로 바꾼다
+## Task 4: 경로 필터를 워크플로 레벨에서 잡 레벨로 옮긴다
 
-워크플로 레벨 `on.paths` 로 건너뛴 체크는 **영영 pending 이라 required 로 걸 수 없다.** 잡 레벨
-`if:` 로 건너뛴 잡은 `skipped` 를 보고하고 GitHub 은 그것을 통과로 센다.
+**읽어야 할 자리**: `ci.yml` 과 `frontend-ci.yml` 의 `on:` 블록 **전체**.
 
-**Files:**
-- Modify: `.github/workflows/ci.yml` (`on.paths` 제거 → `changes` 잡 + 잡별 `if:`)
-- Modify: `.github/workflows/frontend-ci.yml` (동일)
+**왜**: 워크플로째 건너뛴 체크는 **영영 pending** 이라 required 로 걸 수 없다. 잡 레벨 `if:` 로
+건너뛴 잡은 `skipped` 를 보고하고 GitHub 은 `success`·`skipped`·`neutral` 을 통과로 센다.
 
-**Interfaces:**
-- Produces: `changes` 잡의 출력 `backend`·`frontend`·`mcp`·`workflows` (각 `'true'|'false'`)
+**불변식**
 
-- [ ] **Step 1: 지금 경로 필터를 기록하고 대조한다**
+- **현행 트리거 경로를 하나도 잃지 마라.** 초안은 `frontend-ci` 의 5개
+  (`scripts/verify_filter_negation.mjs` · `scripts/fixtures/filter_conformance_cases.json` ·
+  `backend-service/alembic/**` · `THIRD-PARTY-NOTICES.md` · `scripts/verify_notice_counts.py`)를
+  빠뜨렸다. **파일에서 뽑아 대조하라** — 이 문서의 목록을 믿지 마라
+- 필터 판정은 잡 하나가 내고 나머지 잡이 그 출력을 `if:` 로 읽는다
 
-Run:
-```bash
-awk '/^on:/,/^jobs:/' .github/workflows/ci.yml | grep -E "^\s+- " | sort -u
-awk '/^on:/,/^jobs:/' .github/workflows/frontend-ci.yml | grep -E "^\s+- " | sort -u
-```
+**검증**
 
-이 목록이 그대로 `changes` 잡의 필터가 된다. **하나도 빠뜨리지 않는다** — 빠뜨리면 그 경로
-변경에 검사가 안 돈다.
-
-> **아래 Step 2 의 템플릿을 그대로 믿지 마라.** 이 계획을 쓴 시점의 파일 기준이다.
-> 위 두 명령의 출력과 템플릿을 **줄 단위로 대조**하고, 어긋나면 파일이 정본이다.
-> 초안에서 `frontend-ci` 트리거 5개가 빠져 있었고(PR #24 리뷰가 잡았다), 그대로 복사했다면
-> 그 경로 변경에 검사가 조용히 안 돌았다.
-
-- [ ] **Step 2: `changes` 잡을 추가한다**
-
-`.github/workflows/ci.yml` 의 `on:` 에서 `paths:` 블록을 지우고 `pull_request: {}` 로 바꾼 뒤,
-`jobs:` 맨 앞에 넣는다:
-
-```yaml
-  changes:
-    name: "test: changes"
-    runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.f.outputs.backend }}
-      mcp: ${{ steps.f.outputs.mcp }}
-      frontend: ${{ steps.f.outputs.frontend }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: f
-        with:
-          filters: |
-            backend:
-              - 'backend-service/**'
-              - 'multi-agent-service/**'
-              - '*/app/core/security.py'
-              - '*/app/core/auth_context.py'
-              - '*/app/core/config.py'
-              - 'scripts/verify_auth_lockstep.py'
-              - '*-service/CLAUDE.md'
-              - 'scripts/verify_backend_claude_md.py'
-              - 'scripts/run_standalone_tests.py'
-              - 'scripts/run_verify_scripts.py'
-              - 'scripts/verify_alembic_head_freshness.py'
-              - 'frontend/prisma/init/tables.sql'
-              - 'frontend/prisma/table-generator.cjs'
-              - '.github/workflows/**'
-            mcp:
-              - '*-mcp-service/**'
-              - '.github/workflows/**'
-            frontend:
-              - 'frontend/**'
-              - 'scripts/verify_filter_negation.mjs'
-              - 'scripts/fixtures/filter_conformance_cases.json'
-              - 'backend-service/alembic/**'
-              - 'THIRD-PARTY-NOTICES.md'
-              - 'scripts/verify_notice_counts.py'
-              - '.github/workflows/**'
-```
-
-- [ ] **Step 3: 각 잡에 조건과 의존을 건다**
-
-기존 잡마다 두 줄을 넣는다. 예:
-
-```yaml
-  mcp-services:
-    name: "test: mcp-services"
-    needs: changes
-    if: ${{ needs.changes.outputs.mcp == 'true' }}
-    runs-on: ubuntu-latest
-```
-
-- [ ] **Step 4: 문서 PR 에서 `skipped` 가 나오는지 확인한다**
-
-`.md` 파일 하나만 바꾼 브랜치를 push 하고 PR 을 연다.
-Run: `gh pr checks <번호>`
-Expected: `test: backend` 등이 **`skipping`** 으로 나오고 pending 이 아니다.
-**pending 이 하나라도 남으면 Task 5 의 브랜치 보호를 걸면 안 된다** — 그 PR 은 영영 막힌다.
-
-- [ ] **Step 5: 커밋**
-
-```bash
-git add .github/workflows/ci.yml .github/workflows/frontend-ci.yml
-git commit -m "refactor(ci): 경로 필터를 워크플로 레벨에서 잡 레벨로 옮긴다
-
-워크플로째 건너뛴 체크는 영영 pending 이라 required 로 걸 수 없다. 잡 레벨
-조건으로 건너뛴 잡은 skipped 를 보고하고 GitHub 은 그것을 통과로 센다."
-```
+- [ ] 전환 전후의 경로 목록을 뽑아 **집합이 같음**을 보인다
+- [ ] `.md` 만 바꾼 PR 을 열어 `gh pr checks` 가 **`skipping`** 을 내는지 확인한다.
+      **pending 이 하나라도 남으면 Task 5·6 을 진행하지 마라** — 그 PR 이 영영 막힌다
+- [ ] 필터 안쪽 파일을 바꾼 PR 로 해당 잡이 **실제로 도는지**도 확인한다 (한쪽만 보면
+      「전부 skip」이 초록으로 읽힌다)
 
 ---
 
 ## Task 5: required 게이트 잡을 세운다
 
-테스트 9종을 개별로 required 로 걸지 않는다. 「전부 초록인가」를 대표하는 잡 하나만 건다 —
-pending 창이 하나로 줄어 Orca 머지 버튼이 닫혀 있는 시간이 짧아진다.
+**만드는 것**: `repo-scans.yml` 에 상류 잡을 대표하는 잡 하나. 이 워크플로는 경로 필터가 없어
+모든 PR 에서 돈다.
 
-**Files:**
-- Modify: `.github/workflows/repo-scans.yml` (경로 필터가 없어 모든 PR 에서 돈다)
+**불변식**
 
-**Interfaces:**
-- Produces: 체크 이름 `test: gate` — Task 6 의 브랜치 보호가 이 이름을 required 로 건다
+- 통과 조건은 상류 잡이 **`success` 또는 `skipped`** 인 것뿐이다
+- **상류가 0건이면 실패**한다 — `needs` 가 비면 「검사할 게 없어서 초록」이 된다
+- 다른 워크플로(`ci.yml`·`frontend-ci.yml`)의 잡은 `needs` 로 못 묶는다. 그것들을 required 에
+  넣을지는 Task 6 에서 정한다
 
-- [ ] **Step 1: 게이트 잡을 추가한다**
+**검증**
 
-`.github/workflows/repo-scans.yml` 에 넣는다:
-
-```yaml
-  gate:
-    name: "test: gate"
-    if: ${{ always() }}
-    needs: [ci-coverage, repo-scan, repo-scan-app]
-    runs-on: ubuntu-latest
-    steps:
-      - name: 상류 잡 전수 판정 (skipped·success 만 통과)
-        env:
-          RESULTS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json, os, sys
-          needs = json.loads(os.environ["RESULTS"])
-          if not needs:
-              print("FAIL 검사 대상 0건 — needs 가 비었다")
-              sys.exit(1)
-          bad = {k: v["result"] for k, v in needs.items()
-                 if v["result"] not in ("success", "skipped")}
-          print(f"게이트: 상류 {len(needs)}건 검사 · 실패 {len(bad)}건")
-          for k, v in bad.items():
-              print(f"  {k}: {v}")
-          sys.exit(1 if bad else 0)
-          PY
-```
-
-> `needs` 에는 `ci.yml`·`frontend-ci.yml` 의 잡을 넣을 수 없다 — 다른 워크플로다.
-> 그쪽은 Task 6 에서 required 목록에 개별로 넣거나, 넣지 않고 자문으로 둔다.
-> **어느 쪽인지는 Task 6 Step 2 에서 정한다.**
-
-- [ ] **Step 2: 검사 0건이 실패하는지 확인한다**
-
-`needs` 목록을 일시적으로 비운 사본으로 위 파이썬 블록을 손으로 돌린다:
-
-Run: `RESULTS='{}' python3 -c "$(sed -n '/^import json/,/sys.exit/p' /dev/stdin)" <<< ""`
-간단히는 다음으로 확인한다:
-```bash
-RESULTS='{}' python3 -c '
-import json,os,sys
-needs=json.loads(os.environ["RESULTS"])
-print("FAIL 검사 대상 0건" if not needs else "OK"); sys.exit(1 if not needs else 0)'
-```
-Expected: `FAIL 검사 대상 0건` · 종료코드 1
-
-- [ ] **Step 3: 커밋**
-
-```bash
-git add .github/workflows/repo-scans.yml
-git commit -m "feat(ci): 상류 잡을 대표하는 required 게이트 잡을 세운다
-
-테스트를 개별로 required 로 걸면 pending 창이 여러 개가 되어 머지 버튼이
-오래 닫힌다. 하나로 대표하고, skipped·success 만 통과시킨다. 상류가 0건이면
-실패한다."
-```
+- [ ] `needs` 가 빈 입력으로 판정부를 돌려 **실패하는지** 확인한다
+- [ ] 상류 하나를 일부러 실패시킨 PR 에서 게이트가 빨간지 확인한다
 
 ---
 
-## Task 6: 브랜치 보호를 걸고 Orca 에서 체감을 잰다
+## Task 6: 브랜치 보호를 걸고 Orca 체감을 잰다
 
-**이 task 는 코드 변경이 아니라 설정 변경 + 실측이다.** 되돌리기가 토글 하나이므로 논쟁하지 말고
-재본다.
+**코드 변경이 아니라 설정 변경 + 실측이다.** 되돌리기가 토글 하나이므로 논쟁하지 말고 재본다.
 
-**Files:** 없음 (레포 설정)
+**불변식**
 
-- [ ] **Step 1: 현재 상태를 기록한다**
+- **승인을 required 로 걸지 않는다** (`required_pull_request_reviews: null`). 켜면 AI 리뷰가
+  죽었을 때 사람도 머지 못 해 작업 정지 장치가 된다 (2026-08-06 결정 취지 · 2026-08-08 리드 결정)
+- required 목록에는 **Task 4 에서 `skipping` 이 확인된 것만** 넣는다
 
-Run: `gh api repos/Danwoo/trading-lab/branches/main/protection`
-Expected: `{"message":"Branch not protected", "status":"404"}`
+**검증**
 
-- [ ] **Step 2: required 목록을 정한다**
-
-Task 4 Step 4 에서 `skipping` 이 확인된 워크플로만 required 후보다. 확인 안 된 것은 넣지 않는다.
-최소 구성은 `test: gate` 하나다.
-
-- [ ] **Step 3: 보호를 건다 (approvals 없이)**
-
-```bash
-gh api -X PUT repos/Danwoo/trading-lab/branches/main/protection \
-  -H "Accept: application/vnd.github+json" \
-  --input - <<'JSON'
-{
-  "required_status_checks": {"strict": false, "contexts": ["test: gate"]},
-  "enforce_admins": false,
-  "required_pull_request_reviews": null,
-  "restrictions": null
-}
-JSON
-```
-
-`"required_pull_request_reviews": null` 이 핵심이다 — 승인을 required 로 걸지 않는다
-(설계 결정 로그 2026-08-08).
-
-- [ ] **Step 4: 걸렸는지 확인한다**
-
-Run: `gh api repos/Danwoo/trading-lab/branches/main/protection --jq '{checks: .required_status_checks.contexts, reviews: .required_pull_request_reviews}'`
-Expected: `{"checks": ["test: gate"], "reviews": null}`
-
-- [ ] **Step 5: Orca 에서 30분 써 본다**
-
-PR 을 하나 열고 Orca 에서 다음을 본다:
-1. 테스트가 도는 동안 머지 버튼이 닫히는가 (닫히는 것이 정상)
-2. 테스트가 끝나면 열리는가
-3. **`mergeStateStatus` 가 `UNKNOWN` 인 창에서 버튼이 어떻게 구는가** — 설계 문서의
-   미검증 위험이 이 자리다
-
-체감이 나쁘면 되돌린다: `gh api -X DELETE repos/Danwoo/trading-lab/branches/main/protection`
-
-- [ ] **Step 6: 결과를 결정 로그에 적는다**
-
-`CONTEXT.md` 의 `## 결정 로그` 에 한 줄 추가한다 (추가 전용 — 기존 항목 수정 금지):
-
-```
-- 2026-08-08 브랜치 보호=required 체크 `test: gate` 하나, 승인 required 아님 (개별 체크 required 기각 — pending 창이 여러 개가 되어 Orca 머지 버튼이 오래 닫힌다 / 승인 required 기각 — AI 리뷰가 죽으면 사람도 못 머지해 작업 정지 장치가 된다, 2026-08-06 결정 취지)
-```
-
-- [ ] **Step 7: 커밋**
-
-```bash
-git add CONTEXT.md
-git commit -m "docs: 브랜치 보호 결정을 결정 로그에 남긴다"
-```
+- [ ] 걸기 전 상태를 기록한다 (`gh api …/branches/main/protection` → 404)
+- [ ] 건 뒤 `required_status_checks.contexts` 와 `required_pull_request_reviews` 를 조회해 확인
+- [ ] **Orca 에서 30분 써 본다** — 테스트가 도는 동안 버튼이 닫히나, 끝나면 열리나,
+      `mergeStateStatus=UNKNOWN` 창에서 어떻게 구나. 설계 문서의 미검증 위험이 이 자리다
+- [ ] 체감이 나쁘면 되돌린다. 결과를 `CONTEXT.md` 결정 로그에 한 줄 남긴다 (추가 전용)
 
 ---
 
 ## Task 7: 판정을 GitHub 리뷰로 기록하는 기록기
 
-리뷰어는 판정 코멘트를 남기고, 기록기가 `github-actions[bot]` 명의로 `gh pr review` 를 대행한다.
-GitHub 은 자기 PR 자기 승인을 금지하므로 로컬 `gh`(리드 계정)로는 승인이 안 된다.
+**읽어야 할 자리**: `cross-review.yml` 의 `publish` 잡 — 특히 **`:1148` 과 `:1707` 의 저자 필터**와
+`parse_marker`·`poll_verdict`.
 
-**Files:**
-- Create: `scripts/review_record.py`
-- Create: `scripts/test_review_record.py`
-- Create: `.github/workflows/review-record.yml`
-- Modify: `.github/workflows/repo-scans.yml` (배선)
+**만드는 것**: `scripts/review_record.py`(순수 판정) · 테스트 · `.github/workflows/review-record.yml` ·
+`repo-scans.yml` 배선.
 
-**Interfaces:**
-- Consumes: Task 1 의 `label_allowed`
-- Produces:
-  - `parse_marker(body: str) -> dict | None`
-  - `semver_update_type(title: str) -> "major" | "minor" | "patch" | None`
-  - `decide_record(marker, head_sha, gate_ok, risk, author_login, pr_title) -> dict` —
-    키는 `action`(`"approve"|"request_changes"|"none"`) · `arm_automerge`(`bool`) · `reason`(`str`)
+**하는 일**: 리뷰어가 남긴 판정 코멘트를 읽어 `github-actions[bot]` 명의로 `gh pr review` 를
+대행한다. GitHub 이 자기 PR 자기 승인을 금지하므로 로컬 `gh`(리드 계정)로는 승인이 안 된다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+**불변식** — 전역 불변식의 앞 둘이 **이 task 의 것**이다. 특히:
 
-`scripts/test_review_record.py`:
+- **저자 필터를 반드시 옮겨라.** 마커 코멘트는 `OWNER`·`MEMBER`·`COLLABORATOR` 것만 읽는다.
+  초안이 이걸 빠뜨려 **공개 레포에서 누구든 위조 마커로 봇 승인·자동 머지를 일으킬 수 있었다.**
+  승인을 required 로 안 거는 이 설계에서 **유일한 위조 방어**다
+- **sha 는 40자 동등 비교.** 접두사 매치 금지
+- 자동 머지 arm 조건은 전부 참일 때만: ① required 게이트 초록 ② 승인 리뷰가 있고 그
+  `commit_id` 가 현재 head 와 같다 ③ `risk: low` **또는** 저자가 봇이면서 **major 상승이 아니다**
+- **`source=manual` 마커는 arm 하지 않는다** — 사람이 타이핑한 한 줄일 수 있다
+- 봇 PR 의 상승 종류는 PR 제목에서 읽는다. **읽지 못하면 arm 하지 않는다** (fail-closed)
 
-```python
-"""판정 마커 → 리뷰 행동·자동 머지 arm 회귀 그물 — stdlib 전용.
+**검증**
 
-경계 넷을 못박는다:
-  ① 마커 sha 가 head 와 다르면 낡은 판정이다 (승인을 켜지 않으므로 GitHub 의
-     stale 무효화에 기댈 수 없다 — 우리가 대조한다).
-  ② source=manual 마커는 사람이 타이핑한 한 줄일 수 있으므로 자동 머지를 arm 하지 않는다.
-  ③ 봇 저자는 위험 선언이 없어도 자동 머지 대상이다 (2026-08-08 리드 결정).
-  ④ **단 major 상승은 사람 경로다.** 2026-08-07 실측에서 리뷰어가 첫 줄에 올린 두 사실이
-     전부 major 였다. 제목 형식이 바뀌어 판별이 안 되면 arm 하지 않는다 (fail-closed).
-"""
-
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import review_record as rr
-
-HEAD = "a" * 40
-OLD = "b" * 40
-BOT = "dependabot[bot]"
-
-PATCH_TITLE = "build(deps): bump starlette from 1.3.0 to 1.3.1 in /template-mcp-service"
-MINOR_TITLE = "build(deps): bump mcp from 1.27.2 to 1.28.1 in /template-mcp-service"
-MAJOR_TITLE = "build(deps): bump cryptography from 48.0.1 to 50.0.0 in /template-mcp-service"
-HUMAN_TITLE = "fix(auth): 탈퇴자 이메일 잔류 제거"
-
-SEMVER_CASES = [
-    ("patch", PATCH_TITLE, "patch"),
-    ("minor", MINOR_TITLE, "minor"),
-    ("major", MAJOR_TITLE, "major"),
-    ("제목 형식이 다르면 None", HUMAN_TITLE, None),
-    ("버전이 숫자가 아니면 None",
-     "build(deps): bump x from abc to def in /y", None),
-]
-
-CASES = [
-    ("merge_ok + 최신 + 저위험 → 승인·arm",
-     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, "low",
-     "danwoo", HUMAN_TITLE, "approve", True),
-    ("merge_ok + 낡은 sha → 아무것도 안 한다",
-     {"verdict": "merge_ok", "sha": OLD, "source": None}, HEAD, True, "low",
-     "danwoo", HUMAN_TITLE, "none", False),
-    ("needs_changes → 변경 요청, arm 안 함",
-     {"verdict": "needs_changes", "sha": HEAD, "source": None}, HEAD, True, "low",
-     "danwoo", HUMAN_TITLE, "request_changes", False),
-    ("unable → 아무것도 안 한다",
-     {"verdict": "unable", "sha": HEAD, "source": None}, HEAD, True, "low",
-     "danwoo", HUMAN_TITLE, "none", False),
-    ("source=manual → 승인은 하되 arm 안 함",
-     {"verdict": "merge_ok", "sha": HEAD, "source": "manual"}, HEAD, True, "low",
-     "danwoo", HUMAN_TITLE, "approve", False),
-    ("게이트 빨강 → 승인은 하되 arm 안 함",
-     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, False, "low",
-     "danwoo", HUMAN_TITLE, "approve", False),
-    ("고위험 → 승인은 하되 arm 안 함",
-     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, "high",
-     "danwoo", HUMAN_TITLE, "approve", False),
-    ("위험 미선언 + 사람 저자 → arm 안 함",
-     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
-     "danwoo", HUMAN_TITLE, "approve", False),
-    ("봇 + patch → arm 한다",
-     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
-     BOT, PATCH_TITLE, "approve", True),
-    ("봇 + minor → arm 한다",
-     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
-     BOT, MINOR_TITLE, "approve", True),
-    ("봇 + major → 승인은 하되 arm 안 함 (사람 경로)",
-     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
-     BOT, MAJOR_TITLE, "approve", False),
-    ("봇 + 제목 파싱 실패 → arm 안 함 (fail-closed)",
-     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, None,
-     BOT, "이상한 제목", "approve", False),
-    ("봇 + major 라도 risk: low 가 명시돼 있으면 arm 한다",
-     {"verdict": "merge_ok", "sha": HEAD, "source": None}, HEAD, True, "low",
-     BOT, MAJOR_TITLE, "approve", True),
-]
-
-
-def main() -> int:
-    failures = 0
-    for desc, title, want in SEMVER_CASES:
-        got = rr.semver_update_type(title)
-        if got != want:
-            print(f"FAIL [semver/{desc}] got {got!r}, want {want!r}")
-            failures += 1
-    for desc, marker, head, gate_ok, risk, author, title, want_action, want_arm in CASES:
-        got = rr.decide_record(marker, head, gate_ok, risk, author, title)
-        if got["action"] != want_action or got["arm_automerge"] is not want_arm:
-            print(f"FAIL [{desc}] got action={got['action']!r} "
-                  f"arm={got['arm_automerge']!r}, want {want_action!r}/{want_arm!r}")
-            failures += 1
-    total = len(SEMVER_CASES) + len(CASES)
-    print(f"review_record 케이스 {total}건 검사 · 실패 {failures}건")
-    if total == 0:
-        print("FAIL 검사 대상 0건")
-        return 1
-    return 1 if failures else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-```
-
-- [ ] **Step 2: 실패를 확인한다**
-
-Run: `python3 scripts/test_review_record.py`
-Expected: `ModuleNotFoundError: No module named 'review_record'`
-
-- [ ] **Step 3: 최소 구현을 쓴다**
-
-`scripts/review_record.py`:
-
-```python
-"""판정 마커와 PR 상태로 리뷰 행동과 자동 머지 arm 여부를 정한다 — 순수 판정, stdlib 전용.
-
-승인을 required 로 걸지 않으므로 GitHub 의 stale approval 무효화를 못 쓴다.
-마커의 sha 를 head 와 직접 대조하는 것이 그 대체다.
-"""
-
-import re
-
-MARKER = re.compile(
-    r"<!--\s*cross-review v1"
-    r"(?=[^>]*\bverdict=(?P<verdict>[a-z_]+))"
-    r"(?=[^>]*\bsha=(?P<sha>[0-9a-f]{7,40}))"
-    r"(?:(?=[^>]*\bsource=(?P<source>[a-z]+)))?"
-    r"[^>]*-->"
-)
-
-BOT_SUFFIX = "[bot]"
-
-# Dependabot 제목 형식 (실측): `bump <패키지> from <A> to <B> in /<디렉터리>`
-_BUMP = re.compile(r"\bbump\s+\S+\s+from\s+(?P<a>\S+)\s+to\s+(?P<b>\S+)\b")
-
-
-def semver_update_type(title):
-    """제목에서 상승 종류를 읽는다. 형식이 다르거나 버전이 숫자가 아니면 None.
-
-    None 은 '모른다'이지 '안전하다'가 아니다 — 호출부가 fail-closed 로 다룬다.
-    """
-    m = _BUMP.search(title or "")
-    if not m:
-        return None
-    try:
-        a = [int(x) for x in m.group("a").split(".")[:3]]
-        b = [int(x) for x in m.group("b").split(".")[:3]]
-    except ValueError:
-        return None
-    a += [0] * (3 - len(a))
-    b += [0] * (3 - len(b))
-    if a[0] != b[0]:
-        return "major"
-    if a[1] != b[1]:
-        return "minor"
-    return "patch"
-
-
-def parse_marker(body):
-    """코멘트 본문에서 마지막 마커를 읽는다. 없으면 None."""
-    last = None
-    for m in MARKER.finditer(body):
-        last = {"verdict": m.group("verdict"), "sha": m.group("sha"),
-                "source": m.group("source")}
-    return last
-
-
-def decide_record(marker, head_sha, gate_ok, risk, author_login, pr_title=""):
-    if marker is None:
-        return {"action": "none", "arm_automerge": False, "reason": "마커 없음"}
-    if not head_sha.startswith(marker["sha"]):
-        return {"action": "none", "arm_automerge": False,
-                "reason": f"낡은 판정 (마커 {marker['sha']} ≠ head {head_sha[:12]})"}
-
-    verdict = marker["verdict"]
-    if verdict == "needs_changes":
-        return {"action": "request_changes", "arm_automerge": False,
-                "reason": "수정 필요"}
-    if verdict != "merge_ok":
-        return {"action": "none", "arm_automerge": False,
-                "reason": f"판정 {verdict} — 기록하지 않는다"}
-
-    reasons = []
-    if marker["source"] == "manual":
-        reasons.append("수동 마커")
-    if not gate_ok:
-        reasons.append("게이트 미통과")
-
-    if risk != "low":
-        # 봇 PR 은 위험 선언 자리가 없다 — 대신 상승 종류로 가른다 (2026-08-08 리드 결정)
-        if author_login.endswith(BOT_SUFFIX):
-            update = semver_update_type(pr_title)
-            if update == "major":
-                reasons.append("봇 major 상승 — 사람 경로")
-            elif update is None:
-                reasons.append("봇 PR 제목에서 상승 종류를 못 읽음")
-        else:
-            reasons.append("저위험 아님" if risk else "위험 미선언")
-
-    return {"action": "approve", "arm_automerge": not reasons,
-            "reason": "자동 머지 arm" if not reasons else " · ".join(reasons)}
-```
-
-- [ ] **Step 4: 테스트가 통과하는지 확인한다**
-
-Run: `python3 scripts/test_review_record.py`
-Expected: `review_record 케이스 18건 검사 · 실패 0건` · 종료코드 0
-(semver 판별 5건 + 기록 판정 13건)
-
-- [ ] **Step 5: 기록기 워크플로를 만든다**
-
-`.github/workflows/review-record.yml`:
-
-```yaml
-# review-record — 판정 마커를 GitHub 리뷰로 옮겨 적는다.
-#
-# 파이프라인이 아니라 기록기다. 판단은 Orca 의 리뷰어가 하고 여기서는 읽어서
-# 옮기기만 한다. 승인이 github-actions[bot] 명의여야 하는 이유는 GitHub 이
-# 자기 PR 자기 승인을 금지하기 때문이다 (Orca 리뷰어는 리드 계정으로 나간다).
-name: review-record
-on:
-  issue_comment:
-    types: [created]
-
-permissions:
-  pull-requests: write
-  contents: read
-  checks: read
-
-concurrency:
-  group: review-record-${{ github.event.issue.number }}
-  cancel-in-progress: false
-
-jobs:
-  record:
-    name: "chore: review-record (비게이트)"
-    if: ${{ github.event.issue.pull_request && contains(github.event.comment.body, 'cross-review v1') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: 마커 판독 → 리뷰 기록 · 자동 머지 arm
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.issue.number }}
-          BODY: ${{ github.event.comment.body }}
-        run: |
-          set -euo pipefail
-          META=$(gh pr view "$PR" --json headRefOid,author,title,labels)
-          export HEAD_SHA=$(printf '%s' "$META" | python3 -c 'import json,sys;print(json.load(sys.stdin)["headRefOid"])')
-          export AUTHOR=$(printf '%s' "$META" | python3 -c 'import json,sys;print(json.load(sys.stdin)["author"]["login"])')
-          export TITLE=$(printf '%s' "$META" | python3 -c 'import json,sys;print(json.load(sys.stdin)["title"])')
-          export RISK=$(printf '%s' "$META" | python3 -c '
-import json,sys
-lb=[l["name"] for l in json.load(sys.stdin)["labels"]]
-print(next((x[len("risk: "):] for x in lb if x.startswith("risk: ")), ""))')
-          export GATE=$(gh pr checks "$PR" --json name,state --jq '[.[] | select(.name=="test: gate")] | first | .state // ""')
-          DECISION=$(python3 - <<'PY'
-          import json, os, sys
-          sys.path.insert(0, "scripts")
-          import review_record as rr
-          marker = rr.parse_marker(os.environ["BODY"])
-          print(json.dumps(rr.decide_record(
-              marker, os.environ["HEAD_SHA"],
-              os.environ.get("GATE") == "SUCCESS",
-              os.environ.get("RISK") or None,
-              os.environ["AUTHOR"],
-              os.environ.get("TITLE", ""))))
-          PY
-          )
-          ACTION=$(printf '%s' "$DECISION" | python3 -c 'import json,sys;print(json.load(sys.stdin)["action"])')
-          ARM=$(printf '%s' "$DECISION" | python3 -c 'import json,sys;print(json.load(sys.stdin)["arm_automerge"])')
-          REASON=$(printf '%s' "$DECISION" | python3 -c 'import json,sys;print(json.load(sys.stdin)["reason"])')
-          echo "판독: action=${ACTION} arm=${ARM} 사유=${REASON}"
-          case "$ACTION" in
-            approve)         gh pr review "$PR" --approve --body "독립 리뷰 판정을 기록한다 — ${REASON}" ;;
-            request_changes) gh pr review "$PR" --request-changes --body "독립 리뷰 판정을 기록한다 — ${REASON}" ;;
-            none)            echo "기록할 것 없음 (${REASON})" ;;
-          esac
-          if [ "$ARM" = "True" ]; then
-            gh pr merge "$PR" --squash --auto
-            echo "자동 머지 arm 됨"
-          fi
-```
-
-- [ ] **Step 6: CI 에 배선한다**
-
-`.github/workflows/repo-scans.yml` 의 `repo-scan` 잡에 추가:
-
-```yaml
-      - name: 리뷰 기록 판정 회귀 그물
-        run: python3 scripts/test_review_record.py
-```
-
-- [ ] **Step 7: 배선 대조**
-
-Run: `python3 scripts/verify_ci_check_coverage.py`
-Expected: 종료코드 0
-
-- [ ] **Step 8: 실환경 확인 — 봇 승인이 실제로 서는가**
-
-**설계 문서의 미검증 위험 중 하나다.** 확인 없이 다음으로 가지 않는다.
-
-1. 테스트 PR 을 하나 연다
-2. 그 PR 에 마커가 든 코멘트를 손으로 단다:
-   `<!-- cross-review v1 model=claude verdict=merge_ok sha=<그 PR 의 head> -->`
-3. Run: `gh pr view <번호> --json reviews --jq '.reviews[] | {author: .author.login, state: .state}'`
-   Expected: `{"author": "github-actions", "state": "APPROVED"}`
-4. 낡은 sha 로도 해 보고 **아무 리뷰도 안 달리는지** 확인한다
-5. 명령과 출력을 PR 본문에 그대로 싣는다
-
-- [ ] **Step 9: 커밋**
-
-```bash
-git add scripts/review_record.py scripts/test_review_record.py .github/workflows/review-record.yml .github/workflows/repo-scans.yml
-git commit -m "feat(ci): 판정 마커를 GitHub 리뷰로 옮겨 적는 기록기
-
-판단은 Orca 리뷰어가 하고 이 워크플로는 읽어서 옮기기만 한다. 승인이
-github-actions[bot] 명의여야 하는 이유는 GitHub 이 자기 PR 자기 승인을
-막기 때문이다.
-
-승인을 required 로 걸지 않으므로 stale 무효화를 GitHub 에 못 맡긴다 —
-마커의 sha 를 head 와 직접 대조한다."
-```
+- [ ] 단위 테스트에 **공격 케이스**를 넣는다 — 위조 마커(비-멤버 코멘트) · 접두 sha ·
+      낡은 sha · `source=manual` · major 봇 PR · 제목 파싱 실패
+- [ ] **봇 승인이 실제로 서는지 확인한다** — 테스트 PR 에 마커 코멘트를 달고
+      `gh pr view <N> --json reviews` 에 `github-actions` / `APPROVED` 가 뜨는지 본다
+- [ ] **낡은 sha 로도 해 보고 아무 리뷰도 안 달리는지** 확인한다
+- [ ] 명령과 출력을 PR 본문에 그대로 싣는다
 
 ---
 
 ## Task 8: 흉내 내던 워크플로를 삭제하고 `plan-*` 을 통합한다
 
-**Files:**
-- Delete: `.github/workflows/merge-router.yml` · `review-gate.yml` · `board-status.yml`
-- Delete: `.github/workflows/plan-check.yml` · `plan-label.yml` · `plan-label-issue.yml`
-- Create: `.github/workflows/plan.yml` (위 셋의 잡을 이벤트로 갈라 담는다)
-- Modify: 위 파일들을 참조하는 문서·스크립트 (Step 1 에서 전수 조사)
+**삭제**: `merge-router.yml` · `review-gate.yml` · `board-status.yml` ·
+`plan-check.yml` · `plan-label.yml` · `plan-label-issue.yml`
+**신설**: `plan.yml` (위 셋의 잡을 이벤트로 갈라 담는다)
 
-- [ ] **Step 1: 참조를 전수 조사한다**
+**불변식**
 
-**경로를 지우면 그 경로를 참조하는 것을 전부 찾는다.** 빨간불 난 것만 고치면 인스턴스만 고치고
-클래스를 남긴 것이다.
+- **체크 이름을 바꾸지 마라.** `gh pr checks` 에서 확인한 기존 이름과 byte-identical 로 유지한다
+- 삭제 대상이 검증 스크립트를 돌리는지 먼저 확인한다. 돌린다면 고아가 되므로 먼저 옮긴다
+- **`cross-review.yml` 은 이 계획에서 지우지 않는다** — 아래 참조
 
-Run:
-```bash
-grep -rn "merge-router\|review-gate\|board-status\|plan-check\|plan-label" \
-  --include='*.md' --include='*.py' --include='*.yml' --include='*.mjs' . \
-  | grep -v node_modules
-```
-조사한 목록과 처리 결과(갱신·삭제·해당 없음)를 **PR 본문에 담는다.**
+**검증**
 
-- [ ] **Step 2: 삭제 전에 검증 스크립트를 돌리는지 확인한다**
-
-Run:
-```bash
-for f in merge-router review-gate board-status plan-check plan-label plan-label-issue; do
-  printf "%-18s %s건\n" "$f" "$(grep -cE 'python3? .*(verify|test)_.*\.(py|mjs)|node scripts/' .github/workflows/$f.yml)"
-done
-```
-Expected: 전부 0건. **0이 아니면 그 스크립트가 고아가 되므로 먼저 다른 워크플로에 옮긴다.**
-
-- [ ] **Step 3: `plan.yml` 을 만든다**
-
-세 워크플로의 잡을 한 파일에 담고 이벤트로 가른다:
-
-```yaml
-name: plan
-on:
-  pull_request: {}
-  issue_comment:
-    types: [created]
-
-permissions:
-  issues: write
-  pull-requests: write
-  contents: read
-
-jobs:
-  plan-check:
-    name: "chore: plan-check (비게이트)"
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
-    steps: []   # plan-check.yml 의 스텝을 그대로 옮긴다
-
-  plan-label:
-    name: "chore: plan-reconcile (비게이트)"
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
-    steps: []   # plan-label.yml 의 스텝을 그대로 옮긴다
-
-  plan-label-issue:
-    name: "chore: plan-label-issue (비게이트)"
-    if: ${{ github.event_name == 'issue_comment' }}
-    runs-on: ubuntu-latest
-    steps: []   # plan-label-issue.yml 의 스텝을 그대로 옮긴다
-```
-
-**`steps: []` 를 그대로 두지 않는다** — 원본 파일의 스텝을 통째로 복사해 넣는다. 체크 이름은
-`gh pr checks` 에서 확인한 기존 이름과 **byte-identical** 로 유지한다.
-
-- [ ] **Step 4: 삭제한다**
-
-```bash
-git rm .github/workflows/merge-router.yml .github/workflows/review-gate.yml \
-       .github/workflows/board-status.yml .github/workflows/plan-check.yml \
-       .github/workflows/plan-label.yml .github/workflows/plan-label-issue.yml
-```
-
-- [ ] **Step 5: 배선 대조와 줄 수를 확인한다**
-
-Run: `python3 scripts/verify_ci_check_coverage.py`
-Expected: 종료코드 0
-
-Run: `ls .github/workflows/*.yml | wc -l && cat .github/workflows/*.yml | wc -l`
-Expected: 파일 **5개** · 총 줄 수 **1,100줄 이하**. 실제 숫자를 PR 본문에 적는다.
-
-- [ ] **Step 6: 커밋**
-
-```bash
-git add -A .github/workflows/
-git commit -m "refactor(ci): 흉내 내던 워크플로를 삭제하고 plan-* 을 통합한다
-
-merge-router 와 review-gate 는 존재 이유가 'GitHub 이 안 막으니 우리가
-흉내 낸다' 였다. 브랜치 보호와 네이티브 리뷰가 그 자리를 가져가면서
-역할이 없어졌다.
-
-board-status 는 fail-open 이라 초록이 '했다' 를 보장하지 못했다 (리드 결정).
-plan-* 셋은 트리거만 다른 같은 관심사라 한 파일로 합친다."
-```
+- [ ] 삭제 전 참조를 전수 조사한다 (문서·스크립트·CI·훅). 조사 목록과 처리 결과를 PR 본문에
+- [ ] 삭제 후 `python3 scripts/verify_ci_check_coverage.py` 종료코드 0
+- [ ] 워크플로 수와 총 줄 수를 세어 PR 본문에 적는다
 
 ---
 
-## 자체 검토 결과
+## 완료 판정 — 이 계획이 닿는 곳과 못 닿는 곳
 
-**설계 대비 커버리지**
+**이 계획이 끝나면**:
 
-| 설계 항목 | task |
-| --- | --- |
-| §1 경계 (결정론적인 것만 CI) | Task 3·8 |
-| §2 네이티브 PR 리뷰 | Task 7 |
-| §2-1 봇 PR 자동 머지 | Task 7 (케이스 9) |
-| §3 라벨은 위험도만 | Task 7·8 |
-| §4 머지 두 문장 + required 게이트 | Task 5·6 |
-| §5 축 ① automation 3종 · 축 ② 정체 감지 | **이 계획에 없음 — 아래 참조** |
-| §6 걷어내기 | Task 3·8 |
-| §7 bash → scripts/ | Task 1·2·7 |
+- 순수 판정 3종이 `scripts/` 에서 로컬로 돌고 회귀 그물이 붙는다
+- required 게이트가 서고 머지가 예측 가능해진다
+- 판정이 GitHub 리뷰로 기록되고, 저위험·봇(major 제외) PR 은 자동 머지가 arm 된다
+- 리뷰 인프라가 죽어도 사람 머지는 막히지 않는다
+- 워크플로 **11개 → 7개** (`ci` · `frontend-ci` · `repo-scans` · `plan` · `review-record` ·
+  `cross-review` · `orphaned-branch-scan`)
 
-**의도적으로 뺀 것**: 설계 §5 의 두 축(Orca automation 3종 · 정체 감지)은 **CI 가 아니라 Orca
-쪽 subsystem** 이고 도구(`orca-ide` CLI)도 다르다. 이 계획을 끝내면 CI 는 완결된 상태로 서고,
-automation 은 그 위에 독립적으로 얹힌다. **별도 계획으로 세운다.**
+**「5개 · 약 1,000줄」에는 이 계획만으로 도달하지 못한다.** `cross-review.yml` 이 남기 때문이다.
+그 파일이 하는 일 중 `route`(→ Task 1)와 `publish`(→ Task 7)는 옮겨지지만, **리뷰어 기동
+209줄은 automation 계획이 가져가야** 비로소 빈다.
 
-**남은 미결** (설계 문서와 동일):
+```
+cross-review.yml 618줄(review 잡)
+  ├ 입력 번들 준비 230줄 — 신뢰 경계. 누군가는 해야 한다
+  └ 리뷰어 기동   209줄 — automation 계획 소관
+```
 
-1. major 버전 봇 PR 을 사람 경로로 뺄 것인가 — 채택되면 Task 7 의 `decide_record` 에
-   `update_type` 인자가 하나 는다
-2. 워커 기동 automation 의 착수 표식 — automation 계획에서 정한다
+**따라서 순서는**: 이 계획 → automation 계획(리뷰어 기동 이관) → `cross-review.yml` 삭제.
+마지막 단계는 automation 계획이 끝난 뒤 별도로 판단한다. 이슈 #23 의 완료 조건
+「5개 · 약 1,000줄」은 **그 시점의 목표**이지 이 계획의 목표가 아니다.
 
 ## 이 계획이 못 닫는 것
 
-- **Orca `UNKNOWN` 창의 머지 버튼 동작** — Task 6 Step 5 에서 재보지만 설계로는 못 닫는다.
-  되돌리기가 토글 하나다.
-- **`lastActivityAt` 이 안 움직이는 것** — Orca 가 주는 값이라 우리가 못 고친다. 이 계획은
-  스윕 자체를 CI 에서 걷어내는 것으로 우회하지만, Orca automation 이 정리를 맡을 때 같은 함정을
-  다시 밟지 않도록 automation 계획에 명시해야 한다.
+- **Orca `UNKNOWN` 창의 머지 버튼 동작** — Task 6 이 재보지만 설계로는 못 닫는다
+- **`lastActivityAt` 이 안 움직이는 것** — Orca 가 주는 값이라 못 고친다. Task 3 이 스윕을 지워
+  우회하지만, 나이로 생사를 판정하는 코드가 다시 생기면 같은 함정을 밟는다
+- **스윕 삭제와 automation 정리 사이의 공백** — 그 사이 워크트리는 사람이 치운다
