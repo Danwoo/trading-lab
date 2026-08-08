@@ -106,9 +106,9 @@
 #
 # 저자 판별 (자기 신고 값 — 적대 방어 아님, 라우팅·실수 방지용. roles/orchestration.md §6.1):
 #   1순위  커밋 author email 의 <벤더>[-<티어>]-agent@noreply.local (명시 목록만 — 와일드카드 금지)
-#          **이 파일의 판정부가 신원 형식의 SoT 다** — 디스패치 쪽(§6.1 표·conductor·worker 스킬)이
-#          여기에 맞춘다. 형식을 바꿀 때는 이쪽을 먼저 바꾸고 그쪽이 따라온다.
-#          티어 어휘 (2026-07-29 확정, #48 — 근거는 판정부 주석에 출처와 함께):
+#          **scripts/review_route.py 가 신원 형식의 SoT 다** — 디스패치 쪽(§6.1 표·conductor·
+#          worker 스킬)이 여기에 맞춘다. 형식을 바꿀 때는 그 파일을 먼저 바꾸고 그쪽이 따라온다.
+#          티어 어휘 (2026-07-29 확정, #48 — 어휘를 어떻게 확인했는지는 그 파일 주석에):
 #            claude  opus · sonnet · fable · haiku
 #            kimi    k3 · k3-256k · kimi-for-coding · kimi-for-coding-highspeed  (축 예약 — 라우팅 미사용)
 #            codex   gpt-5.6-terra                                              (축 예약 — 라우팅 미사용)
@@ -317,14 +317,15 @@ jobs:
       risk_source: ${{ steps.decide.outputs.risk_source }}
       head_sha: ${{ steps.decide.outputs.head_sha }}
     steps:
-      # 판정 스크립트(scripts/review_route.py)를 부르려면 트리가 필요하다. **PR head 판본**을
-      # 쓴다 — 머지 ref 는 충돌 PR 에서 존재하지 않아 route 가 통째로 죽는다. 이 워크플로 파일
-      # 자체가 이미 PR 판본으로 도는 것과 같은 신뢰선이다 (헤더 「잔존 표면」). 리뷰 루브릭
-      # (.github/review-prompt.md)만 base 에서 읽는 예외는 그대로 둔다.
+      # 판정 스크립트(scripts/review_route.py)를 부르려면 트리가 필요하다. **기본값(머지 커밋)**
+      # 을 쓴다 — `pull_request` 에서 실행되는 워크플로 정의가 그 커밋 판본이므로, 스크립트도
+      # 같은 트리에서 와야 둘이 어긋나지 않는다. head 로 고정하면 base 가 뒤처진 PR (스크립트가
+      # main 에만 있는 동안 열려 있던 PR 전량)에서 파일이 없어 route 가 죽는다.
+      # 신뢰선은 종전과 같다: 이 워크플로 파일 자체가 이미 PR 판본으로 돈다 (헤더 「잔존 표면」).
+      # 리뷰 루브릭(.github/review-prompt.md)만 base 에서 읽는 예외는 그대로 둔다.
       - name: 판정 스크립트 체크아웃
         uses: actions/checkout@v4   # ⚠ 배포 시 커밋 SHA 핀
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
       - name: 커밋 신원·연결 이슈 수집

@@ -1,7 +1,9 @@
 """커밋 신원으로 저자를 판별해 반대 모델 리뷰어를 배정한다 — 순수 판정, stdlib 전용.
 
-`cross-review.yml` 의 `route` 잡이 이것을 부른다 — 리뷰어 배정 판정의 정본은 여기 하나다.
-티어 어휘는 로컬에서 실재를 확인한 것만 받는다.
+`cross-review.yml` 의 `route` 잡이 이것을 부른다 — 리뷰어 배정 판정과 **신원 형식의 SoT** 는
+여기 하나다. 디스패치 쪽(§6.1 표·conductor·worker 스킬)이 이 형식에 맞춘다.
+신원 형식은 `<벤더>[-<티어>]-agent@noreply.local` 이고 **명시 목록만** 받는다 (와일드카드
+금지). 구형식 `<벤더>-agent@`(티어 미상)도 계속 유효하다.
 """
 
 import json
@@ -9,6 +11,14 @@ import os
 import re
 import sys
 
+# 티어 어휘 — **지어내지 않는다.** 여기 없는 이름은 로컬에서 확인되지 않은 것이고, 새 모델이
+# 붙으면 그때 같은 방법(설정 파일·실행 배너)으로 확인해 추가한다. 확인 방법:
+#   claude — `claude --model <별칭>` 으로 실재 확인
+#   kimi   — 로컬 ~/.kimi-code/config.toml 의 등록 모델 실측
+#   codex  — `codex exec` 실행 배너의 `model:` 값 실측
+# kimi·codex 티어는 **축만 예약**이다: 라우팅은 벤더 축으로만 하고 티어는 폴백 티어 선택
+# (claude 전용 규칙)에만 쓴다. 그래도 형식을 열어 둬야 그쪽 디스패치가 티어를 적기 시작할 때
+# 판별이 깨지지 않는다.
 CLAUDE_TIERS = ("opus", "sonnet", "fable", "haiku")
 KIMI_TIERS = ("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed")
 CODEX_TIERS = ("gpt-5.6-terra",)
