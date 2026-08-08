@@ -8,8 +8,8 @@
 리뷰는 GitHub 이 원래 갖고 있는 **PR 리뷰**(Approve / Request changes)로 기록한다. 라벨이 하던
 상태 저장 역할은 GitHub 의 리뷰 상태와 required checks 로 옮기고, 라벨에는 **위험도 하나만** 남긴다.
 
-워크플로 **11개 → 5개**(`ci` · `frontend-ci` · `repo-scans` · 기록기 · `plan` 통합본, `board-status`
-존치 시 6개). **워크플로 YAML 총량 3,705줄 → 약 1,000줄** — 단, 사라진 bash 는 `scripts/` 로
+워크플로 **11개 → 5개**(`ci` · `frontend-ci` · `repo-scans` · 기록기 · `plan` 통합본).
+**워크플로 YAML 총량 3,705줄 → 약 1,000줄** — 단, 사라진 bash 는 `scripts/` 로
 옮겨간 것이지 없어진 것이 아니다. 얻는 것은 줄 수가 아니라 **로컬 실행·단위 테스트 가능성**이다.
 사라지는 것은 흉내 내던 것들이다 —
 `merge-router`(GitHub 이 안 막으니 우리가 흉내), `review-gate`(라벨 위생), 헤드리스 이중 경로,
@@ -73,7 +73,7 @@ $ gh api repos/Danwoo/trading-lab/branches/main/protection
 | `review: passed` 라벨 + 판정 마커 | **Approve / Request changes** |
 | `review: needed` 라벨(만들려던 것) | **draft → Ready for review** |
 | `merge-router.yml` 291줄 | `gh pr merge --auto` |
-| `human: merge` 대기열 | **Require approvals** + dismiss stale on push |
+| `human: merge` 대기열 | **Approve 유무** (단, 이 설계는 Require approvals 를 켜지 않고 자동 머지 arm 신호로만 쓴다 — §4) |
 
 실측: 열린 PR 전부 `reviewDecision` 이 비어 있다 — **GitHub 리뷰 기능을 한 번도 안 썼다.**
 draft PR 도 10건 중 0건이다. 그런데 `cross-review.yml:289` 는 이미 `!draft` 가드를 갖고 있다 —
@@ -95,16 +95,39 @@ CI 밖(Orca)에 둔다.
 리뷰어는 판정을 PR **리뷰**로 남긴다 — `Approve` 또는 `Request changes`. 본문이 리뷰 내용이다.
 
 - 좋으면 → 승인 → (저위험이면) 자동 머지
-- 피드백이면 → `Request changes` 가 머지를 막고 → 저자가 고쳐 push → **승인 자동 무효화** → 재리뷰
+- 피드백이면 → `Request changes` → **자동 머지가 안 걸린다** → 저자가 고쳐 push → 재리뷰
 
-「Require approval of the most recent reviewable push」를 켜면 리뷰 뒤 커밋이 승인을 무효화한다.
-지금 `sha=` 마커와 `check-review-dispatch` 가 손으로 지키던 규칙을 **GitHub 이 대신 한다.**
+**「Require approvals」는 켜지 않는다** (아래 결정 로그). 그래서 `Request changes` 는 사람 머지를
+막지 않는다 — 자동 경로만 멈춘다. AI 판정이 작업 정지 장치가 되지 않는다는 원칙(2026-08-06)의
+직접적 귀결이다.
+
+**승인이 낡았는지는 기록기가 본다.** 승인을 required 로 걸지 않으므로 GitHub 의
+「dismiss stale approvals」에 기댈 수 없다. 대신 리뷰 API 가 리뷰마다 `commit_id` 를 주므로,
+자동 머지를 arm 하기 전에 **`review.commit_id == pr.headRefOid`** 를 대조한다. 지금 `sha=` 마커와
+`check-review-dispatch` 가 손으로 지키던 규칙이 **결정론적 한 줄 비교**가 된다.
 
 **승인 신원**: GitHub 은 자기 PR 자기 승인을 금지한다. Orca 리뷰어는 로컬 `gh` 를 쓰므로 리드
 계정으로 나가 자기 PR 이면 거부된다. 따라서 **리뷰어는 판정 코멘트를 남기고, 기록기 워크플로가
 `github-actions[bot]` 명의로 `gh pr review` 를 대행**한다. 봇 승인은 required approval 로 센다.
 
 > 기록기는 파이프라인이 아니다 — 코멘트를 읽어 리뷰로 옮겨 적는 것뿐이라 결정론적이다.
+
+### 2-1. 봇 PR — 자동 머지 대상이다
+
+2026-08-08 리드 결정. dependabot PR 은 연결 이슈가 없어 `risk` 를 선언할 자리가 없다. 종전 규칙
+(미선언 = 고위험 = 사람 대기열)을 그대로 두면 **봇 PR 은 영원히 사람 손을 탄다** — 2026-08-07
+하루에 9건이 열렸다. 따라서 **저자가 봇이면 위험 선언 없이도 자동 머지 조건을 만족**한 것으로 본다.
+
+**리뷰는 여전히 필요하다.** 봇 PR 도 `Approve` 가 있어야 자동 머지된다 — 위험 선언만 면제되는
+것이지 리뷰가 면제되는 것이 아니다.
+
+> **권고 (미채택 — 리드 판단 대기)**: **major 버전 상승은 사람 경로로 빼는 편이 낫다.**
+> 2026-08-07 실측에서 리뷰어가 판정 첫 줄에 올린 두 가지가 전부 major 였다 —
+> `cryptography 48→50` 이 x86_64 macOS·32비트 Windows 휠을 삭제했고(템플릿을 복사해 쓰는
+> 사람의 환경 요구가 올라감), `pyjwt 2.12→2.13` 이 빈 HMAC 시크릿을 거부하기 시작했다(dev 에서
+> `.env` 없이 띄우던 경로가 막힘). 둘 다 `merge_ok` 였지만 **리드가 읽고 넘어갈 값어치가 있는
+> 사실**이었고, 자동 머지였다면 아무도 읽지 않았을 것이다. Dependabot 은 `semver-patch` ·
+> `semver-minor` · `semver-major` 를 구분해 주므로 게이팅 비용은 거의 없다.
 
 ### 3. 상태 — 라벨은 위험도만
 
@@ -120,13 +143,19 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 리뷰 인프라가 죽으면 **자동 머지가 안 될 뿐** 사람 머지는 열려 있다. AI 판정이 작업 정지 장치가
 되지 않는다(2026-08-06 결정의 취지 유지).
 
-> **주의 — 두 문장이 동시에 참이려면 조건이 필요하다.** GitHub 의 「Require approvals」를 켜면
-> 승인 없이는 **사람도** 머지할 수 없어 1번이 깨진다. 「Request changes 가 머지를 막는다」는
-> 그 설정을 켰을 때만 성립한다. 셋 중 하나를 골라야 하며 **미결 3**에 올린다.
+**「Require approvals」는 켜지 않는다** (2026-08-08 리드 결정). 켜면 승인 없이는 사람도 머지할 수
+없어 1번이 깨지고, AI 리뷰가 죽었을 때 그대로 작업 정지 장치가 된다. 승인은 **자동 머지를 arm
+하는 신호**일 뿐이고, 사람의 머지 권한은 테스트 초록에만 걸린다.
 
 **required checks 에 무엇을 넣나**: 테스트 9종을 개별로 걸지 말고 「전부 초록인가」를 대표하는
 **게이트 잡 하나**만 required 로 건다. pending 창이 하나로 줄어 Orca 머지 버튼이 닫혀 있는
 시간이 짧아진다.
+
+**자동 머지 arm 조건** (전부 참일 때만):
+
+1. required 게이트 잡 초록
+2. `Approve` 리뷰가 있고, 그 `commit_id` 가 현재 head 와 같다
+3. `risk: low` — 또는 **저자가 봇**이다 (아래)
 
 **경로 필터 처리**: 워크플로 레벨 `on.paths` 를 **잡 레벨 `if:`** 로 바꾼다. 워크플로째 건너뛴
 체크는 영영 pending 이라 머지를 막지만, 조건으로 건너뛴 잡은 `skipped` 를 보고하고 GitHub 은
@@ -165,7 +194,7 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 | 폴백 체인·한도 감지 (138 실코드) | 실패는 `Request changes` 없이 **자동 머지가 안 되는 것**으로 정직하게 드러난다 |
 | 워크트리 생명주기 bash (36 + 스윕) | **아래 「스윕 사건」 참조** — CI 가 에이전트 살림을 관장하면 안 된다 |
 | `plan-*` 3파일 | 1파일로 통합 (로직 유지) |
-| `board-status.yml` (170줄) | fail-open. 보드 사용 여부에 따라 리드 판단 — **미결** |
+| `board-status.yml` (170줄) | **삭제 확정** (2026-08-08 리드 결정). fail-open 이라 초록이 「했다」를 보장하지 못했다 |
 
 ### 7. bash 를 `scripts/` 로
 
@@ -245,10 +274,11 @@ review-dep-6-10-claude   lastActivity=56,560s 전  created=56,560s 전  같은�
 2. **#11 수정** — 준비·접수 판정을 프롬프트 박스 상태로. **claude·kimi 두 경로에서 각각 재현 검증**
 3. **헤드리스·폴백 삭제** — 소비자(`publish` 안내문·`review-gate` 라벨) 함께 정리
 4. **경로 필터 전환** — `on.paths` → 잡 레벨 `if:`. 문서 PR 로 `skipped` 가 통과로 세는지 확인
-5. **브랜치 보호 + auto-merge** — 여기서 **Orca 머지 버튼을 30분 써 본다.** 아니면 끈다
+5. **브랜치 보호(required = 게이트 잡 하나, approvals 없음) + auto-merge** — 여기서
+   **Orca 머지 버튼을 30분 써 본다.** 체감이 나쁘면 보호를 끈다(토글 1초)
 6. **리뷰를 네이티브 PR 리뷰로** — 기록기 워크플로 + 라벨 정리
 7. **automation 3종 + 정체 감지** — 루프를 닫는다
-8. **`merge-router`·`review-gate` 삭제** · `plan-*` 통합
+8. **`merge-router`·`review-gate`·`board-status` 삭제** · `plan-*` 통합
 
 ## 완료 판정
 
@@ -259,18 +289,18 @@ review-dep-6-10-claude   lastActivity=56,560s 전  created=56,560s 전  같은�
 - 리뷰어가 못 뜬 것이 **화면에 드러난다** — 조용히 넘어가지 않는다
 - 워크플로 4~5개 · CI 총 줄 수 약 1,000줄
 
-## 미결 (리드 판단 필요)
+## 결정 로그 (2026-08-08 리드 판단)
 
-1. **`board-status.yml`** — 보드를 계속 쓰는가. 쓰면 fail-closed 로 고치고, 안 쓰면 삭제한다
-2. **봇 PR 위험 정책** — dependabot PR 은 이슈가 없어 위험 미선언이다. 자동 머지 대상으로 볼 것인가
-3. **「Require approvals」를 켤 것인가** (§4 주의 참조). 셋 중 하나다:
-   - **㉠ 끈다** — 승인은 자동 머지를 arm 하는 신호일 뿐. 사람은 테스트만 초록이면 언제든 머지.
-     `Request changes` 는 자동 머지를 막지만 사람을 막지는 않는다. **2026-08-06 결정의 취지에
-     가장 충실하다 (추천)**
-   - **㉡ 켜고 admin 우회를 남긴다** — 자동 경로는 승인 없이 못 지나가고, 리드는 admin 으로 통과.
-     「Request changes 가 막는다」가 성립하나 리드 화면에는 BLOCKED 로 보인다
-   - **㉢ 켜고 우회도 막는다** — 가장 엄격. AI 리뷰가 죽으면 아무도 머지 못 한다.
-     작업 정지 장치가 되므로 **권하지 않는다**
+| 항목 | 결정 |
+| --- | --- |
+| `board-status.yml` | **삭제** — fail-open 이라 초록이 「했다」를 보장하지 못했다 |
+| 봇 PR 위험 정책 | **자동 머지 대상** — 위험 선언만 면제, 리뷰는 그대로 필요 (§2-1) |
+| 「Require approvals」 | **켜지 않는다 (㉠)** — 승인은 자동 머지 arm 신호일 뿐, 사람 머지는 테스트 초록에만 걸린다 |
+
+## 남은 미결
+
+1. **major 버전 봇 PR 을 사람 경로로 뺄 것인가** — §2-1 권고. 미채택 상태
+2. **워커 기동 automation 의 착수 표식** — 구현 1단계에서 정한다 (§5 축 ①)
 
 ## 관련
 
