@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Action, INITIAL, researchChatReducer, State } from "@/components/features/ResearchChat/researchChatReducer";
 import { ResearchSource } from "@/schemas/researchChat/researchChat";
 
-// #173 — 컨테이너에서 분리한 순수 reducer 의 불변식 그물.
+// #1 — 컨테이너에서 분리한 순수 reducer 의 불변식 그물.
 // 스트리밍 도중 끊김·중복 클릭·세션 삭제는 화면에서 재현하기 번거롭지만 여기서는 액션 나열로 고정된다.
 
 const SOURCE: ResearchSource = {

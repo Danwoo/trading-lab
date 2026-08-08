@@ -1,4 +1,4 @@
-"""#243 — 데이터 소스 키가 로그·응답·예외로 새지 않는지 (fail-closed).
+"""#2 — 데이터 소스 키가 로그·응답·예외로 새지 않는지 (fail-closed).
 
 **정규식으로 소스를 훑는 그물이 아니다.** 가짜 키를 `.env` 자리에 꽂고 **실제 코드 경로를 태운
 뒤**, 그 키 문자열이 나온 산출물(로그 한 줄·API 응답 본문·예외 메시지)에 있는지 본다. 우회를
@@ -8,7 +8,7 @@
 이 레포는 아직 pytest 를 도입하지 않았으므로(전 서비스 공통) standalone 실행형이다:
     cd backend-service && uv run python tests/test_data_source_key_leak.py
 
-검사하는 4축 (오더 #243 잔여):
+검사하는 4축 (오더 #2 잔여):
 1. **로그** — 재시도 경고·트레이스백. data.go.kr 은 인증키를 쿼리로 받으므로
    `httpx.HTTPStatusError.__str__` 이 키가 박힌 URL 을 문자열로 만든다.
 2. **API 응답** — `capabilities()` 는 "있나/없나"와 "없으면 어디서 받나"만 답한다. 키 값도,
@@ -56,7 +56,7 @@ for _key, _value in {
     "SFTP_USERNAME": "test",
     "SFTP_PASSWORD": "test",
     "JWT_SECRET": "test-secret",
-    "MARKET_DATA_CONTACT": "fintech-ai-platform/test (contact: leak-test@example.com)",
+    "MARKET_DATA_CONTACT": "trading-lab/test (contact: leak-test@example.com)",
     "MARKET_DATA_GOKR_SERVICE_KEY": FAKE_GOKR_KEY,
     "MARKET_DATA_ALPACA_KEY": FAKE_ALPACA_KEY,
     "MARKET_DATA_OPENFIGI_KEY": FAKE_OPENFIGI_KEY,

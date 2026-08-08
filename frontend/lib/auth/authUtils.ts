@@ -170,7 +170,7 @@ export const USER_SCOPED_IDENTIFIER_TABLES_EXCLUDED = [
  * 비교는 대소문자 무관이다 — `normalizeEmail` 규칙이 생기기 전에 쓰인 과거 행의 대소문자까지
  * 잡아야 하고, 같은 이유로 `workspaceScopedEmailWhere` 도 `mode: "insensitive"` 를 쓴다.
  *
- * **인증 토큰(`ba_verification`)도 사용자 축에서 지운다** — 2026-08-07 리드 결정(#414): 만료
+ * **인증 토큰(`ba_verification`)도 사용자 축에서 지운다** — 2026-08-07 리드 결정(#3): 만료
  * 토큰이라 남길 감사 가치가 없고, 같은 PII 축인 `th_email_log` 결정과 짝을 맞춘다. FK 가 없어
  * 조용히 남는 자리다. 이 테이블은 **두 종류의 행이 섞여 있어 키가 둘**이다
  * (`verificationIdentifier.ts` 가 두 경로를 정리해 둔다):
@@ -203,7 +203,7 @@ export async function deleteUserCascade(email: string): Promise<void> {
     prisma.aiChatHistory.deleteMany({ where: { email } }),
     // 메일 발송 로그도 이메일에 매달린 사용자 축이다 (리드 결정 #363 — PII 로 보고 지운다).
     prisma.emailLog.deleteMany({ where: { to: { equals: email, mode: "insensitive" } } }),
-    // 가입 인증 OTP — identifier 평문에 이메일이 들어간다 (리드 결정 #414).
+    // 가입 인증 OTP — identifier 평문에 이메일이 들어간다 (리드 결정 #3).
     prisma.baVerification.deleteMany({
       where: { identifier: { equals: emailVerificationOtpIdentifier(email), mode: "insensitive" } },
     }),

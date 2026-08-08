@@ -1,4 +1,4 @@
-# fintech-ai-platform — 멀티에이전트가 금융 MCP 도구를 오케스트레이션해 근거 기반 투자 리서치를 만드는 풀스택 SaaS
+# trading-lab — 멀티에이전트가 금융 MCP 도구를 오케스트레이션해 근거 기반 투자 리서치를 만드는 풀스택 SaaS
 
 > 투자자의 질문 한 줄을 **Plan-Execute 멀티에이전트**가 분해하고, 시세·공시·뉴스·웹·사내 리서치 RAG 를 **자체 MCP 서버 스위트**로 오케스트레이션해 **공시 근거가 붙은 투자 리서치**를 생성하는 모습을 보여주는 핀테크 포트폴리오. 가드레일이 환각·미근거 수치·컴플라이언스를 방어한다. 경량 MSA(12 서비스 + 1 템플릿) + 6 MCP 서버 + 멀티에이전트 1식 + Next.js 프론트, 멀티테넌트 SaaS 구조.
 >
@@ -95,7 +95,7 @@ docker compose -f compose.staging.yaml up    # prod 는 compose.prod.yaml
 ## 디렉토리
 
 ```
-fintech-ai-platform/
+trading-lab/
 ├── frontend/                  # Next.js 16 UI · API proxy · Better Auth · Prisma
 ├── backend-service/           # 통합 앱 (관심종목·포트폴리오·NAV·틱 MQ·리서치문서·파일/SFTP·스케줄러·챗)
 ├── multi-agent-service/       # Plan-Execute 멀티에이전트 (MCP 소비자)

@@ -1,10 +1,10 @@
-"""#243 — `market_ohlc` 최신순 1~120 계약이 깨지지 않았는지 (fail-closed).
+"""#2 — `market_ohlc` 최신순 1~120 계약이 깨지지 않았는지 (fail-closed).
 
 이 레포는 아직 pytest 를 도입하지 않았으므로(전 서비스 공통) standalone 실행 겸용으로 작성한다:
     uv run python tests/test_market_ohlc_contract.py
 pytest 가 도입되면 test_* 함수가 그대로 수집된다.
 
-#243 은 "기간 지정 조회를 추가해야 한다"고 적었고, 설계(`시세적재-구현설계.md` §5.3)는 그것을
+#2 는 "기간 지정 조회를 추가해야 한다"고 적었고, 설계(`시세적재-구현설계.md` §5.3)는 그것을
 **기존 MCP 도구를 확장하는 방식이 아니라 별도 계약으로** 푼다 — `market_ohlc` 는 LLM 컨텍스트
 보호가 목적이라 최신순 N개(1~120)로 그대로 두고, 기간 지정은 backend-service 의 `GET /bar/daily`
 가 맡는다. 두 계약은 섞지 않는다.

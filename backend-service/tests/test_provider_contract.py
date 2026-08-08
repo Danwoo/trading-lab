@@ -56,7 +56,7 @@ from pydantic import ValidationError  # noqa: E402
 
 # 경계 검사의 정의는 이 파일이 아니라 `scripts/verify_provider_boundary.py` 하나다 — 소스 패키지
 # 목록을 파일시스템에서 읽어 그 이름만 금지하고, 계약 모듈(models·base·merge)은 허용한다.
-# 여기서 다시 grep 을 쓰면 규칙이 두 벌이 되고, 실제로 한 번 갈렸다(#243: 어댑터가 붙자
+# 여기서 다시 grep 을 쓰면 규칙이 두 벌이 되고, 실제로 한 번 갈렸다(#2: 어댑터가 붙자
 # Phase 1 의 `from providers\.` 통짜 grep 이 계약 import 까지 위반으로 잡았다).
 _BOUNDARY_SCRIPT = _BACKEND_DIR / "scripts" / "verify_provider_boundary.py"
 
