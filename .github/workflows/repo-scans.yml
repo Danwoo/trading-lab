@@ -119,6 +119,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_terminal_state.py
 
+      # 고지 문서 생성기의 fail-closed 축 (앵커 파손·미분류 라이선스·§3 보존·--check).
+      # frontend 잡의 `generate_notices.py --check` 는 **지금 트리가 맞는지**만 보인다 —
+      # 생성기가 무엇을 막는지는 안 보이므로, 앵커를 지우거나 분류표를 비워도 트리가
+      # 깨끗하면 그대로 초록이다. 여기서 그 축을 합성 픽스처로 못박는다(node_modules 불필요).
+      - name: 고지 문서 생성기 회귀 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_notices_generator.py
+
   # ── 앱 모듈을 import 하는 전수 스캔 (uv 필요) ────────────────────────────
   repo-scan-app:
     name: "test: repo-scan-app"
