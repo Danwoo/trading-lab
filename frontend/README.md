@@ -82,3 +82,5 @@ proxy.ts(미들웨어) · env.ts(환경 검증)
 ```
 
 자세한 컨테이너 패턴·anti-pattern 체크리스트는 [`CLAUDE.md`](./CLAUDE.md) 및 [`.claude/docs/`](../.claude/docs/) 참조.
+
+<!-- #23 Task 4 경로 필터 검증용 임시 변경 (frontend) — 확인 뒤 브랜치째 삭제 -->
