@@ -178,12 +178,22 @@ def section3(text: str) -> str:
     return text[text.index("## 3. ") :]
 
 
-def expect_problem(name: str, run) -> list[str]:
-    """Problem 이 나야 하는 케이스. 조용히 성공하면 그것이 실패다."""
+def expect_problem(name: str, run, site: str) -> list[str]:
+    """Problem 이 **의도한 자리에서** 나야 하는 케이스.
+
+    `site` 는 그 자리의 메시지 조각이다. 「Problem 이 났다」만 보면 케이스가 엉뚱한 가드에
+    걸려도 초록이고, 그러면 겨냥한 가드를 통째로 지워도 초록이 남는다 — 이 파일이 막으려는
+    바로 그 클래스다(실측: ⑭-b 가 §2 비율 가드 대신 §1 원문 부재에서 났다).
+    """
     try:
         run()
-    except checker.Problem:
-        return []
+    except checker.Problem as problem:
+        if site in str(problem):
+            return []
+        return [
+            f"{name}: Problem 이 다른 자리에서 났다 — 기대 {site!r} / 실제 "
+            f"{str(problem)[:120]!r}"
+        ]
     return [f"{name}: Problem 이 나야 하는데 조용히 성공했다"]
 
 
@@ -285,26 +295,38 @@ def run_cases() -> tuple[list[str], int]:
             "licenseFile": str(root / "0.LICENSE"),
         }
         failures += expect_problem(
-            "⑨ 미분류 라이선스", lambda: gen.build(built, unknown)
+            "⑨ 미분류 라이선스",
+            lambda: gen.build(built, unknown),
+            "분류표에 없는 라이선스",
         )
 
         # ⑩ fail-closed — §1 절 하나가 0건이 되면 빈 절을 만들지 않고 멈춘다.
         cases += 1
         dropped = {k: v for k, v in scan.items() if v["licenses"] != "MPL-2.0"}
-        failures += expect_problem("⑩ §1 절 0건", lambda: gen.build(built, dropped))
+        failures += expect_problem(
+            "⑩ §1 절 0건",
+            lambda: gen.build(built, dropped),
+            "해당하는 패키지가 실측에 0건이다",
+        )
 
         # ⑪ fail-closed — Apache 패키지의 원문 파일이 없으면 본문 없이 만들지 않는다.
         cases += 1
         nofile = {k: dict(v) for k, v in scan.items()}
         nofile["apache-00-0@1.0.0"]["licenseFile"] = str(root / "does-not-exist")
         failures += expect_problem(
-            "⑪ Apache 원문 부재", lambda: gen.build(built, nofile)
+            "⑪ Apache 원문 부재",
+            lambda: gen.build(built, nofile),
+            "라이선스 원문 파일이 없다",
         )
 
         # ⑫ fail-closed — 앵커가 0회 매치(문장이 바뀜)면 조용히 통과하지 않는다.
         cases += 1
         broken = built.replace("프로덕션 의존성", "프로덕션 디펜던시", 1)
-        failures += expect_problem("⑫ 앵커 0회", lambda: gen.build(broken, scan))
+        failures += expect_problem(
+            "⑫ 앵커 0회",
+            lambda: gen.build(broken, scan),
+            "최상단 총계 (문서 전역): 앵커가 0회 매치됐다",
+        )
 
         # ⑬ fail-closed — 앵커가 2회 매치(문장 중복)여도 멈춘다. 어느 쪽을 고칠지 모른다.
         cases += 1
@@ -315,7 +337,9 @@ def run_cases() -> tuple[list[str], int]:
             1,
         )
         failures += expect_problem(
-            "⑬ 앵커 2회(절 안)", lambda: gen.build(doubled, scan)
+            "⑬ 앵커 2회(절 안)",
+            lambda: gen.build(doubled, scan),
+            "§2 예외 절 머리: 앵커가 2회 매치됐다",
         )
 
         # ⑬-b 절 밖의 중복도 잡는다 — 총계는 문서 전역에서 1회여야 한다. 절 안에 같은 문장이
@@ -325,22 +349,40 @@ def run_cases() -> tuple[list[str], int]:
             "## 3. 번들 정적 자산", "프로덕션 의존성 1개\n\n## 3. 번들 정적 자산", 1
         )
         failures += expect_problem(
-            "⑬-b 앵커 2회(절 밖)", lambda: gen.build(echoed, scan)
+            "⑬-b 앵커 2회(절 밖)",
+            lambda: gen.build(echoed, scan),
+            "최상단 총계 (문서 전역): 앵커가 2회 매치됐다",
         )
 
         # ⑭ fail-closed — 실측이 하한 미만이면 스캔 범위가 어긋난 것이다.
         cases += 1
         tiny = dict(list(scan.items())[:10])
-        failures += expect_problem("⑭ 실측 하한", lambda: gen.build(built, tiny))
+        failures += expect_problem(
+            "⑭ 실측 하한",
+            lambda: gen.build(built, tiny),
+            f"하한 {checker.MIN_PACKAGES} 미만",
+        )
 
-        # ⑭-b fail-closed — 원문 파일 없는 패키지가 대량이면 「다들 원문을 뺐다」가 아니라
-        # 경로가 이 환경에서 안 풀린 것이다. 그대로 쓰면 예외 표에 수백 개를 실은 문서가 된다.
+        # ⑭-b fail-closed — §2 에서 원문 파일 없는 패키지가 대량이면 「다들 원문을 뺐다」가
+        # 아니라 경로가 안 풀린 것이다. 그대로 쓰면 예외 표에 수백 개를 실은 문서가 된다.
+        #
+        # **§1 패키지의 경로는 살려 둔다.** 전부 벗기면 `build()` 가 §1 을 먼저 처리하다
+        # 「Apache 원문 부재」(케이스 ⑪ 이 이미 파는 자리)에서 멈춰 이 가드에 도달하지 못한다.
+        # 그 상태로도 Problem 은 나므로 자리를 안 보면 케이스가 초록이고, 겨냥한 가드를
+        # 지워도 초록이 남는다 — 실제로 그랬다(PR #31 리뷰).
         cases += 1
         unresolved = {
-            package: {"licenses": entry["licenses"]} for package, entry in scan.items()
+            package: (
+                {"licenses": entry["licenses"]}
+                if package.startswith("perm-")
+                else dict(entry)
+            )
+            for package, entry in scan.items()
         }
         failures += expect_problem(
-            "⑭-b licenseFile 경로 미해소", lambda: gen.build(built, unresolved)
+            "⑭-b §2 licenseFile 경로 미해소",
+            lambda: gen.build(built, unresolved),
+            "§2 에서 원문 파일이 없는 패키지가",
         )
 
         # ⑮ `--check` — 어긋나면 1, 같으면 0. 그리고 **문서를 고치지 않는다**.
