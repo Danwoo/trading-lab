@@ -23,10 +23,12 @@
 #   되돌림 길: hooks/revert-pr + roles/revert-playbook.md (자동 머지 개시 전 리허설 1회 필수)
 #   설계 근거: diagnosis/2026-07-23-q2-d1-design.md (이 워크플로) · 2026-07-23-q2-d2-design.md (라우팅·머지)
 #
-# 실행 모델 (2026-07-23 개정 — 로컬 실행형 / 2026-07-29 리뷰 잡 단일화): 리뷰 잡(review)은
-#   **self-hosted 러너** (`runs-on: [self-hosted, harness-review]` — 라벨은 제안값)에서
-#   **로컬 CLI** 로 돈다: claude 축 = `claude -p` (Max 구독 인증 재사용), kimi 축 = `kimi -p`
-#   (로컬 로그인 재사용), codex 축 = 스텁 (개통 시 `codex exec` — 로컬 인증 재사용).
+# 실행 모델 (로컬 실행형 / 리뷰 잡 단일화): 리뷰 잡(review)은 **self-hosted 러너**
+#   (`runs-on: [self-hosted, harness-review]` — 라벨은 제안값)에서 **Orca 리뷰 워커**로
+#   돈다 (아래 「실행 경로」). 모델 인증은 러너 사용자의 로컬 로그인 재사용이다 —
+#   claude 는 Max 구독, kimi·codex 는 각 CLI 의 로컬 로그인.
+#   로컬 CLI(`claude -p`·`kimi -p`·`codex exec`)를 이 잡이 직접 부르는 자리는 **한도 확증
+#   프로브 하나뿐**이다 (`probe_limit` — 깨끗한 채널인 stderr 를 얻으려고 쓴다).
 #   모델 API 키 시크릿은 쓰지 않는다 (추가 결제 ≈ 0 — 대신 구독 한도 소진 주의, D2 비용 절).
 #   route·publish 잡은 GitHub-hosted 유지 (gh+토큰만 쓴다). ⚠ hosted↔self-hosted 간
 #   아티팩트 전달(upload/download-artifact)은 라이브 검증 항목 (D1 §6).
@@ -791,6 +793,9 @@ jobs:
             case "$1" in 124|125|137|143) return 0 ;; esac
             grep -qiE "etimedout|econnreset|econnrefused|socket hang ?up|network error|timed? ?out|connection (reset|closed|refused|error)|50[234] " "$2"
           }
+          # ⚠ `classify`(따라서 `is_transient` 도)는 **이 파일 어디에서도 호출되지 않는다.**
+          # 실제로 도는 판정부는 `is_rate_limited`(probe_limit 이 부른다)와 `terminal_hints_limit`
+          # 둘이다. 아래 두 함수는 한도·일시장애 판별 어휘의 보존용으로만 남아 있다.
           classify() {   # $1=rc $2=errfile → limit|transient|other
             if is_rate_limited "$1" "$2"; then echo limit; return; fi
             if is_transient   "$1" "$2"; then echo transient; return; fi
