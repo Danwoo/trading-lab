@@ -266,19 +266,6 @@ export const Login = () => {
                             가입하기
                           </Link>
                         </div>
-                        <div className="flex justify-center pt-5">
-                          <div className="text-sm pr-5">
-                            <Link href="/signup/idsearch/" className="font-medium text-[#303F67] hover:text-blue-500">
-                              아이디 찾기
-                            </Link>
-                          </div>
-                          <span className="mr-4 ml-4 text-[#DDE2EC]">|</span>
-                          <div className="text-sm pl-5">
-                            <Link href="/signup/search/" className="font-medium text-[#303F67] hover:text-blue-500">
-                              비밀번호 찾기
-                            </Link>
-                          </div>
-                        </div>
                       </div>
                     </form>
                   </div>

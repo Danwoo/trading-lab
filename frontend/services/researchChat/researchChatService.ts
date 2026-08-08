@@ -1,7 +1,7 @@
 // services/researchChat/researchChatService.ts
 // #160 슬라이스 D-나: 투자리서치 챗 스트리밍 서비스.
 // 스트림은 apiCall(axios) 로 소비 불가 → sse.ts 의 fetchNDJSON(룰6 예외 파일) 경유.
-// DevActivity 처럼 서비스 파일에서 raw fetch 를 직접 쓰지 않는다(룰6 클린).
+// 서비스 파일에서 raw fetch 를 직접 쓰지 않는다(룰6 클린).
 import { fetchNDJSON } from "@/utils/common/api/sse";
 import { ResearchChatEvent, ResearchChatRequest, ResearchSource } from "@/schemas/researchChat/researchChat";
 

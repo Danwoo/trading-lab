@@ -14,8 +14,8 @@ import {
   createScheduler,
   updateScheduler,
   deleteScheduler,
+  selectHolders,
 } from "@/services/scheduler/schedulerService";
-import { selectHolders } from "@/services/devActivity/devActivityService";
 import { HolderInfo } from "@/schemas/devActivity/devActivity";
 import { useCodeStore } from "@/stores/shared/codeStore";
 import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
