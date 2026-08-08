@@ -174,6 +174,22 @@ CASES = [
         False,
         {"author_vendor": "claude", "identity_source": "commit-email"},
     ),
+    (
+        "앞뒤 공백이 붙은 신원 → 신원 아님, 라벨 금지",
+        [f"  {C}  "],
+        "",
+        ["low"],
+        False,
+        {"author_kind": "human", "author_vendors": [], "label_allowed": False},
+    ),
+    (
+        "위험 라벨에 빈 줄이 섞이면 미선언 → high",
+        [C],
+        "",
+        ["low", ""],
+        False,
+        {"risk": "high", "risk_source": "undeclared-fail-closed"},
+    ),
 ]
 
 

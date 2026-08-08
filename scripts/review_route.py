@@ -14,16 +14,22 @@ KIMI_TIERS = ("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed")
 CODEX_TIERS = ("gpt-5.6-terra",)
 
 _VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS}
+# 줄 전체가 신원이어야 한다. 앞뒤 공백을 다듬지 않는다 — 다듬으면 원본 grep 앵커보다
+# 관대해지고, 그 관대함이 label_allowed(게이트 입력)를 사람에서 에이전트로 뒤집는다.
 _IDENTITY = re.compile(
-    r"^(?P<vendor>claude|kimi|codex)(?:-(?P<tier>[a-z0-9.\-]+))?-agent@noreply\.local$"
+    r"^(?P<vendor>claude|kimi|codex)(?:-(?P<tier>[a-z0-9.\-]+))?-agent@noreply\.local\Z"
 )
-_AGENTISH = re.compile(r"-agent@noreply\.local$", re.I)
-_BRANCH = re.compile(r"^fix-[0-9]+-(?P<vendor>claude|kimi|codex)$")
+# 미상 신원 관측은 접미만 본다 — 앞 공백은 통과하고 뒤 공백은 못 통과한다
+_AGENTISH = re.compile(r"-agent@noreply\.local\Z", re.I)
+_BRANCH = re.compile(r"^fix-[0-9]+-(?P<vendor>claude|kimi|codex)\Z")
 
 
 def _read_risk(issue_risks):
-    """이슈 라벨에서 위험도를 읽는다 — 미선언·이슈 없음은 high (fail-closed)."""
-    vals = [r.strip() for r in issue_risks if r.strip()]
+    """이슈 라벨에서 위험도를 읽는다 — 미선언·이슈 없음은 high (fail-closed).
+
+    빈 줄도 「low 가 아닌 값」으로 센다. 걸러내면 미선언이 low 로 읽힌다.
+    """
+    vals = list(issue_risks)
     if not vals:
         return "high", "no-issue-fail-closed"
     if "high" in vals:
@@ -36,10 +42,7 @@ def _read_risk(issue_risks):
 def decide(emails, head_ref, issue_risks, codex_on):
     vendors, claude_tiers_seen, unknown_agentish = set(), set(), []
     for raw in emails:
-        e = raw.strip()
-        if not e:
-            continue
-        m = _IDENTITY.match(e)
+        m = _IDENTITY.match(raw)
         if m and (
             m.group("tier") is None
             or m.group("tier") in _VENDOR_TIERS[m.group("vendor")]
@@ -47,8 +50,8 @@ def decide(emails, head_ref, issue_risks, codex_on):
             vendors.add(m.group("vendor"))
             if m.group("vendor") == "claude":
                 claude_tiers_seen.add(m.group("tier") or "unknown")
-        elif _AGENTISH.search(e):
-            unknown_agentish.append(e)
+        elif _AGENTISH.search(raw):
+            unknown_agentish.append(raw)
 
     bm = _BRANCH.match(head_ref or "")
     branch_model = bm.group("vendor") if bm else None
