@@ -301,6 +301,9 @@ jobs:
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      # 기본 브랜치 — **이 레포의 것**이다 (`pull_request.head.repo.default_branch` 가 아니다.
+      # 그건 fork 쪽 값이라 PR 이 정한다). base 에 없는 인프라 파일을 되찾는 출처로만 쓴다.
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       CODEX_ON: ${{ vars.CROSS_REVIEW_CODEX }}   # 'on' 이면 고위험 claude 작성분을 codex 로 (복귀 ~2026-08-08 까지 미설정 = off)
     outputs:
       reviewer: ${{ steps.decide.outputs.reviewer }}
@@ -603,19 +606,30 @@ jobs:
           # 이 번들로 실어 나른다. 루브릭과 같은 신뢰선인 **base 커밋을 먼저** 본다 — PR 이 자기
           # 리뷰어를 띄우는 판정을 변조하지 못하게.
           #
-          # base 에 없으면 head 로 되돌아간다. 이 파일이 main 에 없던 동안(또는 base 가 그보다
-          # 앞선 커밋일 때) base 조회는 404 이고, 그것을 fail-closed 로 두면 **모든 PR 의 route
-          # 잡이 죽는다** — 실제로 그렇게 죽는 것을 보고 넣은 갈래다. 되돌림이 새 신뢰 표면을
-          # 열지는 않는다: fork PR 은 review 잡 자체가 안 돌고(`head.repo.full_name` 가드),
-          # 같은 레포 PR 은 워크플로 정의 자체가 이미 head 판본이다. base 에 파일이 있는 한
-          # 이 갈래는 타지 않으므로 변조 방어도 그대로다. 양쪽 다 없으면 실패 = fail-closed.
+          # base 에 없으면 **기본 브랜치**에서 찾는다. 이 파일이 기본 브랜치에 없던 동안(또는
+          # base 가 그보다 앞선 커밋일 때) base 조회는 404 인데, 그것을 fail-closed 로 두면
+          # **모든 PR 의 route 잡이 죽는다** — 실제로 그렇게 죽는 것을 보고 넣은 갈래다.
+          #
+          # **되찾는 출처로 head 를 쓰지 않는다.** 이 파일은 아래 review 잡이 self-hosted 러너에서
+          # `python3` 로 실행하는 코드다. head 는 PR 이 정하므로 그 경로를 열면 「PR 코드를
+          # 체크아웃하지 않는다」는 이 잡의 자세를 우회하는 구멍이 된다. 기본 브랜치는 머지를
+          # 거쳐야만 바뀌므로 PR 이 못 건드린다.
+          #
+          # 둘 다 없으면 **번들에 안 싣고 넘어간다**(경고만). Orca 리뷰 워커 경로는 판정부가
+          # 없어 준비 실패로 끝나고 리뷰는 판정 없음으로 종결된다 — 리뷰가 하나 빠지는 것이지
+          # PR 이 막히지는 않는다. 이 상태는 이 파일이 기본 브랜치에 들어가기 전까지만이다.
           gh api "repos/$REPO/contents/scripts/terminal_state.py?ref=$BASE_SHA" --jq '.content // empty' 2>/dev/null \
             | base64 -d > ctx/terminal_state.py 2>/dev/null || true
           if [ ! -s ctx/terminal_state.py ]; then
-            echo "::warning::준비·접수 판정부가 base 커밋(${BASE_SHA})에 없다 — head 판본으로 되돌아간다"
-            gh api "repos/$REPO/contents/scripts/terminal_state.py?ref=$HEAD_SHA" --jq .content | base64 -d > ctx/terminal_state.py
+            gh api "repos/$REPO/contents/scripts/terminal_state.py?ref=$DEFAULT_BRANCH" --jq '.content // empty' 2>/dev/null \
+              | base64 -d > ctx/terminal_state.py 2>/dev/null || true
+            if [ -s ctx/terminal_state.py ]; then
+              echo "::warning::준비·접수 판정부가 base 커밋(${BASE_SHA})에 없다 — ${DEFAULT_BRANCH} 판본을 쓴다"
+            else
+              rm -f ctx/terminal_state.py
+              echo "::warning::준비·접수 판정부가 base·${DEFAULT_BRANCH} 어디에도 없다 — Orca 리뷰 워커 경로는 준비 실패로 끝난다"
+            fi
           fi
-          test -s ctx/terminal_state.py
 
       - name: 컨텍스트 업로드
         uses: actions/upload-artifact@v4   # ⚠ 배포 시 커밋 SHA 핀
