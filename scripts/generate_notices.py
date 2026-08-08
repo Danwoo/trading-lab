@@ -330,13 +330,17 @@ def rewrite_section2(
     with_file = [package for package in packages if package not in set(without_file)]
 
     # 원문 파일이 없는 패키지는 소수여야 한다. 대량이면 「그 패키지들이 원문을 뺐다」가 아니라
-    # **경로가 이 환경에서 안 풀린 것**이다 (다른 곳에서 뜬 산출물을 `--licenses` 로 준 경우).
-    # 그대로 쓰면 예외 표에 수백 개를 실은 문서가 만들어진다 — 검사기가 잡기 전에 여기서 멈춘다.
+    # **경로가 이 환경에서 안 풀린 것**이고, 그대로 쓰면 예외 표에 수백 개를 실은 문서가 된다.
+    #
+    # 이 가드가 잡는 것은 **부분** 미해소다 — §1 쪽 경로는 풀리는데 §2 쪽만 대량으로 안 풀리는
+    # 상태(스캔 뒤 node_modules 가 부분적으로 정리된 경우 등). 산출물 **전체**가 안 풀리는
+    # 상태는 여기까지 못 온다: `build()` 가 §1 을 먼저 처리하다 `license_text` 의 「Apache 원문
+    # 부재」에서 멈춘다(실측 확인). 두 자리를 헷갈리면 회귀 케이스가 엉뚱한 가드에 걸린다.
     if len(without_file) > len(packages) // 5:
         raise Problem(
             f"§2 에서 원문 파일이 없는 패키지가 {len(without_file)}/{len(packages)}개다 — "
-            "licenseFile 경로가 이 환경에서 안 풀린 것으로 본다 (다른 곳에서 뜬 산출물을 "
-            "`--licenses` 로 준 것은 아닌지 확인하라)"
+            "licenseFile 경로가 이 환경에서 안 풀린 것으로 본다 (스캔 뒤 node_modules 가 "
+            "바뀌었거나, 다른 환경에서 뜬 산출물을 `--licenses` 로 준 것은 아닌지 확인하라)"
         )
 
     total, exceptions, rest = len(packages), len(without_file), len(with_file)
