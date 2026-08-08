@@ -89,3 +89,5 @@ app/
 └─ models/schema.py       # 테이블 정의 (마이그레이션 SoT, 런타임 ORM 미사용)
 alembic/                  # versions/ 마이그레이션 + init/init.sql 시드
 ```
+
+<!-- #23 Task 4 경로 필터 검증용 임시 변경 (backend) — 확인 뒤 브랜치째 삭제 -->
