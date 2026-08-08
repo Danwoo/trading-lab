@@ -298,10 +298,8 @@ jobs:
       REPO: ${{ github.repository }}
       PR: ${{ github.event.pull_request.number }}
       PR_NODE: ${{ github.event.pull_request.node_id }}
-      HEAD_REF: ${{ github.event.pull_request.head.ref }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      CODEX_ON: ${{ vars.CROSS_REVIEW_CODEX }}   # 'on' 이면 고위험 claude 작성분을 codex 로 (복귀 ~2026-08-08 까지 미설정 = off)
     outputs:
       reviewer: ${{ steps.decide.outputs.reviewer }}
       chain: ${{ steps.decide.outputs.chain }}                 # 폴백 체인 (관측된 한도 신호일 때만 다음 홉)
@@ -316,152 +314,100 @@ jobs:
       risk_source: ${{ steps.decide.outputs.risk_source }}
       head_sha: ${{ steps.decide.outputs.head_sha }}
     steps:
-      - name: 저자 판별·위험도 판독·리뷰어 라우팅
-        id: decide
+      # 판정 스크립트(scripts/review_route.py)를 부르려면 트리가 필요하다. **PR head 판본**을
+      # 쓴다 — 머지 ref 는 충돌 PR 에서 존재하지 않아 route 가 통째로 죽는다. 이 워크플로 파일
+      # 자체가 이미 PR 판본으로 도는 것과 같은 신뢰선이다 (헤더 「잔존 표면」). 리뷰 루브릭
+      # (.github/review-prompt.md)만 base 에서 읽는 예외는 그대로 둔다.
+      - name: 판정 스크립트 체크아웃
+        uses: actions/checkout@v4   # ⚠ 배포 시 커밋 SHA 핀
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: 커밋 신원·연결 이슈 수집
+        id: collect
         run: |
           set -euo pipefail
-          # ---- 순수 판정부 시작 (입력: EMAILS·HEAD_REF·ISSUE_RISKS·CODEX_ON — 로컬 단위 테스트 대상) ----
-          decide() {
-            # 신원 형식은 `<벤더>[-<티어>]-agent@noreply.local` 이고 **명시 목록만** 받는다
-            # (와일드카드 금지 — §6.1). 구형식 `<벤더>-agent@`(티어 미상)도 계속 유효하다.
-            #
-            # 티어 어휘 (2026-07-29 확정, 하네스 #48):
-            #   claude — opus · sonnet · fable · haiku (`claude --model <별칭>` 으로 실재 확인)
-            #   kimi   — 로컬 ~/.kimi-code/config.toml 의 등록 모델 실측: k3(기본) · k3-256k ·
-            #            kimi-for-coding · kimi-for-coding-highspeed
-            #   codex  — `codex exec` 실행 배너의 `model:` 값 실측: gpt-5.6-terra
-            # **지어내지 않는다** — 여기 없는 이름은 로컬에서 확인되지 않은 것이고, 새 모델이
-            # 붙으면 그때 같은 방법(설정 파일·실행 배너)으로 확인해 추가한다.
-            # kimi·codex 티어는 **축만 예약**한 상태다: 라우팅은 벤더 축으로만 하고, 티어는
-            # 폴백 티어 선택(=claude 전용 규칙)에만 쓰인다. 그래도 형식을 열어 둬야 그쪽 디스패치가
-            # 티어를 적기 시작할 때 판별이 깨지지 않는다.
-            local claude_tiers='opus|sonnet|fable|haiku'
-            local kimi_tiers='k3|k3-256k|kimi-for-coding|kimi-for-coding-highspeed'
-            local codex_tiers='gpt-5\.6-terra'
-            local known="claude|claude-(${claude_tiers})|kimi|kimi-(${kimi_tiers})|codex|codex-(${codex_tiers})"
-            local agent_ids agent_models agent_count unknown_agentish branch_model=""
-            # agent_ids = 매칭된 신원 토큰 그대로 (claude-opus 등 티어 포함)
-            agent_ids=$(printf '%s\n' "$EMAILS" | grep -E "^(${known})-agent@noreply\.local\$" | sed 's/-agent@noreply\.local$//' | sort -u || true)
-            # agent_models = **벤더 축으로 정규화** (claude-opus → claude). 종전 계약을 그대로 유지해
-            # 리뷰어 라우팅·라벨 자격·혼재 판정이 티어 도입에 영향받지 않게 한다.
-            agent_models=$(printf '%s\n' "$agent_ids" | sed -E 's/^(claude|kimi|codex)-.*$/\1/' | sort -u | grep . || true)
-            agent_count=$(printf '%s' "$agent_models" | grep -c . || true)
-            # 관측은 case-insensitive (Claude-Agent@… 류 대소문자 오타 포착 — 회의론 지적 8), 판별 자체는 exact 유지
-            unknown_agentish=$(printf '%s\n' "$EMAILS" | grep -iE '\-agent@noreply\.local$' | grep -Ev "^(${known})-agent@noreply\.local\$" | paste -sd, - || true)
-            if [[ "$HEAD_REF" =~ ^fix-[0-9]+-(claude|kimi|codex)$ ]]; then branch_model="${BASH_REMATCH[1]}"; fi
-
-            # 작성 티어 — **정확히 한 티어로 수렴할 때만** 확정한다 (폴백 리뷰어의 티어 선택 입력).
-            # 구형식 claude 는 unknown 토큰이 되어, 신·구 혼재나 opus+sonnet 혼재는 미상으로 떨어진다.
-            # 미상 = 폴백 시 "다른 티어" 를 보장할 수 없음 → 판정 라벨 미부착(계약 4 재사용, publish 소관).
-            local tiers tier_count author_tier="" tier_source=none fallback_tier
-            tiers=$(printf '%s\n' "$agent_ids" | grep -E "^claude(-(${claude_tiers}))?\$" | sed -E -e 's/^claude$/unknown/' -e 's/^claude-//' | sort -u | grep . || true)
-            tier_count=$(printf '%s' "$tiers" | grep -c . || true)
-            if [ "$tier_count" -eq 1 ] && [ "$tiers" != unknown ]; then author_tier="$tiers"; tier_source=commit-email; fi
-            # 폴백 리뷰어 티어 = **작성 티어와 다른 것 중 가장 강한 것** (2026-07-29 확정).
-            #   opus 작성          → sonnet (opus 는 자기 자신이라 못 쓰므로 그다음)
-            #   sonnet·fable·haiku → opus   (가장 강한 것을 붙여 리뷰 품질을 올린다)
-            #   미상               → opus 로 리뷰하되 **판정 라벨은 안 붙는다**(사람 경로) —
-            #                        다른 티어임을 보장할 수 없기 때문. publish 소관.
-            case "$author_tier" in
-              opus) fallback_tier=sonnet ;;
-              *)    fallback_tier=opus ;;
-            esac
-
-            local author_kind author_models_out identity_source identity_note=""
-            if [ "$agent_count" -eq 1 ]; then
-              author_kind=agent; author_models_out="$agent_models"; identity_source=commit-email
-              if [ -n "$branch_model" ] && [ "$branch_model" != "$agent_models" ]; then
-                identity_note="브랜치명(${branch_model})과 커밋 신원(${agent_models}) 불일치 — §6.1 일관성 점검 실패, 커밋 신원 우선"
-              fi
-            elif [ "$agent_count" -gt 1 ]; then
-              author_kind=mixed; author_models_out=$(printf '%s' "$agent_models" | paste -sd, -); identity_source=commit-email
-              identity_note="복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, 판정 라벨 미부착(사람 경로)"
-            elif [ -n "$branch_model" ]; then
-              author_kind=agent; author_models_out="$branch_model"; identity_source=branch-name
-              identity_note="커밋에 에이전트 신원 없음 — 브랜치명 단독 판별 (§6.1 디스패치 계약 미이행, 실수 방지 점검 요망. 라우팅·표기 전용 — 판정 라벨 미부착)"
-            else
-              author_kind=human; author_models_out=""; identity_source=none
-              identity_note="에이전트 신원 없음 — 사람 저자 취급, 판정 라벨 미부착(사람 경로)"
-            fi
-            if [ -n "$unknown_agentish" ]; then
-              identity_note="${identity_note:+$identity_note; }목록 밖 에이전트형 이메일 관측: ${unknown_agentish}"
-            fi
-            # 티어 미상 주의 — claude 저자일 때만 의미가 있다 (폴백이 발동하면 라벨이 안 붙는다).
-            # 세 경우를 구분해서 적는다: 커밋 신원이 아예 없는 브랜치명 단독 판별 / 티어 혼재 /
-            # 구형식. 사실과 다른 문구를 적으면 읽는 사람이 엉뚱한 곳을 고치러 간다.
-            if [ "$author_kind" = agent ] && [ "$author_models_out" = claude ] && [ -z "$author_tier" ]; then
-              if [ "$identity_source" = branch-name ]; then
-                identity_note="${identity_note:+$identity_note; }브랜치명 단독 판별이라 작성 티어를 알 수 없다 (커밋에 claude 신원 자체가 없다) — 폴백 리뷰 시 판정 라벨 미부착"
-              elif [ "$tier_count" -gt 1 ]; then
-                identity_note="${identity_note:+$identity_note; }claude 작성 티어 혼재(${tiers//$'\n'/,}) — 티어 미상 처리 (폴백 리뷰 시 판정 라벨 미부착)"
-              else
-                identity_note="${identity_note:+$identity_note; }claude 작성 티어 미기록(구형식 claude-agent@) — 폴백 리뷰 시 판정 라벨 미부착. §6.1 의 티어 신원을 쓰면 해소된다"
-              fi
-            fi
-
-            # 위험도 — 연결 이슈 라벨만이 입력 (SoT. PR 라벨은 merge-router 의 가시화 미러라 안 읽는다).
-            # 부재·이슈 없음 → 고위험 취급 (fail-closed). 머지 경로 판정은 merge-router 가 재판독.
-            local risk risk_source
-            if printf '%s\n' "$ISSUE_RISKS" | grep -qx high; then risk=high; risk_source=issue-label
-            elif [ -n "$ISSUE_RISKS" ] && ! printf '%s\n' "$ISSUE_RISKS" | grep -qvx low; then risk=low; risk_source=issue-label
-            elif [ -n "$ISSUE_RISKS" ]; then risk=high; risk_source=undeclared-fail-closed
-            else risk=high; risk_source=no-issue-fail-closed; fi
-
-            # 리뷰어 라우팅 (저자≠리뷰어 — 모델 단위, 설계 상수 4)
-            local reviewer="" c candidates="claude kimi"
-            if [ "${CODEX_ON:-}" = "on" ]; then candidates="$candidates codex"; fi
-            if [ "$author_kind" = agent ] && [ "$author_models_out" = kimi ]; then reviewer=claude
-            elif [ "$author_kind" = agent ] && [ "$author_models_out" = claude ]; then
-              # §9: claude 작성 고위험은 codex — 미개통 시 kimi 리뷰로 대체 (머지 경로는 어차피 사람 대기열)
-              if [ "$risk" = high ] && [ "${CODEX_ON:-}" = "on" ]; then reviewer=codex; else reviewer=kimi; fi
-            elif [ "$author_kind" = agent ] && [ "$author_models_out" = codex ]; then reviewer=claude
-            elif [ "$author_kind" = human ]; then reviewer=claude   # 사람 저자는 아무 모델 가능 — 기본 claude
-            else
-              reviewer=none
-              for c in $candidates; do
-                if ! printf '%s\n' "$agent_models" | grep -qx "$c"; then reviewer="$c"; break; fi
-              done
-            fi
-
-            # 폴백 체인 — **관측된 한도 신호**로 막혔을 때만 다음 후보로 넘어간다 (리뷰 잡 소관).
-            # claude 가 항상 체인의 끝이다. 저위험 경로에 codex 를 끼우지 않는 것은 §9 의
-            # "codex 는 월 한도가 매우 적어 아껴 쓴다" 를 지키기 위해서다 — 폴백이 codex 예산을
-            # 새로 쓰지 않는다 (종전 라우팅과 동일한 codex 노출량).
-            # 종단 claude 홉은 저자가 claude 여도 유지한다: 그때의 자기리뷰 위험은 **다른 티어**
-            # 강제 + 티어 미상 시 라벨 미부착 + 폴백 라벨·첫 줄 표기로 처리한다 (헤더 「리뷰어 폴백 체인」).
-            # 혼재(mixed) 저자는 어차피 ATTACH=no(계약 4)라 종단 claude 홉은 참고 리뷰로만 남는다.
-            local chain
-            case "$reviewer" in
-              codex)  chain="codex kimi claude" ;;
-              kimi)   chain="kimi claude" ;;
-              claude) chain="claude" ;;
-              *)      chain="" ;;
-            esac
-
-            printf 'author_kind=%s\n'     "$author_kind"
-            printf 'author_models=%s\n'   "$author_models_out"
-            printf 'author_tier=%s\n'     "$author_tier"
-            printf 'tier_source=%s\n'     "$tier_source"
-            printf 'fallback_tier=%s\n'   "$fallback_tier"
-            printf 'identity_source=%s\n' "$identity_source"
-            printf 'identity_note=%s\n'   "$identity_note"
-            printf 'risk=%s\n'            "$risk"
-            printf 'risk_source=%s\n'     "$risk_source"
-            printf 'reviewer=%s\n'        "$reviewer"
-            printf 'chain=%s\n'           "$chain"
-          }
-          # ---- 순수 판정부 끝 ----
-
-          # 수집부: 커밋 author email (1순위 신원)
+          # 커밋 author email (1순위 신원)
           EMAILS=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate --jq '.[].commit.author.email' | sort -u)
-          # 수집부: 연결 이슈(closes #N)의 위험 라벨 + 이슈 번호 (계획 코멘트 취득에 재사용)
+          # 연결 이슈(closes #N)의 위험 라벨 + 이슈 번호 (계획 코멘트 취득에 재사용)
           ISSUES_JSON=$(gh api graphql -f query='query($id:ID!){ node(id:$id){ ... on PullRequest { closingIssuesReferences(first:10){ nodes { number labels(first:30){ nodes { name } } } } } } }' -f id="$PR_NODE" --jq '.data.node.closingIssuesReferences.nodes')
           ISSUE_RISKS=$(printf '%s' "$ISSUES_JSON" | jq -r '.[] | [.labels.nodes[].name] | if index("risk: high") then "high" elif index("risk: low") then "low" else "none" end')
           printf '%s' "$ISSUES_JSON" | jq -r '.[].number' > issue-nums.txt
+          # 둘 다 여러 줄이라 구분자 형식으로 넘긴다 (이메일·라벨은 줄바꿈을 품을 수 없어
+          # 구분자 위조가 불가능하다).
+          {
+            printf 'emails<<__ROUTE_EOF__\n%s\n__ROUTE_EOF__\n' "$EMAILS"
+            printf 'issue_risks<<__ROUTE_EOF__\n%s\n__ROUTE_EOF__\n' "$ISSUE_RISKS"
+          } >> "$GITHUB_OUTPUT"
 
-          export EMAILS ISSUE_RISKS
-          decide | tee route.env >> "$GITHUB_OUTPUT"
-          echo "head_sha=$HEAD_SHA" | tee -a route.env >> "$GITHUB_OUTPUT"
+      # 판정 자체는 scripts/review_route.py 가 한다 (stdlib 전용 순수 함수 — 로컬에서
+      # scripts/test_review_route.py 로 돈다). 여기 남은 것은 입출력 배관뿐이다.
+      - name: 저자 판별·위험도 판독·리뷰어 배정
+        id: decide
+        env:
+          EMAILS: ${{ steps.collect.outputs.emails }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          ISSUE_RISKS: ${{ steps.collect.outputs.issue_risks }}
+          CODEX_ON: ${{ vars.CROSS_REVIEW_CODEX }}   # 'on' 이면 고위험 claude 작성분을 codex 로 (미설정 = off)
+        run: |
+          set -euo pipefail
+          python3 scripts/review_route.py > route.json
+          # null 은 빈 문자열로, 불리언은 소문자로 편다 — 소비자가 `[ -z "$AUTHOR_TIER" ]` 로
+          # 미상을 읽으므로 "None" 이 실리면 판정이 뒤집힌다.
+          python3 - <<'PY' > route.env
+          import json
+
+          with open("route.json", encoding="utf-8") as f:
+              decision = json.load(f)
+          for key, value in decision.items():
+              if value is None:
+                  text = ""
+              elif isinstance(value, bool):
+                  text = str(value).lower()
+              else:
+                  text = str(value)
+              print(f"{key}={text}")
+          PY
+
+          # route 잡의 출력 계약을 유지하는 파생값 — 판정이 아니라 판정의 표현이다.
+          # chain·fallback_tier 는 폴백 체인이 사라지는 시점에 함께 사라진다.
+          val() { sed -n "s/^$1=//p" route.env; }
+          REVIEWER=$(val reviewer)
+          AUTHOR_KIND=$(val author_kind)
+          AUTHOR_VENDOR=$(val author_vendor)
+          AUTHOR_TIER=$(val author_tier)
+          IDENTITY_SOURCE=$(val identity_source)
+          case "$REVIEWER" in
+            codex)  CHAIN="codex kimi claude" ;;
+            kimi)   CHAIN="kimi claude" ;;
+            claude) CHAIN="claude" ;;
+            *)      CHAIN="" ;;
+          esac
+          if [ -n "$AUTHOR_TIER" ]; then TIER_SOURCE=commit-email; else TIER_SOURCE=none; fi
+          if [ "$AUTHOR_TIER" = opus ]; then FALLBACK_TIER=sonnet; else FALLBACK_TIER=opus; fi
+          NOTE=""
+          case "${AUTHOR_KIND}/${IDENTITY_SOURCE}" in
+            agent/branch-name)
+              NOTE="커밋에 에이전트 신원 없음 — 브랜치명 단독 판별 (§6.1 디스패치 계약 미이행. 라우팅·표기 전용 — 판정 라벨 미부착)" ;;
+            mixed/*)
+              NOTE="복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, 판정 라벨 미부착(사람 경로)" ;;
+            human/*)
+              NOTE="에이전트 신원 없음(사람·봇·목록 밖 티어) — 사람 저자 취급, 판정 라벨 미부착(사람 경로)" ;;
+            agent/commit-email)
+              if [ "$AUTHOR_VENDOR" = claude ] && [ -z "$AUTHOR_TIER" ]; then
+                NOTE="claude 작성 티어 미상(구형식 claude-agent@ 또는 티어 혼재) — 폴백 리뷰 시 판정 라벨 미부착. §6.1 의 티어 신원을 쓰면 해소된다"
+              fi ;;
+          esac
+          {
+            printf 'author_models=%s\n' "$AUTHOR_VENDOR"
+            printf 'tier_source=%s\n'   "$TIER_SOURCE"
+            printf 'fallback_tier=%s\n' "$FALLBACK_TIER"
+            printf 'identity_note=%s\n' "$NOTE"
+            printf 'chain=%s\n'         "$CHAIN"
+            printf 'head_sha=%s\n'      "$HEAD_SHA"
+          } >> route.env
+          cat route.env >> "$GITHUB_OUTPUT"
 
       - name: 리뷰 컨텍스트 번들 생성 (diff·계획 코멘트·프롬프트·routing)
         run: |
