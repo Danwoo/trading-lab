@@ -59,14 +59,48 @@
 | **(A) 라벨이 상태인데 writer 가 5개** | `cross-review`·`merge-router`·`review-gate`·`plan-label`·`plan-label-issue` 가 같은 라벨 집합을 쓴다. 조정 장치는 없다 |
 | **(B) 로직이 YAML 안 bash** | 1,248줄. 로컬 실행 불가, 단위 테스트 없음, 실패하면 러너 로그가 유일한 창 |
 
-그리고 **GitHub 이 아무것도 안 막고 있다**:
+### GitHub 이 이미 막고 있다 — 초안이 이것을 반대로 적었다
+
+> **정정 (2026-08-08).** 이 설계의 초안은 「브랜치 보호가 없어 18개 체크가 전부 자문용이다」로
+> 썼고, 근거로 아래 404 를 실었다. **그 판정이 틀렸다.**
+>
+> ```
+> $ gh api repos/Danwoo/trading-lab/branches/main/protection
+> {"message":"Branch not protected", "status":"404"}     ← 초안이 근거로 쓴 것
+> ```
+>
+> 이 엔드포인트는 **classic 브랜치 보호만** 본다. 이 레포는 **ruleset** 으로 보호돼 있고,
+> ruleset 은 여기 나오지 않는다. 404 는 「보호 없음」이 아니라 「classic 보호 없음」이었다.
+> **404 하나로 부재를 단정한 것이 오류의 형태다** — 같은 사실을 다른 도구로 한 번 더 재지 않았다.
+
+실제 상태 (2026-08-08 실측):
 
 ```
-$ gh api repos/Danwoo/trading-lab/branches/main/protection
-{"message":"Branch not protected", "status":"404"}
+$ gh api repos/Danwoo/trading-lab/branches/main --jq .protected
+true
+
+$ gh api repos/Danwoo/trading-lab/rulesets
+20552422  main protection  target=branch  enforcement=active
+
+$ gh api repos/Danwoo/trading-lab/rules/branches/main --jq '[.[].type]|unique'
+["deletion","non_fast_forward","pull_request","required_status_checks"]
 ```
 
-18개 체크가 전부 자문용이다. 이름에 붙은 「게이트」는 성립하지 않는다.
+| 규칙 | 값 |
+| --- | --- |
+| `required_status_checks` | **`test: repo-scan` · `test: repo-scan-app` · `test: ci-coverage`** |
+| `pull_request` → `required_approving_review_count` | **0** |
+| `pull_request` → `require_last_push_approval` | false |
+| `pull_request` → `dismiss_stale_reviews_on_push` | false |
+
+**따라서 이 설계에서 바뀌는 것과 안 바뀌는 것이 갈린다.**
+
+- **바뀜**: 「required checks 를 새로 건다」가 아니라 **「이미 있는 ruleset 에 게이트 잡을 추가한다」**
+  이다. classic 보호를 `PUT` 으로 새로 만들면 ruleset 과 두 겹이 된다 — 하지 않는다.
+- **바뀜**: 테스트 3종은 이미 머지를 막는다. 「아무것도 안 막는다」를 전제한 서술은 전부 무효다.
+- **안 바뀜**: `required_approving_review_count = 0` 이므로 **승인은 요구되지 않는다.**
+  설계 결정 「Require approvals 를 켜지 않는다」는 **현행 상태와 이미 일치**한다.
+- **안 바뀜**: 그래서 `reviewDecision` 은 계속 비어 있다 (아래).
 
 ### 우리가 흉내 낸 것 중 GitHub 에 이미 있는 것 넷
 
@@ -77,7 +111,11 @@ $ gh api repos/Danwoo/trading-lab/branches/main/protection
 | `merge-router.yml` 291줄 | `gh pr merge --auto` |
 | `human: merge` 대기열 | **Approve 유무** (단, 이 설계는 Require approvals 를 켜지 않고 자동 머지 arm 신호로만 쓴다 — §4) |
 
-실측: 열린 PR 전부 `reviewDecision` 이 비어 있다 — **GitHub 리뷰 기능을 한 번도 안 썼다.**
+실측: 열린 PR 전부 `reviewDecision` 이 비어 있다. **이유는 「리뷰 기능을 안 썼다」가 아니다** —
+ruleset 의 `required_approving_review_count` 가 **0** 이라 GitHub 이 그 필드를 아예 계산하지
+않는다. 승인을 요구하는 규칙이 없으면 리뷰가 존재해도 `reviewDecision` 은 빈 채로 남는다.
+**이 구별이 중요하다**: 재작업 automation 이 `reviewDecision` 을 신호로 쓰면 이 설계 아래에서
+영원히 「할 일 없음」이 되고, 그 사실이 조용한 초록으로 덮인다 (automation 계획의 불변식).
 draft PR 도 10건 중 0건이다. 그런데 `cross-review.yml:289` 는 이미 `!draft` 가드를 갖고 있다 —
 **설계는 draft 를 전제했는데 아무도 쓰지 않았다.**
 
@@ -208,7 +246,7 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 | --- | --- |
 | `merge-router.yml` (291줄) | 존재 이유가 「GitHub 이 안 막으니 흉내」였다 |
 | `review-gate.yml` (151줄) | 라벨 위생 — 라벨이 상태가 아니게 되면 대상이 없다 |
-| 헤드리스 이중 경로 (30 실코드) | **이 레포에서 9/9 미사용**(실측). 옛 레포 이력은 확인 못 함 |
+| 헤드리스 이중 경로 (30 실코드) | **관측된 판정 17건 전부 `orca`**(실측). 단 cross-review 총 실행은 23건이라 판정 코멘트가 안 달린 6건은 이 방법으로 안 보인다 — 「미사용」이 아니라 「관측 범위 내 미사용」이다 |
 | 폴백 체인·한도 감지 (138 실코드) | 실패는 `Request changes` 없이 **자동 머지가 안 되는 것**으로 정직하게 드러난다 |
 | 워크트리 생명주기 bash (36) + **시작 스윕**(`cross-review.yml:723`) | **아래 「스윕 사건」 참조** — CI 가 에이전트 살림을 관장하면 안 된다. 정리는 automation 계획 Task 4 가 연결 PR 상태로 맡는다 |
 | `plan-*` 3파일 | 1파일로 통합 (로직 유지) |

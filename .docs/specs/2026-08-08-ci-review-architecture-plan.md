@@ -207,20 +207,42 @@ claude 경로에서 영원히 참이 되지 않으므로 **타임아웃을 늘�
 
 ---
 
-## Task 6: 브랜치 보호를 걸고 Orca 체감을 잰다
+## Task 6: **이미 있는 ruleset** 에 게이트 잡을 추가하고 Orca 체감을 잰다
 
-**코드 변경이 아니라 설정 변경 + 실측이다.** 되돌리기가 토글 하나이므로 논쟁하지 말고 재본다.
+**코드 변경이 아니라 설정 변경 + 실측이다.**
+
+> **초안 정정.** 이 task 는 원래 「브랜치 보호를 새로 건다」였다. **이 레포에는 이미 활성 ruleset
+> 이 있다** — 초안이 `gh api …/branches/main/protection` 의 404 만 보고 「보호 없음」으로 단정했다.
+> 그 엔드포인트는 **classic 보호만** 보고 ruleset 은 안 보여준다.
+
+**읽어야 할 자리** (손대기 전에 현재 상태를 직접 확인한다):
+
+```bash
+gh api repos/Danwoo/trading-lab/branches/main --jq .protected
+gh api repos/Danwoo/trading-lab/rulesets
+gh api repos/Danwoo/trading-lab/rules/branches/main --jq '[.[].type]|unique'
+gh api repos/Danwoo/trading-lab/rulesets/<id>
+```
+
+2026-08-08 실측: ruleset `20552422` (`main protection`, active) 이 `deletion` ·
+`non_fast_forward` · `pull_request`(승인 필요 수 **0**) · `required_status_checks`
+(**`test: repo-scan` · `test: repo-scan-app` · `test: ci-coverage`**) 를 건다.
 
 **불변식**
 
-- **승인을 required 로 걸지 않는다** (`required_pull_request_reviews: null`). 켜면 AI 리뷰가
-  죽었을 때 사람도 머지 못 해 작업 정지 장치가 된다 (2026-08-06 결정 취지 · 2026-08-08 리드 결정)
-- required 목록에는 **Task 4 에서 `skipping` 이 확인된 것만** 넣는다
+- **classic 브랜치 보호를 새로 만들지 마라.** `gh api -X PUT …/branches/main/protection` 은
+  ruleset 과 **겹치는 별개 보호**를 만든다. 기존 ruleset 을 **수정**한다
+- **승인 필요 수는 0 을 유지한다.** 올리면 AI 리뷰가 죽었을 때 사람도 머지 못 해 작업 정지
+  장치가 된다 (2026-08-06 결정 취지 · 2026-08-08 리드 결정). **현행이 이미 0 이므로 건드리지
+  않는 것이 곧 결정 이행이다**
+- required 목록에 넣는 것은 **Task 4 에서 `skipping` 이 확인된 것만**이다
+- 기존 required 3종을 **빼지 마라.** 게이트 잡을 **더하는** 것이지 대체하는 것이 아니다.
+  뺄지 말지는 게이트 잡이 그 셋을 실제로 대표하는지 확인한 뒤 별도로 판단한다
 
 **검증**
 
-- [ ] 걸기 전 상태를 기록한다 (`gh api …/branches/main/protection` → 404)
-- [ ] 건 뒤 `required_status_checks.contexts` 와 `required_pull_request_reviews` 를 조회해 확인
+- [ ] 변경 **전** ruleset 전문을 파일로 떠 둔다 (되돌릴 근거)
+- [ ] 변경 **후** `rules/branches/main` 을 다시 조회해 의도한 것만 바뀌었는지 대조한다
 - [ ] **Orca 에서 30분 써 본다** — 테스트가 도는 동안 버튼이 닫히나, 끝나면 열리나,
       `mergeStateStatus=UNKNOWN` 창에서 어떻게 구나. 설계 문서의 미검증 위험이 이 자리다
 - [ ] 체감이 나쁘면 되돌린다. 결과를 `CONTEXT.md` 결정 로그에 한 줄 남긴다 (추가 전용)
