@@ -72,6 +72,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_no_absolute_dates.py
 
+      # 리뷰어 배정 판정 (cross-review.yml 의 route 잡이 부르는 순수 판정) — 저자 판별·위험도
+      # 판독·리뷰어 배정. 종전엔 YAML 안 bash 라 단위 테스트가 없었다.
+      - name: 리뷰어 배정 판정 회귀 그물
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_review_route.py
+
       # 설계 결정 번호(AD-N) 유일성 (#343) — 접두사 누락 + 같은 접두사 번호의 중복 정의
       - name: 설계 결정 번호(AD-N) 유일성 검사
         if: ${{ !cancelled() }}
