@@ -371,8 +371,6 @@ jobs:
                   text = ""
               elif isinstance(value, bool):
                   text = str(value).lower()
-              elif isinstance(value, list):
-                  text = ",".join(value)
               else:
                   text = str(value)
               print(f"{key}={text}")
@@ -397,6 +395,17 @@ jobs:
             printf 'chain=%s\n'         "$CHAIN"
             printf 'head_sha=%s\n'      "$HEAD_SHA"
           } >> route.env
+
+          # 값 하나에 개행이 섞이면 맨 `key=value` 왕복이 임의 스텝 출력을 주입한다 — 주입된
+          # 줄도 `key=value` 모양이라 형식 검사로는 안 걸린다. **줄 수를 판정 키 수와 대조**해
+          # 강제한다 (판정 키 + 파생 4). 어기면 죽는다 (fail-closed).
+          KEYS=$(python3 -c 'import json; print(len(json.load(open("route.json"))))')
+          LINES=$(wc -l < route.env)
+          if [ "$LINES" -ne "$((KEYS + 4))" ]; then
+            echo "::error::route.env 가 ${LINES}줄 — 판정 키 ${KEYS}개 + 파생 4개와 다르다. 판정값에 개행이 섞였다"
+            exit 1
+          fi
+          echo "route.env ${LINES}줄 검사 · 판정 키 ${KEYS}개 + 파생 4개와 일치"
           cat route.env >> "$GITHUB_OUTPUT"
 
       - name: 리뷰 컨텍스트 번들 생성 (diff·계획 코멘트·프롬프트·routing)
