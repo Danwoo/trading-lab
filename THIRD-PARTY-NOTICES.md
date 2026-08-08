@@ -2913,8 +2913,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@radix-ui/react-collection` | 1.1.15 | MIT |
 | `@radix-ui/react-compose-refs` | 1.1.2 | MIT |
 | `@radix-ui/react-compose-refs` | 1.1.5 | MIT |
-| `@radix-ui/react-context` | 1.2.2 | MIT |
 | `@radix-ui/react-context-menu` | 2.3.7 | MIT |
+| `@radix-ui/react-context` | 1.2.2 | MIT |
 | `@radix-ui/react-dialog` | 1.1.23 | MIT |
 | `@radix-ui/react-direction` | 1.1.4 | MIT |
 | `@radix-ui/react-dismissable-layer` | 1.1.19 | MIT |
@@ -2934,8 +2934,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@radix-ui/react-popper` | 1.3.7 | MIT |
 | `@radix-ui/react-portal` | 1.1.17 | MIT |
 | `@radix-ui/react-presence` | 1.1.10 | MIT |
-| `@radix-ui/react-primitive` | 2.1.3 | MIT |
 | `@radix-ui/react-primitive` | 2.1.10 | MIT |
+| `@radix-ui/react-primitive` | 2.1.3 | MIT |
 | `@radix-ui/react-progress` | 1.1.16 | MIT |
 | `@radix-ui/react-radio-group` | 1.4.7 | MIT |
 | `@radix-ui/react-roving-focus` | 1.1.19 | MIT |
@@ -2948,9 +2948,9 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@radix-ui/react-switch` | 1.3.7 | MIT |
 | `@radix-ui/react-tabs` | 1.1.21 | MIT |
 | `@radix-ui/react-toast` | 1.2.23 | MIT |
+| `@radix-ui/react-toggle-group` | 1.1.19 | MIT |
 | `@radix-ui/react-toggle` | 1.1.10 | MIT |
 | `@radix-ui/react-toggle` | 1.1.18 | MIT |
-| `@radix-ui/react-toggle-group` | 1.1.19 | MIT |
 | `@radix-ui/react-toolbar` | 1.1.19 | MIT |
 | `@radix-ui/react-tooltip` | 1.2.16 | MIT |
 | `@radix-ui/react-use-callback-ref` | 1.1.4 | MIT |
@@ -3125,7 +3125,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `hast-util-to-text` | 4.0.2 | MIT |
 | `hast-util-whitespace` | 3.0.0 | MIT |
 | `hastscript` | 9.0.1 | MIT |
-| `hono` | 4.12.18 | MIT |
+| `hono` | 4.13.1 | MIT |
 | `html-encoding-sniffer` | 6.0.0 | MIT |
 | `html-url-attributes` | 3.0.1 | MIT |
 | `http-status-codes` | 2.3.0 | MIT |
@@ -3288,8 +3288,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `react-icons` | 5.6.0 | MIT |
 | `react-is` | 16.13.1 | MIT |
 | `react-markdown` | 10.1.0 | MIT |
-| `react-remove-scroll` | 2.7.2 | MIT |
 | `react-remove-scroll-bar` | 2.3.8 | MIT |
+| `react-remove-scroll` | 2.7.2 | MIT |
 | `react-resizable-panels` | 4.12.2 | MIT |
 | `react-resizable` | 3.2.0 | MIT |
 | `react-style-singleton` | 2.2.3 | MIT |
