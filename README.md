@@ -139,3 +139,5 @@ trading-lab/
 ## 라이선스
 
 [MIT](LICENSE). 이 저장소가 작성한 코드에 적용된다 — 의존 라이브러리는 각자의 라이선스를 그대로 따르며, 고지 의무가 있는 항목과 상용 라이선스 포함 여부는 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) 를 본다.
+
+<!-- #23 Task 4 경로 필터 검증용 임시 변경 (outside) — 확인 뒤 브랜치째 삭제 -->
