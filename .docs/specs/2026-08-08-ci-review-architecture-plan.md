@@ -71,9 +71,12 @@
 - Modify: `.github/workflows/cross-review.yml:318-628` (`decide()` 를 스크립트 호출로 교체)
 
 **Interfaces:**
-- Produces: `decide(emails: list[str], codex_on: bool, risk: str) -> dict` — 반환 키는
-  `reviewer`(`"claude"|"kimi"|"codex"|"none"`) · `author_kind`(`"agent"|"human"|"mixed"`) ·
-  `author_vendor`(`str|None`) · `author_tier`(`str|None`) · `label_allowed`(`bool`).
+- Produces: `decide(emails: list[str], head_ref: str, issue_risks: list[str], codex_on: bool) -> dict`
+  — 반환 키는 `reviewer`(`"claude"|"kimi"|"codex"|"none"`) ·
+  `author_kind`(`"agent"|"human"|"mixed"`) · `author_vendor`(`str|None`) ·
+  `author_tier`(`str|None`) · `identity_source`(`"commit-email"|"branch-name"|"none"`) ·
+  `risk`(`"low"|"high"`) · `risk_source`(`str`) · `label_allowed`(`bool`).
+  **`risk` 는 인자가 아니라 반환값이다** — 현행 bash 가 `ISSUE_RISKS` 로 함수 안에서 계산한다.
 - `label_allowed` 의 소비자는 **리뷰어 디스패치**다. `False` 면(사람·봇·티어 미상·벤더 혼재)
   교차 모델 리뷰가 성립했다고 볼 수 없으므로, 디스패처는 리뷰 오더에 **판정 마커 끝에
   `source=manual` 을 붙이라**고 지시한다. Task 7 의 `decide_record` 가 그 필드를 보고
@@ -85,10 +88,12 @@
 `scripts/test_review_route.py`:
 
 ```python
-"""review_route.decide 회귀 그물 — 저자 판별·리뷰어 배정 (stdlib 전용).
+"""review_route.decide 회귀 그물 — cross-review.yml 의 bash decide() 동작 동일 확인.
 
-이 판정은 종전 cross-review.yml 의 bash `decide()` 였고 단위 테스트가 없었다.
-티어 어휘는 로컬 실측으로 확인된 것만 받는다 (없는 이름은 미상 처리).
+PR #24 리뷰(kimi)가 잡은 세 자리를 케이스로 못박는다:
+  ① 고위험 codex 는 **claude 저자**일 때다 (kimi 저자가 아니다) — :414-417
+  ② 벤더 혼재 + codex 불가 → reviewer=none (후보 소진) — :419-424
+  ③ 커밋 신원이 없어도 브랜치명(fix-N-<model>)으로 저자를 판별한다 — :379-381
 """
 
 import sys
@@ -97,40 +102,68 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import review_route as rr
 
+C = "claude-opus-agent@noreply.local"
+C_BARE = "claude-agent@noreply.local"
+K = "kimi-agent@noreply.local"
+X = "codex-agent@noreply.local"
+HUMAN = "danwoo@example.com"
+BOT = "49699333+dependabot[bot]@users.noreply.github.com"
+
 CASES = [
-    # (설명, emails, codex_on, risk, 기대 reviewer, 기대 author_kind, 기대 label_allowed)
-    ("claude-opus 저자 → kimi 리뷰",
-     ["claude-opus-agent@noreply.local"], False, "low", "kimi", "agent", True),
-    ("kimi 저자 + 저위험 → claude 리뷰",
-     ["kimi-agent@noreply.local"], False, "low", "claude", "agent", True),
-    ("kimi 저자 + 고위험 + codex 가용 → codex 리뷰",
-     ["kimi-agent@noreply.local"], True, "high", "codex", "agent", True),
-    ("kimi 저자 + 고위험 + codex 불가 → claude 폴백",
-     ["kimi-agent@noreply.local"], False, "high", "claude", "agent", True),
-    ("codex 저자 → claude 리뷰",
-     ["codex-agent@noreply.local"], False, "low", "claude", "agent", True),
-    ("사람 저자 → claude 리뷰, 판정 라벨 금지",
-     ["danwoo@example.com"], False, "low", "claude", "human", False),
-    ("봇 저자(dependabot) → claude 리뷰, 판정 라벨 금지",
-     ["49699333+dependabot[bot]@users.noreply.github.com"], False, "low",
-     "claude", "human", False),
-    ("벤더 혼재 → 판정 라벨 금지",
-     ["claude-opus-agent@noreply.local", "kimi-agent@noreply.local"], False, "low",
-     "codex", "mixed", False),
-    ("목록에 없는 티어는 미상으로 읽고 라벨 금지",
-     ["claude-sonar-agent@noreply.local"], False, "low", "claude", "human", False),
+    # (설명, emails, head_ref, issue_risks, codex_on, 기대 dict 부분집합)
+    ("claude 저자 + 저위험 → kimi",
+     [C], "", ["low"], False, {"reviewer": "kimi", "author_kind": "agent",
+                               "author_tier": "opus", "label_allowed": True}),
+    ("claude 저자 + 고위험 + codex 가용 → codex  (①)",
+     [C], "", ["high"], True, {"reviewer": "codex", "risk": "high"}),
+    ("claude 저자 + 고위험 + codex 불가 → kimi",
+     [C], "", ["high"], False, {"reviewer": "kimi"}),
+    ("kimi 저자 + 고위험 + codex 가용 → claude  (① 반대 방향 확인)",
+     [K], "", ["high"], True, {"reviewer": "claude"}),
+    ("codex 저자 → claude",
+     [X], "", ["low"], False, {"reviewer": "claude"}),
+    ("혼재 + codex 가용 → codex  (②)",
+     [C, K], "", ["low"], True, {"reviewer": "codex", "author_kind": "mixed",
+                                 "label_allowed": False}),
+    ("혼재 + codex 불가 → none  (②)",
+     [C, K], "", ["low"], False, {"reviewer": "none", "author_kind": "mixed"}),
+    ("신원 없음 + 브랜치명 fix-42-claude → agent/claude  (③)",
+     [HUMAN], "fix-42-claude", ["low"], False,
+     {"reviewer": "kimi", "author_kind": "agent", "author_vendor": "claude",
+      "identity_source": "branch-name", "label_allowed": False}),
+    ("신원 없음 + 브랜치명 없음 → human/claude",
+     [HUMAN], "some-branch", ["low"], False,
+     {"reviewer": "claude", "author_kind": "human", "label_allowed": False}),
+    ("봇 저자 → human 취급",
+     [BOT], "", ["low"], False, {"reviewer": "claude", "author_kind": "human",
+                                 "label_allowed": False}),
+    ("이슈 없음 → risk high (fail-closed)",
+     [C], "", [], True, {"risk": "high", "risk_source": "no-issue-fail-closed",
+                         "reviewer": "codex"}),
+    ("이슈 라벨에 low·high 혼재 → high",
+     [C], "", ["low", "high"], False, {"risk": "high"}),
+    ("구형식 claude-agent@ → 티어 미상",
+     [C_BARE], "", ["low"], False, {"author_tier": None, "reviewer": "kimi",
+                                    "label_allowed": True}),
+    ("claude 티어 혼재 → 티어 미상",
+     [C, "claude-sonnet-agent@noreply.local"], "", ["low"], False,
+     {"author_tier": None, "author_kind": "agent"}),
+    ("목록 밖 에이전트형 이메일 → 라벨 금지",
+     ["claude-sonar-agent@noreply.local"], "", ["low"], False,
+     {"author_kind": "human", "label_allowed": False}),
+    ("커밋 신원과 브랜치명 불일치 → 커밋 신원 우선",
+     [C], "fix-7-kimi", ["low"], False,
+     {"author_vendor": "claude", "identity_source": "commit-email"}),
 ]
 
 
 def main() -> int:
     failures = 0
-    for desc, emails, codex_on, risk, want_rev, want_kind, want_label in CASES:
-        got = rr.decide(emails, codex_on, risk)
-        for key, want in (("reviewer", want_rev),
-                          ("author_kind", want_kind),
-                          ("label_allowed", want_label)):
-            if got[key] != want:
-                print(f"FAIL [{desc}] {key}: got {got[key]!r}, want {want!r}")
+    for desc, emails, head_ref, risks, codex_on, want in CASES:
+        got = rr.decide(emails, head_ref, risks, codex_on)
+        for k, v in want.items():
+            if got[k] != v:
+                print(f"FAIL [{desc}] {k}: got {got[k]!r}, want {v!r}")
                 failures += 1
     print(f"review_route 케이스 {len(CASES)}건 검사 · 실패 {failures}건")
     if not CASES:
@@ -155,8 +188,8 @@ Expected: `ModuleNotFoundError: No module named 'review_route'`
 ```python
 """커밋 신원으로 저자를 판별해 반대 모델 리뷰어를 배정한다 — 순수 판정, stdlib 전용.
 
-티어 어휘는 **로컬에서 실재를 확인한 것만** 받는다. 여기 없는 이름은 미상으로 읽어
-판정 라벨을 막는다 (동일-모델 자기리뷰 가능성을 배제할 수 없기 때문).
+`cross-review.yml` 의 bash `decide()` (324~432) 를 **동작 동일**하게 옮긴 것이다.
+티어 어휘는 로컬에서 실재를 확인한 것만 받는다.
 """
 
 import json
@@ -169,52 +202,86 @@ KIMI_TIERS = ("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed")
 CODEX_TIERS = ("gpt-5.6-terra",)
 
 _VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS}
-
-# `<벤더>[-<티어>]-agent@noreply.local` — 와일드카드 금지, 명시 목록만
 _IDENTITY = re.compile(
     r"^(?P<vendor>claude|kimi|codex)(?:-(?P<tier>[a-z0-9.\-]+))?-agent@noreply\.local$"
 )
+_AGENTISH = re.compile(r"-agent@noreply\.local$", re.I)
+_BRANCH = re.compile(r"^fix-[0-9]+-(?P<vendor>claude|kimi|codex)$")
 
-# 저자 벤더 → 리뷰어 벤더. 고위험 kimi 만 codex 를 쓴다 (가용할 때)
-_OPPOSITE = {"claude": "kimi", "kimi": "claude", "codex": "claude"}
+
+def _read_risk(issue_risks):
+    """이슈 라벨에서 위험도를 읽는다 — 미선언·이슈 없음은 high (fail-closed)."""
+    vals = [r.strip() for r in issue_risks if r.strip()]
+    if not vals:
+        return "high", "no-issue-fail-closed"
+    if "high" in vals:
+        return "high", "issue-label"
+    if all(v == "low" for v in vals):
+        return "low", "issue-label"
+    return "high", "undeclared-fail-closed"
 
 
-def decide(emails, codex_on, risk):
-    vendors, tiers, unknown_agentish = set(), set(), False
+def decide(emails, head_ref, issue_risks, codex_on):
+    vendors, claude_tiers_seen, unknown_agentish = set(), set(), []
     for raw in emails:
-        m = _IDENTITY.match(raw.strip())
-        if not m:
+        e = raw.strip()
+        if not e:
             continue
-        vendor, tier = m.group("vendor"), m.group("tier")
-        if tier is not None and tier not in _VENDOR_TIERS[vendor]:
-            unknown_agentish = True
-            continue
-        vendors.add(vendor)
-        if tier:
-            tiers.add(tier)
+        m = _IDENTITY.match(e)
+        if m and (m.group("tier") is None
+                  or m.group("tier") in _VENDOR_TIERS[m.group("vendor")]):
+            vendors.add(m.group("vendor"))
+            if m.group("vendor") == "claude":
+                claude_tiers_seen.add(m.group("tier") or "unknown")
+        elif _AGENTISH.search(e):
+            unknown_agentish.append(e)
 
-    if unknown_agentish or not vendors:
-        # 사람·봇·미상 티어 — 리뷰는 하되 판정 라벨은 붙이지 않는다 (사람 경로)
-        return {"reviewer": "claude", "author_kind": "human",
-                "author_vendor": None, "author_tier": None, "label_allowed": False}
+    bm = _BRANCH.match(head_ref or "")
+    branch_model = bm.group("vendor") if bm else None
 
-    if len(vendors) > 1:
-        return {"reviewer": "codex", "author_kind": "mixed",
-                "author_vendor": None, "author_tier": None, "label_allowed": False}
+    author_tier = None
+    if len(claude_tiers_seen) == 1 and "unknown" not in claude_tiers_seen:
+        author_tier = next(iter(claude_tiers_seen))
 
-    vendor = next(iter(vendors))
-    reviewer = _OPPOSITE[vendor]
-    if vendor == "kimi" and risk == "high" and codex_on:
-        reviewer = "codex"
-    return {"reviewer": reviewer, "author_kind": "agent", "author_vendor": vendor,
-            "author_tier": next(iter(tiers)) if len(tiers) == 1 else None,
-            "label_allowed": True}
+    if len(vendors) == 1:
+        author_kind, author_vendor, identity_source = "agent", next(iter(vendors)), "commit-email"
+    elif len(vendors) > 1:
+        author_kind, author_vendor, identity_source = "mixed", None, "commit-email"
+    elif branch_model:
+        author_kind, author_vendor, identity_source = "agent", branch_model, "branch-name"
+    else:
+        author_kind, author_vendor, identity_source = "human", None, "none"
+
+    risk, risk_source = _read_risk(issue_risks)
+
+    candidates = ["claude", "kimi"] + (["codex"] if codex_on else [])
+    if author_kind == "agent" and author_vendor == "kimi":
+        reviewer = "claude"
+    elif author_kind == "agent" and author_vendor == "claude":
+        reviewer = "codex" if (risk == "high" and codex_on) else "kimi"
+    elif author_kind == "agent" and author_vendor == "codex":
+        reviewer = "claude"
+    elif author_kind == "human":
+        reviewer = "claude"
+    else:
+        reviewer = next((c for c in candidates if c not in vendors), "none")
+
+    label_allowed = (author_kind == "agent"
+                     and identity_source == "commit-email"
+                     and not unknown_agentish)
+
+    return {"reviewer": reviewer, "author_kind": author_kind,
+            "author_vendor": author_vendor, "author_tier": author_tier,
+            "identity_source": identity_source, "risk": risk,
+            "risk_source": risk_source, "label_allowed": label_allowed}
 
 
 def main():
-    emails = [ln for ln in os.environ.get("EMAILS", "").splitlines() if ln.strip()]
-    result = decide(emails, os.environ.get("CODEX_ON", "") == "on",
-                    os.environ.get("RISK", "low"))
+    result = decide(
+        os.environ.get("EMAILS", "").splitlines(),
+        os.environ.get("HEAD_REF", ""),
+        os.environ.get("ISSUE_RISKS", "").splitlines(),
+        os.environ.get("CODEX_ON", "") == "on")
     json.dump(result, sys.stdout)
     print()
     return 0
@@ -227,7 +294,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: 테스트가 통과하는지 확인한다**
 
 Run: `python3 scripts/test_review_route.py`
-Expected: `review_route 케이스 9건 검사 · 실패 0건` · 종료코드 0
+Expected: `review_route 케이스 16건 검사 · 실패 0건` · 종료코드 0
 
 - [ ] **Step 5: CI 에 배선한다**
 
@@ -253,8 +320,9 @@ Expected: 종료코드 0. 새 `scripts/test_review_route.py` 가 배선됐다고
         id: decide
         env:
           EMAILS: ${{ steps.collect.outputs.emails }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          ISSUE_RISKS: ${{ steps.collect.outputs.issue_risks }}
           CODEX_ON: ${{ vars.CROSS_REVIEW_CODEX }}
-          RISK: ${{ steps.risk.outputs.risk }}
         run: |
           set -euo pipefail
           OUT=$(python3 scripts/review_route.py)
@@ -577,11 +645,21 @@ git commit -m "refactor(ci): 헤드리스 이중 경로와 폴백 체인을 걷�
 **Interfaces:**
 - Produces: `changes` 잡의 출력 `backend`·`frontend`·`mcp`·`workflows` (각 `'true'|'false'`)
 
-- [ ] **Step 1: 지금 경로 필터를 기록한다**
+- [ ] **Step 1: 지금 경로 필터를 기록하고 대조한다**
 
-Run: `awk '/^on:/,/^jobs:/' .github/workflows/ci.yml`
+Run:
+```bash
+awk '/^on:/,/^jobs:/' .github/workflows/ci.yml | grep -E "^\s+- " | sort -u
+awk '/^on:/,/^jobs:/' .github/workflows/frontend-ci.yml | grep -E "^\s+- " | sort -u
+```
+
 이 목록이 그대로 `changes` 잡의 필터가 된다. **하나도 빠뜨리지 않는다** — 빠뜨리면 그 경로
 변경에 검사가 안 돈다.
+
+> **아래 Step 2 의 템플릿을 그대로 믿지 마라.** 이 계획을 쓴 시점의 파일 기준이다.
+> 위 두 명령의 출력과 템플릿을 **줄 단위로 대조**하고, 어긋나면 파일이 정본이다.
+> 초안에서 `frontend-ci` 트리거 5개가 빠져 있었고(PR #24 리뷰가 잡았다), 그대로 복사했다면
+> 그 경로 변경에 검사가 조용히 안 돌았다.
 
 - [ ] **Step 2: `changes` 잡을 추가한다**
 
@@ -622,6 +700,11 @@ Run: `awk '/^on:/,/^jobs:/' .github/workflows/ci.yml`
               - '.github/workflows/**'
             frontend:
               - 'frontend/**'
+              - 'scripts/verify_filter_negation.mjs'
+              - 'scripts/fixtures/filter_conformance_cases.json'
+              - 'backend-service/alembic/**'
+              - 'THIRD-PARTY-NOTICES.md'
+              - 'scripts/verify_notice_counts.py'
               - '.github/workflows/**'
 ```
 
