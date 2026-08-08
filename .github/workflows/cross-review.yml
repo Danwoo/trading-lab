@@ -154,8 +154,9 @@
 #     ②가 폴백에 참여하는 것은 2026-07-29 사용자 정밀화다 — 계기 사건(kimi 900초 timeout)이
 #     정확히 ②라, ②를 확정 실패로 두면 가장 흔한 실패에서 게이트가 다시 통째로 멎는다.
 #     대신 "왜 폴백했는지" 를 사유별로 적어 ①과 ②가 코멘트에서 구분되게 한다 (아래 가시성 의무).
-#     판별식·관측 원문은 아래 잡의 `is_rate_limited`·`is_transient` 주석에 인용돼 있다
-#     (2026-07-29 로컬 CLI 실행 실측).
+#     한도 판별식은 아래 잡의 `is_rate_limited` 이고 관측 원문이 그 주석에 인용돼 있다
+#     (2026-07-29 로컬 CLI 실행 실측). ②는 `run_orca` 의 반환값(타임아웃·폴링 조회 불가)이
+#     가른다 — `is_transient`·`classify` 는 지금 호출부가 없다 (그 정의 위 주석 참조).
 #   **티어 규칙**: claude 폴백은 **작성 티어와 다른 티어**로 리뷰한다 (opus 작성 → sonnet 이,
 #     sonnet 작성 → opus 가). 입력은 §6.1 티어 신원. **티어 미상이면 리뷰는 하되 판정 라벨을
 #     붙이지 않는다** — 다른 티어를 보장할 수 없어 동일-티어 자기리뷰 가능성을 못 배제한다.
@@ -756,11 +757,15 @@ jobs:
           WT_PATH_INTERVAL="${ORCA_WT_PATH_POLL_SECS:-3}"
           WT_PATH_TIMEOUT="${ORCA_WT_PATH_TIMEOUT_SECS:-30}"
           WT_DELETE_RETRY="${ORCA_WT_DELETE_RETRY_SECS:-2}"
-          # 한 후보에게 남겨야 하는 최소 시간 — **첫 판정 확인에 닿기까지 필요한 시간**이다:
-          # 사전 프로브(PROBE_TIMEOUT) + TUI 준비(READY_TIMEOUT) + 첫 폴링까지의 대기(ORCA_POLL_FIRST).
+          # 한 후보에게 남겨야 하는 최소 시간 — **첫 판정 확인에 닿기까지의 최악 경로**를 더한다.
           # 이보다 적게 남았는데 디스패치하면 워크트리를 만들어 놓고 폴링을 한 바퀴도 못 돈 채
           # 타임아웃해 고아만 남는다 — 회수기가 없으므로 그 고아는 사람이 치워야 한다.
-          MIN_SLICE="${REVIEW_MIN_SLICE_SECS:-$(( PROBE_TIMEOUT + READY_TIMEOUT + ORCA_POLL_FIRST ))}"
+          #   사전 프로브 PROBE_TIMEOUT · 에이전트 핸들 취득 READY_TIMEOUT · 워크트리 경로 폴링
+          #   WT_PATH_TIMEOUT · TUI 준비 READY_TIMEOUT · 지시 도착·제출 확인 SEND_VERIFY_TIMEOUT×2 ·
+          #   첫 폴링까지의 대기 ORCA_POLL_FIRST  (기본값 합 = 550초)
+          # 이 문턱이 보장하는 것은 **첫 확인에 닿는 것까지**다 — 리뷰가 끝나는 것까지는 아니다
+          # (관측된 리뷰 최소 312초). 그 위는 체인 예산과 ORCA_TIMEOUT 이 맡는다.
+          MIN_SLICE="${REVIEW_MIN_SLICE_SECS:-$(( PROBE_TIMEOUT + READY_TIMEOUT + WT_PATH_TIMEOUT + READY_TIMEOUT + 2 * SEND_VERIFY_TIMEOUT + ORCA_POLL_FIRST ))}"
           # 체인 전체 예산 — 잡 timeout-minutes(100=6000s)보다 작게 잡아 스스로 끝낸다.
           # 러너가 잡을 죽이면 정규화·업로드가 스킵되어 확정 상태를 못 쓴다 (= pending 정체).
           CHAIN_BUDGET="${REVIEW_CHAIN_BUDGET_SECS:-5400}"
@@ -1307,6 +1312,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           CHAIN: ${{ needs.route.outputs.chain }}
           ROUTED: ${{ needs.route.outputs.reviewer }}
+          ORCA_REPO_SELECTOR: ${{ vars.ORCA_REPO_SELECTOR }}
         run: |
           set -uo pipefail
           # ⚠ Actions 기본 셸은 `bash -e {0}` 다 — `set -uo pipefail` 은 -e 를 끄지 않는다.
@@ -1317,9 +1323,18 @@ jobs:
           # 붙여 실제 이름이 밀리기 때문이다(실측 2026-08-06). **이름 규칙**으로 훑는다.
           # 규칙을 이 PR 것(`review-<이 PR>-`)이 아니라 `review-<번호>-` 전체로 잡는다: 사람이
           # 치우는 것이 유일한 회수 경로이므로, 남의 PR 잔재도 보이지 않으면 아무도 못 치운다.
-          LEFT=$(orca-ide worktree list --json $ORCA_ENV 2>/dev/null | jq -r '
+          # ⚠ **repoId 로 이 레포에 가둔다.** `worktree list` 는 Orca 에 등록된 **모든 레포**를
+          #   낸다 — 러너의 Orca 에 옛 레포 클론이 아직 등록돼 있으면 그쪽 `review-*` 가 섞여
+          #   「다른 PR」로 집계되고 사람에게 남의 레포 워크트리를 지우라고 권하게 된다.
+          case "${ORCA_REPO_SELECTOR:-}" in
+            id:*) REPO_ID="${ORCA_REPO_SELECTOR#id:}" ;;
+            *)    REPO_ID=""
+                  echo "::warning::ORCA_REPO_SELECTOR 가 id:<repoId> 형식이 아니다(${ORCA_REPO_SELECTOR:-미설정}) — repoId 필터 없이 이름 규칙만으로 센다. 다른 레포의 review-* 가 섞일 수 있다" ;;
+          esac
+          LEFT=$(orca-ide worktree list --json $ORCA_ENV 2>/dev/null | jq -r --arg rid "$REPO_ID" '
               (.result.worktrees // [])
               | map(select((.isMainWorktree | not))
+                    | select(($rid == "") or (.repoId == $rid))
                     | select(((.displayName // "") | test("^review-[0-9]+-"))))
               | .[] | "\(.displayName)\t\(.path)"' 2>/dev/null)
           MINE=0; OTHERS=0
