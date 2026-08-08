@@ -11,7 +11,7 @@
 워크플로 **11개 → 7개** (CI 계획 완료 시점) → **5개** (automation 계획이 리뷰어 기동을
 가져간 뒤). `cross-review.yml` 은 리뷰어 기동 209줄이 Orca 쪽으로 옮겨져야 비므로 CI 계획만으로는
 지울 수 없다 — 그 의존을 초안이 빠뜨려 「5개」가 도달 불가 목표였다.
-**워크플로 YAML 총량 3,705줄 → 약 1,000줄** — 단, 사라진 bash 는 `scripts/` 로
+**워크플로 YAML 총량 → 약 1,000줄** (진단 시점 3,705줄, #26 머지 후 3,797줄) — 단, 사라진 bash 는 `scripts/` 로
 옮겨간 것이지 없어진 것이 아니다. 얻는 것은 줄 수가 아니라 **로컬 실행·단위 테스트 가능성**이다.
 사라지는 것은 흉내 내던 것들이다 —
 `merge-router`(GitHub 이 안 막으니 우리가 흉내), `review-gate`(라벨 위생), 헤드리스 이중 경로,
@@ -22,7 +22,7 @@
 ### 부피가 어디 있나
 
 ```
-워크플로 11개 · 총 3,705줄 · 인라인 bash 1,248줄
+워크플로 11개 · 총 3,705줄 · 인라인 bash 1,248줄   ← 진단 시점(2026-08-08 오전). #26 머지 후 3,797줄
   cross-review.yml   2,020줄 (실코드 1,113 · bash 930)
   merge-router.yml     291줄
   frontend-ci.yml      258줄
@@ -116,7 +116,7 @@ ruleset 의 `required_approving_review_count` 가 **0** 이라 GitHub 이 그 �
 않는다. 승인을 요구하는 규칙이 없으면 리뷰가 존재해도 `reviewDecision` 은 빈 채로 남는다.
 **이 구별이 중요하다**: 재작업 automation 이 `reviewDecision` 을 신호로 쓰면 이 설계 아래에서
 영원히 「할 일 없음」이 되고, 그 사실이 조용한 초록으로 덮인다 (automation 계획의 불변식).
-draft PR 도 10건 중 0건이다. 그런데 `cross-review.yml:289` 는 이미 `!draft` 가드를 갖고 있다 —
+draft PR 도 10건 중 0건이다. 그런데 `cross-review.yml` 은 이미 `!draft` 가드를 갖고 있다 (`grep -n 'draft' …`) —
 **설계는 draft 를 전제했는데 아무도 쓰지 않았다.**
 
 ## 결정
@@ -248,7 +248,7 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 | `review-gate.yml` (151줄) | 라벨 위생 — 라벨이 상태가 아니게 되면 대상이 없다 |
 | 헤드리스 이중 경로 (30 실코드) | **관측된 판정 17건 전부 `orca`**(실측). 단 cross-review 총 실행은 23건이라 판정 코멘트가 안 달린 6건은 이 방법으로 안 보인다 — 「미사용」이 아니라 「관측 범위 내 미사용」이다 |
 | ~~폴백 체인·한도 감지~~ | **철회 (2026-08-08 리드 정정)** — kimi·codex 한도 시 claude 가 이어받는 것이 의도된 설계다. 실제 판정자는 하나이므로 「한 리뷰를 여러 모델이 이어받아 계속 손대는 것」과 다르다 |
-| 워크트리 생명주기 bash (36) + **시작 스윕**(`cross-review.yml:723`) | **아래 「스윕 사건」 참조** — CI 가 에이전트 살림을 관장하면 안 된다. 정리는 automation 계획 Task 4 가 연결 PR 상태로 맡는다 |
+| 워크트리 생명주기 bash (36) + **시작 스윕** (`grep -n '고아 리뷰 워크트리 시작 청소' .github/workflows/cross-review.yml`) | **아래 「스윕 사건」 참조** — CI 가 에이전트 살림을 관장하면 안 된다. 정리는 automation 계획 Task 4 가 연결 PR 상태로 맡는다 |
 | `plan-*` 3파일 | 1파일로 통합 (로직 유지) |
 | `board-status.yml` (170줄) | **삭제 확정** (2026-08-08 리드 결정). fail-open 이라 초록이 「했다」를 보장하지 못했다 |
 
@@ -265,7 +265,7 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 
 ### #11 — 준비·접수 판정 신호가 죽어 있다
 
-`wait_agent_ready`(`cross-review.yml:1093`)는 프라이머를 보낸 뒤 `term_cursor`(= `latestCursor`)가
+`wait_agent_ready` 는 프라이머를 보낸 뒤 `term_cursor`(= `latestCursor`)가
 자라기를 기다린다. **Claude Code TUI 는 화면을 제자리에서 다시 그려 이 값이 움직이지 않는다.**
 
 살아 있는 유휴 리뷰어에 같은 절차를 손으로 돌린 결과:

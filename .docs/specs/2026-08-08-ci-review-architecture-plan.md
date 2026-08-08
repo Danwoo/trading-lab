@@ -30,6 +30,10 @@
 
 **현행 코드가 정본이다.** 이 문서와 어긋나면 코드가 이긴다 — 어긋난 자리를 PR 본문에 적어라.
 
+> **위치는 줄 번호로 주지 않는다.** 초안이 `cross-review.yml:1148` 처럼 적었다가 #26 이 그 파일에
+> 84줄을 더하면서 인용이 전부 밀렸다 — 저자 필터는 2곳에서 **3곳**이 됐는데 문서는 2곳만 알았다.
+> 이 계획은 **찾는 명령**으로 준다. 명령은 파일이 바뀌어도 맞는 곳을 가리킨다.
+
 ---
 
 ## 전역 제약
@@ -58,12 +62,12 @@
 
 | 불변식 | 근거 위치 | 깨지면 |
 | --- | --- | --- |
-| **판정 마커는 저자 필터를 통과한 코멘트에서만 읽는다** (`OWNER`·`MEMBER`·`COLLABORATOR`) | `cross-review.yml:1148` · `:1707` · 위협모델 주석 `:254` | 공개 레포에서 **누구든** 마커를 코멘트해 봇 승인·자동 머지를 일으킨다. head sha 는 공개 정보다 |
+| **판정 마커는 저자 필터를 통과한 코멘트에서만 읽는다** (`OWNER`·`MEMBER`·`COLLABORATOR`) | `grep -n author_association .github/workflows/cross-review.yml` (**3곳**) · 위협모델 주석은 `grep -n '저자 필터' …` | 공개 레포에서 **누구든** 마커를 코멘트해 봇 승인·자동 머지를 일으킨다. head sha 는 공개 정보다 |
 | **마커 sha 는 head 와 40자 동등 비교** | — (초안 결함) | 접두사 매치면 앞 7자만 같은 다른 커밋의 판정이 통과한다 |
 | **리뷰 루브릭은 PR 의 base 커밋에서 읽는다** | `.github/review-prompt.md` 머리 주석 | PR 이 자기 리뷰 기준을 변조한다 |
-| **리뷰어는 PR 코드를 체크아웃하지 않는다** (`--base-branch origin/main`) | `cross-review.yml` 의 `run_orca` | 남의 코드가 self-hosted 러너에서 실행될 표면이 생긴다 |
-| **fork PR 은 리뷰어를 띄우지 않는다** | `cross-review.yml:289` · `:634` | 같음 |
-| **저자 ≠ 리뷰어** | `cross-review.yml:413-424` | 자기리뷰 |
+| **리뷰어는 PR 코드를 체크아웃하지 않는다** (`--base-branch origin/main`) | `grep -n 'base-branch origin/main' .github/workflows/cross-review.yml` | 남의 코드가 self-hosted 러너에서 실행될 표면이 생긴다 |
+| **fork PR 은 리뷰어를 띄우지 않는다** | `grep -n 'head.repo.full_name' .github/workflows/cross-review.yml` | 같음 |
+| **저자 ≠ 리뷰어** | `decide()` 의 리뷰어 라우팅 블록 — `grep -n 'decide() {' …` 로 함수를 찾아 읽어라 | 자기리뷰 |
 | **판정 코멘트는 배정값이 아니라 실제 판정자를 적는다** | 루브릭: 「`reviewer` 는 route 가 정한 **배정값**이라 폴백이 일어나면 실제 판정자와 다르다」 | 누가 판정했는지가 기록과 어긋난다 |
 | **리뷰어는 고치지 않는다.** 판정과 근거만 낸다 | `.github/review-prompt.md` | 심판이 선수가 된다. 발견 → **저자가** 고침 → 리뷰어가 재판정 순서만 쓴다 |
 
@@ -71,7 +75,7 @@
 
 ## Task 1: 리뷰어 배정을 순수 판정 스크립트로 추출
 
-**읽어야 할 자리**: `.github/workflows/cross-review.yml:324-452` 의 `decide()` **전문**.
+**읽어야 할 자리**: `cross-review.yml` 의 `decide()` **전문** — `grep -n 'decide() {' .github/workflows/cross-review.yml` 로 시작 줄을 찾아 같은 들여쓰기의 닫는 `}` 까지.
 outputs 목록만 보고 옮기지 마라 — 초안이 그렇게 해서 3자리를 틀렸다.
 
 **만드는 것**: `scripts/review_route.py`(순수 판정) · `scripts/test_review_route.py` ·
@@ -82,10 +86,13 @@ outputs 목록만 보고 옮기지 마라 — 초안이 그렇게 해서 3자리
 - 반환은 `decide(emails, head_ref, issue_risks, codex_on) -> dict`. **`risk` 는 인자가 아니라
   반환값**이다 — 현행이 `ISSUE_RISKS` 로 함수 안에서 계산한다.
 - 아래 넷은 초안이 틀렸던 자리다. 현행 코드로 각각 확인하고 그대로 옮겨라:
-  - 고위험 codex 는 **claude 저자**일 때다 (`:414-417`)
-  - 벤더 혼재 시 후보 소진으로 **`reviewer=none`** 이 될 수 있다 (`:419-424`)
-  - 커밋 신원이 없어도 **브랜치명 `fix-N-<model>`** 로 저자를 판별한다 (`:379-381`)
-  - 위험 미선언·이슈 없음은 **high** (fail-closed, `:404-408`)
+  - 고위험 codex 는 **claude 저자**일 때다
+  - 벤더 혼재 시 후보 소진으로 **`reviewer=none`** 이 될 수 있다
+  - 커밋 신원이 없어도 **브랜치명 `fix-N-<model>`** 로 저자를 판별한다
+  - 위험 미선언·이슈 없음은 **high** (fail-closed)
+  - **`identity_note` 의 모든 갈래를 옮겨라.** 판정 코멘트에 `주의: …` 로 실리는 사람 대상
+    신호다. 초안 구현이 두 갈래(브랜치명↔커밋신원 불일치 · 목록 밖 에이전트형 이메일 관측)를
+    빠뜨렸고, **차등 테스트의 대조 키에도 이 키가 없어 4,752조합을 돌리고도 못 잡았다**
 
 **검증**
 
@@ -104,10 +111,14 @@ outputs 목록만 보고 옮기지 마라 — 초안이 그렇게 해서 3자리
 
 ---
 
-## Task 2: 터미널 준비·접수 판정을 교체한다 (구 #11)
+## Task 2: 터미널 준비·접수 판정을 교체한다 (구 #11) — **완료 · PR #26 머지됨 (2026-08-08)**
 
-**읽어야 할 자리**: `cross-review.yml:1078-1130` — `term_cursor()` · `terminal_ready()` ·
-`wait_agent_ready()` · `send_review_prompt()`.
+> **이 task 는 끝났다.** PR #26 이 판정부를 `scripts/terminal_state.py` 로 꺼내고
+> `term_cursor()` 를 없앴다. 아래는 무엇을 왜 했는지의 기록이다 — 다시 하지 마라.
+
+**바뀐 자리**: `scripts/terminal_state.py` · `scripts/test_terminal_state.py` ·
+`scripts/fixtures/terminal_screens.json` 신설, `cross-review.yml` 의 `terminal_ready()` ·
+`wait_agent_ready()` · `send_review_prompt()` 가 그 판정부를 부른다.
 
 **문제**: 준비·접수를 `latestCursor` 성장으로 판정하는데, Claude Code TUI 는 화면을 제자리에서
 다시 그려 이 값이 **움직이지 않는다**. 유휴 30초·완주한 워커 모두 `1` 이었다. `now > base` 는
