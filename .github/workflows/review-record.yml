@@ -11,19 +11,25 @@
 #   적는 것뿐이라 결정론적이다 (판정부는 scripts/review_record.py 순수 함수 — 로컬에서 돈다).
 #
 # 보안 경계 (공개 레포 — 판정부가 지키고 test_review_record.py 가 공격 케이스로 못박는다):
-#   · 저자 필터: OWNER·MEMBER·COLLABORATOR 코멘트의 마커만 읽는다. 승인을 required 로 걸지
-#     않는 이 설계에서 유일한 위조 방어다 — head sha 는 공개 정보라 필터가 없으면 누구든
+#   · 저자 필터: OWNER·MEMBER·COLLABORATOR 코멘트, 그리고 이 레포 워크플로 자신의 게시분
+#     (`github-actions[bot]` — 로그인·봇 타입 둘 다 일치)의 마커만 읽는다. 승인을 required 로
+#     걸지 않는 이 설계에서 유일한 위조 방어다 — head sha 는 공개 정보라 필터가 없으면 누구든
 #     위조 마커로 봇 승인·자동 머지를 일으킨다
 #   · sha 는 40자 동등 비교 (접두사 매치 금지)
 #   · `source=manual` 마커는 기록만 되고 arm 하지 않는다 (#285 규약)
 #   · 봇 PR 은 제목의 상승 종류를 못 읽으면 arm 하지 않는다 (fail-closed)
 #
 # 자동 머지 arm 은 전부 참일 때만: ① required 게이트(`test: gate`) 초록 — 완료까지 재조회,
-#   상한 초과는 실패로 접는다 ② 봇 승인 리뷰의 commit_id == 현재 head ③ risk: low 또는
-#   저자가 봇이면서 major 상승이 아니다. 위험도의 SoT 는 이슈의 risk 라벨(fresh 조회)이고,
-#   이슈 연결은 PR 본문 파싱으로 읽는다 — `Refs #N` 도 위험도 출처다 (2026-08-09 리드 결정.
-#   closingIssuesReferences 는 closing 키워드만 잡아, 그것만 보면 위험도를 읽히려고 PR 마다
-#   전용 이슈를 만들게 된다).
+#   상한 초과는 실패로 접는다 ② 봇 승인 리뷰의 commit_id == 현재 head ③ 리뷰어 벤더 ≠ 저자
+#   벤더, 또는 같은 벤더여도 작성 티어를 안다 (cross-review 의 동일-벤더 자기리뷰 차단 승계 —
+#   신원을 못 읽으면 arm 하지 않는다. 어휘 밖 에이전트형 신원은 사람 저자가 아니라 판독
+#   불가로 접고, 티어 판독은 claude 신원에만 있다) ④ risk: low 또는 저자가 봇이면서 major
+#   상승이 아니다.
+#   위험도의 SoT 는 이슈의 risk 라벨(fresh 조회)이고, 이슈 연결은 PR 본문 파싱으로 읽는다 —
+#   `Refs #N` 도 위험도 출처다 (2026-08-09 리드 결정. closingIssuesReferences 는 closing
+#   키워드만 잡아, 그것만 보면 위험도를 읽히려고 PR 마다 전용 이슈를 만들게 된다).
+#   **`Refs #N` 의 N 은 PR 일 수 있다** — `issues/{N}` 은 PR 에도 응답하고 PR 의 risk 라벨은
+#   가시화 미러라 판정 입력이 아니다. PR 은 배제하고 배제한 번호를 로그에 남긴다.
 #
 # disarm 경로 (synchronize): arm 조건만 두면 「승인 → arm → push → 아무도 안 본 커밋이 머지」가
 #   뚫린다 (설계 §4). GitHub 은 쓰기 권한 없는 사람의 push 에만 auto-merge 를 해제하는데 우리
@@ -34,6 +40,8 @@
 #   GitHub 재귀 방지로 issue_comment 이벤트가 안 뜬다. 주 경로(Orca 리뷰어의 로컬 gh 게시,
 #   사람 코멘트)는 전부 사용자 발이라 문제없고, 폴백 게시분은 workflow_dispatch 로 PR 번호를
 #   주면 같은 판정을 다시 읽는다 (복구 경로 — 판정은 코멘트 전수 재조회라 멱등이다).
+#   그 복구 경로가 서려면 저자 필터가 봇 게시분을 읽어야 한다 — 위 「보안 경계」의 봇 축이
+#   그것이고, 없으면 폴백 판정은 이벤트가 아니라 판독에서 유실된다.
 #
 # 전제 (레포 설정): ① allow_auto_merge 켜짐 (2026-08-09 실측 true) ② Settings → Actions →
 #   General → "Allow GitHub Actions to create and approve pull requests" 켜짐 — 꺼져 있으면
@@ -118,7 +126,8 @@ jobs:
 
           # ── 1) 코멘트·리뷰 전수 수집 — 저자 필터·sha 대조는 판정부(순수 함수)가 건다 ──
           COMMENTS=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            | jq -s 'add // [] | map({body, author_association, html_url})')
+            | jq -s 'add // [] | map({body, author_association, html_url,
+                                      user_login: .user.login, user_type: .user.type})')
           REVIEWS=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
             | jq -s 'add // [] | map({user_login: .user.login, state, commit_id})')
           if [ -z "$COMMENTS" ] || [ -z "$REVIEWS" ]; then
@@ -142,7 +151,7 @@ jobs:
           # ── 2) 네이티브 리뷰 게시 — commit_id 를 마커 sha 로 고정한다 (게시와 head 이동이
           #      경합해도 리뷰가 판정 대상 커밋에 박힌다. arm 은 어차피 head 동등을 재검한다) ──
           if [ "$POST" = "true" ]; then
-            BODY=$(printf '독립 리뷰 판정 대행 기록 — 판정 코멘트의 기계 마커를 네이티브 리뷰로 옮겨 적었다.\n\n- 마커: model=%s verdict=%s sha=%s\n- 판정 코멘트: %s\n- 저자 필터: OWNER·MEMBER·COLLABORATOR 코멘트만 읽는다 (scripts/review_record.py)' \
+            BODY=$(printf '독립 리뷰 판정 대행 기록 — 판정 코멘트의 기계 마커를 네이티브 리뷰로 옮겨 적었다.\n\n- 마커: model=%s verdict=%s sha=%s\n- 판정 코멘트: %s\n- 저자 필터: OWNER·MEMBER·COLLABORATOR 코멘트 + github-actions[bot] 게시분만 읽는다 (scripts/review_record.py)\n\n이 기록은 판정 코멘트의 대행이다 — **자동 머지 arm 조건은 별도로 판정한다**(게이트 초록·승인 head 일치·자기리뷰 차단·위험도). 승인 리뷰가 있어도 arm 되지 않을 수 있고, 그 사유는 이 PR 의 review-record 잡 로그에 남는다.' \
               "$MODEL" "$VERDICT" "$MARKER_SHA" "${COMMENT_URL:-(URL 미상)}")
             if OUT=$(jq -n --arg c "$MARKER_SHA" --arg e "$EVENT" --arg b "$BODY" \
                   '{commit_id: $c, event: $e, body: $b}' \
@@ -157,7 +166,7 @@ jobs:
             echo "리뷰 게시 없음 — $(jq -r .reason <<<"$DECISION")"
           fi
 
-          # ── 3) 자동 머지 arm — 조건 ①②③ 전부 참일 때만 ─────────────────────────────
+          # ── 3) 자동 머지 arm — 조건 ①②③④ 전부 참일 때만 ─────────────────────────────
           if [ "$ARM_CANDIDATE" != "true" ]; then
             echo "arm 후보 아님 — 종료"
             exit 0
@@ -191,8 +200,8 @@ jobs:
             exit 0
           fi
 
-          # ②③ — 전부 fresh 조회로 판정한다 (게이트 대기 동안 push·라벨 변경이 있을 수 있다)
-          FRESH=$(gh pr view "$PR" --repo "$REPO" --json headRefOid,title,body,author)
+          # ②③④ — 전부 fresh 조회로 판정한다 (게이트 대기 동안 push·라벨 변경이 있을 수 있다)
+          FRESH=$(gh pr view "$PR" --repo "$REPO" --json headRefOid,title,body,author,headRefName)
           if [ -z "$FRESH" ]; then
             echo "::warning::arm 직전 PR 재조회 실패 — arm 하지 않는다 (fail-closed)"
             exit 0
@@ -201,24 +210,72 @@ jobs:
           REVIEWS_NOW=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
             | jq -s 'add // [] | map({user_login: .user.login, state, commit_id})')
 
-          # 위험도: PR 본문의 참조 이슈(Refs·Closes 류)에서 risk 라벨을 fresh 조회.
-          # 이슈 라벨 조회 실패는 빈 목록 = 미선언 = 사람 경로로 접힌다 (fail-closed)
-          RISKS='{}'
-          for N in $(jq -r '.body // ""' <<<"$FRESH" | jq -Rs '{body: .}' \
-                       | python3 scripts/review_record.py refs); do
-            LABELS=$(gh api "repos/$REPO/issues/$N/labels" --paginate \
-              | jq -s 'add // [] | map(.name)') || LABELS='[]'
-            RISKS=$(jq --arg n "$N" --argjson l "${LABELS:-[]}" '. + {($n): $l}' <<<"$RISKS")
+          # 판정 마커도 다시 읽는다 — 게이트 대기(최대 1200초) 중에 새 마커가 올 수 있고,
+          # 조건 ③ 은 마커의 model 로 자기리뷰를 판정한다. 낡은 벤더로 판정하지 않게 한다
+          COMMENTS_NOW=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            | jq -s 'add // [] | map({body, author_association, html_url,
+                                      user_login: .user.login, user_type: .user.type})')
+          DECISION_NOW=$(jq -n --arg head "$HEAD_NOW" --argjson comments "${COMMENTS_NOW:-[]}" \
+              --argjson reviews "${REVIEWS_NOW:-[]}" \
+              '{head_sha: $head, comments: $comments, existing_reviews: $reviews}' \
+            | python3 scripts/review_record.py record)
+          if [ -z "$DECISION_NOW" ]; then
+            echo "::warning::arm 직전 마커 재판정 실패 — arm 하지 않는다 (fail-closed)"
+            exit 0
+          fi
+          echo "arm 직전 마커 재판정: $DECISION_NOW"
+          MODEL_NOW=$(jq -r '.model // empty' <<<"$DECISION_NOW")
+          MARKER_SHA_NOW=$(jq -r '.marker_sha // empty' <<<"$DECISION_NOW")
+          VERDICT_NOW=$(jq -r '.verdict // empty' <<<"$DECISION_NOW")
+          MANUAL_NOW=$(jq -r '.manual' <<<"$DECISION_NOW")
+
+          # 위험도: PR 본문의 참조 이슈(Refs·Closes 류)를 fresh 조회한다. `issues/$N` 은 **PR 에도
+          # 응답**하므로 `.pull_request` 로 PR 여부를 함께 읽어 판정부에 넘긴다 — PR 의 risk 라벨은
+          # merge-router 가 붙인 가시화 미러라 판정 입력이 아니다. 조회 실패는 lookup_failed 로
+          # 실어 미선언 = 사람 경로로 접힌다 (fail-closed. 빈 목록으로 흡수하면 실패가 low 에 묻힌다)
+          # 산문 참조와 「코드·인용에서 버린 후보」를 한 번에 받는다 — 버린 후보는 위험도를
+          # **올리는 쪽으로만** 쓴다(그냥 버리면 고위험 참조가 접히고 저위험만 남아 위험도가
+          # 내려간다). 한 호출이라 한쪽만 실패해 조용히 빈 목록이 되는 경로가 없다
+          SCAN=$(jq -r '.body // ""' <<<"$FRESH" | jq -Rs '{body: .}' \
+            | python3 scripts/review_record.py scan-refs)
+          if [ -z "$SCAN" ]; then
+            echo "::warning::참조 판독 실패 — arm 하지 않는다 (fail-closed)"
+            exit 0
+          fi
+          DROPPED=$(jq -c .dropped <<<"$SCAN")
+          REFS='[]'
+          for N in $(jq -r '.refs[]' <<<"$SCAN"); do
+            META=$(gh api "repos/$REPO/issues/$N" \
+              --jq '{number, is_pr: (.pull_request != null), labels: [.labels[].name]}') \
+              || META=""
+            [ -n "$META" ] || META=$(jq -n --argjson n "$N" '{number: $n, lookup_failed: true}')
+            REFS=$(jq --argjson m "$META" '. + [$m]' <<<"$REFS")
           done
 
-          ARM=$(jq -n --arg head "$HEAD_NOW" --arg marker "$MARKER_SHA" \
-              --argjson fresh "$FRESH" --argjson reviews "${REVIEWS_NOW:-[]}" --argjson risks "$RISKS" \
-              '{head_sha: $head, marker_sha: $marker, verdict: "merge_ok", manual: false,
+          # 저자 신원(조건 ③) — 커밋 author 이메일이 1순위, 브랜치명이 2순위다 (review_route 가
+          # 형식의 SoT). 조회 실패는 빈 목록이고 판정부가 arm 을 거부한다 (fail-closed)
+          EMAILS=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate \
+            --jq '.[].commit.author.email' | jq -Rs 'split("\n") | map(select(length > 0))')
+
+          ARM=$(jq -n --arg head "$HEAD_NOW" --arg marker "$MARKER_SHA_NOW" --arg model "$MODEL_NOW" \
+              --arg verdict "$VERDICT_NOW" --argjson manual "${MANUAL_NOW:-true}" \
+              --argjson fresh "$FRESH" --argjson reviews "${REVIEWS_NOW:-[]}" \
+              --argjson refs "$REFS" --argjson dropped "${DROPPED:-[]}" \
+              --argjson emails "${EMAILS:-[]}" \
+              '{head_sha: $head, marker_sha: $marker, marker_model: $model,
+                verdict: $verdict, manual: $manual,
                 reviews: $reviews, pr_author_login: $fresh.author.login,
                 pr_author_is_bot: ($fresh.author.is_bot // false),
-                pr_title: $fresh.title, issue_risks: $risks}' \
+                pr_title: $fresh.title, head_ref: $fresh.headRefName,
+                issue_refs: $refs, dropped_refs: $dropped,
+                commit_author_emails: $emails}' \
             | python3 scripts/review_record.py arm)
           echo "arm 판정: $ARM"
+          if [ -z "$ARM" ]; then
+            echo "::warning::arm 판정부가 출력을 내지 못했다 — arm 하지 않는다 (fail-closed)"
+            exit 0
+          fi
+          echo "위험도 근거: $(jq -r .risk_evidence <<<"$ARM") · PR 이라 제외한 참조: $(jq -r '.excluded_pr_refs | if length == 0 then "없음" else map("#\(.)") | join(",") end' <<<"$ARM")"
           if [ "$(jq -r .arm <<<"$ARM")" != "true" ]; then
             echo "arm 하지 않는다 — $(jq -r .reason <<<"$ARM")"
             exit 0
@@ -233,7 +290,7 @@ jobs:
           esac
 
           # arm 시도 → required 가 이미 전부 초록이라 PR 이 CLEAN 이면 GitHub 이 arm 을
-          # 거부한다("clean status" — 기다릴 것이 없으면 arm 이 성립하지 않는다). 조건 ①②③ 을
+          # 거부한다("clean status" — 기다릴 것이 없으면 arm 이 성립하지 않는다). 조건 ①②③④ 를
           # 이미 검증했으므로 직접 머지한다 (merge-router 의 검증된 폴백 승계)
           if ARM_OUT=$(gh pr merge "$PR" --repo "$REPO" --auto --"$METHOD" 2>&1); then
             echo "자동 머지 arm 완료 (방식: $METHOD · $(jq -r .reason <<<"$ARM"))"

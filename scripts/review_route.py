@@ -103,7 +103,11 @@ def _identity_note(
     return "; ".join(parts)
 
 
-def decide(emails, head_ref, issue_risks, codex_on):
+def identify_author(emails, head_ref):
+    """커밋 author 이메일·브랜치명으로 저자 신원을 판별한다 — 신원 형식 판독의 단일 자리.
+
+    `review_record` 의 자기리뷰 차단(동일-벤더 + 티어 미상 → arm 거부)도 이것을 부른다.
+    """
     vendors, claude_tiers_seen, unknown_agentish = set(), set(), []
     for raw in emails:
         m = _IDENTITY.match(raw)
@@ -141,8 +145,31 @@ def decide(emails, head_ref, issue_risks, codex_on):
     else:
         author_kind, author_vendor, identity_source = "human", None, "none"
 
-    # 저자 표기 — 혼재는 벤더 목록, 브랜치명 단독 판별은 그 벤더 (커밋 신원이 없다)
-    author_models = ",".join(sorted(vendors)) or (author_vendor or "")
+    return {
+        "author_kind": author_kind,
+        "author_vendor": author_vendor,
+        # 저자 표기 — 혼재는 벤더 목록, 브랜치명 단독 판별은 그 벤더 (커밋 신원이 없다)
+        "author_models": ",".join(sorted(vendors)) or (author_vendor or ""),
+        "author_tier": author_tier,
+        "identity_source": identity_source,
+        "branch_vendor": branch_vendor,
+        "unknown_agentish": unknown_agentish,
+        "claude_tiers_seen": sorted(claude_tiers_seen),
+        "vendors": sorted(vendors),
+    }
+
+
+def decide(emails, head_ref, issue_risks, codex_on):
+    identity = identify_author(emails, head_ref)
+    author_kind = identity["author_kind"]
+    author_vendor = identity["author_vendor"]
+    author_models = identity["author_models"]
+    author_tier = identity["author_tier"]
+    identity_source = identity["identity_source"]
+    branch_vendor = identity["branch_vendor"]
+    unknown_agentish = identity["unknown_agentish"]
+    claude_tiers_seen = identity["claude_tiers_seen"]
+    vendors = identity["vendors"]
 
     risk, risk_source = _read_risk(issue_risks)
 
