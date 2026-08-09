@@ -860,8 +860,11 @@ def main() -> int:
         if got != want:
             failures.append(f"scan_refs: {desc}: 기대 {want!r} ≠ 실제 {got!r}")
 
-    # 불변식: 좁히기 전(본문 전체 탐욕 판독)이 보던 번호는 하나도 사라지지 않는다 —
-    # refs 로 남거나 dropped 로 남는다. 마크다운 판별이 어디서 틀리든 위험도는 안 내려간다.
+    # 불변식 두 항의 성질이 다르다:
+    #   · 첫 항(missing)은 `dropped := 탐욕 − 산문` 정의상 **항상 참**이다. 검사가 아니라
+    #     리팩터 가드다 — `dropped` 를 다시 「버린 줄에서 긁는」 방식으로 되돌리면 빨개진다.
+    #   · 둘째 항(invented)이 실제 검사다. 좁힘이 **없던 참조를 만들어 내는** 방향은 차집합이
+    #     정의상 못 잡으므로 여기서만 걸린다 (버린 자리 표시가 빠지면 빨개진다).
     for desc, body, *_ in REFS_CASES + DROPPED_CASES:
         total += 1
         got = rr.scan_refs(body)

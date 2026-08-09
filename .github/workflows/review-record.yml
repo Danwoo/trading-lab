@@ -151,7 +151,7 @@ jobs:
           # ── 2) 네이티브 리뷰 게시 — commit_id 를 마커 sha 로 고정한다 (게시와 head 이동이
           #      경합해도 리뷰가 판정 대상 커밋에 박힌다. arm 은 어차피 head 동등을 재검한다) ──
           if [ "$POST" = "true" ]; then
-            BODY=$(printf '독립 리뷰 판정 대행 기록 — 판정 코멘트의 기계 마커를 네이티브 리뷰로 옮겨 적었다.\n\n- 마커: model=%s verdict=%s sha=%s\n- 판정 코멘트: %s\n- 저자 필터: OWNER·MEMBER·COLLABORATOR 코멘트 + github-actions[bot] 게시분만 읽는다 (scripts/review_record.py)' \
+            BODY=$(printf '독립 리뷰 판정 대행 기록 — 판정 코멘트의 기계 마커를 네이티브 리뷰로 옮겨 적었다.\n\n- 마커: model=%s verdict=%s sha=%s\n- 판정 코멘트: %s\n- 저자 필터: OWNER·MEMBER·COLLABORATOR 코멘트 + github-actions[bot] 게시분만 읽는다 (scripts/review_record.py)\n\n이 기록은 판정 코멘트의 대행이다 — **자동 머지 arm 조건은 별도로 판정한다**(게이트 초록·승인 head 일치·자기리뷰 차단·위험도). 승인 리뷰가 있어도 arm 되지 않을 수 있고, 그 사유는 이 PR 의 review-record 잡 로그에 남는다.' \
               "$MODEL" "$VERDICT" "$MARKER_SHA" "${COMMENT_URL:-(URL 미상)}")
             if OUT=$(jq -n --arg c "$MARKER_SHA" --arg e "$EVENT" --arg b "$BODY" \
                   '{commit_id: $c, event: $e, body: $b}' \
