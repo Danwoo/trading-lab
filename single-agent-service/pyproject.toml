@@ -22,8 +22,8 @@ dependencies = [
     "httpx~=0.28.1",
     "uvicorn[standard]~=0.47.0",
     "fastapi~=0.136.1",
-    "pydantic-settings~=2.14.1",
-    "pyjwt~=2.12.1",
+    "pydantic-settings~=2.14.2",
+    "pyjwt~=2.13.0",
     # 공통 core 템플릿 의존 (exception_handler 가 sqlalchemy 예외 매핑)
     "sqlalchemy~=2.0.49",
 ]

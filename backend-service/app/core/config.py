@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
     # 시세 소스에 우리를 밝히는 연락처 문자열 — **비밀값이 아니다.** SEC 는 API 키 대신
     # "연락처가 담긴 User-Agent"를 요구하고(전자공시 접근 정책), 이메일이 없는 UA 는 403 으로
-    # 거절한다(실측). 예: "fintech-ai-platform/1.0 (contact: you@example.com)". 비면 SEC
+    # 거절한다(실측). 예: "trading-lab/1.0 (contact: you@example.com)". 비면 SEC
     # 어댑터가 capability 에 "연락처 미설정" 사유를 실어 스스로 막는다.
     MARKET_DATA_CONTACT: str = ""
 

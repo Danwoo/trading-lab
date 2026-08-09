@@ -6,18 +6,25 @@
 
 **2026-08-04 갱신(#391 D3, O8-3/#341 이관 반영)** — radix-ui 이관 커널이 신규 프로덕션 패키지 73종(`@radix-ui/*` 60 + `radix-ui` 1 + `@floating-ui/*` 4 + `aria-hidden`·`detect-node-es`·`get-nonce`·`react-remove-scroll`·`react-remove-scroll-bar`·`react-style-singleton`·`use-callback-ref`·`use-sidecar` 8)을 들여와 550→623개로 늘었다. 아래 재현 명령의 실제 출력을 `main` 대비 `frontend/package-lock.json` diff(신규 76 항목 − 버전만 오른 기존 패키지 3 종 `axios`·`form-data`·`hasown` = 순증 73)와 대조해 신규분을 확정했다. **73종 전수를 `licenses-prod.json` 에서 개별 확인 — 전부 `MIT`, `licenseFile` 실재(파일 없음 0건).** 아래 §2 표에 반영했다.
 
-생성 명령(재현 가능, 이 목록은 손으로 옮기지 않고 아래 명령의 실제 출력에서 뽑았다):
+생성 명령(재현 가능 — §1·§2 의 목록은 이 명령의 실제 출력에서 생성기가 만든다):
 
 ```bash
 cd frontend && npm ci --ignore-scripts
 npx --yes license-checker-rseidelsohn --production --excludePrivatePackages --json --out /tmp/licenses-prod.json
 ```
 
-**이 문서의 숫자는 CI 가 매번 대조한다 (#365).** `scripts/verify_notice_counts.py` 가 위 명령을
-다시 돌려 **이 문서가 열거한 `이름@버전` 집합과 실측 집합을 양방향으로** 맞춰 보고, 절 머리의
-선언 개수·§3 의 폰트 파일 수까지 함께 본다 (`test: frontend` 잡). 개수만 맞추면 「하나 빠지고
-하나 더 들어온」 상태가 통과하므로 집합으로 본다. 그래서 **숫자를 손으로 고치는 것으로는
-초록이 되지 않는다** — 의존성이 바뀌면 위 명령의 새 출력을 정본으로 삼아 목록째 갱신해야 한다.
+**§1·§2 의 개수·목록·라이선스 원문은 손으로 세지 않는다.** 의존성이 바뀌면
+`python3 scripts/generate_notices.py` 를 돌려 다시 만들어 커밋한다. 어디까지가 생성기 소관이고
+어디부터가 사람이 쓴 산문인지(라이선스 **분류** 판단·각 절의 설명·§3 전체)는 그 스크립트의 머리
+주석이 경계로 적어 두었다 — 분류표에 없는 라이선스가 새로 들어오면 생성기는 그것을 §2
+permissive 로 흘려보내지 않고 멈춘다(사람이 판단할 자리다).
+
+**그리고 CI 가 매번 두 겹으로 대조한다 (#365, `test: frontend` 잡).**
+`scripts/generate_notices.py --check` 는 「생성기 출력 = 커밋된 문서」를 보고,
+`scripts/verify_notice_counts.py` 는 생성기 출력을 믿지 않고 **문서를 다시 파싱해** 「문서가
+열거한 `이름@버전` 집합 = 실측 집합」을 양방향으로 본다(절 머리의 선언 개수·§3 의 폰트 파일
+수까지 함께). 개수만 맞추면 「하나 빠지고 하나 더 들어온」 상태가 통과하므로 집합으로 본다 —
+**숫자를 손으로 고치는 것으로는 초록이 되지 않는다.**
 
 ---
 
@@ -2913,8 +2920,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@radix-ui/react-collection` | 1.1.15 | MIT |
 | `@radix-ui/react-compose-refs` | 1.1.2 | MIT |
 | `@radix-ui/react-compose-refs` | 1.1.5 | MIT |
-| `@radix-ui/react-context` | 1.2.2 | MIT |
 | `@radix-ui/react-context-menu` | 2.3.7 | MIT |
+| `@radix-ui/react-context` | 1.2.2 | MIT |
 | `@radix-ui/react-dialog` | 1.1.23 | MIT |
 | `@radix-ui/react-direction` | 1.1.4 | MIT |
 | `@radix-ui/react-dismissable-layer` | 1.1.19 | MIT |
@@ -2934,8 +2941,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@radix-ui/react-popper` | 1.3.7 | MIT |
 | `@radix-ui/react-portal` | 1.1.17 | MIT |
 | `@radix-ui/react-presence` | 1.1.10 | MIT |
-| `@radix-ui/react-primitive` | 2.1.3 | MIT |
 | `@radix-ui/react-primitive` | 2.1.10 | MIT |
+| `@radix-ui/react-primitive` | 2.1.3 | MIT |
 | `@radix-ui/react-progress` | 1.1.16 | MIT |
 | `@radix-ui/react-radio-group` | 1.4.7 | MIT |
 | `@radix-ui/react-roving-focus` | 1.1.19 | MIT |
@@ -2948,9 +2955,9 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@radix-ui/react-switch` | 1.3.7 | MIT |
 | `@radix-ui/react-tabs` | 1.1.21 | MIT |
 | `@radix-ui/react-toast` | 1.2.23 | MIT |
+| `@radix-ui/react-toggle-group` | 1.1.19 | MIT |
 | `@radix-ui/react-toggle` | 1.1.10 | MIT |
 | `@radix-ui/react-toggle` | 1.1.18 | MIT |
-| `@radix-ui/react-toggle-group` | 1.1.19 | MIT |
 | `@radix-ui/react-toolbar` | 1.1.19 | MIT |
 | `@radix-ui/react-tooltip` | 1.2.16 | MIT |
 | `@radix-ui/react-use-callback-ref` | 1.1.4 | MIT |
@@ -3125,7 +3132,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `hast-util-to-text` | 4.0.2 | MIT |
 | `hast-util-whitespace` | 3.0.0 | MIT |
 | `hastscript` | 9.0.1 | MIT |
-| `hono` | 4.12.18 | MIT |
+| `hono` | 4.13.1 | MIT |
 | `html-encoding-sniffer` | 6.0.0 | MIT |
 | `html-url-attributes` | 3.0.1 | MIT |
 | `http-status-codes` | 2.3.0 | MIT |
@@ -3288,8 +3295,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `react-icons` | 5.6.0 | MIT |
 | `react-is` | 16.13.1 | MIT |
 | `react-markdown` | 10.1.0 | MIT |
-| `react-remove-scroll` | 2.7.2 | MIT |
 | `react-remove-scroll-bar` | 2.3.8 | MIT |
+| `react-remove-scroll` | 2.7.2 | MIT |
 | `react-resizable-panels` | 4.12.2 | MIT |
 | `react-resizable` | 3.2.0 | MIT |
 | `react-style-singleton` | 2.2.3 | MIT |
@@ -3497,7 +3504,7 @@ SOFTWARE.
 아래 「히스토리 노출면」에서 따로 다룬다.
 
 같은 조사에서 함께 확인한 npm 미경유 자산 4개는 출처 메타데이터(PNG 텍스트 청크·EXIF)가 비어 있어
-제3자 자산인지 자체 제작물인지 이 저장소 안에서는 판단할 근거가 없었다. MIT 공개 배포(#287)를
+제3자 자산인지 자체 제작물인지 저장소 안에서는 판단할 근거가 없었다. MIT 공개 배포(#287)를
 앞두고 재배포 가능 여부를 확인할 수 없어, 확인 대신 교체했다.
 
 | 파일 | 이전 상태 | 처리 | 방식 |
@@ -3554,11 +3561,16 @@ Copyright (c) 2006 by Tavmjong Bah. All Rights Reserved.
 옮긴 것이고, 라이선스 **전문**은 네트워크 없이 확인할 수 없어 옮기지 않았다(Pretendard 절과
 달리 원문 파일이 저장소 안에 없다).
 
-### 히스토리 노출면 — git 히스토리에 남아 있는 자산 (2026-08-04 결정, #360)
+### 히스토리 노출면 — 옛 개발 레포 히스토리에 남아 있는 자산 (2026-08-04 결정, #360)
+
+> **이 저장소에는 아래 4개 blob 이 없다.** 이사(2026-08-07)로 이 공개 레포는 옛 개발 레포의
+> 히스토리를 한 커밋도 싣지 않은 채 시작했다 — `git log --all -- frontend/public/bg1.png` 이
+> 이 저장소에서 0건이다. 이 절은 **왜 그렇게 시작했는지와 무엇이 다시 들어오면 안 되는지**의
+> 기록이며, 아래 명령·출력은 **옛 개발 레포에서** 잰 것이다.
 
 **위 표의 「처리 완료」는 작업 트리 기준이다** — 현재 체크아웃되는 파일에 제3자 자산이 없다는
-뜻이지, 이 저장소를 통째로 넘겨도 안전하다는 뜻이 아니다. 파일을 작업 트리에서 지워도
-**git 히스토리에는 사본이 남고**, 아래 4개 blob 은 지금도 이 개발 저장소 히스토리에 살아 있다:
+뜻이지, 저장소를 통째로 넘겨도 안전하다는 뜻이 아니다. 파일을 작업 트리에서 지워도
+**git 히스토리에는 사본이 남고**, 아래 4개 blob 은 옛 개발 저장소 히스토리에 살아 있었다:
 
 ```
 $ git log --all --oneline -- frontend/public/bg1.png
@@ -3574,12 +3586,12 @@ $ git cat-file -s 659c2a410c20e4ab88795c690bb8fd2cbe607e42
 열린 PR·클론·이슈의 커밋 참조가 전부 깨지고, 아래 「남는 노출면」대로 GitHub 의 `refs/pull/*`
 는 그렇게 해도 닫히지 않는다.
 
-대신 **공개본은 이 저장소의 히스토리를 한 커밋도 싣지 않는다.** 내보내기는
-`scripts/release_public.py` 의 `git archive <커밋>` 한 갈래뿐이고(그 명령은 트리만 tar 로 뱉는다),
+대신 **이 공개본은 옛 개발 레포의 히스토리를 한 커밋도 싣지 않았다.** 내보내기는
+`scripts/release_public.py` 의 `git archive <커밋>` 한 갈래뿐이었고(그 명령은 트리만 tar 로 뱉는다),
 내보낸 트리는 `scripts/verify_public_release_tree.py` 가 **아래 4개 blob 의 재유입을 해시로
-차단**한 뒤에야 나간다. 즉 이 저장소는 **보관용으로 비공개로 남고**, 공개 레포는 히스토리 없는
-스냅샷에서 시작한다 — 그 뒤의 개발은 공개 레포에서 이어지고(리드 결정 2026-08-07), 같은 게이트가
-거기서 **매 PR 마다** 이 4개 blob 의 재유입을 계속 막는다.
+차단**한 뒤에야 나갔다. 즉 옛 개발 저장소는 **보관용으로 비공개로 남았고**, 이 공개 레포는
+히스토리 없는 스냅샷에서 시작했다 — 그 뒤의 개발은 여기서 이어지며(리드 결정 2026-08-07), 같은
+게이트가 **매 PR 마다** 이 4개 blob 의 재유입을 계속 막는다.
 
 아래 표는 그래서 **「제거했다」가 아니라 「공개본에 실리면 안 되는 것」의 목록**이다 —
 `verify_public_release_tree.py` 의 `DENYLIST_BLOBS` 와 같은 4건이다.

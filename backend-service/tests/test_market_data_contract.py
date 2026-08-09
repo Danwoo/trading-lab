@@ -1,4 +1,4 @@
-"""#243 — 시세 계층의 계약 불변식 검증 (키 0개 상태에서 도는 것).
+"""#2 — 시세 계층의 계약 불변식 검증 (키 0개 상태에서 도는 것).
 
 이 레포는 아직 pytest 를 도입하지 않았으므로(전 서비스 공통) standalone 실행형으로 작성한다:
     cd backend-service && uv run python tests/test_market_data_contract.py

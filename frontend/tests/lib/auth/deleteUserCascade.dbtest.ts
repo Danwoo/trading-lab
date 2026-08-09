@@ -407,9 +407,9 @@ describe("deleteUserCascade — FK 가 없어 조용히 남던 축 (#363)", () =
     // 워크스페이스 축(`workspace_id` 대조) 밖의 축이다 — 공용 워크스페이스만 쓰던 사용자의 행은
     // 워크스페이스 축 삭제로 하나도 안 지워지므로, 식별자 컬럼을 원천으로 따로 대조해야 한다.
     // `th_email_log.to` 가 정확히 이 사각지대에 있었다 (#363 리드 결정으로 삭제 목록에 편입).
-    // `ba_verification.identifier` 도 같은 자리였다 (#414 리드 결정으로 편입).
+    // `ba_verification.identifier` 도 같은 자리였다 (#3 리드 결정으로 편입).
     // 감사 컬럼(`reg_id`·`mod_id`)은 이 대조의 대상이 아니다 — 행의 주체가 아니라 조작한 사람을
-    // 적는 자리라 삭제 여부가 별개 판단이다 (#414 ㉡ 로 실측만 하고 정책은 리드 대기).
+    // 적는 자리라 삭제 여부가 별개 판단이다 (#3 ㉡ 로 실측만 하고 정책은 리드 대기).
     const rows = await prisma.$queryRaw<{ table_schema: string; table_name: string; column_name: string }[]>`
       SELECT c.table_schema, c.table_name, c.column_name
       FROM information_schema.columns c
@@ -421,7 +421,7 @@ describe("deleteUserCascade — FK 가 없어 조용히 남던 축 (#363)", () =
     `;
     const found = [...new Set(rows.map((r) => `${r.table_schema}.${r.table_name}`))].sort();
     // 통과가 "위반 없음"인지 "아무것도 안 봤음"인지 읽는 사람이 구분할 수 있게 검사한 수를 남긴다.
-    console.log(`[#414] 식별자 컬럼 대조: 테이블 ${found.length}개 / 컬럼 ${rows.length}개 검사`);
+    console.log(`[#3] 식별자 컬럼 대조: 테이블 ${found.length}개 / 컬럼 ${rows.length}개 검사`);
     // 대상 DB 에 스키마가 안 세워졌으면 이 검사는 아무것도 안 본 것이다 — 통과시키지 않는다.
     expect(found.length).toBeGreaterThan(0);
     expect(rows.length).toBeGreaterThan(0);
@@ -553,7 +553,7 @@ describe("deleteUserCascade — FK 가 없어 조용히 남던 축 (#363)", () =
   });
 });
 
-describe("deleteUserCascade — 인증 토큰(ba_verification)도 사용자 축에서 지운다 (#414 리드 결정)", () => {
+describe("deleteUserCascade — 인증 토큰(ba_verification)도 사용자 축에서 지운다 (#3 리드 결정)", () => {
   /** Better Auth 가 저장하는 모양 그대로 — `verification.storeIdentifier: "hashed"`(auth.ts) 의 기본 해시. */
   const hashedIdentifier = (raw: string) => createHash("sha256").update(raw).digest("base64url");
 
