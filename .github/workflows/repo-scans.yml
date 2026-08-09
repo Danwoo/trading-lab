@@ -102,6 +102,50 @@ jobs:
       - name: CI 배선 대조 (검증 단위 전수 ↔ 워크플로 실행 목록)
         run: python3 scripts/verify_ci_check_coverage.py
 
+  # ── 저자 신원 그물 — 「누가 썼는지 모르는 PR」을 막는다 (#23 Task 9) ──────────
+  # 에이전트 워크트리가 `git config --worktree user.email` 을 빠뜨리면 커밋이 리드 신원으로
+  # 찍히고, squash 뒤 main 에는 사람이 쓴 것으로 남는다. 판정부는 순수 함수
+  # (`scripts/pr_authorship.py`)이고 여기서는 PR 커밋을 모아 넘기기만 한다.
+  # **PR 이벤트에서만 돈다** — main push 에는 대조할 브랜치 선언이 없다. 건너뛴 잡도
+  # `skipped` 체크런을 남기고 게이트가 그것을 통과로 세므로 `test: gate` 는 흔들리지 않는다.
+  authorship:
+    name: "test: authorship"
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: PR 커밋 저자 신원 ↔ 브랜치 선언 대조 (fail-closed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          # 브랜치명·로그인은 데이터로만 다룬다 — 셸 보간에 넣지 않는다
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          IS_BOT: ${{ github.event.pull_request.user.type == 'Bot' }}
+        run: |
+          set -uo pipefail
+          set +e
+          # 조회 실패를 빈 목록으로 흡수하지 않는다 — 판정부의 R0 이 그것을 위반으로 잡아야
+          # 하므로 실패는 `null` 로 넘겨 「읽지 못했다」를 그대로 전달한다
+          COMMITS=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate \
+            --jq '.[] | {sha, author_email: .commit.author.email, author_name: .commit.author.name}' \
+            | jq -s '.') || COMMITS=""
+          jq -n --arg ref "$HEAD_REF" --argjson bot "$IS_BOT" \
+                --argjson commits "${COMMITS:-null}" \
+                '{head_ref: $ref, pr_author_is_bot: $bot, commits: $commits}' \
+            | python3 scripts/pr_authorship.py
+          RC=$?
+          if [ "$RC" -ne 0 ]; then
+            echo "::error::PR 의 커밋 저자 신원을 읽을 수 없거나 브랜치 선언과 어긋난다 — 위 사유를 보고 디스패치의 §6.1 신원 설정(git config --worktree user.email)을 확인하라"
+          fi
+          exit "$RC"
+
   # ── stdlib 전용 전수 스캔 ────────────────────────────────────────────────
   repo-scan:
     name: "test: repo-scan"
@@ -196,6 +240,16 @@ jobs:
       # 위조 표면(비-멤버 마커·접두 sha·낡은 sha·source=manual·major 봇 PR·제목 파싱 실패)이
       # 봇 승인·자동 머지 arm 으로 이어지지 않는지를 공격 케이스로 못박는다.
       # 케이스를 0건 모으면 실패한다 (fail-closed).
+      - name: 저자 신원 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_pr_authorship.py
+
+      # 머지 본문 재현이 실물과 어긋나면 `--body-file` 이 커밋 메시지와 Co-authored-by 를
+      # 지운다. 픽스처는 머지된 PR 의 실제 본문이다 (`fixtures/squash_bodies.json`).
+      - name: 머지 provenance 판정·본문 재현 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_merge_provenance.py
+
       - name: 리뷰 기록기 판정 검사
         if: ${{ !cancelled() }}
         run: python3 scripts/test_review_record.py

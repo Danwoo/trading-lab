@@ -1,7 +1,7 @@
 # review-record — 판정 코멘트를 GitHub 네이티브 PR 리뷰로 옮겨 적는 기록기 (#23 Task 7)
 #
 # 무엇: 리뷰어(Orca 워커 또는 사람)가 남긴 판정 코멘트의 기계 마커
-#   (`<!-- cross-review v1 model=… verdict=… sha=… -->`)를 읽어 `github-actions[bot]` 명의의
+#   (`<!-- cross-review v1 model=… [tier=…] verdict=… sha=… -->`)를 읽어 `github-actions[bot]` 명의의
 #   네이티브 리뷰로 대행한다 — merge_ok → Approve, needs_changes → Request changes.
 #   이어서 자동 머지 arm 조건(설계 §4)을 판정해 arm 하고, push(synchronize)가 오면 disarm 한다.
 #
@@ -21,9 +21,11 @@
 #
 # 자동 머지 arm 은 전부 참일 때만: ① required 게이트(`test: gate`) 초록 — 완료까지 재조회,
 #   상한 초과는 실패로 접는다 ② 봇 승인 리뷰의 commit_id == 현재 head ③ 리뷰어 벤더 ≠ 저자
-#   벤더, 또는 같은 벤더여도 작성 티어를 안다 (cross-review 의 동일-벤더 자기리뷰 차단 승계 —
-#   신원을 못 읽으면 arm 하지 않는다. 어휘 밖 에이전트형 신원은 사람 저자가 아니라 판독
-#   불가로 접고, 티어 판독은 claude 신원에만 있다) ④ risk: low 또는 저자가 봇이면서 major
+#   벤더, 또는 같은 벤더이면서 **작성 티어와 리뷰어 티어를 둘 다 알고 서로 다르다**
+#   (cross-review 의 동일-벤더 자기리뷰 차단 승계 — 신원을 못 읽으면 arm 하지 않는다. 어휘 밖
+#   에이전트형 신원은 사람 저자가 아니라 판독 불가로 접고, 티어 판독은 claude 신원에만 있다.
+#   리뷰어 티어는 마커의 `tier=` 로 오는데 그 값은 리뷰어의 자기 보고가 아니라 cross-review 가
+#   기동 배너에서 읽은 관측값이다 — #23 Task 9) ④ risk: low 또는 저자가 봇이면서 major
 #   상승이 아니다.
 #   위험도의 SoT 는 이슈의 risk 라벨(fresh 조회)이고, 이슈 연결은 PR 본문 파싱으로 읽는다 —
 #   `Refs #N` 도 위험도 출처다 (2026-08-09 리드 결정. closingIssuesReferences 는 closing
@@ -151,8 +153,9 @@ jobs:
           # ── 2) 네이티브 리뷰 게시 — commit_id 를 마커 sha 로 고정한다 (게시와 head 이동이
           #      경합해도 리뷰가 판정 대상 커밋에 박힌다. arm 은 어차피 head 동등을 재검한다) ──
           if [ "$POST" = "true" ]; then
-            BODY=$(printf '독립 리뷰 판정 대행 기록 — 판정 코멘트의 기계 마커를 네이티브 리뷰로 옮겨 적었다.\n\n- 마커: model=%s verdict=%s sha=%s\n- 판정 코멘트: %s\n- 저자 필터: OWNER·MEMBER·COLLABORATOR 코멘트 + github-actions[bot] 게시분만 읽는다 (scripts/review_record.py)\n\n이 기록은 판정 코멘트의 대행이다 — **자동 머지 arm 조건은 별도로 판정한다**(게이트 초록·승인 head 일치·자기리뷰 차단·위험도). 승인 리뷰가 있어도 arm 되지 않을 수 있고, 그 사유는 이 PR 의 review-record 잡 로그에 남는다.' \
-              "$MODEL" "$VERDICT" "$MARKER_SHA" "${COMMENT_URL:-(URL 미상)}")
+            TIER=$(jq -r '.tier // empty' <<<"$DECISION")
+            BODY=$(printf '독립 리뷰 판정 대행 기록 — 판정 코멘트의 기계 마커를 네이티브 리뷰로 옮겨 적었다.\n\n- 마커: model=%s tier=%s verdict=%s sha=%s\n- 판정 코멘트: %s\n- 저자 필터: OWNER·MEMBER·COLLABORATOR 코멘트 + github-actions[bot] 게시분만 읽는다 (scripts/review_record.py)\n\n이 기록은 판정 코멘트의 대행이다 — **자동 머지 arm 조건은 별도로 판정한다**(게이트 초록·승인 head 일치·자기리뷰 차단·위험도). 승인 리뷰가 있어도 arm 되지 않을 수 있고, 그 사유는 이 PR 의 review-record 잡 로그에 남는다.' \
+              "$MODEL" "${TIER:-미상}" "$VERDICT" "$MARKER_SHA" "${COMMENT_URL:-(URL 미상)}")
             if OUT=$(jq -n --arg c "$MARKER_SHA" --arg e "$EVENT" --arg b "$BODY" \
                   '{commit_id: $c, event: $e, body: $b}' \
                 | gh api -X POST "repos/$REPO/pulls/$PR/reviews" --input - 2>&1); then
@@ -225,6 +228,9 @@ jobs:
           fi
           echo "arm 직전 마커 재판정: $DECISION_NOW"
           MODEL_NOW=$(jq -r '.model // empty' <<<"$DECISION_NOW")
+          # 리뷰어 티어 — 마커의 `tier=`(어휘 대조를 통과한 것만). 없으면 빈 값 = 미상이고
+          # 동일-벤더 리뷰면 조건 ③ 이 그것으로 arm 을 막는다 (#23 Task 9)
+          TIER_NOW=$(jq -r '.tier // empty' <<<"$DECISION_NOW")
           MARKER_SHA_NOW=$(jq -r '.marker_sha // empty' <<<"$DECISION_NOW")
           VERDICT_NOW=$(jq -r '.verdict // empty' <<<"$DECISION_NOW")
           MANUAL_NOW=$(jq -r '.manual' <<<"$DECISION_NOW")
@@ -252,17 +258,22 @@ jobs:
             REFS=$(jq --argjson m "$META" '. + [$m]' <<<"$REFS")
           done
 
-          # 저자 신원(조건 ③) — 커밋 author 이메일이 1순위, 브랜치명이 2순위다 (review_route 가
-          # 형식의 SoT). 조회 실패는 빈 목록이고 판정부가 arm 을 거부한다 (fail-closed)
-          EMAILS=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate \
-            --jq '.[].commit.author.email' | jq -Rs 'split("\n") | map(select(length > 0))')
+          # 커밋 — 저자 신원(조건 ③)과 머지 커밋 본문 재현에 **같은 조회**를 쓴다. 신원 형식의
+          # SoT 는 review_route 이고, 조회 실패는 빈 목록이라 판정부가 arm 을 거부한다 (fail-closed)
+          COMMITS=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate \
+            --jq '.[] | {message: .commit.message, author_name: .commit.author.name,
+                        author_email: .commit.author.email, parents: (.parents | length)}' \
+            | jq -s '.') || COMMITS=""
+          EMAILS=$(jq -c '[.[].author_email | select(length > 0)]' <<<"${COMMITS:-[]}")
 
           ARM=$(jq -n --arg head "$HEAD_NOW" --arg marker "$MARKER_SHA_NOW" --arg model "$MODEL_NOW" \
+              --arg tier "$TIER_NOW" \
               --arg verdict "$VERDICT_NOW" --argjson manual "${MANUAL_NOW:-true}" \
               --argjson fresh "$FRESH" --argjson reviews "${REVIEWS_NOW:-[]}" \
               --argjson refs "$REFS" --argjson dropped "${DROPPED:-[]}" \
               --argjson emails "${EMAILS:-[]}" \
               '{head_sha: $head, marker_sha: $marker, marker_model: $model,
+                marker_tier: $tier,
                 verdict: $verdict, manual: $manual,
                 reviews: $reviews, pr_author_login: $fresh.author.login,
                 pr_author_is_bot: ($fresh.author.is_bot // false),
@@ -289,12 +300,34 @@ jobs:
             rebase) echo "::warning::AUTO_MERGE_METHOD=rebase 는 화이트리스트 밖 — merge 로 강제" ;;
           esac
 
+          # ── 머지 커밋 본문 — `작성 · 리뷰 · 머지` 한 줄을 남긴다 (#23 Task 9) ──────────
+          # `--body-file` 은 GitHub 의 조립분(커밋 메시지 + Co-authored-by)을 **대체**하므로,
+          # 그 조립을 재현한 뒤 한 줄을 더한다. 재현이 안 되면 **본문을 넘기지 않는다** —
+          # 한 줄을 남기려고 열 개의 커밋 메시지와 저자 트레일러를 지우는 것이 더 나쁘다.
+          BODY_JSON=$(jq -n --argjson commits "${COMMITS:-[]}" --argjson fresh "$FRESH" \
+              --arg model "$MODEL_NOW" --arg tier "$TIER_NOW" \
+              '{commits: $commits, head_ref: $fresh.headRefName,
+                pr_author_is_bot: ($fresh.author.is_bot // false),
+                reviewer_model: $model, reviewer_tier: $tier, merged_by: "auto"}' \
+            | python3 scripts/merge_provenance.py body)
+          MSG_ARGS=()
+          if [ -n "$BODY_JSON" ] && [ "$(jq -r '.body | length' <<<"$BODY_JSON")" -gt 0 ]; then
+            jq -r .body <<<"$BODY_JSON" > merge-body.txt
+            MSG_ARGS=(--subject "$(jq -r .title <<<"$FRESH") (#${PR})" --body-file merge-body.txt)
+            echo "provenance: $(jq -r .line <<<"$BODY_JSON")"
+          else
+            echo "::warning::머지 본문 재현 실패 — GitHub 기본 본문으로 머지한다 (provenance 줄 없음)"
+          fi
+
           # arm 시도 → required 가 이미 전부 초록이라 PR 이 CLEAN 이면 GitHub 이 arm 을
           # 거부한다("clean status" — 기다릴 것이 없으면 arm 이 성립하지 않는다). 조건 ①②③④ 를
-          # 이미 검증했으므로 직접 머지한다 (merge-router 의 검증된 폴백 승계)
-          if ARM_OUT=$(gh pr merge "$PR" --repo "$REPO" --auto --"$METHOD" 2>&1); then
+          # 이미 검증했으므로 직접 머지한다 (merge-router 의 검증된 폴백 승계).
+          # `--match-head-commit` — 판정과 머지 사이에 push 가 끼면 GitHub 이 거부한다.
+          if ARM_OUT=$(gh pr merge "$PR" --repo "$REPO" --auto --"$METHOD" \
+                         --match-head-commit "$HEAD_NOW" "${MSG_ARGS[@]}" 2>&1); then
             echo "자동 머지 arm 완료 (방식: $METHOD · $(jq -r .reason <<<"$ARM"))"
-          elif MERGE_OUT=$(gh pr merge "$PR" --repo "$REPO" --"$METHOD" 2>&1); then
+          elif MERGE_OUT=$(gh pr merge "$PR" --repo "$REPO" --"$METHOD" \
+                             --match-head-commit "$HEAD_NOW" "${MSG_ARGS[@]}" 2>&1); then
             echo "직접 머지 완료 (arm 거부: ${ARM_OUT})"
           else
             echo "::warning::arm·직접 머지 모두 실패 — arm: ${ARM_OUT} / 직접: ${MERGE_OUT}"

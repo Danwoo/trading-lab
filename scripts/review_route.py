@@ -23,7 +23,9 @@ CLAUDE_TIERS = ("opus", "sonnet", "fable", "haiku")
 KIMI_TIERS = ("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed")
 CODEX_TIERS = ("gpt-5.6-terra",)
 
-_VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS}
+# 신원 판독(여기)과 마커의 `tier=` 판독(`review_record.read_marker_tier`)이 같은 어휘를
+# 봐야 한다 — 갈리면 한쪽이 인정한 티어를 다른 쪽이 미상으로 접는다. 그래서 공개 이름이다.
+VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS}
 # 줄 전체가 신원이어야 한다. 앞뒤 공백을 다듬지 않는다 — 다듬으면 원본 grep 앵커보다
 # 관대해지고, 그 관대함이 label_allowed(게이트 입력)를 사람에서 에이전트로 뒤집는다.
 _IDENTITY = re.compile(
@@ -113,7 +115,7 @@ def identify_author(emails, head_ref):
         m = _IDENTITY.match(raw)
         if m and (
             m.group("tier") is None
-            or m.group("tier") in _VENDOR_TIERS[m.group("vendor")]
+            or m.group("tier") in VENDOR_TIERS[m.group("vendor")]
         ):
             vendors.add(m.group("vendor"))
             if m.group("vendor") == "claude":

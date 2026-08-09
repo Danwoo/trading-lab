@@ -24,13 +24,14 @@ GitHub 이 자기 PR 자기 승인을 금지해 로컬 `gh`(리드 계정)로는
 
   ① required 게이트 초록 — `gate` 서브커맨드 (워크플로가 완료까지 재조회한다)
   ② 승인 리뷰가 있고 그 `commit_id` 가 현재 head 와 같다 — `arm`
-  ③ 저자 벤더 ≠ 리뷰어 벤더, 또는 같은 벤더여도 **그 벤더의** 작성 티어를 안다 — `arm`
+  ③ 저자 벤더 ≠ 리뷰어 벤더, 또는 같은 벤더이면서 **작성 티어와 리뷰어 티어를 둘 다 알고
+     서로 다르다** — `arm`
   ④ `risk: low` **또는** 저자가 봇이면서 major 상승이 아니다 — `arm`
 
 조건 ③ 은 cross-review.yml 의 동일-벤더 폴백 차단을 arm 조건으로 승계한 것이다: 리뷰어
-벤더가 저자 벤더와 같으면 교차 축이 티어뿐인데, 작성 티어를 모르면 동일-티어 자기리뷰
-가능성을 배제할 수 없다. 저자 신원은 커밋 author 이메일(1순위)·브랜치명으로 읽고, 판독
-자체가 안 되면 arm 하지 않는다 (fail-closed). 신원 형식의 SoT 는 `review_route` 하나다.
+벤더가 저자 벤더와 같으면 교차 축이 티어뿐이다. 저자 신원은 커밋 author 이메일(1순위)·
+브랜치명으로 읽고, 리뷰어 티어는 마커의 `tier=`(기동 배너 관측값)로 읽는다. **어느 쪽이든
+판독이 안 되면 arm 하지 않는다** (fail-closed). 신원 형식의 SoT 는 `review_route` 하나다.
 
 위험도의 SoT 는 **이슈의 risk 라벨**이고 판정 시점마다 fresh 조회한다 (merge-router.yml 이
 못 박은 규칙 승계). 이슈 연결은 `closingIssuesReferences` 가 아니라 **PR 본문 파싱**으로 읽는다
@@ -46,6 +47,9 @@ PR 마다 전용 이슈를 만들게 된다). 여러 이슈면 가장 높은 위
           PR 본문을 산문 참조(`refs`)와 버린 후보(`dropped`)로 갈라 낸다 — 한 번의 호출로
           둘을 함께 주므로, 한쪽만 실패해 조용히 빈 목록이 되는 경로가 없다
   arm     승인·위험도·봇 상승 종류로 arm 여부를 판정한다
+  delegate
+          위임 머지(지휘자가 워크플로에 시키는 머지)를 허용할지 판정한다 — ① 리뷰 통과 마커
+          ② required 게이트 초록 ③ 저위험 확정. `arm` 을 재사용하고 사유를 **전부** 모아 낸다
   gate    check-runs JSON 에서 required 게이트(`test: gate`)의 상태를 판정한다
           — 종료코드 0 초록 · 1 실패 · 2 미완(재조회 요망), `--final` 은 미완을 실패로 접는다
 """
@@ -73,8 +77,15 @@ TIER_KNOWN_VENDOR = "claude"
 # cross-review.yml 의 마커 게시부·merge-router.yml 의 arm 가드와 같은 문법. sha 자릿수는
 # 여기서 안 좁힌다 — 접두 sha 를 정규식에서 거르면 「40자 동등 비교」가 검증 불가능한
 # 암묵이 된다. 아래 판정이 길이 40 + 문자열 동등을 명시적으로 검사한다.
+#
+# `tier=` 는 **선택 필드**다 (#23 Task 9). 이미 달린 마커에는 없고, kimi·codex 리뷰와
+# 티어를 확인하지 못한 claude 리뷰에도 없다 — 없으면 「미상」으로 읽는다. 값 어휘를 여기서
+# 좁히지 않는 이유는 sha 와 같다: 어휘 밖 값을 정규식이 삼키면 「미상으로 접었다」가 아니라
+# 「마커 자체를 못 봤다」가 되어 판정이 통째로 사라진다. 어휘 대조는 `read_marker_tier` 가
+# `review_route` 의 목록으로 명시적으로 한다.
 _MARKER = re.compile(
     r"<!-- cross-review v1 model=(?P<model>claude|kimi|codex)"
+    r"(?: tier=(?P<tier>[a-z0-9.\-]+))?"
     r" verdict=(?P<verdict>merge_ok|needs_changes|unable)"
     r" sha=(?P<sha>[0-9a-f]+)(?P<manual> source=manual)? -->"
 )
@@ -112,6 +123,20 @@ VERDICT_TO_EVENT = {"merge_ok": "APPROVE", "needs_changes": "REQUEST_CHANGES"}
 EVENT_TO_STATE = {"APPROVE": "APPROVED", "REQUEST_CHANGES": "CHANGES_REQUESTED"}
 
 
+def read_marker_tier(model, tier):
+    """마커의 `tier=` 를 어휘로 대조해 읽는다 — 어휘 밖·부재는 None (미상).
+
+    어휘의 SoT 는 `review_route.VENDOR_TIERS` 하나다. 벤더와 티어가 짝이 맞아야 한다 —
+    `model=kimi tier=opus` 처럼 남의 벤더 티어를 실은 마커는 위조이거나 형식 오류이고,
+    어느 쪽이든 「그 티어로 리뷰했다」의 근거가 못 된다.
+    """
+    if not tier:
+        return None
+    if tier in review_route.VENDOR_TIERS.get(model, ()):
+        return tier
+    return None
+
+
 def _normalize_login(login) -> str:
     # REST 는 `github-actions[bot]`, `gh pr view` 는 `github-actions` 로 준다
     return (login or "").removesuffix("[bot]")
@@ -120,7 +145,8 @@ def _normalize_login(login) -> str:
 def find_marker(comments, head_sha):
     """저자 필터를 통과한 코멘트에서 head 와 40자 동등한 마지막 유효 마커를 찾는다.
 
-    반환은 dict(model·verdict·manual·sha·comment_url) 또는 None. 코멘트는 시간 오름차순
+    반환은 dict(model·tier·verdict·manual·sha·comment_url) 또는 None. `tier` 는 어휘 대조를
+    통과한 리뷰어 티어이고 **없거나 어휘 밖이면 None (미상)** 이다. 코멘트는 시간 오름차순
     입력을 전제한다 (GitHub API 기본 정렬) — 같은 head 에 판정이 여럿이면 마지막 것이 이긴다.
     """
     if not _FULL_SHA.match(head_sha or ""):
@@ -136,6 +162,7 @@ def find_marker(comments, head_sha):
                 continue
             found = {
                 "model": m.group("model"),
+                "tier": read_marker_tier(m.group("model"), m.group("tier")),
                 "verdict": m.group("verdict"),
                 "manual": m.group("manual") is not None,
                 "sha": m.group("sha"),
@@ -178,6 +205,7 @@ def decide_record(payload) -> dict:
     base = {
         "verdict": None,
         "model": None,
+        "tier": None,
         "manual": False,
         "marker_sha": None,
         "review_event": None,
@@ -204,6 +232,7 @@ def decide_record(payload) -> dict:
         **base,
         "verdict": marker["verdict"],
         "model": marker["model"],
+        "tier": marker["tier"],
         "manual": marker["manual"],
         "marker_sha": marker["sha"],
         "comment_url": marker["comment_url"],
@@ -430,17 +459,22 @@ def judge_author_identity(payload) -> dict:
     kimi·codex 는 티어를 실어도 늘 사람 경로이고, 혼재 저자에서 claude 티어를 안다는 이유로
     kimi 리뷰의 차단이 풀리지도 않는다.
 
-    **한계**: 마커는 `model=`(벤더)만 싣고 리뷰어 티어를 싣지 않으므로, 저자 티어를 안다는
-    것이 「다른 티어가 리뷰했다」의 증명은 아니다 — 폴백이 반대 티어를 고른다는 cross-review
-    쪽 계약을 믿는 것이다 (종전 bash 조건 승계). 실제로 대조하려면 마커에 리뷰어 티어를
-    실어야 한다.
+    **티어 대조는 이제 실측이다** (#23 Task 9). 종전엔 저자 티어만 알면 통과시키고 「폴백이
+    반대 티어를 고른다」는 cross-review 쪽 계약을 믿었는데, 그 계약이 실제로는 지켜지지
+    않고 있었다 — `worktree create --agent claude` 는 모델 인자를 받지 않아 계산된 폴백
+    티어와 무관하게 Orca 기본 모델로 떴다(실측: 배정 sonnet, 기동 배너 `Opus 5 (1M context)`).
+    즉 「저자 티어를 안다」가 「다른 티어가 리뷰했다」의 근거가 아니었다. 이제 마커가
+    리뷰어 티어를 싣고(기동 배너 관측값), **둘을 직접 비교해** 같으면 차단한다.
+    티어를 못 읽으면 — 어느 쪽이든 — arm 하지 않는다 (fail-closed).
     """
     emails = payload.get("commit_author_emails")
     reviewer = payload.get("marker_model") or ""
+    reviewer_tier = payload.get("marker_tier") or None
     result = {
         "self_vendor": None,
         "author_models": None,
         "author_tier": None,
+        "reviewer_tier": reviewer_tier,
         "identity_source": None,
         "unknown_agentish": None,
         "block": None,
@@ -465,6 +499,7 @@ def judge_author_identity(payload) -> dict:
         "self_vendor": self_vendor,
         "author_models": author_models or None,
         "author_tier": identity["author_tier"],
+        "reviewer_tier": reviewer_tier,
         "identity_source": identity["identity_source"],
         "unknown_agentish": unknown_agentish or None,
         "block": None,
@@ -476,14 +511,36 @@ def judge_author_identity(payload) -> dict:
             + ", ".join(unknown_agentish)
             + ") — 저자 벤더를 판정할 수 없어 arm 하지 않는다 (fail-closed)",
         }
-    # 아는 티어가 **리뷰어 벤더의 것**일 때만 차단이 풀린다 — 혼재 저자에서 다른 벤더의
-    # 티어로 풀면 동일-티어 자기리뷰를 배제하지 못한 채 통과한다
-    tier_known = identity["author_tier"] is not None and reviewer == TIER_KNOWN_VENDOR
-    if self_vendor and not tier_known:
+    if not self_vendor:
+        return result
+
+    # ── 동일-벤더: 교차 축이 티어뿐이다. 양쪽 티어를 **둘 다** 알고 **다를 때만** 푼다 ──
+    # 티어 판독은 claude 신원에만 있으므로 동일-벤더 kimi·codex 는 여기서 늘 막힌다 —
+    # 혼재 저자(claude+kimi)를 kimi 가 리뷰할 때 claude 쪽 티어로 차단이 풀리던 자리다.
+    if reviewer != TIER_KNOWN_VENDOR:
         return {
             **result,
-            "block": f"동일-벤더 리뷰({reviewer}) + 그 벤더의 작성 티어 미상 — 동일-티어 "
+            "block": f"동일-벤더 리뷰({reviewer}) — 이 벤더는 티어 축이 없어 교차를 "
+            "증명할 수 없다. arm 하지 않는다 (게이트만 사람에게)",
+        }
+    if identity["author_tier"] is None:
+        return {
+            **result,
+            "block": f"동일-벤더 리뷰({reviewer}) + 작성 티어 미상 — 동일-티어 "
             "자기리뷰를 배제할 수 없어 arm 하지 않는다 (게이트만 사람에게)",
+        }
+    if reviewer_tier is None:
+        return {
+            **result,
+            "block": f"동일-벤더 리뷰({reviewer}) + **리뷰어 티어 미상**(마커에 tier= 없음 "
+            "또는 어휘 밖) — 작성 티어를 아는 것만으로는 다른 티어가 리뷰했다는 근거가 "
+            "되지 않는다. arm 하지 않는다 (fail-closed)",
+        }
+    if reviewer_tier == identity["author_tier"]:
+        return {
+            **result,
+            "block": f"동일-벤더·**동일-티어** 자기리뷰({reviewer}/{reviewer_tier}) — "
+            "교차 축이 하나도 남지 않는다. arm 하지 않는다",
         }
     return result
 
@@ -507,6 +564,7 @@ def decide_arm(payload) -> dict:
         "self_vendor": identity["self_vendor"],
         "author_models": identity["author_models"],
         "author_tier": identity["author_tier"],
+        "reviewer_tier": identity["reviewer_tier"],
         "identity_source": identity["identity_source"],
         "unknown_agentish": identity["unknown_agentish"],
     }
@@ -556,6 +614,71 @@ def decide_arm(payload) -> dict:
             return {**base, "reason": "봇 PR major 상승 — 사람 경로 (설계 §2-1)"}
         return {**base, "arm": True, "reason": f"봇 PR {bump} 상승 + 봇 승인 — arm"}
     return {**base, "reason": f"위험도 {risk} ({evidence}) — 사람 경로"}
+
+
+def decide_delegate(payload) -> dict:
+    """위임 머지 허용 판정 — 지휘자가 요청했다고 그냥 밀지 않는다 (#23 Task 9).
+
+    지휘자는 버튼을 직접 누르는 대신 워크플로에 시킨다 (그래야 `mergedBy` 가
+    `app/github-actions` 로 갈려 세 갈래가 구조적으로 구분된다). 그 대가로 **워크플로가 머지
+    조건을 다시 판정한다**:
+
+      ① 머지 대상 head 의 리뷰 통과 마커 — `merge_ok` · `source=manual` 아님 · sha 동등
+      ② required 게이트(`test: gate`) 전수 초록 — `gate` 서브커맨드가 판정한 상태를 받는다
+      ③ 저위험 확정 — `risk: low` 로 **읽힌** 것만. 미선언·고위험은 사람 경로다
+
+    ①③ 과 자기리뷰 차단·승인 대조는 `decide_arm` 을 그대로 쓴다 (자동 머지와 같은 판정부를
+    두 개로 갈라 놓으면 언젠가 갈린다). ② 만 여기서 더한다 — 자동 경로는 게이트를 기다리지만
+    위임 경로는 **기다리지 않는다**: 지휘자가 지금 밀어 달라고 한 것이므로 지금 초록이
+    아니면 거부하고 이유를 돌려준다.
+
+    **사유를 하나만 내지 않는다.** 첫 실패에서 끊으면 지휘자가 고치고 다시 요청할 때마다
+    다음 사유가 하나씩 나온다. 전부 모아 한 번에 돌려준다.
+    """
+    arm = decide_arm(payload)
+    gate_state = payload.get("gate_state")
+    reasons = []
+
+    if payload.get("verdict") != "merge_ok" or payload.get("manual"):
+        reasons.append(
+            "① 리뷰 통과 마커 없음 — "
+            f"판정={payload.get('verdict') or '없음'}"
+            f"{' · source=manual(사람이 타이핑한 한 줄일 수 있다)' if payload.get('manual') else ''}"
+        )
+    elif payload.get("marker_sha") != payload.get("head_sha"):
+        reasons.append(
+            "① 마커가 현재 head 의 것이 아님 — 낡은 판정으로는 머지하지 않는다"
+        )
+
+    if gate_state != "pass":
+        reasons.append(
+            f"② required 게이트 비초록 (상태: {gate_state or '미상'}) — "
+            "위임 머지는 게이트를 기다리지 않는다. 초록이 된 뒤 다시 요청하라"
+        )
+
+    if arm["risk"] != "low":
+        reasons.append(
+            f"③ 저위험 확정 아님 (위험도: {arm['risk']} — {arm['risk_evidence']}) — "
+            "미선언·고위험은 사람 경로다"
+        )
+
+    # `decide_arm` 이 막은 것은 **항상** 함께 싣는다. 승인 부재·자기리뷰 차단·sha 형식 불량은
+    # 위 셋으로 환원되지 않고, 환원되는 것(①③)은 같은 말이 한 번 더 나올 뿐이다 —
+    # 거부 사유가 겹치는 것보다 빠지는 쪽이 훨씬 나쁘다.
+    if not arm["arm"]:
+        reasons.append(f"부가 조건 미충족 — {arm['reason']}")
+
+    return {
+        "allow": not reasons,
+        "reasons": reasons,
+        "risk": arm["risk"],
+        "risk_evidence": arm["risk_evidence"],
+        "author_models": arm["author_models"],
+        "author_tier": arm["author_tier"],
+        "reviewer_tier": arm["reviewer_tier"],
+        "arm_reason": arm["reason"],
+        "gate_state": gate_state,
+    }
 
 
 def judge_gate(records, *, final: bool = False):
@@ -617,9 +740,12 @@ def main(argv) -> int:
         return 0
     elif command == "arm":
         json.dump(decide_arm(payload), sys.stdout, ensure_ascii=False)
+    elif command == "delegate":
+        json.dump(decide_delegate(payload), sys.stdout, ensure_ascii=False)
     else:
         print(
-            f"::error::알 수 없는 서브커맨드: {command!r} (record|scan-refs|arm|gate)"
+            f"::error::알 수 없는 서브커맨드: {command!r} "
+            "(record|scan-refs|arm|delegate|gate)"
         )
         return 1
     print()
