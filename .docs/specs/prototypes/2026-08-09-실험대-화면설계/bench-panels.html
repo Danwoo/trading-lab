@@ -218,6 +218,116 @@
 </div>
 
 <!-- ── 거래 로그 ── -->
+<h3>①-b 조건을 운용 중에 바꿀 때 <em>— 위험을 줄이는 변경만 소급합니다</em></h3>
+<p class="lead">
+  봇 상세의 <b>「조건」 탭</b>에서 손절·익절을 바꾸면 <b>이미 들고 있는 것</b>이 어떻게 되는지가 문제입니다.
+  규칙은 하나입니다 — <b>위험을 줄이는 변경은 지금 물린 것에도 적용하고, 늘리는 변경은 다음 거래부터</b>입니다.
+</p>
+
+<table class="t">
+  <tr><th style="width:24%">바꾸는 것</th><th style="width:20%">위험</th><th>이미 들고 있는 것</th></tr>
+  <tr><td>손절 −7% → <b>−5%</b></td><td style="color:#9BBE7A">줄임</td><td><b>적용합니다</b> — 조건에 걸린 건 즉시 나갑니다</td></tr>
+  <tr><td>손절 −7% → −10%</td><td style="color:#E2837A">늘림</td><td>다음 거래부터 — <b>지금 물린 걸 살리려는 완화</b>가 대부분이라</td></tr>
+  <tr><td>익절 +15% → <b>+10%</b></td><td style="color:#9BBE7A">줄임</td><td><b>적용합니다</b> — 빨리 나오는 쪽이라 같은 규칙</td></tr>
+  <tr><td>익절 +15% → +20%</td><td style="color:#E2837A">늘림</td><td>다음 거래부터</td></tr>
+</table>
+
+<div class="rack">
+  <div class="pw">
+    <div class="lbl"><b>조건 탭에서 손절을 조였을 때</b> — 누르기 전에 결과를 보여줍니다</div>
+    <div class="panel">
+      <div class="ptop"><span style="color:var(--if)">←</span><b>대형주 20일선 눌림목</b>
+        <div class="r"><span>✕</span></div></div>
+      <div class="tabs"><u class="on">조건</u><u>검진</u><u>운용</u></div>
+      <div class="pbd" style="background:var(--bg)">
+        <div class="fld"><label>손절 <s>— 지금 −7%</s></label>
+          <div class="two"><div class="inp" style="color:#E2837A">−5</div><div class="inp ph">%</div></div></div>
+
+        <div style="margin-top:10px;border:1px solid #6E3A33;background:rgba(201,74,59,.07);
+                    border-radius:9px;padding:10px 11px">
+          <b style="color:#E2837A;display:block;margin-bottom:5px">지금 저장하면 2건이 바로 팔립니다</b>
+          <div class="row"><span class="nm">LG화학<s>200만원 · −6.2%</s></span>
+            <span class="v" style="color:var(--dn)">−12.4만</span></div>
+          <div class="row"><span class="nm">네이버<s>150만원 · −5.4%</s></span>
+            <span class="v" style="color:var(--dn)">−8.1만</span></div>
+          <div class="row" style="border-top:1px solid var(--hl);padding-top:7px">
+            <span class="nm" style="color:var(--ik)">합계 — 손실이 확정됩니다</span>
+            <span class="v" style="color:#E2837A;font-weight:600">−20.5만</span></div>
+          <div class="cap" style="margin-top:7px;color:var(--im)">
+            삼성전자·현대차는 <b style="color:var(--im)">이익 중이라 그대로</b> 갑니다.
+          </div>
+        </div>
+
+        <div class="cap" style="margin-top:9px;border-top:1px solid var(--hl);padding-top:8px">
+          <b style="color:var(--im)">이 2건은 「내가 손댄 거래」로 기록됩니다</b>
+          <span style="color:var(--if)">— 봇의 규칙대로 나간 게 아니라 제가 손절선을 옮겨서 나간 것이라,
+          나중에 봇 성적을 셀 때 섞이면 안 됩니다.</span>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:7px">
+          <span style="flex:1;text-align:center;font-size:12px;padding:8px;border-radius:8px;
+                       background:#8C3B30;color:var(--is);font-weight:600">−20.5만 확정하고 저장</span>
+          <span style="flex:0 0 auto;font-size:12px;padding:8px 13px;border-radius:8px;
+                       border:1px solid var(--ls);color:var(--im)">취소</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pw">
+    <div class="lbl"><b>반대로 풀었을 때</b> — 아무 일도 안 일어납니다</div>
+    <div class="panel">
+      <div class="ptop"><span style="color:var(--if)">←</span><b>대형주 20일선 눌림목</b>
+        <div class="r"><span>✕</span></div></div>
+      <div class="tabs"><u class="on">조건</u><u>검진</u><u>운용</u></div>
+      <div class="pbd" style="background:var(--bg)">
+        <div class="fld"><label>손절 <s>— 지금 −7%</s></label>
+          <div class="two"><div class="inp" style="color:#D9B45C">−10</div><div class="inp ph">%</div></div></div>
+
+        <div style="margin-top:10px;border:1px solid #6B5A2E;background:rgba(217,164,65,.05);
+                    border-radius:9px;padding:10px 11px">
+          <b style="color:#D9B45C;display:block;margin-bottom:5px">지금 들고 있는 6건은 −7% 로 그대로 갑니다</b>
+          <div style="font-size:11.5px;color:var(--im);line-height:1.65">
+            새 기준은 <b style="color:var(--ik)">다음 거래부터</b>입니다.<br>
+            <span style="color:var(--if)">— 손절을 푸는 이유는 대개 「지금 물린 걸 살리려고」입니다.
+            그때 소급되면 봇이 아니라 <b style="color:var(--im)">그 순간의 마음</b>이 손절선을 정하게 됩니다.</span>
+          </div>
+        </div>
+
+        <div class="cap" style="margin-top:9px;border-top:1px solid var(--hl);padding-top:8px">
+          <b style="color:var(--im)">이력에 「완화」로 남습니다</b>
+          <span style="color:var(--if)">— 그때 계좌가 고점 대비 얼마였는지와 함께.
+          평온할 때 푼 것과 물려서 푼 것은 다릅니다.</span>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:7px">
+          <span style="flex:1;text-align:center;font-size:12px;padding:8px;border-radius:8px;
+                       background:var(--is);color:var(--bg);font-weight:600">저장</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note good">
+  <b>비대칭이지만 규칙은 하나입니다</b> — 「위험을 줄이는 변경만 소급」.
+  손절을 조이는 것과 익절을 낮추는 것이 <b>같은 편</b>이고, 푸는 것과 올리는 것이 <b>반대편</b>입니다.
+  「손절은 이렇고 익절은 저렇고」로 외울 필요가 없습니다.
+</div>
+
+<div class="note warn">
+  <b>막지는 않습니다.</b> −20.5만원이 확정되는 걸 <b>누르기 전에 보여줄 뿐</b>이고,
+  누르면 그대로 나갑니다(§17 원칙).
+  다만 버튼에 <b>금액을 박아</b> 뒀습니다 — 「저장」이 아니라 <b>「−20.5만 확정하고 저장」</b>입니다.
+</div>
+
+<div class="note bad">
+  <b>DB 에 필요한 것</b> — <code>tn_bot_param_change</code> 에
+  <code>risk_direction</code>(<code>reduce</code>|<code>increase</code>) ·
+  <code>applied_retroactively</code> · <code>positions_closed_by_change</code>(JSON: trade_id 목록) ·
+  <code>realized_pnl_by_change</code>. 그리고 그때 나간 거래는 <code>tn_trade.actor = human</code> ·
+  <code>exit_reason = param_change</code> 다.<br>
+  <span style="color:var(--if)">이게 없으면 「봇이 −20.5만을 잃었다」로 집계돼 <b style="color:var(--im)">봇 성적이 왜곡</b>됩니다.</span>
+</div>
+
 <h3>② 거래 로그 패널 <em>— 7열 표를 2열 + 펼침으로</em></h3>
 
 <div class="rack">
