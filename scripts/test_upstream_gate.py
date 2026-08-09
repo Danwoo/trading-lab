@@ -28,9 +28,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import verify_upstream_gate as gate  # noqa: E402
 
 # 케이스가 이보다 적으면 수집이 깨진 것이다 (「0건 통과」 방지).
-MIN_JUDGE_CASES = 18
+MIN_JUDGE_CASES = 20
 MIN_PARSE_CASES = 6
 MIN_STRUCTURE_CASES = 6
+MIN_LOOP_CASES = 7
 
 SELF = gate.SELF_CHECK_NAME
 
@@ -115,6 +116,27 @@ JUDGE_CASES: list[tuple[str, list[dict], bool, str]] = [
         "conclusion 이 null 인데 completed",
         SHORT + [_run("test: bad", None, run_id=9)],
         False,
+        "fail",
+    ),
+    # 개시 직후가 실제로 가장 흔한 상태다 — repo-scans.yml 과 ci.yml·frontend-ci.yml 은 같은
+    # pull_request 이벤트로 동시에 시작하므로, 게이트가 처음 조회할 때 상류는 대개 아직 돈다.
+    # 이 상태를 통과로 접으면 게이트는 아무것도 안 보고 초록이 된다.
+    (
+        "개시 직후 — 상류가 전부 미완",
+        [
+            _run(f"test: job{i}", None, run_id=200 + i, status="in_progress")
+            for i in range(gate.MIN_TEST_CHECKS)
+        ],
+        False,
+        "wait",
+    ),
+    (
+        "개시 직후 상태로 대기 상한 초과",
+        [
+            _run(f"test: job{i}", None, run_id=200 + i, status="in_progress")
+            for i in range(gate.MIN_TEST_CHECKS)
+        ],
+        True,
         "fail",
     ),
     (
@@ -269,11 +291,77 @@ STRUCTURE_CASES: list[tuple[str, str, dict[str, str], bool, str]] = [
 ]
 
 
+_LOOP_OK = """    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: 테스트 체크런 전수 판정
+        run: |
+          DEADLINE=$(( $(date +%s) + 1200 ))
+          while :; do
+            FINAL=""
+            [ "$(date +%s)" -ge "$DEADLINE" ] && FINAL="--final"
+            OUT=$(gh api ... | python3 scripts/verify_upstream_gate.py $FINAL)
+            RC=$?
+            if [ "$RC" -ne 2 ]; then exit "$RC"; fi
+            sleep 15
+          done
+"""
+
+# (라벨, 게이트 잡 본문, 문제가 있어야 하는가, 사유 조각)
+LOOP_CASES: list[tuple[str, str, bool, str]] = [
+    ("대기 루프가 서 있음", _LOOP_OK, False, ""),
+    ("본문을 못 읽음", "", True, "본문을 못 읽었습니다"),
+    (
+        "루프 없이 한 번만 조회",
+        _LOOP_OK.replace("while :; do", "if :; then"),
+        True,
+        "재조회 루프",
+    ),
+    (
+        "종료코드 2 처리를 지움",
+        _LOOP_OK.replace('"$RC" -ne 2', '"$RC" -ne 9'),
+        True,
+        "종료코드 2",
+    ),
+    (
+        "--final 을 지움",
+        _LOOP_OK.replace('FINAL="--final"', 'FINAL=""'),
+        True,
+        "--final",
+    ),
+    (
+        "--final 이 주석에만 남음",
+        _LOOP_OK.replace('FINAL="--final"', 'FINAL=""   # 종전엔 --final 을 넣었다'),
+        True,
+        "--final",
+    ),
+    (
+        "대기 상한을 지움",
+        _LOOP_OK.replace("DEADLINE=$(( $(date +%s) + 1200 ))", "DEADLINE=0"),
+        True,
+        "대기 상한",
+    ),
+    (
+        "timeout-minutes 를 지움",
+        _LOOP_OK.replace("    timeout-minutes: 25\n", ""),
+        True,
+        "timeout-minutes",
+    ),
+    (
+        "잡 타임아웃이 대기 상한보다 짧다",
+        _LOOP_OK.replace("timeout-minutes: 25", "timeout-minutes: 15"),
+        True,
+        "먼저 잡을",
+    ),
+]
+
+
 def main() -> int:
     for label, cases, minimum in (
         ("판정", JUDGE_CASES, MIN_JUDGE_CASES),
         ("파싱", PARSE_CASES, MIN_PARSE_CASES),
         ("구조", STRUCTURE_CASES, MIN_STRUCTURE_CASES),
+        ("대기", LOOP_CASES, MIN_LOOP_CASES),
     ):
         if len(cases) < minimum:
             print(
@@ -312,16 +400,36 @@ def main() -> int:
                 f"실제 사유: {joined}",
             )
 
+    for label, block, should_fail, fragment in LOOP_CASES:
+        problems = gate.check_wait_loop(block)
+        joined = " / ".join(problems)
+        _check(
+            f"[대기] {label}",
+            bool(problems) == should_fail,
+            f"기대 {'문제 있음' if should_fail else '문제 없음'} · 실제 {joined or '문제 없음'}",
+        )
+        if should_fail and problems:
+            _check(
+                f"[대기] {label} — 사유에 {fragment!r}",
+                fragment in joined,
+                f"실제 사유: {joined}",
+            )
+
     # 합성 픽스처만 보면 실제 배선이 끊겨도 초록이다 — 살아 있는 워크플로로도 한 번 판다.
-    live_jobs = gate.parse_jobs(gate.GATE_WORKFLOW.read_text(encoding="utf-8"))
+    live_text = gate.GATE_WORKFLOW.read_text(encoding="utf-8")
+    live_jobs = gate.parse_jobs(live_text)
     live_names = gate.collect_test_job_names(gate.WORKFLOW_DIR)
     live_problems = gate.check_structure(live_jobs, live_names)
     _check("[실물] 게이트 구조", not live_problems, " / ".join(live_problems))
+    live_loop = gate.check_wait_loop(gate.gate_job_block(live_text))
+    _check("[실물] 게이트 대기 루프", not live_loop, " / ".join(live_loop))
 
-    total = len(JUDGE_CASES) + len(PARSE_CASES) + len(STRUCTURE_CASES) + 1
+    total = (
+        len(JUDGE_CASES) + len(PARSE_CASES) + len(STRUCTURE_CASES) + len(LOOP_CASES) + 2
+    )
     print(
         f"케이스 {total}건 (판정 {len(JUDGE_CASES)} · 파싱 {len(PARSE_CASES)} · "
-        f"구조 {len(STRUCTURE_CASES)} · 실물 1) · 실패 {len(failures)}건"
+        f"구조 {len(STRUCTURE_CASES)} · 대기 {len(LOOP_CASES)} · 실물 2) · 실패 {len(failures)}건"
     )
     print(
         f"실물: 선언된 `{gate.CHECK_NAME_PREFIX}` 잡 {len(live_names)}개 (게이트 포함) · "

@@ -251,6 +251,87 @@ def parse_jobs(text: str) -> dict[str, dict]:
     return jobs
 
 
+def gate_job_block(text: str) -> str:
+    """게이트 잡의 본문만 잘라 낸다 (다음 잡 헤더·주석 블록 직전까지)."""
+    out: list[str] = []
+    top: str | None = None
+    inside = False
+
+    for line in text.splitlines():
+        m = TOP_KEY.match(line)
+        if m:
+            if inside:
+                break
+            top = m.group(1)
+            continue
+        if top != "jobs":
+            continue
+
+        m = JOB_HEADER.match(line)
+        if m:
+            if inside:
+                break
+            inside = m.group(1) == GATE_JOB_ID
+            continue
+        if inside:
+            if line.startswith("  #"):
+                break
+            out.append(line)
+    return "\n".join(out)
+
+
+def check_wait_loop(block: str) -> list[str]:
+    """게이트가 상류를 **기다리는** 계약이 서 있는지 본다.
+
+    `repo-scans.yml` 과 `ci.yml`·`frontend-ci.yml` 은 같은 `pull_request` 이벤트로 **동시에**
+    시작한다. 그래서 게이트가 개시 직후 한 번만 조회하면 상류가 `in_progress` 로 잡혀 빨개진다
+    — required 로 걸린 잡이 코드 PR 마다 빨가면 사람 머지까지 막히는 작업 정지 장치가 된다.
+    기다리게 하는 것은 판정부가 아니라 워크플로의 루프라, 여기서 그 배선을 못박는다.
+    """
+    if not block.strip():
+        return ["게이트 잡의 본문을 못 읽었습니다 — 파싱이 깨졌거나 잡이 사라졌습니다"]
+
+    # 주석을 걷어내고 본다 — 이 블록은 자기 계약을 주석으로도 설명하므로, 걷어내지 않으면
+    # 코드에서 `--final` 을 지워도 주석에 남은 글자가 검사를 통과시킨다 (실측).
+    block = "\n".join(re.sub(r"(^|\s)#.*$", "", line) for line in block.splitlines())
+
+    problems: list[str] = []
+    if "while" not in block:
+        problems.append(
+            "게이트에 재조회 루프가 없습니다 — 한 번만 조회하면 동시에 시작한 상류가 "
+            "`in_progress` 로 잡혀 코드 PR 마다 빨개집니다"
+        )
+    if "-ne 2" not in block:
+        problems.append(
+            "종료코드 2(미완 — 재조회) 처리가 없습니다 — 판정부가 「아직 모른다」고 낸 것을 "
+            "실패로 접으면 게이트가 상류를 못 기다립니다"
+        )
+    if "--final" not in block:
+        problems.append(
+            "`--final` 이 없습니다 — 대기 상한을 넘긴 뒤 미완을 실패로 접을 길이 사라져 "
+            "게이트가 영영 초록도 빨강도 아닌 상태로 남습니다"
+        )
+
+    deadline = re.search(
+        r"DEADLINE=\$\(\(\s*\$\(date \+%s\)\s*\+\s*(\d+)\s*\)\)", block
+    )
+    timeout = re.search(r"^\s*timeout-minutes:\s*(\d+)\s*$", block, re.M)
+    if deadline is None:
+        problems.append(
+            "대기 상한(`DEADLINE`)이 없습니다 — 상한 없는 대기는 fail-closed 가 아닙니다"
+        )
+    if timeout is None:
+        problems.append("게이트 잡에 `timeout-minutes` 가 없습니다")
+    if deadline and timeout:
+        limit, killed = int(deadline.group(1)), int(timeout.group(1)) * 60
+        if killed <= limit:
+            problems.append(
+                f"잡 타임아웃 {killed}초가 대기 상한 {limit}초 이하입니다 — 러너가 먼저 잡을 "
+                "죽여 `--final` 판정이 남지 않습니다 (빨간불의 이유가 로그에서 사라집니다)"
+            )
+    return problems
+
+
 def collect_test_job_names(workflow_dir: Path) -> dict[str, str]:
     """레포 워크플로에 선언된 `test: ` 잡의 체크 이름 → 워크플로 파일명."""
     found: dict[str, str] = {}
@@ -315,15 +396,15 @@ def check_structure(
 def main(argv: list[str]) -> int:
     final = "--final" in argv[1:]
 
-    gate_jobs = (
-        parse_jobs(GATE_WORKFLOW.read_text(encoding="utf-8"))
-        if GATE_WORKFLOW.is_file()
-        else {}
+    gate_text = (
+        GATE_WORKFLOW.read_text(encoding="utf-8") if GATE_WORKFLOW.is_file() else ""
     )
+    gate_jobs = parse_jobs(gate_text)
     test_job_names = (
         collect_test_job_names(WORKFLOW_DIR) if WORKFLOW_DIR.is_dir() else {}
     )
     structure_problems = check_structure(gate_jobs, test_job_names)
+    structure_problems += check_wait_loop(gate_job_block(gate_text))
 
     print(
         f"구조: 워크플로에 선언된 `{CHECK_NAME_PREFIX}` 잡 {len(test_job_names)}개 "
