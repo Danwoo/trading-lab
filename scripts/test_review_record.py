@@ -2,8 +2,11 @@
 
 공개 레포의 위조 표면이 승인·자동 머지로 이어지지 않는지를 못박는다:
   ① 위조 마커(비-멤버 코멘트) ② 접두 sha ③ 낡은 sha ④ `source=manual`
-  ⑤ major 봇 PR ⑥ 제목 파싱 실패 — 각각이 기록 또는 arm 을 막아야 한다.
-케이스를 0건 모으면 실패한다 (fail-closed).
+  ⑤ major 봇 PR ⑥ 제목 파싱 실패 ⑦ 봇 사칭(로그인·타입 한쪽만 일치)
+  ⑧ PR 번호 참조로 가시화 미러 라벨 읽히기 ⑨ 동일-벤더 자기리뷰
+  — 각각이 기록 또는 arm 을 막아야 한다.
+경계를 넓힌 자리(봇 폴백 게시분 읽기)는 **양방향으로** 못박는다 — 읽히는 것과 막히는 것을
+같이 보지 않으면 방어가 뚫린 걸 못 본다. 케이스를 0건 모으면 실패한다 (fail-closed).
 """
 
 import sys
@@ -21,8 +24,25 @@ def marker(sha=HEAD, verdict="merge_ok", model="kimi", manual=False):
     return f"<!-- cross-review v1 model={model} verdict={verdict} sha={sha}{tail} -->"
 
 
-def comment(body, association="OWNER", url="https://example.test/c/1"):
-    return {"body": body, "author_association": association, "html_url": url}
+def comment(
+    body,
+    association="OWNER",
+    url="https://example.test/c/1",
+    login="Danwoo",
+    user_type="User",
+):
+    return {
+        "body": body,
+        "author_association": association,
+        "html_url": url,
+        "user_login": login,
+        "user_type": user_type,
+    }
+
+
+def bot_comment(body, login="github-actions[bot]", user_type="Bot"):
+    # 워크플로 자신의 게시분 — GITHUB_TOKEN 발이라 author_association 은 NONE 이다
+    return comment(body, association="NONE", login=login, user_type=user_type)
 
 
 def approval(sha=HEAD, state="APPROVED", login="github-actions[bot]"):
@@ -50,6 +70,62 @@ RECORD_CASES = [
             "existing_reviews": [],
         },
         {"post_review": False, "review_event": None, "arm_candidate": False},
+    ),
+    (
+        "cross-review publish 폴백 게시(github-actions[bot], association NONE) → 읽힌다",
+        {
+            "head_sha": HEAD,
+            "comments": [bot_comment(marker())],
+            "existing_reviews": [],
+        },
+        {"post_review": True, "review_event": "APPROVE", "arm_candidate": True},
+    ),
+    (
+        "봇 사칭 — 로그인은 github-actions 인데 타입이 User → 무행동  (공격 ⑦)",
+        {
+            "head_sha": HEAD,
+            "comments": [
+                comment(
+                    marker(),
+                    association="NONE",
+                    login="github-actions",
+                    user_type="User",
+                )
+            ],
+            "existing_reviews": [],
+        },
+        {"post_review": False, "arm_candidate": False, "marker_sha": None},
+    ),
+    (
+        "봇 사칭 — 타입은 Bot 인데 다른 앱(dependabot[bot]) → 무행동  (공격 ⑦)",
+        {
+            "head_sha": HEAD,
+            "comments": [bot_comment(marker(), login="dependabot[bot]")],
+            "existing_reviews": [],
+        },
+        {"post_review": False, "arm_candidate": False, "marker_sha": None},
+    ),
+    (
+        "봇 사칭 — 타입 Bot + 로그인 유사(github-actions-ci[bot]) → 무행동  (공격 ⑦)",
+        {
+            "head_sha": HEAD,
+            "comments": [bot_comment(marker(), login="github-actions-ci[bot]")],
+            "existing_reviews": [],
+        },
+        {"post_review": False, "arm_candidate": False},
+    ),
+    (
+        "비-멤버 사람 코멘트는 봇 축이 열려도 여전히 막힌다  (공격 ①)",
+        {
+            "head_sha": HEAD,
+            "comments": [
+                comment(
+                    marker(), association="NONE", login="stranger", user_type="User"
+                )
+            ],
+            "existing_reviews": [],
+        },
+        {"post_review": False, "arm_candidate": False, "marker_sha": None},
     ),
     (
         "위조 마커(CONTRIBUTOR) → 무행동  (공격 ① — 기여자도 신뢰 경계 밖)",
@@ -167,13 +243,16 @@ RECORD_CASES = [
 ARM_BASE = {
     "head_sha": HEAD,
     "marker_sha": HEAD,
+    "marker_model": "kimi",  # 저자(claude)와 교차 벤더
     "verdict": "merge_ok",
     "manual": False,
     "reviews": [approval()],
     "pr_author_login": "Danwoo",
     "pr_author_is_bot": False,
     "pr_title": "feat: 예시",
-    "issue_risks": {"23": ["risk: low"]},
+    "issue_refs": [{"number": 23, "labels": ["risk: low"]}],
+    "commit_author_emails": ["claude-opus-agent@noreply.local"],
+    "head_ref": "Danwoo/ci-task7-followup",
 }
 
 ARM_CASES = [
@@ -216,39 +295,163 @@ ARM_CASES = [
     ),
     (
         "risk: high → 사람 경로",
-        {"issue_risks": {"23": ["risk: high"]}},
+        {"issue_refs": [{"number": 23, "labels": ["risk: high"]}]},
         {"arm": False, "risk": "high"},
     ),
     (
         "이슈 여럿이면 최고 위험 (low+high → high)",
-        {"issue_risks": {"2": ["risk: low"], "23": ["risk: high"]}},
+        {
+            "issue_refs": [
+                {"number": 2, "labels": ["risk: low"]},
+                {"number": 23, "labels": ["risk: high"]},
+            ]
+        },
         {"arm": False, "risk": "high"},
     ),
     (
         "참조 이슈에 risk 라벨 없음 → 미선언 = 사람 경로",
-        {"issue_risks": {"7": ["bug"]}},
+        {"issue_refs": [{"number": 7, "labels": ["bug"]}]},
         {"arm": False, "risk": "undeclared"},
     ),
     (
         "이슈 참조 없음 → 미선언 = 사람 경로",
-        {"issue_risks": {}},
+        {"issue_refs": []},
         {"arm": False, "risk": "undeclared"},
+    ),
+    # ── ② `Refs #N` 의 N 이 PR 인 경우 — PR 의 risk 라벨은 가시화 미러다 ──────────
+    (
+        "Refs 가 PR 번호뿐 → 배제되어 미선언 = 사람 경로  (공격 ⑧)",
+        {"issue_refs": [{"number": 13, "is_pr": True, "labels": ["risk: low"]}]},
+        {"arm": False, "risk": "undeclared", "excluded_pr_refs": [13]},
+    ),
+    (
+        "PR 미러(low) + 고위험 이슈 → 고위험을 취한다  (공격 ⑧)",
+        {
+            "issue_refs": [
+                {"number": 13, "is_pr": True, "labels": ["risk: low"]},
+                {"number": 23, "labels": ["risk: high"]},
+            ]
+        },
+        {"arm": False, "risk": "high", "excluded_pr_refs": [13]},
+    ),
+    (
+        "PR 미러 + 저위험 이슈 → 이슈만 읽어 arm (배제가 정상 판독을 막지 않는다)",
+        {
+            "issue_refs": [
+                {"number": 13, "is_pr": True, "labels": ["risk: high"]},
+                {"number": 2, "labels": ["risk: low"]},
+            ]
+        },
+        {"arm": True, "risk": "low", "excluded_pr_refs": [13]},
+    ),
+    (
+        "이슈 조회 실패 → 미선언 = 사람 경로 (fail-closed)",
+        {"issue_refs": [{"number": 23, "lookup_failed": True}]},
+        {"arm": False, "risk": "undeclared"},
+    ),
+    (
+        "저위험 이슈 + 조회 실패 이슈 → 미선언 (실패가 low 에 묻히지 않는다)",
+        {
+            "issue_refs": [
+                {"number": 2, "labels": ["risk: low"]},
+                {"number": 23, "lookup_failed": True},
+            ]
+        },
+        {"arm": False, "risk": "undeclared"},
+    ),
+    # ── ③ 저자 신원 축 — 동일-벤더면 티어를 알아야 arm 한다 ──────────────────────
+    (
+        "동일-벤더 + 작성 티어 미상(구형식 claude-agent@) → arm 거부  (공격 ⑨)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["claude-agent@noreply.local"],
+        },
+        {"arm": False, "self_vendor": True, "author_tier": None},
+    ),
+    (
+        "동일-벤더 + 작성 티어 명시 → arm (반대 티어가 배정된다)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["claude-opus-agent@noreply.local"],
+        },
+        {"arm": True, "self_vendor": True, "author_tier": "opus"},
+    ),
+    (
+        "동일-벤더 + claude 티어 혼재 → 티어 미상으로 접혀 arm 거부  (공격 ⑨)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": [
+                "claude-opus-agent@noreply.local",
+                "claude-sonnet-agent@noreply.local",
+            ],
+        },
+        {"arm": False, "self_vendor": True, "author_tier": None},
+    ),
+    (
+        "동일-벤더 + 브랜치명 단독 판별(커밋 신원 없음) → arm 거부  (공격 ⑨)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "fix-23-claude",
+        },
+        {"arm": False, "self_vendor": True, "identity_source": "branch-name"},
+    ),
+    (
+        "교차 벤더(claude 저자 · kimi 리뷰) → 티어 미상이어도 arm",
+        {"commit_author_emails": ["claude-agent@noreply.local"]},
+        {"arm": True, "self_vendor": False},
+    ),
+    (
+        "사람 저자(에이전트 신원 없음) → 자기리뷰 축 미해당, risk: low 면 arm",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/x",
+        },
+        {"arm": True, "self_vendor": False, "identity_source": "none"},
+    ),
+    (
+        "커밋 저자 이메일 0건(조회 실패) → arm 거부 (fail-closed)",
+        {"commit_author_emails": []},
+        {"arm": False, "self_vendor": None},
+    ),
+    (
+        "커밋 저자 이메일 키 부재 → arm 거부 (fail-closed)",
+        {"commit_author_emails": None},
+        {"arm": False, "self_vendor": None},
+    ),
+    (
+        "마커 모델 미상 → 자기리뷰 판정 불가로 arm 거부 (fail-closed)",
+        {"marker_model": ""},
+        {"arm": False, "self_vendor": None},
+    ),
+    (
+        "마커 모델이 어휘 밖 → arm 거부 (fail-closed)",
+        {"marker_model": "gpt"},
+        {"arm": False, "self_vendor": None},
     ),
     (
         "봇 PR minor 상승 → 위험 미선언이어도 arm  (설계 §2-1)",
         {
             "pr_author_is_bot": True,
+            "pr_author_login": "dependabot[bot]",
             "pr_title": "build(deps): bump pyjwt from 2.12.1 to 2.13.0 in /template-mcp-service",
-            "issue_risks": {},
+            "issue_refs": [],
+            "commit_author_emails": [
+                "49699333+dependabot[bot]@users.noreply.github.com"
+            ],
         },
-        {"arm": True, "bot_bump": "non-major"},
+        {"arm": True, "bot_bump": "non-major", "self_vendor": False},
     ),
     (
         "봇 PR major 상승 → 사람 경로  (공격 ⑤)",
         {
             "pr_author_is_bot": True,
             "pr_title": "build(deps): bump cryptography from 48.0.1 to 50.0.0 in /market-data-mcp-service",
-            "issue_risks": {},
+            "issue_refs": [],
+            "commit_author_emails": [
+                "49699333+dependabot[bot]@users.noreply.github.com"
+            ],
         },
         {"arm": False, "bot_bump": "major"},
     ),
@@ -257,7 +460,10 @@ ARM_CASES = [
         {
             "pr_author_is_bot": True,
             "pr_title": "build(deps): bump the pip group with 3 updates",
-            "issue_risks": {},
+            "issue_refs": [],
+            "commit_author_emails": [
+                "49699333+dependabot[bot]@users.noreply.github.com"
+            ],
         },
         {"arm": False, "bot_bump": None},
     ),
@@ -265,7 +471,7 @@ ARM_CASES = [
         "사람 저자 + major 꼴 제목 → 봇 경로 미적용 (미선언 = 사람 경로)",
         {
             "pr_title": "build(deps): bump x from 1.0 to 2.0",
-            "issue_risks": {},
+            "issue_refs": [],
         },
         {"arm": False},
     ),

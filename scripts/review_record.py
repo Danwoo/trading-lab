@@ -7,9 +7,12 @@ GitHub 이 자기 PR 자기 승인을 금지해 로컬 `gh`(리드 계정)로는
 
 ## 보안 경계 (공개 레포 — 이 넷이 위조 방어의 전부다)
 
-1. **저자 필터**: 마커는 `OWNER`·`MEMBER`·`COLLABORATOR` 가 쓴 코멘트에서만 읽는다.
-   승인을 required 로 걸지 않는 이 설계에서 유일한 위조 방어다 — 없으면 누구든 위조 마커로
-   봇 승인·자동 머지를 일으킬 수 있다 (head sha 는 공개 정보다).
+1. **저자 필터**: 마커는 `OWNER`·`MEMBER`·`COLLABORATOR` 가 쓴 코멘트, 또는 이 레포의
+   워크플로 자신(`github-actions[bot]`)이 쓴 코멘트에서만 읽는다. 승인을 required 로 걸지
+   않는 이 설계에서 유일한 위조 방어다 — 없으면 누구든 위조 마커로 봇 승인·자동 머지를
+   일으킬 수 있다 (head sha 는 공개 정보다). 봇 축은 **로그인과 봇 타입이 둘 다** 맞을 때만
+   열린다: 타입만 보면 이 레포에 설치된 아무 앱이나, 로그인만 보면 같은 이름의 사람 계정이
+   통과한다.
 2. **sha 는 40자 동등 비교**: 접두사 매치 금지 — 접두 비교는 앞자리만 같은 다른 커밋의
    판정을 통과시킨다.
 3. **`source=manual` 마커는 arm 하지 않는다**: 사람이 타이핑한 한 줄일 수 있다 (#285 규약 —
@@ -21,12 +24,20 @@ GitHub 이 자기 PR 자기 승인을 금지해 로컬 `gh`(리드 계정)로는
 
   ① required 게이트 초록 — `gate` 서브커맨드 (워크플로가 완료까지 재조회한다)
   ② 승인 리뷰가 있고 그 `commit_id` 가 현재 head 와 같다 — `arm`
-  ③ `risk: low` **또는** 저자가 봇이면서 major 상승이 아니다 — `arm`
+  ③ 저자 벤더 ≠ 리뷰어 벤더, 또는 같은 벤더여도 작성 티어를 안다 — `arm`
+  ④ `risk: low` **또는** 저자가 봇이면서 major 상승이 아니다 — `arm`
+
+조건 ③ 은 cross-review.yml 의 동일-벤더 폴백 차단을 arm 조건으로 승계한 것이다: 리뷰어
+벤더가 저자 벤더와 같으면 교차 축이 티어뿐인데, 작성 티어를 모르면 동일-티어 자기리뷰
+가능성을 배제할 수 없다. 저자 신원은 커밋 author 이메일(1순위)·브랜치명으로 읽고, 판독
+자체가 안 되면 arm 하지 않는다 (fail-closed). 신원 형식의 SoT 는 `review_route` 하나다.
 
 위험도의 SoT 는 **이슈의 risk 라벨**이고 판정 시점마다 fresh 조회한다 (merge-router.yml 이
 못 박은 규칙 승계). 이슈 연결은 `closingIssuesReferences` 가 아니라 **PR 본문 파싱**으로 읽는다
 (`Refs #N` 도 위험도 출처 — 2026-08-09 리드 결정. closing 키워드만 잡으면 위험도를 읽히려고
 PR 마다 전용 이슈를 만들게 된다). 여러 이슈면 가장 높은 위험, 하나도 못 읽으면 미선언 = 고위험.
+**`Refs #N` 의 N 은 PR 일 수 있다** — `issues/{N}` 은 PR 에도 응답하고 PR 의 risk 라벨은
+가시화 미러라 판정 입력이 아니다. PR 은 배제하고 근거에 남긴다.
 
 ## 서브커맨드 (stdin JSON → stdout JSON, `gate` 만 종료코드 프로토콜)
 
@@ -43,10 +54,15 @@ import json
 import re
 import sys
 
+import review_route
 import verify_upstream_gate as gate_lib
 
 TRUSTED_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")
 BOT_REVIEWER_LOGIN = "github-actions"
+# GITHUB_TOKEN 으로 올린 코멘트의 `author_association` 은 이 레포에서 `NONE` 이다
+# (2026-08-09 실측) — cross-review publish 폴백 게시분이 여기 걸려 영영 안 읽혔다.
+TRUSTED_BOT_LOGINS = (BOT_REVIEWER_LOGIN,)
+REVIEWER_VENDORS = ("claude", "kimi", "codex")
 
 # cross-review.yml 의 마커 게시부·merge-router.yml 의 arm 가드와 같은 문법. sha 자릿수는
 # 여기서 안 좁힌다 — 접두 sha 를 정규식에서 거르면 「40자 동등 비교」가 검증 불가능한
@@ -91,7 +107,7 @@ def find_marker(comments, head_sha):
     for comment in comments:
         if not isinstance(comment, dict):
             continue
-        if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
+        if not is_trusted_author(comment):
             continue
         for m in _MARKER.finditer(comment.get("body") or ""):
             if len(m.group("sha")) != 40 or m.group("sha") != head_sha:
@@ -104,6 +120,20 @@ def find_marker(comments, head_sha):
                 "comment_url": comment.get("html_url"),
             }
     return found
+
+
+def is_trusted_author(comment) -> bool:
+    """마커를 읽어도 되는 코멘트인가 — 멤버 축, 또는 워크플로 자신(봇) 축.
+
+    봇 축은 로그인·타입을 **둘 다** 요구한다. 어느 한쪽만 보면 신뢰 경계가 「이 레포의
+    워크플로」에서 「봇처럼 보이는 것」으로 넓어진다.
+    """
+    if comment.get("author_association") in TRUSTED_ASSOCIATIONS:
+        return True
+    return (
+        comment.get("user_type") == "Bot"
+        and _normalize_login(comment.get("user_login")) in TRUSTED_BOT_LOGINS
+    )
 
 
 def _bot_reviews_for_head(reviews, head_sha):
@@ -144,7 +174,8 @@ def decide_record(payload) -> dict:
         return {
             **base,
             "reason": "현재 head 와 40자 동등한 유효 마커 없음 "
-            "(저자 필터 OWNER/MEMBER/COLLABORATOR · 낡은 sha·접두 sha 불인정)",
+            "(저자 필터 OWNER/MEMBER/COLLABORATOR + github-actions[bot] · "
+            "낡은 sha·접두 sha 불인정)",
         }
 
     result = {
@@ -202,34 +233,122 @@ def classify_bump(title):
     return "major" if new != old else "non-major"
 
 
-def read_risk(issue_risks):
-    """이슈별 라벨에서 위험도를 접는다 — 이슈 없음·라벨 없음은 미선언 = 고위험 취급."""
-    if not issue_risks:
-        return "undeclared", "연결 이슈 없음 — 위험도 판독 불가"
-    per_issue = {}
-    for number, labels in issue_risks.items():
-        labels = labels or []
+def _ref_sort_key(ref):
+    number = str(ref.get("number", "") if isinstance(ref, dict) else "")
+    return (0, int(number)) if number.isdigit() else (1, number)
+
+
+def read_risk(refs):
+    """참조 번호별 메타에서 위험도를 접는다 — 라벨 없음·판독 불가는 미선언 = 고위험 취급.
+
+    원소는 `{number, is_pr, labels, lookup_failed}`. **PR 은 위험도 출처가 아니다** —
+    `issues/{N}` 이 PR 에도 응답해 PR 의 가시화 미러 라벨이 판정 입력으로 새는 것을 막는다.
+    배제한 번호는 근거 문자열에 남긴다. 반환은 (위험도, 근거, 배제한 PR 번호 목록).
+    """
+    if not refs:
+        return "undeclared", "연결 이슈 없음 — 위험도 판독 불가", []
+
+    verdicts, notes, excluded = [], [], []
+    for ref in sorted(refs, key=_ref_sort_key):
+        if not isinstance(ref, dict):
+            notes.append("#?=형식 불량(미선언)")
+            verdicts.append("undeclared")
+            continue
+        number = ref.get("number")
+        if ref.get("is_pr"):
+            excluded.append(number)
+            notes.append(f"#{number}=PR(제외 — risk 라벨은 가시화 미러)")
+            continue
+        if ref.get("lookup_failed"):
+            notes.append(f"#{number}=조회 실패(미선언)")
+            verdicts.append("undeclared")
+            continue
+        labels = ref.get("labels") or []
         if "risk: high" in labels:
-            per_issue[number] = "high"
+            verdict = "high"
         elif "risk: low" in labels:
-            per_issue[number] = "low"
+            verdict = "low"
         else:
-            per_issue[number] = "undeclared"
-    evidence = ", ".join(f"#{n}={per_issue[n]}" for n in sorted(per_issue, key=str))
-    if any(v == "high" for v in per_issue.values()):
-        return "high", evidence
-    if any(v == "undeclared" for v in per_issue.values()):
-        return "undeclared", evidence
-    return "low", evidence
+            verdict = "undeclared"
+        verdicts.append(verdict)
+        notes.append(f"#{number}={verdict}")
+
+    evidence = ", ".join(notes)
+    if not verdicts:
+        return "undeclared", f"{evidence} — 이슈 참조 0건, 위험도 판독 불가", excluded
+    if "high" in verdicts:
+        return "high", evidence, excluded
+    if "undeclared" in verdicts:
+        return "undeclared", evidence, excluded
+    return "low", evidence, excluded
+
+
+def judge_author_identity(payload) -> dict:
+    """조건 ③ — 리뷰어 벤더가 저자 벤더와 같을 때 작성 티어를 아는가.
+
+    같은 벤더면 교차 축이 티어뿐이다. 티어를 모르면 동일-티어 자기리뷰 가능성을 배제할 수
+    없으므로 arm 을 거부한다 (리뷰 자체와 코멘트·네이티브 리뷰 기록은 그대로 남는다).
+    신원을 아예 못 읽어도 거부한다 — 못 읽으면 arm 하지 않는다.
+    """
+    emails = payload.get("commit_author_emails")
+    reviewer = payload.get("marker_model") or ""
+    result = {
+        "self_vendor": None,
+        "author_models": None,
+        "author_tier": None,
+        "identity_source": None,
+        "block": None,
+    }
+    if not isinstance(emails, list) or not [e for e in emails if e]:
+        return {
+            **result,
+            "block": "커밋 저자 신원을 못 읽음(이메일 0건) — arm 하지 않는다 (fail-closed)",
+        }
+    if reviewer not in REVIEWER_VENDORS:
+        return {
+            **result,
+            "block": f"리뷰어 벤더 미상({reviewer!r}) — 자기리뷰 여부를 판정할 수 없다 "
+            "(fail-closed)",
+        }
+
+    identity = review_route.identify_author(emails, payload.get("head_ref") or "")
+    author_models = identity["author_models"]
+    self_vendor = reviewer in [v for v in author_models.split(",") if v]
+    result = {
+        "self_vendor": self_vendor,
+        "author_models": author_models or None,
+        "author_tier": identity["author_tier"],
+        "identity_source": identity["identity_source"],
+        "block": None,
+    }
+    if self_vendor and not identity["author_tier"]:
+        return {
+            **result,
+            "block": f"동일-벤더 리뷰({reviewer}) + 작성 티어 미상 — 동일-티어 자기리뷰를 "
+            "배제할 수 없어 arm 하지 않는다 (게이트만 사람에게)",
+        }
+    return result
 
 
 def decide_arm(payload) -> dict:
-    """자동 머지 arm 여부 — 조건 ②③ 을 판정한다 (① 게이트는 `gate` 서브커맨드가 맡는다)."""
+    """자동 머지 arm 여부 — 조건 ②③④ 를 판정한다 (① 게이트는 `gate` 서브커맨드가 맡는다)."""
     head_sha = payload.get("head_sha") or ""
     marker_sha = payload.get("marker_sha") or ""
-    risk, evidence = read_risk(payload.get("issue_risks") or {})
+    risk, evidence, excluded_prs = read_risk(payload.get("issue_refs") or [])
     bump = classify_bump(payload.get("pr_title"))
-    base = {"arm": False, "risk": risk, "risk_evidence": evidence, "bot_bump": bump}
+    identity = judge_author_identity(payload)
+    base = {
+        "arm": False,
+        "risk": risk,
+        "risk_evidence": evidence,
+        "excluded_pr_refs": excluded_prs,
+        "bot_bump": bump,
+        "pr_author_login": payload.get("pr_author_login"),
+        "self_vendor": identity["self_vendor"],
+        "author_models": identity["author_models"],
+        "author_tier": identity["author_tier"],
+        "identity_source": identity["identity_source"],
+    }
 
     if payload.get("verdict") != "merge_ok":
         return {**base, "reason": f"판정이 merge_ok 아님({payload.get('verdict')})"}
@@ -256,6 +375,9 @@ def decide_arm(payload) -> dict:
             "reason": "현재 head 에 대한 봇 승인 리뷰 없음 (조건 ② 미충족 — "
             "리뷰 게시 실패 또는 push 로 낡음)",
         }
+
+    if identity["block"]:
+        return {**base, "reason": f"조건 ③ 미충족 — {identity['block']}"}
 
     if risk == "low":
         return {
