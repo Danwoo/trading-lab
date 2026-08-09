@@ -12,7 +12,8 @@ export type PanelCapability =
   | "positions"
   | "botState"
   | "researchDocs"
-  | "aiConsole";
+  | "aiConsole"
+  | "dataIngest";
 
 export type CapabilityVerdict = { available: true } | { available: false; reason: string };
 

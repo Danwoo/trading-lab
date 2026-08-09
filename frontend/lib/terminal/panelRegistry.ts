@@ -29,6 +29,16 @@ export const PANEL_REGISTRY: Record<string, PanelDefinition> = {
     minSize: { w: 3, h: 4 },
     load: () => import("@/components/features/SymbolInfoPanel/SymbolInfoPanel"),
   },
+  // 종목을 고르기 전에도 열려야 한다 — 차트에 그릴 캔들을 먼저 여기서 받는다.
+  "data-ingest": {
+    type: "data-ingest",
+    title: "데이터 적재",
+    capability: "dataIngest",
+    needsSymbol: false,
+    defaultSize: { w: 4, h: 12 },
+    minSize: { w: 3, h: 8 },
+    load: () => import("@/components/features/DataIngestPanel/DataIngestPanel"),
+  },
 };
 
 export function getPanelDefinition(type: string): PanelDefinition | undefined {
