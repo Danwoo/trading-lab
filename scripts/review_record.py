@@ -24,7 +24,7 @@ GitHub 이 자기 PR 자기 승인을 금지해 로컬 `gh`(리드 계정)로는
 
   ① required 게이트 초록 — `gate` 서브커맨드 (워크플로가 완료까지 재조회한다)
   ② 승인 리뷰가 있고 그 `commit_id` 가 현재 head 와 같다 — `arm`
-  ③ 저자 벤더 ≠ 리뷰어 벤더, 또는 같은 벤더여도 작성 티어를 안다 — `arm`
+  ③ 저자 벤더 ≠ 리뷰어 벤더, 또는 같은 벤더여도 **그 벤더의** 작성 티어를 안다 — `arm`
   ④ `risk: low` **또는** 저자가 봇이면서 major 상승이 아니다 — `arm`
 
 조건 ③ 은 cross-review.yml 의 동일-벤더 폴백 차단을 arm 조건으로 승계한 것이다: 리뷰어
@@ -63,6 +63,10 @@ BOT_REVIEWER_LOGIN = "github-actions"
 # (2026-08-09 실측) — cross-review publish 폴백 게시분이 여기 걸려 영영 안 읽혔다.
 TRUSTED_BOT_LOGINS = (BOT_REVIEWER_LOGIN,)
 REVIEWER_VENDORS = ("claude", "kimi", "codex")
+# `review_route` 가 티어를 모으는 벤더 — 지금은 claude 뿐이다. 티어 축은 **리뷰어 벤더의**
+# 티어를 알 때만 자기리뷰 차단을 푼다: 혼재 저자(claude+kimi)에서 claude 티어를 안다는
+# 이유로 kimi 리뷰의 차단이 풀리면, 아는 티어와 겹치는 벤더가 달라 아무것도 배제하지 못한다.
+TIER_KNOWN_VENDOR = "claude"
 
 # cross-review.yml 의 마커 게시부·merge-router.yml 의 arm 가드와 같은 문법. sha 자릿수는
 # 여기서 안 좁힌다 — 접두 sha 를 정규식에서 거르면 「40자 동등 비교」가 검증 불가능한
@@ -76,16 +80,20 @@ _FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
 
 # PR 본문의 이슈 참조 — 키워드 + `#N` 목록 (`Refs #23, #24` 꼴 허용). closing 키워드도
 # 위험도 출처로 같이 읽는다 (Closes 를 쓴 PR 이 Refs 만 못 읽혀 미선언이 되지 않게).
-# **코드 펜스·인용·인라인 코드는 참조가 아니다** — 본문 어디에 있든 읽으면 재현 스크립트
-# 인자·인용·서술 속 `Refs #<저위험 이슈>` 가 위험도 출처가 된다 (PR #67 본문 실측: 뽑힌 4건
-# 중 진짜 참조는 1건. 나머지는 코드 펜스 안 테스트 인자와 인라인 코드 서술이었다).
+# **코드와 인용 안은 참조가 아니다** — 본문 어디에 있든 읽으면 재현 스크립트 인자·인용·서술
+# 속 `Refs #<저위험 이슈>` 가 위험도 출처가 된다 (PR #67 본문 실측: 뽑힌 4건 중 진짜 참조는
+# 1건. 나머지는 코드 펜스 안 테스트 인자와 인라인 코드 서술이었다). 코드 판별은 펜스(중첩
+# 포함)·4칸 들여쓰기 블록·인라인 셋, 인용 판별은 `>` 와 그 lazy 연속행이다.
 _REF_BLOCK = re.compile(
     r"\b(?:refs?|close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b:?\s*"
     r"(#\d+(?:\s*(?:,|and)?\s*#\d+)*)",
     re.IGNORECASE,
 )
 _REF_NUMBER = re.compile(r"#(\d+)")
-_FENCE = re.compile(r"^\s*(?:```|~~~)")
+# 펜스는 여는 표시를 기억했다가 **같은 문자로 그만큼 이상** 일 때만 닫는다 — 단일 토글이면
+# 중첩 펜스(백틱 4개 안의 백틱 3개)에서 안팎이 뒤집혀 코드가 산문으로 읽힌다.
+_FENCE = re.compile(r"^\s{0,3}(?P<mark>`{3,}|~{3,})")
+_INDENTED_CODE = re.compile(r"^(?: {4}|\t)")
 _INLINE_CODE = re.compile(r"`[^`]*`")
 
 # dependabot 제목 형식: `build(deps): bump X from A to B in /path` (설계 §2-1 실측).
@@ -216,17 +224,35 @@ def decide_record(payload) -> dict:
 def parse_refs(body) -> list[int]:
     """PR 본문의 산문에서 참조 이슈 번호를 뽑는다 (중복 제거, 오름차순).
 
-    코드 펜스·인용(`>`)·인라인 코드는 버린다 — 거기 적힌 `Refs #N` 은 선언이 아니라 인용이다.
+    코드는 버린다 — 펜스(중첩 포함)·4칸 들여쓰기 블록·인라인 코드, 그리고 인용은 lazy
+    연속행(`>` 없는 다음 줄)까지. 거기 적힌 `Refs #N` 은 선언이 아니라 인용이다.
     못 읽으면 미선언 = 사람 경로라 좁히는 방향이 fail-closed 다 (레포 전 PR 본문 60건 실측:
     달라지는 것은 2건 — 위 실측 PR 과, 참조를 인라인 코드로만 적은 확인용 PR 하나).
     """
     numbers: set[int] = set()
-    in_fence = False
+    fence: str | None = None
+    in_quote = False
     for line in (body or "").splitlines():
-        if _FENCE.match(line):
-            in_fence = not in_fence
+        opened = _FENCE.match(line)
+        if fence is not None:
+            # 닫는 것은 같은 문자로 여는 길이 이상일 때만 (중첩 펜스 보호)
+            if (
+                opened
+                and opened.group("mark")[0] == fence[0]
+                and len(opened.group("mark")) >= len(fence)
+            ):
+                fence = None
             continue
-        if in_fence or line.lstrip().startswith(">"):
+        if opened:
+            fence = opened.group("mark")
+            continue
+        if not line.strip():
+            in_quote = False
+            continue
+        if line.lstrip().startswith(">"):
+            in_quote = True
+            continue
+        if in_quote or _INDENTED_CODE.match(line):
             continue
         for m in _REF_BLOCK.finditer(_INLINE_CODE.sub(" ", line)):
             numbers.update(int(n) for n in _REF_NUMBER.findall(m.group(1)))
@@ -313,8 +339,9 @@ def judge_author_identity(payload) -> dict:
     을 내어 리뷰어로 claude 를 배정한다.
 
     작성 티어는 현재 claude 신원에서만 판독된다 (`review_route` 가 `claude_tiers_seen` 만
-    모은다). 따라서 동일-벤더 kimi·codex 는 티어를 실어도 늘 사람 경로다 — fail-closed 쪽
-    비대칭이라 그대로 두되, 「티어를 알면 arm」이 claude 에서만 성립한다는 뜻이다.
+    모은다). 그래서 차단 해제는 **리뷰어 벤더가 claude 일 때만** 성립한다 — 동일-벤더
+    kimi·codex 는 티어를 실어도 늘 사람 경로이고, 혼재 저자에서 claude 티어를 안다는 이유로
+    kimi 리뷰의 차단이 풀리지도 않는다.
     """
     emails = payload.get("commit_author_emails")
     reviewer = payload.get("marker_model") or ""
@@ -357,11 +384,14 @@ def judge_author_identity(payload) -> dict:
             + ", ".join(unknown_agentish)
             + ") — 저자 벤더를 판정할 수 없어 arm 하지 않는다 (fail-closed)",
         }
-    if self_vendor and not identity["author_tier"]:
+    # 아는 티어가 **리뷰어 벤더의 것**일 때만 차단이 풀린다 — 혼재 저자에서 다른 벤더의
+    # 티어로 풀면 동일-티어 자기리뷰를 배제하지 못한 채 통과한다
+    tier_known = identity["author_tier"] is not None and reviewer == TIER_KNOWN_VENDOR
+    if self_vendor and not tier_known:
         return {
             **result,
-            "block": f"동일-벤더 리뷰({reviewer}) + 작성 티어 미상 — 동일-티어 자기리뷰를 "
-            "배제할 수 없어 arm 하지 않는다 (게이트만 사람에게)",
+            "block": f"동일-벤더 리뷰({reviewer}) + 그 벤더의 작성 티어 미상 — 동일-티어 "
+            "자기리뷰를 배제할 수 없어 arm 하지 않는다 (게이트만 사람에게)",
         }
     return result
 
