@@ -192,6 +192,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_upstream_gate.py
 
+      # 리뷰 기록기 판정 (#23 Task 7) — review-record.yml 이 부르는 순수 판정. 공개 레포의
+      # 위조 표면(비-멤버 마커·접두 sha·낡은 sha·source=manual·major 봇 PR·제목 파싱 실패)이
+      # 봇 승인·자동 머지 arm 으로 이어지지 않는지를 공격 케이스로 못박는다.
+      # 케이스를 0건 모으면 실패한다 (fail-closed).
+      - name: 리뷰 기록기 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_review_record.py
+
       # 고지 문서 생성기의 fail-closed 축 (앵커 파손·미분류 라이선스·§3 보존·--check).
       # frontend 잡의 `generate_notices.py --check` 는 **지금 트리가 맞는지**만 보인다 —
       # 생성기가 무엇을 막는지는 안 보이므로, 앵커를 지우거나 분류표를 비워도 트리가
