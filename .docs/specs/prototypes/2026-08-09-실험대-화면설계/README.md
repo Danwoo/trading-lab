@@ -10,7 +10,19 @@
 > 숫자의 타당성은 실데이터가 생긴 뒤에 다시 봐야 합니다.
 > (4차 검증에서 `유효 종목 3.5` 가 수학적으로 불가능한 값임이 드러난 것이 이 한계의 실례입니다.)
 
-## 제품 화면 — 현재 안
+## 셸·구조 — 최신 (2026-08-09)
+
+| 파일 | 무엇 | 결정 |
+|---|---|---|
+| [`bench-board.html`](bench-board.html) | **보드 본체** — 메인 화면. 눌러집니다 | §24 |
+| [`bench-shell.html`](bench-shell.html) | 셸 구조 — 레일·패널·터미널 해체 | §20 |
+| [`bench-tutorial.html`](bench-tutorial.html) | 첫 진입 튜토리얼 — ③에 함정 | §21.1 |
+| [`bench-states.html`](bench-states.html) | 빈 상태·기다림·실패·좁은 화면 | §21.4~6 |
+| [`bench-panels.html`](bench-panels.html) | 화면 8개를 372px 패널로 재배치 | §23 |
+| [`bench-research.html`](bench-research.html) | **리서치** — 두 번째 기둥 | §25 |
+| [`bench-export.html`](bench-export.html) | CSV 내보내기 규격 | §26 |
+
+## 제품 화면 — 재배치 전 원본
 
 | 파일 | 화면 | 상태 |
 |---|---|---|

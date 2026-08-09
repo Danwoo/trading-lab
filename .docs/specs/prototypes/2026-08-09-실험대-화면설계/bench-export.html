@@ -1,0 +1,218 @@
+<style>
+  .ex { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --ok:#7FA05A; --wr:#D9A441; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .ex .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+  .ex h2 { font-size:17px; font-weight:700; color:var(--is); margin:0 0 5px; }
+  .ex h3 { font-size:14.5px; font-weight:700; color:var(--is); margin:30px 0 4px; }
+  .ex h3 em { font-style:normal; color:var(--if); font-weight:400; font-size:12.5px; margin-left:7px; }
+  .ex p.lead { font-size:12.5px; color:var(--im); line-height:1.7; margin:0 0 13px; max-width:80ch; }
+  .ex p.lead b { color:var(--ik); font-weight:500; }
+  .ex code { font-size:11px; color:var(--im); background:var(--rs); padding:1px 4px; border-radius:3px; }
+
+  .panel { width:372px; background:var(--pn); border:1px solid var(--ln); border-radius:11px; overflow:hidden; }
+  .ptop { display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--ln); }
+  .ptop b { font-size:12.5px; color:var(--is); }
+  .ptop .sub { font-size:11px; color:var(--im); }
+  .ptop .r { margin-left:auto; display:flex; gap:7px; color:var(--is); font-size:12px; }
+  .pbd { padding:11px 12px; font-size:11.5px; color:var(--im); line-height:1.6; }
+
+  .opt { display:flex; align-items:flex-start; gap:8px; padding:8px 0; border-bottom:1px solid var(--hl); }
+  .opt:last-child { border-bottom:0; }
+  .opt u { text-decoration:none; width:13px; height:13px; border-radius:4px; border:1px solid var(--ls);
+           flex:0 0 auto; margin-top:2px; }
+  .opt u.on { background:var(--is); border-color:var(--is); position:relative; }
+  .opt u.on::after { content:'✓'; position:absolute; inset:0; color:var(--bg); font-size:9px;
+                     display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .opt .t { flex:1; min-width:0; color:var(--ik); }
+  .opt .t s { display:block; text-decoration:none; font-size:10.5px; color:var(--if); margin-top:1px; }
+
+  .btn { margin-top:10px; text-align:center; font-size:12px; padding:8px; border-radius:8px;
+         background:var(--is); color:var(--bg); font-weight:600; }
+
+  pre.f { background:var(--bg); border:1px solid var(--ln); border-radius:9px; padding:11px 13px;
+          font-size:11px; line-height:1.8; color:var(--im); overflow-x:auto; margin:9px 0;
+          font-family:ui-monospace,Menlo,monospace; }
+  pre.f b { color:var(--ik); font-weight:600; }
+  pre.f s { text-decoration:none; color:var(--if); }
+
+  table.t { width:100%; border-collapse:collapse; font-size:11.5px; margin:8px 0 2px; max-width:960px; }
+  table.t th { text-align:left; font-weight:600; color:var(--im); padding:5px 7px;
+               border-bottom:1px solid var(--ln); font-size:11px; }
+  table.t td { padding:6px 7px; border-bottom:1px solid var(--hl); color:var(--im); vertical-align:top; }
+  table.t td b { color:var(--ik); font-weight:600; }
+  table.t td code { font-size:10.5px; }
+  table.t tr:last-child td { border-bottom:0; }
+
+  .note { border-left:2px solid var(--ls); padding:2px 0 2px 11px; margin:12px 0 0;
+          font-size:11.5px; color:var(--im); line-height:1.65; max-width:80ch; }
+  .note b { color:var(--ik); }
+  .note.good { border-left-color:var(--ok); } .note.warn { border-left-color:var(--wr); }
+  .note.bad { border-left-color:var(--dg); }
+  .cap { font-size:11px; color:var(--if); margin-top:6px; line-height:1.6; }
+</style>
+
+<div class="ex">
+
+<h2>CSV 내보내기 규격</h2>
+<p class="lead">
+  퀀트 페르소나가 이렇게 말했습니다 — <b>"버튼은 약속이지 산출물이 아닙니다."</b>
+  거래 로그 헤더의 <b>⤓</b> 를 눌렀을 때 무엇이 나오는지를 못박습니다.<br>
+  기준은 하나입니다 — <b>받은 사람이 엑셀에서 화면과 같은 숫자를 다시 만들 수 있어야 합니다.</b>
+  그러려면 값만으로는 부족하고 <b>그때의 가정</b>이 같이 나가야 합니다.
+</p>
+
+<h3>① 누르면 이렇게 <em>— 거래 로그 패널의 ⤓</em></h3>
+<div class="panel">
+  <div class="ptop"><b>내보내기</b><span class="sub">거래 로그</span><div class="r"><span>✕</span></div></div>
+  <div class="pbd">
+    <div class="opt"><u class="on"></u><span class="t">거래 <s>trades.csv · 131행 — 지금 목록에 보이는 것</s></span></div>
+    <div class="opt"><u class="on"></u><span class="t">주문·체결 <s>orders.csv · fills.csv — 한 거래가 몇 번에 나눠 체결됐는지</s></span></div>
+    <div class="opt"><u class="on"></u><span class="t">신호 판정 <s>signals.csv · 안 나간 37건 포함 — 왜 안 샀는지가 여기 있습니다</s></span></div>
+    <div class="opt"><u class="on"></u><span class="t">일별 자산 <s>equity_daily.csv · 880행 — 곡선을 다시 그릴 수 있습니다</s></span></div>
+    <div class="opt"><u class="on"></u><span class="t">계산에 쓴 가정 <s>assumptions.csv — 수수료·세금·체결규칙·시세 스냅샷</s>
+      <s style="color:#D9B45C">끄면 위 숫자를 재현할 수 없습니다</s></span></div>
+    <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--hl)">
+      <div class="opt"><u class="on"></u><span class="t">기간 — <b style="color:var(--ik)">지금 보고 있는 구간</b>
+        <s>06-04 ~ 08-07 (거래일 47일). 곡선을 끌어 좁혔으면 그 구간</s></span></div>
+      <div class="opt"><u></u><span class="t">기간 — 전체 <s>모의 시작부터 지금까지</s></span></div>
+    </div>
+    <div class="btn">5개 파일 내려받기 (zip)</div>
+    <div class="cap" style="text-align:center">
+      trading-lab_대형주20일선눌림목_2026-06-04_2026-08-07.zip
+    </div>
+  </div>
+</div>
+
+<div class="note warn">
+  <b>「계산에 쓴 가정」은 기본으로 켜져 있고, 끄면 경고가 붙습니다.</b>
+  수수료 0.015%·세금 0.18%·체결 「신호 다음 날 시가」·시세 08-07 스냅샷이 없으면
+  받은 사람이 <b>같은 숫자를 못 만듭니다.</b> 그러면 CSV 는 「숫자 목록」이지 <b>기록이 아닙니다.</b>
+</div>
+
+<h3>② 파일 다섯 개</h3>
+<table class="t">
+  <tr><th style="width:18%">파일</th><th style="width:24%">DB 출처</th><th>무엇에 답하나</th></tr>
+  <tr><td><code>trades.csv</code></td><td><code>tn_trade</code></td><td>무엇을 언제 사고팔아 얼마 벌었나</td></tr>
+  <tr><td><code>orders.csv</code><br><code>fills.csv</code></td><td><code>tn_order</code> · <code>tn_fill</code></td>
+      <td>주문이 <b>몇 번에 나눠</b> 체결됐나, 거부·취소·만료는 왜</td></tr>
+  <tr><td><code>signals.csv</code></td><td><code>tn_signal_evaluation</code> · <code>tn_missed_signal</code></td>
+      <td><b>안 산 것까지</b> — 조건별 통과/탈락, 못 산 이유(앱 꺼짐·상한가·거래정지·잔고부족)</td></tr>
+  <tr><td><code>equity_daily.csv</code></td><td><code>tn_bot_equity_daily</code></td><td>일별 자산 — <b>곡선을 다시 그릴 수 있음</b></td></tr>
+  <tr><td><code>assumptions.csv</code></td><td><code>tn_run</code> · <code>tn_cost_assumption</code></td>
+      <td><b>이 숫자들이 어떤 전제 위에 있나</b></td></tr>
+</table>
+
+<h3>③ 열 — <code>trades.csv</code></h3>
+<pre class="f"><b>trade_id,bot_id,mode,run_id,symbol,symbol_name,side,</b>
+<b>entry_ts,entry_price,exit_ts,exit_price,qty,</b>
+<b>pnl_amount,pnl_pct,fee_amount,tax_amount,</b>
+<b>entry_slippage_bp,exit_slippage_bp,entry_slippage_amt,exit_slippage_amt,</b>
+<b>mae_pct,mfe_pct,exit_reason,actor,param_set_hash,data_snapshot_id</b>
+
+TR-000131,BOT-01,paper,RUN-0f3a,035720,카카오,long,
+2026-07-27T09:00:00+09:00,45050,2026-08-07T09:00:00+09:00,41887,45,
+-142335,-7.02,304,3650,<s>← 수수료·세금을 손익과 따로</s>
+2.0,2.0,405,377,
+3.20,-7.40,stop_loss,bot,<s>← 사람이 손댔으면 human</s>
+p_8c21e0,SNAP-2026-08-07</pre>
+
+<table class="t">
+  <tr><th style="width:26%">왜 이 열이 있나</th><th>이유</th></tr>
+  <tr><td><code>mode</code> · <code>run_id</code></td><td><b>백테스트와 모의를 섞어 받지 않게.</b> 어느 파라미터셋으로 돌던 구간인지도 붙는다</td></tr>
+  <tr><td><code>fee_amount</code>·<code>tax_amount</code> 분리</td><td>손익에 이미 반영돼 있지만 <b>따로도 준다</b> — 1차 검증에서 수수료가 10배 틀렸던 자리다</td></tr>
+  <tr><td>슬리피지 <b>bp + 원화</b></td><td>bp 만 주면 나중에 금액으로 되돌릴 때 <b>사후 추정</b>이 된다(§18 참조)</td></tr>
+  <tr><td><code>mae_pct</code>·<code>mfe_pct</code></td><td>보유 중 <b>가장 나빴을 때·좋았을 때.</b> 손절선을 다시 정할 때 이것만 본다</td></tr>
+  <tr><td><code>actor</code></td><td><b>봇이 한 것과 사람이 손댄 것을 가른다.</b> 화면의 「내가 손댄 거래」와 같은 값</td></tr>
+  <tr><td><code>param_set_hash</code></td><td>같은 봇이라도 설정을 바꿨으면 다른 값. <b>섞어서 통계 내는 것을 막는다</b></td></tr>
+</table>
+
+<h3>④ 열 — <code>signals.csv</code> <em>(이게 이 제품에서 제일 특이한 파일입니다)</em></h3>
+<p class="lead">
+  다른 도구는 <b>산 것만</b> 내보냅니다. 여기는 <b>안 산 것</b>도 나갑니다 —
+  「왜 이 종목은 안 샀나」와 「왜 못 샀나」가 갈려 있어야 봇을 고칠 수 있습니다.
+</p>
+<pre class="f"><b>signal_ts,symbol,symbol_name,decision,rule_results,</b>
+<b>miss_reason,intended_price,price_at_next_open,simulated_pnl</b>
+
+2026-08-06T15:30:00+09:00,005930,삼성전자,entered,<s>← 실제로 샀음</s>
+"ma20_touch=passed;surge_filter=passed;volume=disabled",,71400,,
+2026-08-06T15:30:00+09:00,000660,SK하이닉스,rejected,<s>← 조건 미달로 안 삼</s>
+"ma20_touch=passed;surge_filter=failed;volume=disabled",,,,
+2026-08-04T15:30:00+09:00,051910,LG화학,missed,<s>← 사려 했으나 못 삼</s>
+"ma20_touch=passed;surge_filter=passed;volume=disabled",app_down,412000,418500,-64000</pre>
+
+<table class="t">
+  <tr><th style="width:22%">값</th><th>뜻</th></tr>
+  <tr><td><code>decision</code></td><td><code>entered</code> 샀음 / <code>rejected</code> <b>조건이 안 맞아 안 삼</b> / <code>missed</code> <b>조건은 맞았는데 못 삼</b></td></tr>
+  <tr><td><code>rule_results</code></td><td>조건별 <code>passed</code>/<code>failed</code>/<code>disabled</code>/<code>not_evaluated</code>.
+    <b><code>disabled</code>(안 켠 조건)를 <code>failed</code> 와 구분</b>하는 것이 핵심이다 — 안 켠 걸 「걸렀다」고 세면 봇을 잘못 고친다</td></tr>
+  <tr><td><code>miss_reason</code></td><td><code>app_down</code>·<code>limit_up</code>·<code>suspended</code>·<code>insufficient_cash</code></td></tr>
+  <tr><td><code>simulated_pnl</code></td><td><b>놓쳐서 잃은 것(또는 번 것).</b> 봇 규칙대로 언제 팔았을지 시뮬레이션한 값</td></tr>
+</table>
+
+<h3>⑤ 형식 — 정한 것</h3>
+<table class="t">
+  <tr><th style="width:22%">항목</th><th style="width:26%">정한 값</th><th>이유</th></tr>
+  <tr><td>인코딩</td><td><b>UTF-8 BOM 포함</b></td><td>BOM 없이 주면 <b>엑셀에서 한글이 깨진다.</b> 받는 사람 대부분이 엑셀로 연다</td></tr>
+  <tr><td>구분자</td><td>쉼표. 값 안에 쉼표·따옴표가 있으면 <code>"</code> 로 감쌈</td><td>표준(RFC 4180). <code>rule_results</code> 가 세미콜론을 쓰는 이유이기도 하다</td></tr>
+  <tr><td>줄바꿈</td><td><code>CRLF</code></td><td>엑셀 호환</td></tr>
+  <tr><td>날짜·시각</td><td><b>ISO 8601 + 오프셋</b> <code>2026-07-27T09:00:00+09:00</code></td>
+      <td>엑셀이 자동 변환해도 원본이 남는다. <b>KST 를 문자열로 박아</b> 나중에 시간대를 헷갈리지 않게</td></tr>
+  <tr><td>숫자</td><td><b>반올림하지 않음.</b> 천단위 구분 없음, 소수점 <code>.</code></td>
+      <td>화면은 「−14.2만」으로 줄여 보여주지만 CSV 는 <code>-142335</code> 그대로.
+      <b>화면이 반올림한 값을 CSV 가 그대로 물려받으면 합계가 안 맞는다</b></td></tr>
+  <tr><td>퍼센트</td><td><code>-7.02</code> <b>(단위 없이 숫자만)</b></td><td><code>%</code> 를 붙이면 엑셀이 문자열로 읽는다</td></tr>
+  <tr><td>빈 값</td><td><b>빈 칸</b> (<code>NULL</code>·<code>-</code> 안 씀)</td><td>「값이 0」과 「값이 없음」을 가른다 — 보유 중인 거래의 <code>exit_price</code> 는 빈 칸이다</td></tr>
+  <tr><td>파일명</td><td><code>trading-lab_&lt;봇이름&gt;_&lt;시작&gt;_&lt;끝&gt;.zip</code></td><td>여러 번 받아도 안 섞인다</td></tr>
+</table>
+
+<h3>⑥ <code>assumptions.csv</code> — 없으면 나머지가 무의미합니다</h3>
+<pre class="f"><b>key,value,note</b>
+run_id,RUN-0f3a,
+mode,paper,
+bot_id,BOT-01,
+param_set_hash,p_8c21e0,<s>설정을 바꾸면 값이 바뀐다</s>
+code_version,v0.4.1+8ac2,<s>엔진이 바뀌면 같은 설정도 결과가 다르다</s>
+data_snapshot_id,SNAP-2026-08-07,<s>시세가 소급 수정되면 결과가 바뀐다</s>
+fee_rate_bp,1.5,왕복 0.015%
+tax_rate_bp,18,매도만 0.18%
+slippage_bp,5,0.05%
+fill_rule,next_open,신호 다음 날 시가
+calendar_id,KRX-2026,
+universe_id,KOSPI200-asof,날짜별 그때의 상위 200 (생존편향 없음)
+period_start,2026-06-04,
+period_end,2026-08-07,
+trading_days,47,
+result_hash,c81f2a...,<s>이 파일들의 체크섬 — 재현했는지 기계가 판정</s></pre>
+
+<div class="note good">
+  <b><code>result_hash</code> 가 있는 이유</b> — 「같은 설정으로 돌렸는데 결과가 다르다」를
+  사람이 눈으로 대조하면 못 찾습니다. 자산 곡선과 거래 목록의 체크섬을 같이 내보내면
+  <b>재현했는지를 기계가 판정</b>합니다.
+</div>
+
+<div class="note bad">
+  <b>안 내보내는 것 — 증권사 키·계좌번호.</b> <code>tn_broker_credential</code> 은 어느 파일에도 안 들어갑니다.
+  계좌번호가 필요한 자리는 <b>마스킹</b>합니다(<code>****1234</code>).
+  CSV 는 남에게 보내기 쉬운 형식이라, 실수 한 번이 되돌릴 수 없습니다.
+</div>
+
+<h3>⑦ 화면에 적는 한 줄</h3>
+<p class="lead">
+  §10 에서 <b>"화면에 「CSV에 나오는 것」 한 줄만 있으면 닫힌다"</b>고 했던 자리입니다.
+  내보내기 패널 맨 아래에 이 문장이 들어갑니다:
+</p>
+<div class="panel" style="width:372px">
+  <div class="pbd" style="padding:10px 12px">
+    <div style="font-size:11px;color:var(--if);line-height:1.7">
+      <b style="color:var(--im)">화면에 보이는 것보다 많이 나갑니다.</b>
+      안 산 신호 37건, 주문이 몇 번에 나눠 체결됐는지, 그리고
+      <b style="color:var(--im)">이 숫자들을 만든 가정</b>(수수료·세금·체결 규칙·시세 날짜)까지.<br>
+      <span style="color:var(--im)">엑셀에서 같은 숫자가 다시 나오게 하려는 것입니다.</span>
+    </div>
+  </div>
+</div>
+
+</div>
