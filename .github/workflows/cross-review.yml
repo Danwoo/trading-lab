@@ -1778,12 +1778,22 @@ jobs:
           #      못한다 (GitHub 재귀 방지). 주 경로(Orca 워커의 로컬 gh 게시)는 사용자 발이라
           #      문제없고, 여기 폴백 게시분은 review-record 의 workflow_dispatch 로 사람이
           #      다시 읽힌다.
+          #      ⚠ **티어는 워커의 전사를 믿지 않는다** (2026-08-09 실측). 티어를 배너에서 읽어
+          #      프롬프트의 마커 본에 박아 줬는데도 워커가 `tier=` 없이 게시했다 (PR #74 첫 리뷰:
+          #      잡 로그는 `리뷰어 티어 확인: sonnet`, 워커의 마커는 `model=claude verdict=merge_ok`).
+          #      마커를 옮겨 적는 것은 모델의 일이라 한 필드가 조용히 빠질 수 있고, 그러면
+          #      리뷰어 티어가 영영 미상이 된다 — 판정은 안전한 쪽으로 틀리지만 **기록은 안 남는다.**
+          #      그래서 관측 티어가 있으면 **그 티어를 실은** 마커가 있을 때만 생략한다. 없으면
+          #      우리가 게시한다 (마지막 마커가 이긴다 — 판정부 계약). 워커가 제대로 옮겨 적으면
+          #      종전대로 코멘트는 하나뿐이다.
+          MARKER_RE="<!-- cross-review v1 model=${REVIEWER}${TIER_FIELD:-( tier=[a-z0-9.-]+)?} verdict=(merge_ok|needs_changes|unable) sha=${HEAD_SHA} -->"
           EXISTING_MARKERS=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
             --jq '.[] | select(.author_association=="OWNER" or .author_association=="MEMBER" or .author_association=="COLLABORATOR") | .body' \
-            | grep -cE "<!-- cross-review v1 model=${REVIEWER}( tier=[a-z0-9.-]+)? verdict=(merge_ok|needs_changes|unable) sha=${HEAD_SHA} -->" || true)
+            | grep -cE "$MARKER_RE" || true)
           if [ "${EXISTING_MARKERS:-0}" -gt 0 ]; then
             echo "같은 SHA 유효 마커 코멘트 기존 ${EXISTING_MARKERS}건 — 중복 게시 생략 (Orca 워커 직접 게시)"
           else
+            [ -n "${TIER_FIELD:-}" ] && echo "워커 마커에 관측 티어(${REVIEWER_TIER})가 없다 — 워크플로가 관측값을 실은 마커를 게시한다"
             gh pr comment "$PR" --repo "$REPO" --body-file comment.md
           fi
 
