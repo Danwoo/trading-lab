@@ -98,6 +98,9 @@ _FENCE = re.compile(r"^\s{0,3}(?P<mark>`{3,}|~{3,})")
 _INDENTED_CODE = re.compile(r"^(?: {4}|\t)")
 # 버린 자리 표시 — 산문을 이어붙일 때 경계가 되며 참조 문법에 절대 안 맞는다
 _DROP_MARK = "\x00"
+# 렌더되지 않는 HTML 주석 — 사람 눈에 안 보이는 선언이 위험도 출처가 되지 않게 접는다
+# (기계 마커 `<!-- cross-review v1 … -->` 도 이 자리에 산다)
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # 여는 백틱 수만큼으로 닫는다 — `` `[^`]*` `` 로는 이중 백틱 스팬의 여는 표시를 빈
 # 스팬으로 먹어 안쪽이 산문으로 남는다
 _INLINE_CODE = re.compile(r"(`+)[\s\S]*?\1")
@@ -239,6 +242,8 @@ def scan_refs(body) -> dict:
 
     코드는 버린다 — 펜스(중첩 포함)·4칸 들여쓰기 블록·인라인 코드, 그리고 인용은 lazy
     연속행(`>` 없는 다음 줄)까지. 거기 적힌 `Refs #N` 은 선언이 아니라 인용이다.
+    **렌더되지 않는 HTML 주석도 버린다** — 사람 눈에 안 보이는 한 줄이 위험도 출처가 되면
+    본문만 읽는 사람은 그 PR 이 왜 저위험으로 접혔는지 알 수 없다.
 
     **`dropped` 는 「본문 전체에서 보이는 후보」 빼기 「산문 후보」로 구한다.** 버린 줄에서만
     긁어모으면 판별 자체의 빈틈이 그대로 구멍이 된다 — 펜스 구분선(여는 줄의 info string·
@@ -251,6 +256,16 @@ def scan_refs(body) -> dict:
     판독에 없으므로 `dropped` 가 정의상 못 잡고, 위험도가 내려간다. 버린 자리마다 비-공백
     자리표시를 남겨 참조 문법의 공백 건너뛰기가 그 경계를 넘지 못하게 한다.
     """
+    raw = body or ""
+    # 주석은 줄 수를 보존해 가린다 — 한 줄로 접으면 앞뒤 산문이 이어붙는다.
+    # 닫히지 않은 `<!--` 는 그 자리부터 끝까지 주석으로 본다 (fail-closed)
+    masked = _HTML_COMMENT.sub(
+        lambda m: "\n".join(_DROP_MARK for _ in m.group(0).splitlines()), raw
+    )
+    if "<!--" in masked:
+        head, _, tail = masked.partition("<!--")
+        masked = head + "\n".join(_DROP_MARK for _ in ("<!--" + tail).splitlines())
+
     prose: list[str] = []
     fence: str | None = None
     in_quote = False
@@ -259,7 +274,7 @@ def scan_refs(body) -> dict:
         # 비-공백 자리표시 — 버린 자리를 사이에 두고 앞뒤 산문이 한 문장으로 붙지 않게
         prose.append(_DROP_MARK)
 
-    for line in (body or "").splitlines():
+    for line in masked.splitlines():
         opened = _FENCE.match(line)
         if fence is not None:
             if (
@@ -288,7 +303,7 @@ def scan_refs(body) -> dict:
         prose.append(_INLINE_CODE.sub(_DROP_MARK, line))
 
     refs = _numbers_in("\n".join(prose))
-    return {"refs": sorted(refs), "dropped": sorted(_numbers_in(body or "") - refs)}
+    return {"refs": sorted(refs), "dropped": sorted(_numbers_in(raw) - refs)}
 
 
 def parse_refs(body) -> list[int]:

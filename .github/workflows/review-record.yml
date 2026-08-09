@@ -166,7 +166,7 @@ jobs:
             echo "리뷰 게시 없음 — $(jq -r .reason <<<"$DECISION")"
           fi
 
-          # ── 3) 자동 머지 arm — 조건 ①②③ 전부 참일 때만 ─────────────────────────────
+          # ── 3) 자동 머지 arm — 조건 ①②③④ 전부 참일 때만 ─────────────────────────────
           if [ "$ARM_CANDIDATE" != "true" ]; then
             echo "arm 후보 아님 — 종료"
             exit 0
@@ -290,7 +290,7 @@ jobs:
           esac
 
           # arm 시도 → required 가 이미 전부 초록이라 PR 이 CLEAN 이면 GitHub 이 arm 을
-          # 거부한다("clean status" — 기다릴 것이 없으면 arm 이 성립하지 않는다). 조건 ①②③ 을
+          # 거부한다("clean status" — 기다릴 것이 없으면 arm 이 성립하지 않는다). 조건 ①②③④ 를
           # 이미 검증했으므로 직접 머지한다 (merge-router 의 검증된 폴백 승계)
           if ARM_OUT=$(gh pr merge "$PR" --repo "$REPO" --auto --"$METHOD" 2>&1); then
             echo "자동 머지 arm 완료 (방식: $METHOD · $(jq -r .reason <<<"$ARM"))"
