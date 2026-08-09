@@ -45,6 +45,12 @@
 #   그 복구 경로가 서려면 저자 필터가 봇 게시분을 읽어야 한다 — 위 「보안 경계」의 봇 축이
 #   그것이고, 없으면 폴백 판정은 이벤트가 아니라 판독에서 유실된다.
 #
+# 롤아웃 순서 주의 (#23 Task 9): 이 워크플로는 **main 리비전**에서 돌므로, 마커 문법을 넓히는
+#   변경은 **머지되기 전까지 main 의 파서가 새 마커를 못 읽는다.** `tier=` 를 실은 마커는
+#   구 파서의 정규식에 안 걸려 「유효 마커 없음」이 되고, 그 사이에 리뷰된 PR 은 네이티브 리뷰
+#   기록을 잃는다. 되찾는 길은 이미 있다 — 판정은 코멘트 전수 재조회라 **멱등**이므로
+#   머지 뒤 `gh workflow run review-record.yml -f pr=<번호>` 로 다시 읽히면 그대로 기록된다.
+#
 # 전제 (레포 설정): ① allow_auto_merge 켜짐 (2026-08-09 실측 true) ② Settings → Actions →
 #   General → "Allow GitHub Actions to create and approve pull requests" 켜짐 — 꺼져 있으면
 #   승인 게시가 403 (GitHub Actions is not permitted to approve pull requests) 으로 죽는다.
