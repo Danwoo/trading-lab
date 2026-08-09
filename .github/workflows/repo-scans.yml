@@ -152,6 +152,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_terminal_state.py
 
+      # 경로 필터 판정 (#23 Task 4) — ci.yml·frontend-ci.yml 의 `changes` 잡이 부르는 순수
+      # 판정 + **배선 구조 자체**. 글롭 의미만 보면 "판정은 맞는데 아무도 안 부르는" 상태가
+      # 초록이므로, on.paths 재유입·판정 잡 부재·`if:` 안 읽는 잡·추적 파일을 하나도 안 무는
+      # 죽은 패턴을 같이 본다. 이 잡은 경로 필터가 없어 그 그물 자신은 항상 돈다.
+      - name: 경로 필터 판정·배선 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_ci_path_filter.py
+
       # required 게이트 판정 (#23 Task 5) — 통과 집합(success·skipped)과 상류 0건 실패,
       # 그리고 게이트의 needs 가 이 워크플로의 나머지 잡을 전부 담는지. 게이트는 초록일 때
       # 아무 일도 안 하는 검사라 죽어도 티가 안 난다. 케이스를 0건 모으면 실패한다.
