@@ -42,7 +42,9 @@ PR 마다 전용 이슈를 만들게 된다). 여러 이슈면 가장 높은 위
 ## 서브커맨드 (stdin JSON → stdout JSON, `gate` 만 종료코드 프로토콜)
 
   record  코멘트 목록 + head 에서 기록할 리뷰를 판정한다
-  refs    PR 본문에서 참조 이슈 번호를 뽑는다 (한 줄에 하나)
+  refs    PR 본문의 산문에서 참조 이슈 번호를 뽑는다 (한 줄에 하나)
+  dropped-refs
+          코드·인용으로 접혀 버린 참조 후보를 뽑는다 — 위험도를 올리는 쪽으로만 쓴다
   arm     승인·위험도·봇 상승 종류로 arm 여부를 판정한다
   gate    check-runs JSON 에서 required 게이트(`test: gate`)의 상태를 판정한다
           — 종료코드 0 초록 · 1 실패 · 2 미완(재조회 요망), `--final` 은 미완을 실패로 접는다
@@ -221,15 +223,26 @@ def decide_record(payload) -> dict:
     }
 
 
-def parse_refs(body) -> list[int]:
-    """PR 본문의 산문에서 참조 이슈 번호를 뽑는다 (중복 제거, 오름차순).
+def _numbers_in(text) -> set[int]:
+    numbers: set[int] = set()
+    for m in _REF_BLOCK.finditer(text):
+        numbers.update(int(n) for n in _REF_NUMBER.findall(m.group(1)))
+    return numbers
+
+
+def scan_refs(body) -> dict:
+    """본문을 산문과 버린 자리로 갈라 참조 후보를 모은다 — `{"refs": …, "dropped": …}`.
 
     코드는 버린다 — 펜스(중첩 포함)·4칸 들여쓰기 블록·인라인 코드, 그리고 인용은 lazy
     연속행(`>` 없는 다음 줄)까지. 거기 적힌 `Refs #N` 은 선언이 아니라 인용이다.
-    못 읽으면 미선언 = 사람 경로라 좁히는 방향이 fail-closed 다 (레포 전 PR 본문 60건 실측:
-    달라지는 것은 2건 — 위 실측 PR 과, 참조를 인라인 코드로만 적은 확인용 PR 하나).
+
+    **버린 자리의 후보를 그냥 없애면 위험도가 내려갈 수 있다** — 고위험 참조가 리스트
+    연속행(4칸 들여쓰기)이라 접히고 저위험 참조만 남으면 high 가 low 로 내려간다. 그래서
+    버린 후보를 `dropped` 로 함께 돌려주고 `read_risk` 가 그것을 **미선언 쪽으로만** 쓴다.
+    좁히는 것이 fail-closed 이려면 「버린 자리에 후보가 있었다」가 판정까지 가야 한다.
     """
-    numbers: set[int] = set()
+    refs: set[int] = set()
+    dropped: set[int] = set()
     fence: str | None = None
     in_quote = False
     for line in (body or "").splitlines():
@@ -242,6 +255,8 @@ def parse_refs(body) -> list[int]:
                 and len(opened.group("mark")) >= len(fence)
             ):
                 fence = None
+            else:
+                dropped |= _numbers_in(line)
             continue
         if opened:
             fence = opened.group("mark")
@@ -251,12 +266,21 @@ def parse_refs(body) -> list[int]:
             continue
         if line.lstrip().startswith(">"):
             in_quote = True
+            dropped |= _numbers_in(line)
             continue
         if in_quote or _INDENTED_CODE.match(line):
+            dropped |= _numbers_in(line)
             continue
-        for m in _REF_BLOCK.finditer(_INLINE_CODE.sub(" ", line)):
-            numbers.update(int(n) for n in _REF_NUMBER.findall(m.group(1)))
-    return sorted(numbers)
+        prose = _INLINE_CODE.sub(" ", line)
+        refs |= _numbers_in(prose)
+        # 인라인 코드로 지운 조각에도 후보가 있었으면 그 사실을 남긴다
+        dropped |= _numbers_in(line) - _numbers_in(prose)
+    return {"refs": sorted(refs), "dropped": sorted(dropped - refs)}
+
+
+def parse_refs(body) -> list[int]:
+    """PR 본문의 산문에서 참조 이슈 번호를 뽑는다 (중복 제거, 오름차순)."""
+    return scan_refs(body)["refs"]
 
 
 def _major_of(version):
@@ -280,15 +304,34 @@ def _ref_sort_key(ref):
     return (0, int(number)) if number.isdigit() else (1, number)
 
 
-def read_risk(refs):
+def read_risk(refs, dropped=()):
     """참조 번호별 메타에서 위험도를 접는다 — 라벨 없음·판독 불가는 미선언 = 고위험 취급.
 
     원소는 `{number, is_pr, labels, lookup_failed}`. **PR 은 위험도 출처가 아니다** —
     `issues/{N}` 이 PR 에도 응답해 PR 의 가시화 미러 라벨이 판정 입력으로 새는 것을 막는다.
     배제한 번호는 근거 문자열에 남긴다. 반환은 (위험도, 근거, 배제한 PR 번호 목록).
+
+    `dropped` 는 `scan_refs` 가 코드·인용에서 버린 참조 후보다. **위험도를 올리는 쪽으로만**
+    쓴다 — 버린 자리에 후보가 있었으면 그것이 진짜 선언이었을 수 있으므로 low 를 미선언으로
+    접는다 (버린 것이 고위험 이슈였는데 저위험 이슈만 남는 경우가 fail-open 이다).
     """
+    unknown = sorted(
+        set(dropped) - {r.get("number") for r in refs if isinstance(r, dict)}
+    )
+
+    def fold(risk, evidence, excluded):
+        if unknown and risk != "high":
+            listed = ", ".join(f"#{n}" for n in unknown)
+            return (
+                "undeclared",
+                f"{evidence} · 코드·인용에서 버린 참조 후보({listed}) — 선언이었을 수 있어 "
+                "미선언으로 접는다",
+                excluded,
+            )
+        return risk, evidence, excluded
+
     if not refs:
-        return "undeclared", "연결 이슈 없음 — 위험도 판독 불가", []
+        return fold("undeclared", "연결 이슈 없음 — 위험도 판독 불가", [])
 
     verdicts, notes, excluded = [], [], []
     for ref in sorted(refs, key=_ref_sort_key):
@@ -317,12 +360,14 @@ def read_risk(refs):
 
     evidence = ", ".join(notes)
     if not verdicts:
-        return "undeclared", f"{evidence} — 이슈 참조 0건, 위험도 판독 불가", excluded
+        return fold(
+            "undeclared", f"{evidence} — 이슈 참조 0건, 위험도 판독 불가", excluded
+        )
     if "high" in verdicts:
-        return "high", evidence, excluded
+        return fold("high", evidence, excluded)
     if "undeclared" in verdicts:
-        return "undeclared", evidence, excluded
-    return "low", evidence, excluded
+        return fold("undeclared", evidence, excluded)
+    return fold("low", evidence, excluded)
 
 
 def judge_author_identity(payload) -> dict:
@@ -342,6 +387,11 @@ def judge_author_identity(payload) -> dict:
     모은다). 그래서 차단 해제는 **리뷰어 벤더가 claude 일 때만** 성립한다 — 동일-벤더
     kimi·codex 는 티어를 실어도 늘 사람 경로이고, 혼재 저자에서 claude 티어를 안다는 이유로
     kimi 리뷰의 차단이 풀리지도 않는다.
+
+    **한계**: 마커는 `model=`(벤더)만 싣고 리뷰어 티어를 싣지 않으므로, 저자 티어를 안다는
+    것이 「다른 티어가 리뷰했다」의 증명은 아니다 — 폴백이 반대 티어를 고른다는 cross-review
+    쪽 계약을 믿는 것이다 (종전 bash 조건 승계). 실제로 대조하려면 마커에 리뷰어 티어를
+    실어야 한다.
     """
     emails = payload.get("commit_author_emails")
     reviewer = payload.get("marker_model") or ""
@@ -400,7 +450,9 @@ def decide_arm(payload) -> dict:
     """자동 머지 arm 여부 — 조건 ②③④ 를 판정한다 (① 게이트는 `gate` 서브커맨드가 맡는다)."""
     head_sha = payload.get("head_sha") or ""
     marker_sha = payload.get("marker_sha") or ""
-    risk, evidence, excluded_prs = read_risk(payload.get("issue_refs") or [])
+    risk, evidence, excluded_prs = read_risk(
+        payload.get("issue_refs") or [], payload.get("dropped_refs") or []
+    )
     bump = classify_bump(payload.get("pr_title"))
     identity = judge_author_identity(payload)
     base = {
@@ -521,10 +573,17 @@ def main(argv) -> int:
         for number in parse_refs(payload.get("body")):
             print(number)
         return 0
+    elif command == "dropped-refs":
+        for number in scan_refs(payload.get("body"))["dropped"]:
+            print(number)
+        return 0
     elif command == "arm":
         json.dump(decide_arm(payload), sys.stdout, ensure_ascii=False)
     else:
-        print(f"::error::알 수 없는 서브커맨드: {command!r} (record|refs|arm|gate)")
+        print(
+            f"::error::알 수 없는 서브커맨드: {command!r} "
+            "(record|refs|dropped-refs|arm|gate)"
+        )
         return 1
     print()
     return 0

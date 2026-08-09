@@ -214,9 +214,13 @@ jobs:
           # 응답**하므로 `.pull_request` 로 PR 여부를 함께 읽어 판정부에 넘긴다 — PR 의 risk 라벨은
           # merge-router 가 붙인 가시화 미러라 판정 입력이 아니다. 조회 실패는 lookup_failed 로
           # 실어 미선언 = 사람 경로로 접힌다 (fail-closed. 빈 목록으로 흡수하면 실패가 low 에 묻힌다)
+          BODY_JSON=$(jq -r '.body // ""' <<<"$FRESH" | jq -Rs '{body: .}')
+          # 코드·인용으로 접혀 버린 참조 후보 — 위험도를 **올리는 쪽으로만** 쓴다. 그냥 버리면
+          # 고위험 참조가 리스트 연속행이라 접히고 저위험 참조만 남아 위험도가 내려간다
+          DROPPED=$(printf '%s' "$BODY_JSON" | python3 scripts/review_record.py dropped-refs \
+            | jq -Rs 'split("\n") | map(select(length > 0) | tonumber)')
           REFS='[]'
-          for N in $(jq -r '.body // ""' <<<"$FRESH" | jq -Rs '{body: .}' \
-                       | python3 scripts/review_record.py refs); do
+          for N in $(printf '%s' "$BODY_JSON" | python3 scripts/review_record.py refs); do
             META=$(gh api "repos/$REPO/issues/$N" \
               --jq '{number, is_pr: (.pull_request != null), labels: [.labels[].name]}') \
               || META=""
@@ -231,13 +235,15 @@ jobs:
 
           ARM=$(jq -n --arg head "$HEAD_NOW" --arg marker "$MARKER_SHA" --arg model "$MODEL" \
               --argjson fresh "$FRESH" --argjson reviews "${REVIEWS_NOW:-[]}" \
-              --argjson refs "$REFS" --argjson emails "${EMAILS:-[]}" \
+              --argjson refs "$REFS" --argjson dropped "${DROPPED:-[]}" \
+              --argjson emails "${EMAILS:-[]}" \
               '{head_sha: $head, marker_sha: $marker, marker_model: $model,
                 verdict: "merge_ok", manual: false,
                 reviews: $reviews, pr_author_login: $fresh.author.login,
                 pr_author_is_bot: ($fresh.author.is_bot // false),
                 pr_title: $fresh.title, head_ref: $fresh.headRefName,
-                issue_refs: $refs, commit_author_emails: $emails}' \
+                issue_refs: $refs, dropped_refs: $dropped,
+                commit_author_emails: $emails}' \
             | python3 scripts/review_record.py arm)
           echo "arm 판정: $ARM"
           if [ -z "$ARM" ]; then

@@ -367,6 +367,26 @@ ARM_CASES = [
         {"arm": True, "risk": "low", "excluded_pr_refs": [13]},
     ),
     (
+        "코드·인용에서 버린 참조 후보가 있으면 low 를 미선언으로 접는다  (공격 ⑪)",
+        {"issue_refs": [{"number": 1, "labels": ["risk: low"]}], "dropped_refs": [23]},
+        {"arm": False, "risk": "undeclared"},
+    ),
+    (
+        "버린 후보가 있어도 high 는 그대로 (위험도를 올리는 쪽으로만 쓴다)",
+        {"issue_refs": [{"number": 23, "labels": ["risk: high"]}], "dropped_refs": [1]},
+        {"arm": False, "risk": "high"},
+    ),
+    (
+        "버린 후보가 읽은 참조와 같은 번호면 영향 없음",
+        {"issue_refs": [{"number": 1, "labels": ["risk: low"]}], "dropped_refs": [1]},
+        {"arm": True, "risk": "low"},
+    ),
+    (
+        "참조 0건 + 버린 후보 있음 → 미선언 (근거에 남는다)",
+        {"issue_refs": [], "dropped_refs": [1]},
+        {"arm": False, "risk": "undeclared"},
+    ),
+    (
         "이슈 조회 실패 → 미선언 = 사람 경로 (fail-closed)",
         {"issue_refs": [{"number": 23, "lookup_failed": True}]},
         {"arm": False, "risk": "undeclared"},
@@ -611,6 +631,42 @@ REFS_CASES = [
     ),
 ]
 
+# 버린 자리의 참조 후보 — 이것을 그냥 없애면 위험도가 **내려간다** (공격 ⑪)
+DROPPED_CASES = [
+    # (설명, 본문, 기대 refs, 기대 dropped)
+    (
+        "리스트 연속행(4칸)의 고위험 참조 + 산문의 저위험 참조",
+        "- 배경:\n    Closes #23\n\nRefs #1\n",
+        [1],
+        [23],
+    ),
+    (
+        "코드 펜스 안의 참조 후보",
+        "Refs #23\n\n```\nRefs #1\n```\n",
+        [23],
+        [1],
+    ),
+    (
+        "인용 안의 참조 후보",
+        "> Closes #99\n\nRefs #23\n",
+        [23],
+        [99],
+    ),
+    (
+        "인라인 코드의 참조 후보",
+        "본문에 `Refs #1` 만 있는 PR.\n\nRefs #23\n",
+        [23],
+        [1],
+    ),
+    (
+        "산문에도 있는 번호는 버린 것으로 세지 않는다",
+        "Refs #23\n\n```\nRefs #23\n```\n",
+        [23],
+        [],
+    ),
+    ("버릴 것이 없으면 빈 목록", "Refs #23\n", [23], []),
+]
+
 GATE_CASES = [
     # (설명, records, final, 기대 상태)
     (
@@ -724,6 +780,13 @@ def main() -> int:
         got = rr.parse_refs(body)
         if got != expected:
             failures.append(f"refs: {desc}: 기대 {expected!r} ≠ 실제 {got!r}")
+
+    for desc, body, expected_refs, expected_dropped in DROPPED_CASES:
+        total += 1
+        got = rr.scan_refs(body)
+        want = {"refs": expected_refs, "dropped": expected_dropped}
+        if got != want:
+            failures.append(f"scan_refs: {desc}: 기대 {want!r} ≠ 실제 {got!r}")
 
     for desc, records, final, expected_state in GATE_CASES:
         total += 1
