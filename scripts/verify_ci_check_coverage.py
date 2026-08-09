@@ -76,13 +76,13 @@ EXEMPT: dict[str, str] = {
 # 축이 통째로 사라져도 조용하다. 하한은 현재 실측치이며, 파일을 정당하게 지웠다면 함께 내린다.
 INVENTORY_AXES: list[tuple[str, str, int]] = [
     ("*/scripts", "verify_*.py", 26),  # 서비스별 계약 검증
-    ("scripts", "verify_*.py", 10),  # 루트 계약 검증
+    ("scripts", "verify_*.py", 11),  # 루트 계약 검증
     ("scripts", "verify_*.mjs", 2),  # 루트 계약 검증 (node)
     # 루트 실행형 테스트. 이 축이 없던 동안 `scripts/test_public_release_gate.py` 는 배선돼
     # 있었지만 **인벤토리에는 없었다** — 배선을 지워도 이 검사가 초록이었다는 뜻이다. 서비스
     # 쪽 `*/tests` 축이 있는데 루트만 비어 있던 자리이고, 이 스크립트가 막으려는 바로 그
     # 클래스라 채운다 (#23 Task 2).
-    ("scripts", "test_*.py", 3),
+    ("scripts", "test_*.py", 5),
     ("*/tests", "test_*.py", 35),  # 서비스별 standalone 테스트 (#335)
     ("frontend/scripts", "check-*.js", 3),  # frontend 정적 스캔
     ("frontend/scripts", "generate-*.js", 1),  # 생성물 재현 대조 (--check 모드, #361)

@@ -34,6 +34,33 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # ── required 게이트 — 아래 잡 전부를 체크 하나로 대표한다 (#23 Task 5) ──────
+  # 테스트를 개별로 required 로 걸면 pending 창이 잡 수만큼 생긴다. `review-gate.yml` 머리의
+  # 「Orca 판정 규칙」 실측대로 pending 이 하나만 있어도 머지 버튼이 잠기므로, 대표 잡 하나만
+  # 건다. required 로 **거는 것**은 레포 설정(ruleset) 소관이라 여기서는 걸 대상만 세운다.
+  #
+  # 판정은 `scripts/verify_upstream_gate.py` 가 한다 — 셸에서 그대로 돌려 볼 수 있어야
+  # 「needs 가 비면 실패한다」를 로컬에서 증명할 수 있다. 그 스크립트는 구조(needs 가 나머지
+  # 잡을 전부 담는가)도 함께 보므로, 아래에 잡을 더하고 needs 를 안 고치면 게이트가 빨개진다.
+  #
+  # `if: always()` 인 이유 — `!cancelled()` 로 두면 취소된 실행에서 이 잡이 **skipped** 로
+  # 끝나는데, GitHub 은 skipped 를 required check 통과로 센다. 상류가 취소됐는데 게이트가
+  # 통과로 읽히는 창을 막으려면 취소된 실행에서도 돌아 결과를 봐야 한다.
+  gate:
+    name: "test: gate"
+    needs: [ci-coverage, repo-scan, repo-scan-app]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 상류 잡 결과 판정
+        if: always()
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 scripts/verify_upstream_gate.py
+
   # ── CI 배선 대조 — 이 레포가 반복해서 데인 클래스를 닫는다 ────────────────
   # #241 · #252 · #269 · #290 · #302 · #335 는 전부 같은 부류였다: 검증은 실재하는데 CI 가
   # 안 돌린다. 종전 처방은 매번 "빠진 것을 찾아 잡을 하나 더" 였고 그래서 잡이 36개가 됐다.
@@ -124,6 +151,13 @@ jobs:
       - name: 터미널 준비·접수 판정 검사
         if: ${{ !cancelled() }}
         run: python3 scripts/test_terminal_state.py
+
+      # required 게이트 판정 (#23 Task 5) — 통과 집합(success·skipped)과 상류 0건 실패,
+      # 그리고 게이트의 needs 가 이 워크플로의 나머지 잡을 전부 담는지. 게이트는 초록일 때
+      # 아무 일도 안 하는 검사라 죽어도 티가 안 난다. 케이스를 0건 모으면 실패한다.
+      - name: required 게이트 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_upstream_gate.py
 
       # 고지 문서 생성기의 fail-closed 축 (앵커 파손·미분류 라이선스·§3 보존·--check).
       # frontend 잡의 `generate_notices.py --check` 는 **지금 트리가 맞는지**만 보인다 —
