@@ -96,7 +96,11 @@ _REF_NUMBER = re.compile(r"#(\d+)")
 # 중첩 펜스(백틱 4개 안의 백틱 3개)에서 안팎이 뒤집혀 코드가 산문으로 읽힌다.
 _FENCE = re.compile(r"^\s{0,3}(?P<mark>`{3,}|~{3,})")
 _INDENTED_CODE = re.compile(r"^(?: {4}|\t)")
-_INLINE_CODE = re.compile(r"`[^`]*`")
+# 버린 자리 표시 — 산문을 이어붙일 때 경계가 되며 참조 문법에 절대 안 맞는다
+_DROP_MARK = "\x00"
+# 여는 백틱 수만큼으로 닫는다 — `` `[^`]*` `` 로는 이중 백틱 스팬의 여는 표시를 빈
+# 스팬으로 먹어 안쪽이 산문으로 남는다
+_INLINE_CODE = re.compile(r"(`+)[\s\S]*?\1")
 
 # dependabot 제목 형식: `build(deps): bump X from A to B in /path` (설계 §2-1 실측).
 _TITLE_BUMP = re.compile(r"\bfrom\s+(\S+)\s+to\s+(\S+)")
@@ -241,10 +245,20 @@ def scan_refs(body) -> dict:
     닫는 줄의 꼬리)처럼 산문도 코드도 아닌 자리, 줄바꿈으로 이어진 참조 목록의 둘째 줄처럼
     줄 단위 스캔이 놓치는 자리가 실제로 있었다. 차집합으로 구하면 **좁힘이 무엇을 잃든**
     그 번호가 `dropped` 로 남아 위험도를 올리는 쪽으로만 작용한다 (`read_risk` 가 그렇게 쓴다).
+
+    반대 방향도 막아야 한다 — 버린 줄을 자리표시 없이 건너뛰면 앞뒤 산문이 이어붙어
+    **원문에 없던 「키워드 + `#N`」이 생긴다** (`Refs:` / 펜스 블록 / `#1`). 그 번호는 탐욕
+    판독에 없으므로 `dropped` 가 정의상 못 잡고, 위험도가 내려간다. 버린 자리마다 비-공백
+    자리표시를 남겨 참조 문법의 공백 건너뛰기가 그 경계를 넘지 못하게 한다.
     """
     prose: list[str] = []
     fence: str | None = None
     in_quote = False
+
+    def drop():
+        # 비-공백 자리표시 — 버린 자리를 사이에 두고 앞뒤 산문이 한 문장으로 붙지 않게
+        prose.append(_DROP_MARK)
+
     for line in (body or "").splitlines():
         opened = _FENCE.match(line)
         if fence is not None:
@@ -254,9 +268,11 @@ def scan_refs(body) -> dict:
                 and len(opened.group("mark")) >= len(fence)
             ):
                 fence = None
+            drop()
             continue
         if opened:
             fence = opened.group("mark")
+            drop()
             continue
         if not line.strip():
             in_quote = False
@@ -264,10 +280,12 @@ def scan_refs(body) -> dict:
             continue
         if line.lstrip().startswith(">"):
             in_quote = True
+            drop()
             continue
         if in_quote or _INDENTED_CODE.match(line):
+            drop()
             continue
-        prose.append(_INLINE_CODE.sub(" ", line))
+        prose.append(_INLINE_CODE.sub(_DROP_MARK, line))
 
     refs = _numbers_in("\n".join(prose))
     return {"refs": sorted(refs), "dropped": sorted(_numbers_in(body or "") - refs)}

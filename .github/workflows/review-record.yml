@@ -210,6 +210,25 @@ jobs:
           REVIEWS_NOW=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
             | jq -s 'add // [] | map({user_login: .user.login, state, commit_id})')
 
+          # 판정 마커도 다시 읽는다 — 게이트 대기(최대 1200초) 중에 새 마커가 올 수 있고,
+          # 조건 ③ 은 마커의 model 로 자기리뷰를 판정한다. 낡은 벤더로 판정하지 않게 한다
+          COMMENTS_NOW=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            | jq -s 'add // [] | map({body, author_association, html_url,
+                                      user_login: .user.login, user_type: .user.type})')
+          DECISION_NOW=$(jq -n --arg head "$HEAD_NOW" --argjson comments "${COMMENTS_NOW:-[]}" \
+              --argjson reviews "${REVIEWS_NOW:-[]}" \
+              '{head_sha: $head, comments: $comments, existing_reviews: $reviews}' \
+            | python3 scripts/review_record.py record)
+          if [ -z "$DECISION_NOW" ]; then
+            echo "::warning::arm 직전 마커 재판정 실패 — arm 하지 않는다 (fail-closed)"
+            exit 0
+          fi
+          echo "arm 직전 마커 재판정: $DECISION_NOW"
+          MODEL_NOW=$(jq -r '.model // empty' <<<"$DECISION_NOW")
+          MARKER_SHA_NOW=$(jq -r '.marker_sha // empty' <<<"$DECISION_NOW")
+          VERDICT_NOW=$(jq -r '.verdict // empty' <<<"$DECISION_NOW")
+          MANUAL_NOW=$(jq -r '.manual' <<<"$DECISION_NOW")
+
           # 위험도: PR 본문의 참조 이슈(Refs·Closes 류)를 fresh 조회한다. `issues/$N` 은 **PR 에도
           # 응답**하므로 `.pull_request` 로 PR 여부를 함께 읽어 판정부에 넘긴다 — PR 의 risk 라벨은
           # merge-router 가 붙인 가시화 미러라 판정 입력이 아니다. 조회 실패는 lookup_failed 로
@@ -238,12 +257,13 @@ jobs:
           EMAILS=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate \
             --jq '.[].commit.author.email' | jq -Rs 'split("\n") | map(select(length > 0))')
 
-          ARM=$(jq -n --arg head "$HEAD_NOW" --arg marker "$MARKER_SHA" --arg model "$MODEL" \
+          ARM=$(jq -n --arg head "$HEAD_NOW" --arg marker "$MARKER_SHA_NOW" --arg model "$MODEL_NOW" \
+              --arg verdict "$VERDICT_NOW" --argjson manual "${MANUAL_NOW:-true}" \
               --argjson fresh "$FRESH" --argjson reviews "${REVIEWS_NOW:-[]}" \
               --argjson refs "$REFS" --argjson dropped "${DROPPED:-[]}" \
               --argjson emails "${EMAILS:-[]}" \
               '{head_sha: $head, marker_sha: $marker, marker_model: $model,
-                verdict: "merge_ok", manual: false,
+                verdict: $verdict, manual: $manual,
                 reviews: $reviews, pr_author_login: $fresh.author.login,
                 pr_author_is_bot: ($fresh.author.is_bot // false),
                 pr_title: $fresh.title, head_ref: $fresh.headRefName,

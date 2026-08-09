@@ -683,6 +683,24 @@ DROPPED_CASES = [
         [1, 23],
         [],
     ),
+    (
+        "버린 블록이 앞뒤 산문을 잇지 않는다 — 없던 참조를 만들지 않는다  (공격 ⑫)",
+        "Refs:\n\n```\ncode\n```\n\n#1\n",
+        [],
+        [],
+    ),
+    (
+        "인용이 앞뒤 산문을 잇지 않는다  (공격 ⑫)",
+        "Refs:\n> 인용\n#1\n",
+        [],
+        [],
+    ),
+    (
+        "이중 백틱 인라인 코드도 접는다",
+        "``Refs #1`` 를 인용한다.\n\nRefs #23\n",
+        [23],
+        [1],
+    ),
 ]
 
 GATE_CASES = [
@@ -817,6 +835,13 @@ def main() -> int:
             failures.append(
                 f"보존 불변식: {desc}: 탐욕 판독의 {sorted(missing)!r} 이 "
                 f"refs·dropped 어디에도 없다 (위험도가 내려갈 수 있다)"
+            )
+        # 대칭 항: 좁힘이 **없던 참조를 만들어 내면** 그 번호는 dropped 가 정의상 못 잡는다
+        invented = set(got["refs"]) - greedy
+        if invented:
+            failures.append(
+                f"보존 불변식(대칭): {desc}: 탐욕 판독에 없던 {sorted(invented)!r} 이 "
+                f"refs 에 생겼다 (버린 자리가 앞뒤 산문을 이었다)"
             )
 
     for desc, records, final, expected_state in GATE_CASES:
