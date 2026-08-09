@@ -114,7 +114,7 @@
       <b style="color:var(--ik)">이 숫자들이 나온 가정</b> —
       위탁수수료 <b style="color:var(--ik)">0.015%</b>(왕복) · 증권거래세 <b style="color:var(--ik)">0.15%</b>(매도) ·
       체결 <b style="color:var(--ik)">신호 다음 날 시가</b> · 슬리피지 <b style="color:var(--ik)">0.05%</b> ·
-      시세 <b style="color:var(--ik)">2026-08-08 스냅샷</b> · 원주가(수정 안 함)
+      시세 <b style="color:var(--ik)">2026-08-07 스냅샷</b> <s style="font-size:10.5px;color:var(--if)">(직전 거래일)</s> · 원주가(수정 안 함)
     </span>
     <span style="flex:0 0 auto;border:1px solid var(--ls);border-radius:7px;padding:4px 10px;color:var(--im)">전체 가정 보기</span>
   </div>
@@ -122,17 +122,17 @@
   <!-- 요약 1줄: 결과 -->
   <div class="sum">
     <div><div class="k">거래</div><div class="v n">131건</div>
-      <div class="s">종료 125 · 보유 6<br>47일간 · 하루 평균 2.8건</div></div>
+      <div class="s">종료 125 · 보유 6<br>거래일 47일 · 하루 평균 2.8건<s style="display:block;text-decoration:none;font-size:10px;color:var(--if)">06-04 ~ 08-07 (달력 65일)</s></div></div>
     <div><div class="k">이긴 비율</div><div class="v n">42%</div>
-      <div class="s">55승 76패 <span style="color:var(--if)">(보유 6건은 지금 평가 기준)</span><br>
+      <div class="s">53승 72패 <span style="color:var(--if)">(종료한 125건만. 보유 6건은 아래 따로)</span><br>
         <span style="color:var(--im)">이 봇은 <b style="color:var(--ik)">33%</b>만 맞아도 본전</span>
         <span style="color:var(--if)">(1 ÷ (1+2.0))</span></div></div>
     <div><div class="k">이길 때 : 질 때</div><div class="v n">2.0배</div>
-      <div class="s">이긴 55건 합 <b style="color:var(--ik)">+148만</b> (평균 2.7만)<br>
-        진 76건 합 <b style="color:var(--ik)">−102만</b> (평균 1.3만)</div></div>
+      <div class="s">이긴 53건 합 <b style="color:var(--ik)">+142만</b> (평균 2.7만)<br>
+        진 72건 합 <b style="color:var(--ik)">−95.8만</b> (평균 1.3만)</div></div>
     <div><div class="k">실현 손익</div><div class="v n" style="color:var(--up)">+46.2만원</div>
-      <div class="s">148 − 102 = 46.2 <span style="color:var(--if)">(비용 차감 후)</span><br>
-        아직 들고 있는 것 <b style="color:var(--ik)">+25.8</b> → 합 <b style="color:var(--ik)">+72.0</b></div></div>
+      <div class="s">142 − 95.8 = 46.2 <span style="color:var(--if)">(종료 125건, 비용 차감 후)</span><br>
+        아직 들고 있는 6건 평가 <b style="color:var(--ik)">+25.8</b> → 합 <b style="color:var(--ik)">+72.0</b></div></div>
     <div style="background:rgba(217,164,65,.06)"><div class="k" style="color:#D9B45C">내가 손댄 거래</div>
       <div class="v n" style="color:#D9B45C">2건</div>
       <div class="s"><b style="color:#D9B45C">−31.4만원</b><br>
@@ -179,7 +179,7 @@
 
         <tr class="open">
           <td class="sym">삼성전자<s>005930 · 28주</s></td>
-          <td class="n">08-08<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">71,400원</s></td>
+          <td class="n">08-07<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">71,400원</s></td>
           <td class="n" style="color:var(--im)">지금<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">72,100원</s></td>
           <td class="r n">1일</td>
           <td class="r n" style="color:var(--up)">+2.0만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">+1.0%</s></td>
@@ -189,7 +189,7 @@
 
         <tr class="open">
           <td class="sym">현대차<s>005380 · 8주</s></td>
-          <td class="n">08-08<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">248,000원</s></td>
+          <td class="n">08-07<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">248,000원</s></td>
           <td class="n" style="color:var(--im)">지금<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">245,500원</s></td>
           <td class="r n">1일</td>
           <td class="r n" style="color:var(--dn)">−2.0만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">−1.0%</s></td>
@@ -200,16 +200,16 @@
         <!-- 펼친 행 -->
         <tr>
           <td class="sym">카카오<s>035720 · 45주</s></td>
-          <td class="n">07-25<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">45,050원<br><span style="color:var(--im)">전날 신호</span></s></td>
-          <td class="n">08-07<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">41,750원</s></td>
-          <td class="r n">14일</td>
+          <td class="n">07-27<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">45,050원<br><span style="color:var(--im)">전 거래일 신호</span></s></td>
+          <td class="n">08-07<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">41,887원</s></td>
+          <td class="r n">9거래일</td>
           <td class="r n" style="color:var(--dn)">−14.2만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">−7.0%</s></td>
           <td class="r n" style="color:var(--if)">0.39만</td>
           <td><span class="tag st">손절</span></td>
         </tr>
         <tr class="exp"><td colspan="7">
           <div class="box">
-            <div class="t">왜 샀나 — 07월 24일 종가로 판정, <span style="font-weight:400;color:var(--im)">07월 25일 시가에 체결</span></div>
+            <div class="t">왜 샀나 — 07월 24일(금) 종가로 판정, <span style="font-weight:400;color:var(--im)">07월 27일(월) 시가에 체결</span></div>
             <div class="cond"><i class="y">✓</i><span><b>20일 평균선까지 떨어졌다 반등</b> — 저가 44,150원이 평균선(44,320)을 찍고 종가 44,900으로 <b>+1.7%</b> 회복</span></div>
             <div class="cond"><i class="y">✓</i><span><b>내린 폭이 오른 폭보다 훨씬 큼</b> — 최근 14거래일 중 <b>오른 날 상승폭 합 : 내린 날 하락폭 합 = 27 : 73</b> (30 아래면 조건 충족)</span></div>
             <div class="cond"><i class="n">·</i><span style="color:var(--if)">거래량 급증 — <b>봇을 만들 때 이 조건을 켜지 않았습니다</b>(기본 꺼짐). 켜려면 봇 설정에서 →</span></div>
@@ -319,7 +319,7 @@
         <div class="row"><span class="nm" style="color:var(--if)">나머지 38종목</span><span class="bar"><i style="width:13%;background:var(--if)"></i></span><span class="v">−34만</span></div>
         <div class="warn">
           <b>이익 낸 종목들이 번 120만원 중 106만원(88%)이 이 세 종목에서 나왔습니다.</b>
-          <span style="color:var(--im);font-weight:400">— 거래 단위 합계(+148만)와 다른 이유는
+          <span style="color:var(--im);font-weight:400">— 거래 단위 합계(+142만)와 다른 이유는
           손해 본 거래가 있는 종목은 순액으로 셌기 때문입니다.</span>
           셋을 빼면 남는 건 <b>−34만원</b> — 나머지 38종목은 합쳐서 손해였습니다.
           이 성적은 <b>세 번의 큰 거래</b>가 만든 것입니다.
@@ -338,7 +338,7 @@
         <div class="row"><span class="nm">현대차 ↔ 기아</span><span class="v" style="color:#D9B45C">0.74</span></div>
         <div class="row"><span class="nm">POSCO ↔ 셀트리온</span><span class="v" style="color:var(--im)">0.09</span></div>
         <div class="warn">
-          <b>6종목인데 유효하게는 2.4개어치입니다.</b>
+          <b>지금 들고 있는 6종목이 유효하게는 2.4개어치입니다.</b><s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">「내 기준」의 <b>증거 9건어치</b>와 다른 값입니다 — 저건 41종목의 <b>수익 비중</b>으로 잰 것이고, 이건 보유 6종목의 <b>일별 상관</b>으로 잰 것입니다. 묻는 것이 다릅니다.</s>
           삼성전자·SK하이닉스가 0.81, 현대차·기아가 0.74로 거의 같이 움직여서
           <b>평가액의 67%</b>가 사실상 두 덩어리입니다.
           <span style="color:var(--im)">— 업종이 같아서가 아니라 <b style="color:var(--ik)">실제로 같이 움직여서</b>입니다.
