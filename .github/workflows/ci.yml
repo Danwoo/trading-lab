@@ -161,9 +161,8 @@ jobs:
   # ── backend-service — DB 불필요분 (uv) ──────────────────────────────────
   backend:
     name: "test: backend"
-    # PROBE: 상류 워크플로(ci.yml) 잡 하나를 skipped 로 만든다
     needs: changes
-    if: ${{ false }}
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:

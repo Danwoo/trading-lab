@@ -203,6 +203,7 @@ jobs:
   # ── 앱 모듈을 import 하는 전수 스캔 (uv 필요) ────────────────────────────
   repo-scan-app:
     name: "test: repo-scan-app"
+    if: ${{ false }}   # PROBE: 상류를 skipped 로 만든다
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
