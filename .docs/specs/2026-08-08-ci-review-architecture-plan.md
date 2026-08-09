@@ -259,6 +259,14 @@ gh api repos/Danwoo/trading-lab/rulesets/<id>
   장치가 된다 (2026-08-06 결정 취지 · 2026-08-08 리드 결정). **현행이 이미 0 이므로 건드리지
   않는 것이 곧 결정 이행이다**
 - required 목록에 넣는 것은 **Task 4 에서 `skipping` 이 확인된 것만**이다
+- **`ci.yml`·`frontend-ci.yml` 의 `test: ` 잡을 required 에 넣는 것은 선택이 아니다 —
+  Task 8 의 선행 조건이다.** 지금 `merge-router.yml` 이 자동 머지 전에 **`test: ` 접두 체크런
+  전부**(13개)를 확인하는데, ruleset 의 required 는 `repo-scans.yml` 의 3종뿐이다. Task 5 의
+  게이트 잡은 같은 워크플로 안만 `needs` 로 묶으므로 나머지 10종을 대표하지 못한다.
+  **이 상태로 Task 8 이 `merge-router.yml` 을 지우면 자동 머지가 backend·frontend 테스트 결과를
+  안 보고 머지한다.** 사람 머지 경로는 원래 3종만 걸려 변화가 없지만 자동 경로가 약해진다.
+  대안은 둘이다 — ㉠ 그 10종을 required 에 넣는다 ㉡ 게이트 잡이 `check-runs` 조회로 대표한다
+  (`merge-router` 가 지금 하는 방식). **어느 쪽이든 Task 8 전에 서 있어야 한다**
 - 기존 required 3종을 **빼지 마라.** 게이트 잡을 **더하는** 것이지 대체하는 것이 아니다.
   뺄지 말지는 게이트 잡이 그 셋을 실제로 대표하는지 확인한 뒤 별도로 판단한다
 
@@ -330,6 +338,12 @@ gh api repos/Danwoo/trading-lab/rulesets/<id>
 - **체크 이름을 바꾸지 마라.** `gh pr checks` 에서 확인한 기존 이름과 byte-identical 로 유지한다
 - 삭제 대상이 검증 스크립트를 돌리는지 먼저 확인한다. 돌린다면 고아가 되므로 먼저 옮긴다
 - **`cross-review.yml` 은 이 계획에서 지우지 않는다** — 아래 참조
+- **`merge-router.yml` 을 지우기 전에 두 가지가 서 있어야 한다.** 지우면 사라지는 것을 받는
+  자리가 없으면 조용히 약해진다:
+  1. **자동 머지 disarm 경로** (Task 7 불변식) — 없으면 승인 뒤 push 가 무검증으로 머지된다
+  2. **`test: ` 전수 초록 판정** — `merge-router` 가 13개 체크런을 다 보는데, required 는 3종뿐이다.
+     Task 6 이 나머지를 required 에 넣었거나 게이트 잡이 `check-runs` 조회로 대표해야 한다
+  **둘 중 하나라도 없으면 이 task 를 진행하지 마라.** 확인한 결과를 PR 본문에 적어라
 
 **검증**
 
