@@ -1,0 +1,152 @@
+<style>
+  .sh { --void:#0C0B09; --panel:#1A1815; --raised:#221F1A; --line:#302B24;
+        --ink:#D6CFC4; --muted:#8A8175; --accent:#C9973F; --bad:#C6453A; --ok:#7FA05A; }
+  .sh-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin:18px 0 8px; }
+  @media (max-width:1150px){ .sh-grid{grid-template-columns:1fr;} }
+  .sh-card { border-radius:10px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color .12s, transform .12s;
+             background:#1A1815; font-family:Pretendard,system-ui,sans-serif; }
+  .sh-card:hover { transform:translateY(-2px); }
+  .sh-card.selected { border-color:#4f8cff; }
+  .sh-wrap { padding:16px; background:#0C0B09; }
+  .sh-note { padding:13px 16px; font-size:12.5px; line-height:1.55; color:#D6CFC4; }
+  .sh-note b.t { display:block; font-size:14.5px; margin-bottom:5px; }
+  .sh-tag { display:inline-block; font-size:10.5px; padding:2px 7px; border-radius:5px; margin-bottom:7px; }
+
+  /* 와이어프레임 부품 */
+  .w { border:1px solid #302B24; border-radius:7px; overflow:hidden; background:#0C0B09; height:250px; display:flex; flex-direction:column; }
+  .w .bar { height:22px; background:#1A1815; border-bottom:1px solid #302B24; display:flex; align-items:center; padding:0 8px; gap:6px; font-size:9px; color:#C9973F; letter-spacing:.12em; font-weight:700; }
+  .w .bar em { font-style:normal; color:#8A8175; font-weight:400; letter-spacing:0; margin-left:auto; }
+  .w .mid { flex:1; display:flex; min-height:0; }
+  .w .rail { flex:0 0 26px; background:#1A1815; border-right:1px solid #302B24; display:flex; flex-direction:column; align-items:center; gap:5px; padding-top:7px; }
+  .w .rail i { width:15px; height:15px; border-radius:5px; background:#302B24; display:block; }
+  .w .rail i.on { background:#C9973F; }
+  .w .menu { flex:0 0 74px; background:#1A1815; border-right:1px solid #302B24; padding:7px 6px; }
+  .w .menu u { display:block; height:6px; background:#302B24; border-radius:2px; margin-bottom:5px; text-decoration:none; }
+  .w .menu u:nth-child(2){ width:80%; } .w .menu u:nth-child(3){ width:65%; } .w .menu u:nth-child(4){ width:88%; } .w .menu u:nth-child(5){ width:58%; }
+  .w .sym { flex:0 0 68px; background:#1A1815; border-right:1px solid #302B24; padding:6px 5px; }
+  .w .sym u { display:flex; justify-content:space-between; height:9px; margin-bottom:4px; }
+  .w .sym u b { display:block; width:26px; height:100%; background:#302B24; border-radius:2px; }
+  .w .sym u s { display:block; width:20px; height:100%; background:rgba(198,69,58,.55); border-radius:2px; }
+  .w .sym u s.dn { background:rgba(76,111,168,.55); }
+  .w .col { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .w .tabs { height:17px; background:#221F1A; border-bottom:1px solid #302B24; display:flex; gap:3px; padding:3px 5px 0; }
+  .w .tabs u { width:34px; background:#302B24; border-radius:3px 3px 0 0; }
+  .w .tabs u.on { background:#0C0B09; }
+  .w .frame { flex:1; margin:5px; border:1px dashed #C6453A; border-radius:4px; padding:4px; display:flex; flex-direction:column; min-height:0; position:relative; }
+  .w .frame::after { content:"iframe"; position:absolute; top:2px; right:4px; font-size:7px; color:#C6453A; letter-spacing:.08em; }
+  .w .pane { flex:1; display:flex; gap:4px; min-height:0; padding:5px; }
+  .w .pane .big { flex:2; background:#1A1815; border:1px solid #302B24; border-radius:4px; }
+  .w .pane .sm { flex:1; display:flex; flex-direction:column; gap:4px; }
+  .w .pane .sm div { flex:1; background:#1A1815; border:1px solid #302B24; border-radius:4px; }
+  .w .pane .sm div.hatch { background-color:rgba(201,151,63,.07); background-image:repeating-linear-gradient(45deg, rgba(201,151,63,.3) 0 1px, transparent 1px 8px); border-color:rgba(201,151,63,.4); }
+
+  .sh-anno { display:flex; gap:6px; align-items:flex-start; font-size:11px; margin-top:9px; line-height:1.45; }
+  .sh-anno span:first-child { flex:0 0 auto; font-weight:700; }
+</style>
+
+<h2>앱 셸 구조 — 사이드바가 애매한 진짜 이유</h2>
+<p class="subtitle">
+  터미널을 볼 때 화면에 <b>사이드바가 두 개, 크롬이 두 겹</b>입니다. 색·간격으로는 절대 안 풀립니다.
+  이건 CSS 가 아니라 <b>라우팅·레이아웃 구조</b> 문제입니다.
+</p>
+
+<div class="sh sh-grid options">
+
+  <!-- S1 -->
+  <div class="sh-card option" data-choice="s1" onclick="toggleSelect(this)">
+    <div class="sh-wrap">
+      <div class="w">
+        <div class="bar">TRADING LAB <em>검색 · 사용자</em></div>
+        <div class="mid">
+          <div class="menu"><u></u><u></u><u></u><u></u><u></u></div>
+          <div class="col">
+            <div class="tabs"><u class="on"></u><u></u><u></u></div>
+            <div class="frame">
+              <div class="pane" style="padding:0">
+                <div class="sym"><u><b></b><s></s></u><u><b></b><s></s></u><u><b></b><s class="dn"></s></u><u><b></b><s class="dn"></s></u><u><b></b><s></s></u></div>
+                <div class="big"></div>
+                <div class="sm"><div></div><div class="hatch"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sh-anno" style="color:#C6453A"><span>①②</span><span>메뉴 사이드바 + 종목 사이드바가 <b>동시에</b> 세로줄 두 개를 만듭니다. 그 사이에 탭 바와 iframe 경계까지 들어가 실제 작업 영역이 네 겹 안쪽입니다.</span></div>
+    </div>
+    <div class="sh-note">
+      <span class="sh-tag" style="background:rgba(198,69,58,.16);color:#E0776C">현행 — 진단용</span>
+      <b class="t">S1. 그대로 둔다</b>
+      구조 변경 0. 색만 P2 로 갈아입힙니다.
+      <b style="display:inline;color:#E0776C">"애매하다"는 감각은 그대로 남습니다</b> — 원인을 안 건드리기 때문입니다.
+      결정 로그의 <code>터미널은 탭 밖</code> 도 계속 미실행 상태로 남습니다.
+    </div>
+  </div>
+
+  <!-- S2 -->
+  <div class="sh-card option" data-choice="s2" onclick="toggleSelect(this)">
+    <div class="sh-wrap">
+      <div class="w">
+        <div class="bar">TRADING LAB <em>삼성전자 005930 · 장중 · 사용자</em></div>
+        <div class="mid">
+          <div class="rail"><i class="on"></i><i></i><i></i><i></i><i style="margin-top:auto;margin-bottom:7px"></i></div>
+          <div class="sym"><u><b></b><s></s></u><u><b></b><s></s></u><u><b></b><s class="dn"></s></u><u><b></b><s class="dn"></s></u><u><b></b><s></s></u><u><b></b><s></s></u></div>
+          <div class="col">
+            <div class="pane">
+              <div class="big"></div>
+              <div class="sm"><div></div><div class="hatch"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sh-anno" style="color:#9FBF7A"><span>✓</span><span>세로줄이 <b>레일(26px, 아이콘만) + 종목(하나)</b> 로 정리됩니다. iframe 이 사라져 종목 선택이 전 패널에 그대로 브로드캐스트됩니다.</span></div>
+    </div>
+    <div class="sh-note">
+      <span class="sh-tag" style="background:rgba(201,151,63,.16);color:#D4A855">추천</span>
+      <b class="t">S2. 아이콘 레일 + 컨텍스트 사이드바</b>
+      제품 전역 이동(터미널·포트폴리오·리서치·관리)은 <b style="display:inline">얇은 아이콘 레일</b>이 맡고,
+      넓은 사이드바는 <b style="display:inline">지금 화면의 맥락(종목 목록)</b> 하나만 맡습니다.
+      상단바에 현재 종목·장 상태가 올라와 <b style="display:inline">"지금 무엇을 보고 있는가"가 한 줄로</b> 읽힙니다.
+      기존 MDI 탭은 <code>/admin</code> 관리 화면에만 남깁니다 — 버리지 않습니다.
+    </div>
+  </div>
+
+  <!-- S3 -->
+  <div class="sh-card option" data-choice="s3" onclick="toggleSelect(this)">
+    <div class="sh-wrap">
+      <div class="w">
+        <div class="bar">⌘ <em>삼성전자 005930 · 장중 · 사용자</em></div>
+        <div class="mid">
+          <div class="sym"><u><b></b><s></s></u><u><b></b><s></s></u><u><b></b><s class="dn"></s></u><u><b></b><s class="dn"></s></u><u><b></b><s></s></u><u><b></b><s></s></u></div>
+          <div class="col">
+            <div class="pane">
+              <div class="big"></div>
+              <div class="sm"><div></div><div class="hatch"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sh-anno" style="color:#8A8175"><span>⌘</span><span>세로줄이 <b>하나</b>. 다른 화면은 <code>⌘K</code> 런처나 좌상단 버튼으로 진입합니다 — 상시 내비게이션이 없습니다.</span></div>
+    </div>
+    <div class="sh-note">
+      <span class="sh-tag" style="background:rgba(138,129,117,.2);color:#A79C8D">최소</span>
+      <b class="t">S3. 터미널 전체화면 + 런처</b>
+      크롬을 최대한 지웁니다. 화면 대비 데이터 면적이 가장 넓고 성격이 가장 강합니다.
+      대신 <b style="display:inline;color:#E0776C">다른 화면이 있다는 사실 자체가 안 보입니다</b> —
+      처음 클론한 사람이 관리·포트폴리오 화면을 못 찾을 위험이 실제로 있고, 이건 G1(남이 받아서 띄운다)과 정면으로 부딪힙니다.
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <p class="label">정직하게 붙이는 비용</p>
+  <p style="line-height:1.7">
+    S2·S3 은 <b>CSS 작업이 아닙니다.</b> <code>app/(main)/layout.tsx</code> 가 메인 프레임에서 <code>children</code> 을
+    렌더하지 않는 구조를 바꿔야 하고, <code>GlobalTabs</code> 의 iframe 경로에서 터미널을 빼내야 합니다.
+    <b>디자인 개선과 별개의 구조 변경이고, 회귀 위험도 여기가 가장 큽니다</b>
+    (탭 상태 저장 <code>tabStore</code>, 권한 게이트, <code>isEmbed</code> 분기가 전부 이 구조에 물려 있습니다).
+    <br><br>
+    그래서 <b>순서를 나누는 것도 선택지</b>입니다 — 먼저 <b>토큰·컴포넌트만 P2 로 정리(S1 상태에서)</b> 하고,
+    셸 개편은 별도 작업으로 뒤에 두는 것. 화면은 확실히 나아지지만 "사이드바가 애매하다"는 그때까지 남습니다.
+    <b>동시에 갈지, 나눠 갈지도 알려주십시오.</b>
+  </p>
+</div>

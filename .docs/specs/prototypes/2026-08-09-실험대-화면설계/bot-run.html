@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>모의로 돌리는 중 — 눌러지는 프로토타입</title>
+<style>
+  :root{--bg:#0D0F11;--pn:#16191C;--rs:#1C2126;--hl:rgba(38,43,48,.75);--ln:#262B30;--ls:#3A4249;
+        --is:#F5F3EF;--ik:#E6E4E0;--im:#8B877F;--if:#625E58;--up:#DB4F3E;--dn:#4A8CC8;--dg:#C94A3B}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0A0C0E;color:var(--ik);font-family:Pretendard,system-ui,sans-serif;
+       letter-spacing:-.01em;padding:22px}
+  .n{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  h2{font-size:19px;color:var(--is);margin:0 0 5px;font-weight:700}
+  .sub{font-size:12.5px;color:var(--im);margin:0 0 16px;line-height:1.6}
+  .sub b{color:var(--ik);font-weight:500}
+
+  .win{background:var(--bg);border:1px solid var(--ln);border-radius:12px;overflow:hidden;max-width:1300px}
+  .hud{display:flex;align-items:center;height:48px;padding:0 15px;gap:15px;background:var(--pn);
+       border-bottom:1px solid var(--ln);font-size:12.5px}
+  .hud .wm{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--is)}
+  .hud .bot{font-size:13.5px;font-weight:700;color:var(--is)}
+  .hud .tag{font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--ls);color:var(--im)}
+  .hud .sp{flex:1}
+  .mode{display:flex;align-items:center;gap:8px;padding:4px 11px;border-radius:7px;
+        border:1px solid rgba(127,160,90,.45);background:rgba(127,160,90,.1);font-size:11.5px;color:#9BBE7A;
+        white-space:nowrap}
+  .mode b{font-weight:700}
+  .mode s{text-decoration:none;color:var(--im);font-variant-numeric:tabular-nums}
+  .mode .dot{width:6px;height:6px;border-radius:50%;background:#9BBE7A;flex:0 0 auto}
+  .btn2{font-size:12px;padding:6px 13px;border-radius:8px;cursor:pointer;user-select:none;
+        background:transparent;border:1px solid var(--ls);color:var(--im)}
+  .btn2:hover{color:var(--ik)}
+  .btn2.stop:hover{color:#E2837A;border-color:rgba(201,74,59,.6)}
+
+  .cols{display:flex;min-height:520px}
+  .col{padding:15px;min-width:0}
+  .col+.col{border-left:1px solid var(--ln)}
+  .lb{font-size:12.5px;font-weight:600;color:var(--is);margin-bottom:3px}
+  .lbn{font-size:11.5px;color:var(--if);line-height:1.5;margin-bottom:11px}
+
+  /* 밤사이 */
+  .ev{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--hl)}
+  .ev:last-child{border-bottom:none}
+  .ev .tg{flex:0 0 auto;font-size:10.5px;padding:2px 7px;border-radius:5px;height:fit-content;margin-top:1px}
+  .ev .tg.buy{background:rgba(219,79,62,.16);color:#E58273;border:1px solid rgba(219,79,62,.4)}
+  .ev .tg.sell{background:rgba(74,140,200,.15);color:#7FAEDA;border:1px solid rgba(74,140,200,.4)}
+  .ev .tg.idle{background:var(--rs);color:var(--im);border:1px solid var(--ln)}
+  .ev .bd{flex:1;min-width:0}
+  .ev .bd b{font-size:12.5px;color:var(--is);font-weight:600}
+  .ev .bd .amt{font-size:12px;margin-left:6px;font-variant-numeric:tabular-nums}
+  .ev .bd .why{font-size:11.5px;color:var(--im);line-height:1.5;margin-top:3px}
+
+  /* 돈 */
+  .money{background:var(--rs);border:1px solid var(--ls);border-radius:10px;padding:13px}
+  .money .r{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0}
+  .money .r+.r{border-top:1px solid var(--hl)}
+  .money .k{font-size:12px;color:var(--ik)}
+  .money .v{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+  .money .hero .k{font-size:12.5px}
+  .money .hero .v{font-size:25px;letter-spacing:-.02em}
+
+  .plot{height:168px;position:relative;margin-top:13px;
+        background-image:repeating-linear-gradient(0deg,var(--hl) 0 1px,transparent 1px 42px)}
+  .plot svg{position:absolute;inset:0;width:100%;height:100%}
+  .lg{display:flex;gap:14px;font-size:11.5px;margin-top:7px}
+  .lg span{display:flex;align-items:center;gap:5px;color:var(--im)}
+  .lg i{width:15px;height:0;display:block}
+
+  .gap{margin-top:13px;border:1px solid var(--ln);border-radius:9px;padding:11px 12px;background:var(--pn)}
+  .gap .t{font-size:12.5px;font-weight:600;color:var(--is);margin-bottom:5px}
+  .gap .l{font-size:12px;color:var(--im);line-height:1.6}
+  .gap .l b{color:var(--ik);font-weight:500}
+  .gap .warn{color:#D9B45C}
+
+  /* 보유 */
+  .hold{display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--hl);font-size:12px}
+  .hold:last-child{border-bottom:none}
+  .hold .nm{flex:1;color:var(--ik)}
+  .hold .nm s{display:block;text-decoration:none;font-size:11px;color:var(--if);font-variant-numeric:tabular-nums}
+  .hold .v{text-align:right;font-variant-numeric:tabular-nums}
+  .hold .v b{display:block;font-weight:500}
+  .hold .v s{display:block;text-decoration:none;font-size:11px}
+  .cash{display:flex;justify-content:space-between;padding:10px 0 0;margin-top:6px;border-top:1px solid var(--ls);font-size:12px}
+  .cash span{color:var(--im)} .cash b{color:var(--ik);font-weight:500;font-variant-numeric:tabular-nums}
+
+  .tips{max-width:1300px;margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .tip{background:var(--pn);border:1px solid var(--ln);border-radius:9px;padding:12px 14px;font-size:12px;
+       line-height:1.6;color:var(--im)}
+  .tip b{color:var(--ik);font-weight:500;display:block;margin-bottom:3px}
+</style>
+</head>
+<body>
+
+<h2>모의로 돌리는 중 — 매일 아침 보는 화면</h2>
+<p class="sub">
+  <b>가짜 돈으로 실제 시장에서 돌리고 있습니다.</b> 백테스트는 과거 데이터고 이건 지금 벌어지는 일이라,
+  <b>둘이 얼마나 벌어지는지</b>가 이 화면의 핵심입니다.
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span>
+    <span class="mode"><span class="dot"></span><b>모의</b><s>실제 주문 나가지 않음 · 연결된 계좌 없음 · 오늘 나간 주문 <b style="color:var(--ik)">0</b>건</s></span>
+    <span class="bot">대형주 눌림목 봇</span>
+    <span class="tag">모의 운용 <b class="n" style="color:var(--ik)">47</b>일째</span>
+    <div class="sp"></div>
+    <span class="btn2">설정 보기</span>
+    <span class="btn2 stop" title="누르면 두 가지를 고릅니다">멈추기…</span>
+  </div>
+  <div style="padding:9px 15px;background:rgba(217,164,65,.07);border-bottom:1px solid rgba(217,164,65,.25);
+              font-size:11.5px;color:#D9B45C;line-height:1.5">
+    <b>「멈추기」를 누르면 두 가지를 고릅니다</b> —
+    <b style="color:var(--ik)">그대로 두고 멈추기</b>(6종목 계속 보유 · <b>손절도 안 나갑니다</b>) /
+    <b style="color:var(--ik)">전부 팔고 멈추기</b>(시장가로 정리). 누르기 전에 무슨 일이 생기는지 먼저 보여줍니다.
+  </div>
+
+  <div class="cols">
+    <!-- 밤사이 -->
+    <div class="col" style="flex:0 0 330px">
+      <div class="lb">밤사이 봇이 한 일</div>
+      <div class="lbn">어제 장 마감 후 ~ 오늘 아침. 봇이 스스로 했고, <b style="color:var(--im)">가짜 돈이라 승인은 받지 않았습니다.</b></div>
+
+      <div class="ev"><span class="tg buy">샀음</span><div class="bd">
+        <b>삼성전자</b><span class="amt" style="color:var(--ik)">200만원</span>
+        <div class="why">20일 평균선까지 떨어졌다가 <b style="color:var(--ik)">+1.7% 반등</b>했고, 많이 팔린 상태였습니다. 두 조건 다 맞아서 샀습니다.</div></div></div>
+
+      <div class="ev"><span class="tg buy">샀음</span><div class="bd">
+        <b>현대차</b><span class="amt" style="color:var(--ik)">200만원</span>
+        <div class="why">같은 조건입니다. <b style="color:#D9B45C">다만 8월 12일에 실적 발표가 예정돼 있습니다</b> — 봇은 그걸 안 봅니다.</div></div></div>
+
+      <div class="ev"><span class="tg sell">팔았음</span><div class="bd">
+        <b>카카오</b><span class="amt" style="color:var(--dn)">−14만원</span>
+        <div class="why">44,900원에 샀는데 41,750원까지 떨어져 <b style="color:var(--dn)">−7%</b> 손절선에 닿았습니다. 정해둔 대로 팔았습니다.</div></div></div>
+
+      <div class="ev"><span class="tg idle">안 함</span><div class="bd">
+        <b>나머지 211종목</b>
+        <div class="why">조건에 맞는 게 없었습니다. <b style="color:var(--ik)">아무것도 안 한 것도 봇이 일한 것</b>입니다.</div></div></div>
+
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ln);font-size:11.5px;color:var(--if);line-height:1.55">
+        <b style="color:var(--im)">왜 샀는지가 항상 붙습니다.</b> 이유 없이 사는 봇은 나중에 왜 틀렸는지도 알 수 없습니다.
+      </div>
+    </div>
+
+    <!-- 돈 + 곡선 -->
+    <div class="col" style="flex:1">
+      <div class="lb">내 돈은 지금</div>
+      <div class="lbn">47일 전에 <b style="color:var(--im)">1,600만원</b>을 맡겼습니다.</div>
+
+      <div class="money">
+        <div class="r hero"><span class="k">지금 평가액</span><span class="v" style="color:var(--up)">1,672만원</span></div>
+        <div class="r"><span class="k">벌었나 잃었나</span><span class="v" style="color:var(--up)">+72만원 (+4.5%)</span></div>
+        <div class="r"><span class="k">가장 많이 까였을 때</span><span class="v" style="color:var(--dn)">−58만원</span></div>
+        <div class="r"><span class="k">그때가 언제였나</span><span class="v" style="font-size:13px;color:var(--im)">7월 18일 · 9일간</span></div>
+      </div>
+
+      <div class="plot">
+        <svg viewBox="0 0 600 168" preserveAspectRatio="none">
+          <polyline fill="none" stroke="#625E58" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"
+            points="0,140 40,134 80,127 120,131 160,120 200,112 240,118 280,104 320,96 360,101 400,88 440,80 480,74 520,68 560,60 600,52"/>
+          <polyline fill="none" stroke="#F5F3EF" stroke-width="2" vector-effect="non-scaling-stroke"
+            points="0,140 40,136 80,131 120,138 160,128 200,122 240,131 280,118 320,110 360,119 400,104 440,97 480,92 520,86 560,79 600,72"/>
+          <rect x="470" y="0" width="42" height="168" fill="rgba(217,164,65,.08)" stroke="rgba(217,164,65,.3)" stroke-width="1"/>
+          <text x="491" y="14" fill="#D9B45C" font-size="9" text-anchor="middle" font-family="Pretendard,sans-serif">컴퓨터 꺼짐</text>
+        </svg>
+      </div>
+      <div class="lg">
+        <span><i style="border-top:2px solid #F5F3EF"></i>실제로 돌린 결과</span>
+        <span><i style="border-top:1px dashed #625E58"></i>백테스트가 예상했던 것</span>
+      </div>
+
+      <div class="gap">
+        <div class="t">백테스트대로 되고 있나</div>
+        <div class="l">
+          예상보다 <b style="color:#D9B45C">−1.2%p</b> 낮습니다 — 금액으로 <b>19만원</b> 차이입니다.<br>
+          <span class="warn">그중 3일은 컴퓨터가 꺼져 있어 봇이 아예 안 돌았습니다.</span> 그때 신호 2건을 놓쳤고, 그게 차이의 절반쯤입니다.<br>
+          나머지 차이는 <b>실제로 살 때 가격이 조금 밀린 것</b>입니다. 백테스트는 딱 그 가격에 샀다고 계산합니다.
+        </div>
+      </div>
+    </div>
+
+    <!-- 보유 -->
+    <div class="col" style="flex:0 0 292px">
+      <div class="lb">지금 들고 있는 것</div>
+      <div class="lbn">최대 8종목까지 들 수 있고, 지금 <b style="color:var(--im)">6종목</b>입니다.</div>
+
+      <div class="hold"><div class="nm">삼성전자<s>28주 · 어제 샀음</s></div>
+        <div class="v"><b>202만원</b><s style="color:var(--up)">+2만 (+1.0%)</s></div></div>
+      <div class="hold"><div class="nm">SK하이닉스<s>11주 · 6일째</s></div>
+        <div class="v"><b>214만원</b><s style="color:var(--up)">+14만 (+7.1%)</s></div></div>
+      <div class="hold"><div class="nm">현대차<s>8주 · 어제 샀음</s></div>
+        <div class="v"><b>198만원</b><s style="color:var(--dn)">−2만 (−1.0%)</s></div></div>
+      <div class="hold"><div class="nm">기아<s>19주 · 12일째</s></div>
+        <div class="v"><b>207만원</b><s style="color:var(--up)">+7만 (+3.6%)</s></div></div>
+      <div class="hold"><div class="nm">POSCO홀딩스<s>5주 · 3일째</s></div>
+        <div class="v"><b>194만원</b><s style="color:var(--dn)">−6만 (−3.0%)</s></div></div>
+      <div class="hold"><div class="nm">셀트리온<s>12주 · 21일째</s></div>
+        <div class="v"><b>211만원</b><s style="color:var(--up)">+11만 (+5.6%)</s></div></div>
+      <div class="cash"><span>아직 안 쓴 돈</span><b>446만원</b></div>
+
+      <div style="margin-top:15px;padding-top:13px;border-top:1px solid var(--ln)">
+        <div class="lb" style="font-size:12px">이 봇을 실제 돈으로 돌려도 되나</div>
+        <div style="font-size:12px;color:var(--im);line-height:1.6;margin-top:6px">
+          아직 <b style="color:var(--ik)">47일</b>치뿐입니다. 이 성적이 운인지 실력인지 통계로 가리려면
+          <b style="color:var(--ik)">앞으로 11개월</b>이 더 필요합니다.<br><br>
+          <span style="color:var(--if)">지금 판단하시면 <b style="color:var(--im)">47일 성적을 믿는 것</b>입니다 — 막지는 않습니다.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tips">
+  <div class="tip"><b>실선과 점선의 간격이 핵심입니다</b>점선(백테스트 예상)보다 실선(실제)이 아래에 있으면 <b style="color:var(--ik);display:inline">봇이 약속대로 못 하고 있다</b>는 뜻입니다.</div>
+  <div class="tip"><b>「컴퓨터 꺼짐」 구간을 보세요</b>내 컴퓨터에서 도는 봇이라 <b style="color:var(--ik);display:inline">노트북을 닫으면 봇도 멈춥니다.</b> 그 사실을 숨기지 않고 곡선 위에 표시합니다.</div>
+  <div class="tip"><b>「안 함」도 기록합니다</b>조건에 맞는 게 없어 아무것도 안 한 날도 남깁니다 — <b style="color:var(--ik);display:inline">봇이 죽은 건지 기다리는 건지</b>를 구분하기 위해서입니다.</div>
+</div>
+
+</body>
+</html>

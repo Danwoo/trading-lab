@@ -1,0 +1,261 @@
+<style>
+  .bd { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .bd .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:12px; overflow:hidden; }
+
+  /* ── 상단 HUD — 항상 보이는 상태 ── */
+  .hud { display:flex; align-items:center; height:40px; padding:0 14px; gap:0;
+         background:var(--pn); border-bottom:1px solid var(--ln); font-size:12px; }
+  .hud .wm { font-size:11px; font-weight:700; letter-spacing:.16em; color:var(--is); margin-right:16px; }
+  .hud .cell { display:flex; align-items:baseline; gap:6px; padding:0 14px; border-left:1px solid var(--ln); height:100%; }
+  .hud .cell:first-of-type { border-left:none; }
+  .hud .cell > span:first-child { color:var(--if); font-size:11px; }
+  .hud .cell b { color:var(--ik); font-weight:500; }
+  .hud .warn { color:var(--dg); font-weight:500; }
+  .hud .sp { flex:1; }
+  .hud .av { width:24px; height:24px; border-radius:50%; background:var(--rs); border:1px solid var(--ln);
+             display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--im); }
+
+  .body { display:flex; height:600px; }
+
+  /* ── 좌측 레일 — 페이지 전환기가 아니라 패널 호출기 ── */
+  .rail { flex:0 0 46px; background:var(--pn); border-right:1px solid var(--ln);
+          display:flex; flex-direction:column; align-items:center; gap:5px; padding:9px 0; }
+  .rail i { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+            font-size:14px; color:var(--if); border:1px solid transparent; font-style:normal; }
+  .rail i.on  { background:var(--rs); border-color:var(--ls); color:var(--is); }
+  .rail i.act { background:var(--is); color:var(--bg); font-weight:700; }
+  .rail .gap { flex:1; }
+
+  /* ── 보드 ── */
+  .board { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .btop { flex:1; display:flex; min-height:0; }
+
+  .curve { flex:1; display:flex; flex-direction:column; padding:13px 14px 0; min-width:0; }
+  .chd { display:flex; align-items:baseline; gap:10px; margin-bottom:9px; }
+  .chd b { font-size:13px; font-weight:700; color:var(--is); }
+  .chd .lg { display:flex; gap:13px; margin-left:auto; font-size:11px; }
+  .chd .lg span { display:flex; align-items:center; gap:5px; color:var(--im); }
+  .chd .lg i { width:14px; height:0; border-top-style:solid; display:block; }
+
+  .plot { flex:1; position:relative; min-height:0;
+          background-image:repeating-linear-gradient(0deg,var(--hl) 0 1px,transparent 1px 46px); }
+  .plot svg { position:absolute; inset:0; width:100%; height:100%; }
+  .brush { position:absolute; top:0; bottom:0; background:rgba(245,243,239,.055);
+           border-left:1px solid var(--ls); border-right:1px solid var(--ls); }
+  .brush em { position:absolute; top:4px; left:50%; transform:translateX(-50%); font-style:normal;
+              font-size:10px; color:var(--im); white-space:nowrap; }
+
+  .under { height:72px; padding:0 14px 11px; }
+  .under .lb { font-size:9.5px; letter-spacing:.13em; font-weight:700; color:var(--if); margin:7px 0 4px; }
+  .under .up2 { position:relative; height:44px;
+                background-image:repeating-linear-gradient(0deg,var(--hl) 0 1px,transparent 1px 22px); }
+  .under svg { position:absolute; inset:0; width:100%; height:100%; }
+
+  /* ── 우측 — 격자 + 지표 ── */
+  .side { flex:0 0 274px; border-left:1px solid var(--ln); padding:13px 14px; display:flex; flex-direction:column; min-height:0; }
+  .lb { font-size:9.5px; letter-spacing:.13em; font-weight:700; color:var(--if); margin-bottom:8px; }
+  .lb.m { margin-top:16px; }
+
+  .grid { display:grid; grid-template-columns:repeat(10,1fr); gap:2px; }
+  .grid i { aspect-ratio:1; border-radius:2px; display:block; position:relative; }
+  .grid i.sel { box-shadow:0 0 0 1.5px var(--is); z-index:2; }
+  .gaxis { display:flex; justify-content:space-between; font-size:9.5px; color:var(--if); margin-top:5px; }
+
+  .tile { display:flex; justify-content:space-between; align-items:baseline; padding:7px 0; }
+  .tile + .tile { border-top:1px solid var(--hl); }
+  .tile .k { font-size:11.5px; color:var(--im); }
+  .tile .v { font-size:14px; font-weight:500; color:var(--ik); }
+  .tile.hero .k { color:var(--ik); }
+  .tile.hero .v { font-size:21px; letter-spacing:-.02em; color:var(--is); }
+
+  /* ── 하단 독 — 실험 이력 ── */
+  .dock { flex:0 0 88px; border-top:1px solid var(--ln); background:var(--pn); padding:9px 14px; }
+  .dock .hdr { display:flex; align-items:baseline; gap:9px; margin-bottom:7px; }
+  .dock .hdr b { font-size:11px; font-weight:700; letter-spacing:.13em; color:var(--if); }
+  .dock .hdr span { font-size:11px; color:var(--im); }
+  .strip { display:flex; gap:5px; align-items:flex-end; height:40px; }
+  .strip u { flex:1; border-radius:2px 2px 0 0; text-decoration:none; display:block; position:relative; }
+  .strip u.on { box-shadow:0 0 0 1.5px var(--is); }
+  .strip u.dead { opacity:.32; }
+
+  /* ── 떠오른 패널 (전략 게임식 오버레이) ── */
+  .panel { position:absolute; right:14px; top:56px; width:296px; background:var(--pn);
+           border:1px solid var(--ls); border-radius:11px;
+           box-shadow:0 8px 28px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.5); z-index:9; }
+  .panel .ph { display:flex; align-items:center; gap:8px; padding:12px 14px 0; }
+  .panel .ph b { font-size:12.5px; font-weight:700; color:var(--is); }
+  .panel .ph .x { margin-left:auto; color:var(--if); font-size:14px; }
+  .panel .pb { padding:9px 14px 14px; }
+  .panel .doc { padding:8px 0; font-size:12px; line-height:1.5; }
+  .panel .doc + .doc { border-top:1px solid var(--hl); }
+  .panel .doc b { color:var(--ik); font-weight:500; display:block; }
+  .panel .doc span { color:var(--if); font-size:11px; }
+
+  .cal { display:flex; gap:12px; margin-top:12px; font-size:11.5px; color:var(--im); line-height:1.65; }
+  .cal .pin { flex:0 0 auto; color:var(--if); font-weight:700; }
+  .cal b { color:var(--ik); font-weight:500; }
+</style>
+
+<div class="bd">
+<h2 style="color:#F5F3EF">실험대 — 보드 + HUD</h2>
+<p class="subtitle" style="color:#8B877F">
+  <b style="color:#E6E4E0">화면을 떠나지 않습니다.</b> 레일은 페이지 전환기가 아니라 <b style="color:#E6E4E0">패널 호출기</b>이고,
+  리서치·포트폴리오·설정은 보드 위에 떠올랐다 사라집니다. 상태는 상단 HUD 에 상시 노출됩니다.
+</p>
+
+<div class="win" style="position:relative">
+
+  <!-- ══ 상단 HUD ══ -->
+  <div class="hud">
+    <span class="wm">TRADING LAB</span>
+    <div class="cell"><span>가설</span><b>대형주 20일선 눌림목</b></div>
+    <div class="cell"><span>시도</span><b class="n">32</b><span class="warn n">/ 45 상한</span></div>
+    <div class="cell"><span>모의 운용</span><b class="n">3</b><span>봇 · <b class="n">47</b>일</span></div>
+    <div class="cell"><span>적재</span><b class="n">2,847</b><span>종목 · 08-07</span></div>
+    <div class="sp"></div>
+    <div class="cell"><span class="warn">⚠ MinBTL 잔여 13회</span></div>
+    <div class="av">D</div>
+  </div>
+
+  <!-- ══ 떠오른 패널 — 리서치 ══ -->
+  <div class="panel">
+    <div class="ph"><b>리서치</b><span style="font-size:11px;color:var(--im)">삼성전자 관련</span><span class="x">×</span></div>
+    <div class="pb">
+      <div class="doc"><b>2026 반도체 사이클 메모</b><span class="n">08-02 · 내가 작성 · 3곳 인용</span></div>
+      <div class="doc"><b>HBM 공급과잉 리포트 요약</b><span class="n">07-28 · 업로드 · 1곳 인용</span></div>
+      <div class="doc" style="opacity:.6"><b style="color:var(--im)">이 종목 관련 문서 2건</b><span>전체 문서에서 검색 →</span></div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- ══ 레일 — 패널 호출기 ══ -->
+    <div class="rail">
+      <i class="on">▦</i>
+      <i>◵</i>
+      <i class="act">◷</i>
+      <i>⌸</i>
+      <div class="gap"></div>
+      <i>⚙</i>
+    </div>
+
+    <!-- ══ 보드 ══ -->
+    <div class="board">
+      <div class="btop">
+
+        <!-- 곡선 — 화면의 주인공 -->
+        <div class="curve">
+          <div class="chd">
+            <b>자산곡선</b>
+            <span style="font-size:11.5px;color:var(--im)" class="n">2023-01 → 2026-08 · 880 세션</span>
+            <div class="lg">
+              <span><i style="border-top:2px solid #F5F3EF"></i>전략</span>
+              <span><i style="border-top:1px solid #8B877F"></i>코스피200</span>
+              <span><i style="border-top:1px dashed #625E58"></i>유니버스 동일가중</span>
+            </div>
+          </div>
+          <div class="plot">
+            <svg viewBox="0 0 600 240" preserveAspectRatio="none">
+              <polyline fill="none" stroke="#625E58" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"
+                points="0,222 40,214 80,206 120,196 160,190 200,178 240,170 280,158 320,166 360,150 400,138 440,128 480,120 520,110 560,100 600,92"/>
+              <polyline fill="none" stroke="#8B877F" stroke-width="1" vector-effect="non-scaling-stroke"
+                points="0,224 40,218 80,212 120,206 160,202 200,194 240,188 280,180 320,186 360,176 400,168 440,162 480,156 520,150 560,144 600,138"/>
+              <polyline fill="none" stroke="#F5F3EF" stroke-width="2" vector-effect="non-scaling-stroke"
+                points="0,220 40,208 80,198 120,182 160,172 200,152 240,140 280,120 320,152 360,128 400,108 440,92 480,80 520,64 560,50 600,38"/>
+            </svg>
+            <div class="brush" style="left:44%;right:38%"><em class="n">2024-08 · 낙폭 구간 선택됨</em></div>
+          </div>
+          <div class="under">
+            <div class="lb">낙폭 (underwater) — 시간축 연동</div>
+            <div class="up2">
+              <svg viewBox="0 0 600 44" preserveAspectRatio="none">
+                <polyline fill="none" stroke="#4A8CC8" stroke-width="1.4" vector-effect="non-scaling-stroke"
+                  points="0,2 40,6 80,3 120,10 160,5 200,2 240,8 280,4 300,26 320,38 340,34 360,22 400,9 440,3 480,6 520,2 560,4 600,2"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- 우측 — 격자와 지표 -->
+        <div class="side">
+          <div class="lb">파라미터 격자 · 이평 × RSI</div>
+          <div class="grid">
+            <i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#232A30"></i><i style="background:#2B333A"></i><i style="background:#2B333A"></i><i style="background:#232A30"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i>
+            <i style="background:#1C2126"></i><i style="background:#232A30"></i><i style="background:#3A444C"></i><i style="background:#55636D"></i><i style="background:#55636D"></i><i style="background:#3A444C"></i><i style="background:#232A30"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i>
+            <i style="background:#232A30"></i><i style="background:#3A444C"></i><i style="background:#6E808C"></i><i style="background:#8E A0AB"></i><i style="background:#93A5B0"></i><i style="background:#6E808C"></i><i style="background:#3A444C"></i><i style="background:#232A30"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i>
+            <i style="background:#2B333A"></i><i style="background:#55636D"></i><i style="background:#93A5B0"></i><i style="background:#C3D0D8" class="sel"></i><i style="background:#C3D0D8"></i><i style="background:#93A5B0"></i><i style="background:#55636D"></i><i style="background:#2B333A"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i>
+            <i style="background:#2B333A"></i><i style="background:#55636D"></i><i style="background:#93A5B0"></i><i style="background:#C3D0D8"></i><i style="background:#B8C6CF"></i><i style="background:#8EA0AB"></i><i style="background:#4A5760"></i><i style="background:#232A30"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i>
+            <i style="background:#232A30"></i><i style="background:#3A444C"></i><i style="background:#6E808C"></i><i style="background:#8EA0AB"></i><i style="background:#6E808C"></i><i style="background:#3A444C"></i><i style="background:#232A30"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i>
+            <i style="background:#1C2126"></i><i style="background:#232A30"></i><i style="background:#3A444C"></i><i style="background:#4A5760"></i><i style="background:#3A444C"></i><i style="background:#232A30"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#D8E2E8"></i><i style="background:#1C2126"></i>
+            <i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#232A30"></i><i style="background:#232A30"></i><i style="background:#232A30"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i>
+            <i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i>
+            <i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i><i style="background:#1C2126"></i>
+          </div>
+          <div class="gaxis"><span class="n">이평 5</span><span style="color:var(--im)">고원 ✓ · 절벽 없음</span><span class="n">60</span></div>
+          <div style="font-size:11px;color:var(--im);line-height:1.5;margin-top:7px">
+            현재 지점은 <b style="color:var(--ik);font-weight:500">두께 있는 고원 안</b>입니다.
+            <b style="color:var(--ik);font-weight:500">우하단의 고립점</b>은 SR 이 더 높지만 이웃이 전부 어둡습니다 — 봉우리.
+          </div>
+
+          <div class="lb m">이 지점의 성과</div>
+          <div class="tile hero"><span class="k">최장 미회복</span><span class="v n">7.4개월</span></div>
+          <div class="tile"><span class="k">MDD · Calmar</span><span class="v n" style="color:var(--dn)">-16.9%<span style="color:var(--if)"> · </span><span style="color:var(--ik)">0.84</span></span></div>
+          <div class="tile"><span class="k">거래당 수익 vs 비용</span><span class="v n">3.2<span style="font-size:11px;color:var(--if)">배 쿠션</span></span></div>
+          <div class="tile"><span class="k">연환산</span><span class="v n" style="color:var(--up)">+14.2%</span></div>
+          <div class="tile"><span class="k" style="color:var(--if)">샤프</span><span class="v n" style="color:var(--im);font-size:12.5px">1.21 ±0.54</span></div>
+        </div>
+      </div>
+
+      <!-- ══ 하단 독 — 실험 이력 ══ -->
+      <div class="dock">
+        <div class="hdr"><b>실험 이력</b><span class="n">32회 · 커밋 3 · 버림 29</span>
+          <span style="margin-left:auto;color:var(--if)">막대 높이 = 검증구간 성과 · 흐린 것은 버린 시도</span></div>
+        <div class="strip">
+          <u class="dead" style="height:22%;background:var(--dn)"></u><u class="dead" style="height:36%;background:var(--up)"></u>
+          <u class="dead" style="height:14%;background:var(--dn)"></u><u class="dead" style="height:44%;background:var(--up)"></u>
+          <u class="dead" style="height:28%;background:var(--up)"></u><u class="dead" style="height:9%;background:var(--dn)"></u>
+          <u class="dead" style="height:52%;background:var(--up)"></u><u class="dead" style="height:31%;background:var(--up)"></u>
+          <u class="dead" style="height:18%;background:var(--dn)"></u><u class="dead" style="height:47%;background:var(--up)"></u>
+          <u style="height:66%;background:var(--up)"></u><u class="dead" style="height:24%;background:var(--up)"></u>
+          <u class="dead" style="height:39%;background:var(--up)"></u><u class="dead" style="height:12%;background:var(--dn)"></u>
+          <u class="dead" style="height:55%;background:var(--up)"></u><u style="height:71%;background:var(--up)"></u>
+          <u class="dead" style="height:33%;background:var(--up)"></u><u class="dead" style="height:20%;background:var(--dn)"></u>
+          <u class="dead" style="height:48%;background:var(--up)"></u><u class="dead" style="height:26%;background:var(--up)"></u>
+          <u class="dead" style="height:41%;background:var(--up)"></u><u class="dead" style="height:16%;background:var(--dn)"></u>
+          <u class="dead" style="height:58%;background:var(--up)"></u><u class="dead" style="height:29%;background:var(--up)"></u>
+          <u class="dead" style="height:37%;background:var(--up)"></u><u class="dead" style="height:11%;background:var(--dn)"></u>
+          <u class="dead" style="height:50%;background:var(--up)"></u><u class="dead" style="height:23%;background:var(--dn)"></u>
+          <u class="dead" style="height:44%;background:var(--up)"></u><u class="dead" style="height:19%;background:var(--dn)"></u>
+          <u class="dead" style="height:35%;background:var(--up)"></u><u class="on" style="height:63%;background:var(--up)"></u>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cal"><span class="pin">구조 1</span><span>
+  <b>레일을 눌러도 화면을 떠나지 않습니다.</b> 지금 리서치(◷)가 눌려 보드 위에 패널로 떠 있고, 뒤의 곡선과 격자는 그대로입니다.
+  닫으면 보드로 돌아옵니다 — <b>brushing &amp; linking 이 끊기지 않습니다.</b>
+</span></div>
+<div class="cal"><span class="pin">구조 2</span><span>
+  <b>곡선이 압도적으로 큽니다.</b> 이전 시안이 카드 6개를 균등 배치해 "뭘 봐야 할지 모르겠다"가 됐습니다.
+  보드는 주인공이 하나여야 합니다 — 나머지는 그 주변에 붙습니다.
+</span></div>
+<div class="cal"><span class="pin">구조 3</span><span>
+  <b>HUD 가 상시로 경고합니다.</b> 상단에 <b style="color:#C94A3B">시도 32 / 45 상한 · MinBTL 잔여 13회</b> 가 항상 떠 있습니다.
+  100번까지 가서 알려주면 늦으니, <b>지금 몇 번째인지가 화면을 떠나지 않습니다.</b>
+</span></div>
+<div class="cal"><span class="pin">구조 4</span><span>
+  <b>단일 결과가 없습니다.</b> 우측 격자가 곧 이번 실행의 결과이고, 왼쪽 곡선은 그중 <b>선택된 한 칸</b>입니다.
+  고원 안에 있는지 봉우리에 걸터앉았는지가 <b>숨을 데 없이 보입니다</b> — 우하단 고립점이 그 대조군입니다.
+</span></div>
+<div class="cal"><span class="pin">구조 5</span><span>
+  <b>버린 시도 29개가 하단에 남습니다.</b> 흐리게 깔린 막대가 그것이고, 지금 결과(오른쪽 끝)가
+  <b>32개 분포의 어디인지</b>가 한눈에 보입니다. "32번 중 최고를 골랐다"를 숨길 수 없습니다.
+</span></div>
+</div>

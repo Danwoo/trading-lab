@@ -1,0 +1,241 @@
+<style>
+  .hm { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --ok:#7FA05A; --wr:#D9A441;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .hm .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:12px; overflow:hidden; }
+  .hud { display:flex; align-items:center; height:46px; padding:0 15px; gap:13px; background:var(--pn);
+         border-bottom:1px solid var(--ln); font-size:12.5px; }
+  .hud .wm { font-size:11px; font-weight:700; letter-spacing:.16em; color:var(--is); }
+  .mode { display:flex; align-items:center; gap:7px; padding:4px 11px; border-radius:7px;
+          border:1px solid rgba(127,160,90,.45); background:rgba(127,160,90,.1); font-size:11.5px; color:#9BBE7A; }
+  .mode .dot { width:6px; height:6px; border-radius:50%; background:#9BBE7A; }
+  .mode s { text-decoration:none; color:var(--im); }
+  .hud .sp { flex:1; }
+  .hud .av { width:25px; height:25px; border-radius:50%; background:var(--rs); border:1px solid var(--ln);
+             display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--im); }
+
+  .body { display:flex; min-height:610px; }
+  .menu { flex:0 0 134px; background:var(--pn); border-right:1px solid var(--ln); padding:10px 8px;
+          display:flex; flex-direction:column; gap:3px; }
+  .menu a { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:8px; font-size:12.5px;
+            color:var(--im); text-decoration:none; border:1px solid transparent; }
+  .menu a.on { background:var(--rs); border-color:var(--ls); color:var(--is); font-weight:500; }
+  .menu a i { font-style:normal; width:15px; text-align:center; font-size:13px; }
+  .menu .gap { flex:1; }
+
+  .main { flex:1; padding:17px 18px; min-width:0; }
+  .greet { font-size:16px; color:var(--is); font-weight:600; margin-bottom:3px; }
+  .greetn { font-size:12px; color:var(--if); margin-bottom:13px; }
+
+  .ask { background:var(--rs); border:1px solid var(--ls); border-radius:11px; padding:13px 14px; }
+  .ask .ph { font-size:13px; color:var(--if); }
+  .ask .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:11px; }
+  .ask .chips span { font-size:11.5px; padding:5px 11px; border:1px solid var(--ln); border-radius:15px;
+                     color:var(--im); background:var(--bg); }
+  .ask .hint { font-size:11px; color:var(--if); margin-top:10px; line-height:1.5; }
+
+  .sec { font-size:12.5px; font-weight:600; color:var(--is); margin:19px 0 3px; display:flex; align-items:baseline; gap:8px; }
+  .sec span { font-weight:400; font-size:11.5px; color:var(--if); }
+  .secn { font-size:11.5px; color:var(--if); margin-bottom:9px; line-height:1.5; }
+
+  .ev { display:flex; gap:11px; padding:10px 0; border-bottom:1px solid var(--hl); }
+  .ev:last-child { border-bottom:none; }
+  .ev .who { flex:0 0 96px; font-size:12px; color:var(--ik); font-weight:500; }
+  .ev .who s { display:block; text-decoration:none; font-size:10.5px; color:var(--if); font-weight:400; margin-top:1px; }
+  .ev .bd { flex:1; min-width:0; font-size:12px; color:var(--im); line-height:1.55; }
+  .ev .bd b { color:var(--ik); font-weight:500; }
+  .ev .amt { font-variant-numeric:tabular-nums; }
+
+  .todo { border:1px solid rgba(217,164,65,.35); background:rgba(217,164,65,.06); border-radius:10px;
+          padding:11px 13px; margin-top:4px; }
+  .todo .t { font-size:12.5px; font-weight:600; color:#D9B45C; margin-bottom:7px; }
+  .todo .r { display:flex; gap:10px; padding:7px 0; font-size:12px; line-height:1.55; color:var(--im); }
+  .todo .r + .r { border-top:1px solid rgba(217,164,65,.18); }
+  .todo .r b { color:var(--ik); font-weight:500; }
+  .todo .r .go { margin-left:auto; flex:0 0 auto; font-size:11.5px; color:var(--im);
+                 border:1px solid var(--ls); border-radius:7px; padding:4px 11px; white-space:nowrap; }
+
+  .side { flex:0 0 246px; border-left:1px solid var(--ln); padding:17px 15px; }
+  .card { border:1px solid var(--ln); border-radius:10px; padding:12px 13px; background:var(--pn); margin-bottom:11px; }
+  .card .k { font-size:11px; color:var(--if); }
+  .card .v { font-size:21px; font-weight:600; margin-top:3px; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  .card .s { font-size:11.5px; color:var(--im); margin-top:3px; line-height:1.5; }
+
+  .bar { height:7px; border-radius:4px; background:var(--rs); overflow:hidden; margin:8px 0 6px; display:flex; }
+  .bar i { display:block; height:100%; background:var(--wr); }
+
+  .bot { display:flex; align-items:center; gap:9px; padding:9px 0; border-bottom:1px solid var(--hl); font-size:12px; }
+  .bot:last-child { border-bottom:none; }
+  .bot .d { width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
+  .bot .nm { flex:1; color:var(--ik); }
+  .bot .nm s { display:block; text-decoration:none; font-size:10.5px; color:var(--if); }
+  .bot .v { font-variant-numeric:tabular-nums; }
+
+  .cal { display:flex; gap:12px; margin-top:11px; font-size:12px; color:var(--im); line-height:1.65; }
+  .cal .pin { flex:0 0 auto; color:var(--if); font-weight:700; }
+  .cal b { color:var(--ik); font-weight:500; }
+</style>
+
+<div class="hm">
+<h2 style="color:#F5F3EF">홈 — 자율 에이전트가 밤사이 한 일</h2>
+<p class="subtitle" style="color:#8B877F">
+  <b style="color:#E6E4E0">봇 목록이 아닙니다.</b> 에이전트가 시키지 않아도 일하고, 아침에 와서
+  <b style="color:#E6E4E0">무슨 일이 있었는지와 내 판단이 필요한 것</b>을 봅니다. Claude Code 를 아침에 열었을 때와 같은 자리입니다.
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span>
+    <span class="mode"><span class="dot"></span><b>모의</b><s>실제 주문 나가지 않음 · 오늘 나간 주문 <b style="color:var(--ik)">0</b>건</s></span>
+    <div class="sp"></div>
+    <span style="font-size:11.5px;color:var(--im)">8월 9일 토요일 · 장 쉬는 날</span>
+    <span class="av">D</span>
+  </div>
+
+  <div class="body">
+    <div class="menu">
+      <a class="on"><i>◉</i>홈</a>
+      <a><i>▦</i>실험실</a>
+      <a><i>◵</i>종목 차트</a>
+      <a><i>◷</i>내 메모</a>
+      <a><i>≡</i>거래 기록</a>
+      <a><i>⌸</i>내 계좌</a>
+      <div class="gap"></div>
+      <a><i>⚙</i>내 기준</a>
+    </div>
+
+    <div class="main">
+      <div class="greet">안녕하세요. 어젯밤 사이에 다섯 가지가 있었습니다.</div>
+      <div class="greetn">먼저 보실 것 두 개를 아래 노란 칸에 올려뒀습니다.</div>
+
+      <!-- 말 거는 자리 -->
+      <div class="ask">
+        <div class="ph">무엇이든 편하게 말씀하세요…</div>
+        <div class="chips">
+          <span>요즘 반도체 좋다던데 그런 걸로 하나 만들어줘</span>
+          <span>나는 회사 다녀서 장중에 못 봐</span>
+          <span>지난달에 왜 손해 봤어?</span>
+          <span>지금 돌아가는 것 중에 제일 안 좋은 게 뭐야</span>
+          <span>100만원으로 시작해보고 싶어</span>
+        </div>
+        <div class="hint">
+          전문 용어를 쓰실 필요 없습니다. <b style="color:var(--im)">하고 싶은 걸 그냥 말씀하시면</b>
+          알아서 종목을 추리고, 규칙을 만들고, 과거 데이터로 돌려본 뒤 결과를 가져옵니다.
+        </div>
+      </div>
+
+      <!-- 사람 판단이 필요한 것 -->
+      <div class="sec">먼저 봐주셔야 할 것 <span>2건</span></div>
+      <div class="secn">에이전트가 혼자 정하지 않고 남겨둔 것입니다.</div>
+
+      <div class="todo">
+        <div class="t">⚠ 판단이 필요합니다 <span style="font-weight:400;color:var(--im);font-size:11.5px">· 월요일 장 열리기 전까지 답하시면 됩니다</span></div>
+        <div class="r"><div>
+          <b>대형주봇이 어제 산 현대차, 12일에 실적 발표가 있습니다.</b><br>
+          봇은 실적 일정을 보지 않습니다. 그대로 둘지, 그 종목만 뺄지 정해주세요.
+        </div><span class="go">보기 →</span></div>
+        <div class="r"><div>
+          <b>「반도체 실험」의 설정을 47번 바꿨습니다 — 한계는 45번입니다.</b><br>
+          여기서 더 바꾸면 좋은 설정을 찾은 게 아니라 <b>우연히 잘 맞은 걸 고른 것</b>에 가까워집니다.
+          제가 더 진행하지 않고 멈춰 뒀습니다.
+        </div><span class="go">보기 →</span></div>
+      </div>
+
+      <!-- 어젯밤에 한 일 -->
+      <div class="sec">어젯밤에 한 일</div>
+      <div class="secn">시키지 않아도 하는 일들입니다. 무엇을 왜 했는지 항상 남깁니다.</div>
+
+      <div class="ev"><div class="who">대형주봇<s>모의 47일째</s></div><div class="bd">
+        <b>2종목을 샀습니다</b> — 삼성전자 200만원, 현대차 200만원.
+        <span class="amt">둘 다 평균선까지 눌렸다가 반등했고, 많이 팔린 상태였습니다.</span>
+      </div></div>
+
+      <div class="ev"><div class="who">눌림목봇<s>모의 12일째</s></div><div class="bd">
+        <b>아무것도 안 했습니다</b> — 조건에 맞는 종목이 없었습니다.
+        <span style="color:var(--if)">기다린 것도 일한 것입니다. 봇이 죽은 게 아닙니다.</span>
+      </div></div>
+
+      <div class="ev"><div class="who">반도체 실험<s>어제 저녁 시작</s></div><div class="bd">
+        <b>설정 100가지를 다 돌려봤고 결과가 나왔습니다.</b>
+        가장 나은 자리는 1년에 <b style="color:var(--up)">+18.4%</b>, 최악일 때 <b style="color:var(--dn)">−22.1%</b>,
+        그 상태가 <b>9.2개월</b> 이어졌습니다. <span style="color:var(--if)">견딜 만한지는 사람이 정하는 부분입니다.</span>
+      </div></div>
+
+      <div class="ev"><div class="who">데이터<s>새벽 3시</s></div><div class="bd">
+        <b>어제 시세를 받아 넣었습니다</b> — 국내 2,847종목.
+        <span style="color:#D9B45C">미국 분봉은 아직 안 받았습니다</span> — 단타를 해보시려면 그때 받아옵니다.
+      </div></div>
+
+      <div class="ev"><div class="who" style="color:var(--if)">나</div><div class="bd" style="color:var(--if)">
+        컴퓨터가 <b style="color:#D9B45C">3시간</b> 꺼져 있었습니다(01:20~04:35). 그동안 봇은 멈춰 있었고,
+        <b style="color:#D9B45C">손절도 나가지 않았습니다.</b> 이번엔 장이 안 열려 놓친 게 없습니다.<br>
+        <b style="color:#E2837A">다만 지난 47일 중 14번은 장중에 꺼져 있었고, 그때 신호를 놓쳤습니다.</b>
+        <span style="color:var(--if)">— 거래 기록에서 「안 나간 37건」으로 볼 수 있습니다. 24시간 지키려면
+        증권사 예약 손절을 따로 걸어야 합니다.</span>
+      </div></div>
+    </div>
+
+    <!-- 오른쪽 상시 -->
+    <div class="side">
+      <div class="card">
+        <div class="k">내 돈 (모의)</div>
+        <div class="v" style="color:var(--up)">1,672만원</div>
+        <div class="s">맡긴 1,600만원 · <b style="color:var(--up)">+72만원</b> · 47일째<br>
+          <span style="color:var(--if)">가장 좋았던 때는 1,730만원이었습니다</span></div>
+      </div>
+
+      <div class="card" style="border-color:rgba(217,164,65,.35)">
+        <div class="k" style="color:#D9B45C">내가 정한 손실 한계선</div>
+        <div class="v">−58 <span style="font-size:13px;color:var(--if);font-weight:400">/ −160만원</span></div>
+        <div style="font-size:11px;color:var(--if);line-height:1.5;margin-top:2px">
+          벌고 있는데 왜 마이너스인가 — <b style="color:var(--im)">가장 좋았던 1,730만원에서 58만원 내려온 것</b>입니다.
+          한계선은 여기서 잽니다</div>
+        <div class="bar"><i style="width:36%"></i></div>
+        <div class="s"><b style="color:var(--ik)">36% 소진</b> · 남은 거리 102만원<br>
+          <span style="color:var(--if)">08-09에 직접 적어두신 값입니다</span></div>
+      </div>
+
+      <div class="card">
+        <div class="k" style="margin-bottom:6px">돌고 있는 것</div>
+        <div class="bot"><span class="d" style="background:var(--ok)"></span>
+          <span class="nm">대형주봇<s>6종목 보유</s></span><span class="v" style="color:var(--up)">+4.5%</span></div>
+        <div class="bot"><span class="d" style="background:var(--ok)"></span>
+          <span class="nm">눌림목봇<s>보유 없음</s></span><span class="v" style="color:var(--im)">0.0%</span></div>
+        <div class="bot"><span class="d" style="background:var(--wr)"></span>
+          <span class="nm">반도체 실험<s>멈춤 — 판단 대기</s></span><span class="v" style="color:var(--if)">—</span></div>
+      </div>
+
+      <div class="card">
+        <div class="k">코스피는 같은 기간</div>
+        <div class="v" style="font-size:17px;color:var(--up)">+6.1%</div>
+        <div class="s"><b style="color:#D9B45C">내 봇이 1.6%p 지고 있습니다.</b><br>
+          <span style="color:var(--if)">다만 내 계좌는 <b style="color:var(--im)">73%만 투자</b>돼 있습니다 —
+          같은 비율로 맞추면 지수는 +4.5%라 <b style="color:var(--im)">사실상 비슷</b>합니다.<br>
+          현금을 쥐고 있는 것도 선택이니 <b style="color:var(--im)">두 숫자를 같이</b> 봅니다.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cal"><span class="pin">①</span><span>
+  <b>말투가 바뀌었습니다.</b> 예시가 <b>"요즘 반도체 좋다던데 그런 걸로 하나 만들어줘"</b> 입니다 —
+  「20일선 눌림목 대형주」는 제가 쓰던 말이지 사용자가 쓸 말이 아니었습니다.
+  <b>종목을 추리고 규칙을 만드는 건 에이전트 몫</b>입니다.
+</span></div>
+<div class="cal"><span class="pin">②</span><span>
+  <b>자율형이라 「어젯밤에 한 일」이 홈입니다.</b> 시켜서 한 게 아니라 알아서 한 일들이고,
+  <b>아무것도 안 한 것도 기록</b>합니다 — 봇이 죽은 건지 기다리는 건지 구분하려고요.
+</span></div>
+<div class="cal"><span class="pin">③</span><span>
+  <b>혼자 정하지 않은 것을 맨 위에 올립니다.</b> 실적 발표는 봇이 못 보고,
+  시도 47번은 한계를 넘었습니다 — <b>에이전트가 스스로 멈춰서 사람에게 올렸습니다.</b>
+  자율형의 핵심은 다 하는 게 아니라 <b>어디서 멈출지 아는 것</b>입니다.
+</span></div>
+<div class="cal"><span class="pin">④</span><span>
+  <b>손실 한계선이 상시로 있습니다.</b> 원금 30% 잃어본 페르소나가 「딱 하나만 추가한다면」으로 꼽은 것 —
+  <b>−58 / −160만원 · 36% 소진</b>. 그리고 <b>코스피에 1.6%p 지고 있다</b>는 사실도 숨기지 않습니다.
+</span></div>
+</div>

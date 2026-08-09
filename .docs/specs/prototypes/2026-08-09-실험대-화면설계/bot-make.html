@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>봇 만들기 — 눌러지는 프로토타입</title>
+<style>
+  :root{--bg:#0D0F11;--pn:#16191C;--rs:#1C2126;--hl:rgba(38,43,48,.75);--ln:#262B30;--ls:#3A4249;
+        --is:#F5F3EF;--ik:#E6E4E0;--im:#8B877F;--if:#625E58;--up:#DB4F3E;--dn:#4A8CC8;--dg:#C94A3B}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0A0C0E;color:var(--ik);font-family:Pretendard,system-ui,sans-serif;
+       letter-spacing:-.01em;padding:22px}
+  .n{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  h2{font-size:19px;color:var(--is);margin:0 0 5px;font-weight:700}
+  .sub{font-size:12.5px;color:var(--im);margin:0 0 16px;line-height:1.6}
+  .sub b{color:var(--ik);font-weight:500}
+
+  .win{background:var(--bg);border:1px solid var(--ln);border-radius:12px;overflow:hidden;max-width:1300px}
+  .hud{display:flex;align-items:center;height:46px;padding:0 15px;gap:14px;background:var(--pn);
+       border-bottom:1px solid var(--ln);font-size:12.5px}
+  .hud .wm{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--is)}
+  .hud input.name{background:var(--bg);border:1px solid var(--ln);border-radius:7px;color:var(--is);
+       font:inherit;font-size:13px;font-weight:600;padding:5px 10px;width:210px}
+  .hud .sp{flex:1}
+  .hud .draft{font-size:11.5px;color:var(--if)}
+  .mode{display:flex;align-items:center;gap:8px;padding:4px 11px;border-radius:7px;
+        border:1px solid rgba(127,160,90,.45);background:rgba(127,160,90,.1);font-size:11.5px;color:#9BBE7A;
+        white-space:nowrap}
+  .mode b{font-weight:700}
+  .mode s{text-decoration:none;color:var(--im);font-variant-numeric:tabular-nums}
+  .mode .dot{width:6px;height:6px;border-radius:50%;background:#9BBE7A;flex:0 0 auto}
+  .btn{font-size:12.5px;font-weight:500;padding:7px 15px;border-radius:8px;cursor:pointer;user-select:none;
+       background:linear-gradient(180deg,#2E353B,#242A30);border:1px solid #434C54;color:var(--is);
+       box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+  .btn:hover{background:linear-gradient(180deg,#39424A,#2C333A)}
+
+  .cols{display:flex;min-height:520px}
+  .col{flex:1;padding:15px;min-width:0}
+  .col+.col{border-left:1px solid var(--ln)}
+  .step{display:flex;align-items:baseline;gap:8px;margin-bottom:3px}
+  .step i{font-style:normal;width:19px;height:19px;border-radius:50%;background:var(--is);color:var(--bg);
+          font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .step b{font-size:14px;font-weight:700;color:var(--is)}
+  .stepnote{font-size:11.5px;color:var(--if);line-height:1.5;margin:0 0 13px 27px}
+
+  .fld{margin-bottom:13px}
+  .fld .lb{font-size:12px;color:var(--ik);margin-bottom:5px;display:flex;align-items:baseline;gap:7px}
+  .fld .lb em{font-style:normal;font-size:11px;color:var(--if)}
+  .row{display:flex;align-items:center;gap:9px}
+  input[type=range]{flex:1;accent-color:#F5F3EF;height:3px}
+  .val{font-size:12.5px;color:var(--is);min-width:74px;text-align:right;font-variant-numeric:tabular-nums}
+  .seg{display:flex;border:1px solid var(--ln);border-radius:7px;overflow:hidden}
+  .seg b{flex:1;text-align:center;font-size:12px;font-weight:400;padding:6px 0;color:var(--im);cursor:pointer;user-select:none}
+  .seg b+b{border-left:1px solid var(--ln)}
+  .seg b.on{background:var(--is);color:var(--bg);font-weight:600}
+  .chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ik);padding:5px 0;cursor:pointer;user-select:none}
+  .chk i{font-style:normal;width:15px;height:15px;border-radius:4px;border:1px solid var(--ls);display:flex;
+         align-items:center;justify-content:center;font-size:10px;color:transparent}
+  .chk.on i{background:var(--is);border-color:var(--is);color:var(--bg);font-weight:800}
+
+  .rule{border:1px solid var(--ln);border-radius:9px;padding:10px 11px;margin-bottom:8px;background:var(--pn)}
+  .rule.off{opacity:.42}
+  .rule .rh{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+  .rule .rh b{font-size:12.5px;font-weight:600;color:var(--is)}
+  .rule .rh i{font-style:normal;width:15px;height:15px;border-radius:4px;border:1px solid var(--ls);
+              display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent;flex:0 0 auto}
+  .rule.on .rh i{background:var(--is);border-color:var(--is);color:var(--bg);font-weight:800}
+  .rule .rb{margin-top:8px;padding-top:8px;border-top:1px solid var(--hl)}
+  .rule .plain{font-size:11.5px;color:var(--im);line-height:1.5;margin-top:6px}
+
+  .out{background:var(--rs);border:1px solid var(--ls);border-radius:10px;padding:12px 13px;margin-top:4px}
+  .out .big{font-size:24px;font-weight:600;color:var(--is);letter-spacing:-.02em}
+  .out .cap{font-size:11.5px;color:var(--im);margin-top:3px;line-height:1.5}
+  .out .warn{font-size:11.5px;color:#D9B45C;margin-top:8px;line-height:1.5}
+
+  .dock{border-top:1px solid var(--ln);background:var(--pn);padding:12px 15px}
+  .dock .dh{display:flex;align-items:baseline;gap:9px;margin-bottom:8px}
+  .dock .dh b{font-size:12.5px;font-weight:600;color:var(--ik)}
+  .dock .dh span{font-size:11.5px;color:var(--im)}
+  .cands{display:flex;gap:7px;overflow:auto;padding-bottom:2px}
+  .cand{flex:0 0 auto;border:1px solid var(--ln);border-radius:8px;padding:8px 11px;background:var(--bg);min-width:118px}
+  .cand b{display:block;font-size:12px;color:var(--ik);font-weight:500}
+  .cand span{font-size:11px;color:var(--if);font-variant-numeric:tabular-nums}
+  .cand u{display:block;text-decoration:none;font-size:11.5px;margin-top:3px;font-variant-numeric:tabular-nums}
+
+  .tips{max-width:1300px;margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .tip{background:var(--pn);border:1px solid var(--ln);border-radius:9px;padding:12px 14px;font-size:12px;
+       line-height:1.6;color:var(--im)}
+  .tip b{color:var(--ik);font-weight:500;display:block;margin-bottom:3px}
+</style>
+</head>
+<body>
+
+<h2>봇 만들기</h2>
+<p class="sub">
+  <b>세 가지만 정하면 봇이 됩니다</b> — 무엇을 살지, 언제 사고팔지, 얼마씩 살지.
+  바꿀 때마다 <b>아래에 실제로 걸리는 종목</b>이 같이 바뀝니다.
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span>
+    <span class="mode"><span class="dot"></span><b>모의</b><s>실제 주문 나가지 않음 · 연결된 계좌 없음 · 오늘 나간 주문 <b style="color:var(--ik)">0</b>건</s></span>
+    <input class="name" id="botName" value="대형주 눌림목 봇">
+    <span class="draft">초안 자동 저장됨 · <span class="n">14:38</span></span>
+    <div class="sp"></div>
+    <span class="btn" id="goBtn">이대로 믿을 만한지 확인하기 →</span>
+  </div>
+
+  <div class="cols">
+    <!-- ① 무엇을 살까 -->
+    <div class="col">
+      <div class="step"><i>1</i><b>무엇을 살까</b></div>
+      <p class="stepnote">전체 종목에서 <b style="color:var(--im)">봇이 쳐다볼 후보</b>를 좁힙니다. 여기서 빠진 종목은 봇이 아예 안 봅니다.</p>
+
+      <div class="fld">
+        <div class="lb">어느 시장</div>
+        <div class="seg" id="mkt"><b class="on" data-v="kr">국내</b><b data-v="us">미국</b></div>
+      </div>
+
+      <div class="fld">
+        <div class="lb">회사 크기 <em>시가총액이 이보다 큰 것만</em></div>
+        <div class="row"><input type="range" id="cap" min="0" max="10" value="3"><span class="val" id="capV"></span></div>
+      </div>
+
+      <div class="fld">
+        <div class="lb">거래가 활발한 순서로 <em>사고팔기 쉬운 종목만</em></div>
+        <div class="row"><input type="range" id="liq" min="50" max="1000" step="50" value="200"><span class="val" id="liqV"></span></div>
+      </div>
+
+      <div class="fld">
+        <div class="lb">빼고 볼 것</div>
+        <div class="chk on" data-k="risk"><i>✓</i>관리종목·거래정지 종목</div>
+        <div class="chk on" data-k="loss"><i>✓</i>최근 적자인 회사</div>
+        <div class="chk" data-k="new"><i>✓</i>상장한 지 1년 안 된 회사</div>
+      </div>
+
+      <div class="out">
+        <div class="big n" id="candN">—</div>
+        <div class="cap" id="candCap"></div>
+        <div class="warn" id="candWarn" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- ② 언제 사고 팔까 -->
+    <div class="col">
+      <div class="step"><i>2</i><b>언제 사고 팔까</b></div>
+      <p class="stepnote">후보 중에서 <b style="color:var(--im)">어떤 순간에</b> 사고, <b style="color:var(--im)">어떤 순간에</b> 팔지 정합니다.</p>
+
+      <div style="font-size:11.5px;color:var(--if);margin-bottom:6px">살 때</div>
+      <div class="rule on" data-r="ma">
+        <div class="rh"><i>✓</i><b>평균선까지 내려왔다 반등하면</b></div>
+        <div class="rb">
+          <div class="row"><span style="font-size:11.5px;color:var(--im);width:74px">평균선</span>
+            <input type="range" id="maP" min="5" max="60" step="5" value="20"><span class="val n" id="maV"></span></div>
+          <div class="plain">최근 <b id="maT">20</b>일 평균 가격까지 떨어졌다가 다시 올라오는 첫 순간에 삽니다.</div>
+        </div>
+      </div>
+      <div class="rule on" data-r="rsi">
+        <div class="rh"><i>✓</i><b>내린 폭이 오른 폭보다 훨씬 클 때</b></div>
+        <div class="rb">
+          <div class="row"><span style="font-size:11.5px;color:var(--im);width:74px">기준</span>
+            <input type="range" id="rsiP" min="10" max="50" step="5" value="30"><span class="val n" id="rsiV"></span></div>
+          <div class="plain" id="rsiPlain"></div>
+        </div>
+      </div>
+      <div class="rule" data-r="vol">
+        <div class="rh"><i>✓</i><b>거래량이 갑자기 늘면</b></div>
+        <div class="rb"><div class="plain">평소보다 사람이 몰릴 때만 삽니다. 조용한 종목은 건너뜁니다.</div></div>
+      </div>
+
+      <div class="fld" style="margin-top:11px">
+        <div class="lb">위 조건들을</div>
+        <div class="seg" id="comb"><b class="on" data-v="and">전부 만족할 때</b><b data-v="or">하나라도 맞으면</b></div>
+      </div>
+
+      <div style="font-size:11.5px;color:var(--if);margin:13px 0 6px">팔 때</div>
+      <div class="row" style="margin-bottom:8px"><span style="font-size:12px;color:var(--ik);width:86px">이만큼 잃으면</span>
+        <input type="range" id="sl" min="3" max="20" value="7"><span class="val n" id="slV"></span></div>
+      <div class="row"><span style="font-size:12px;color:var(--ik);width:86px">이만큼 벌면</span>
+        <input type="range" id="tp" min="5" max="50" step="5" value="15"><span class="val n" id="tpV"></span></div>
+      <div class="plain" style="font-size:11.5px;color:var(--im);margin-top:8px;line-height:1.5" id="exitPlain"></div>
+    </div>
+
+    <!-- ③ 얼마씩 -->
+    <div class="col">
+      <div class="step"><i>3</i><b>얼마씩 살까</b></div>
+      <p class="stepnote">한 종목에 <b style="color:var(--im)">얼마를</b>, 최대 <b style="color:var(--im)">몇 종목까지</b> 들고 갈지 정합니다.</p>
+
+      <div class="fld">
+        <div class="lb">이 봇에 맡길 돈</div>
+        <div class="row"><input type="range" id="money" min="100" max="10000" step="100" value="1600"><span class="val n" id="moneyV"></span></div>
+      </div>
+      <div class="fld">
+        <div class="lb">최대 몇 종목까지 동시에</div>
+        <div class="row"><input type="range" id="slots" min="1" max="30" value="8"><span class="val n" id="slotsV"></span></div>
+      </div>
+
+      <div class="out">
+        <div class="big n" id="perN">—</div>
+        <div class="cap" id="perCap"></div>
+        <div class="warn" id="perWarn" style="display:none"></div>
+      </div>
+
+      <div class="out" style="margin-top:11px">
+        <div style="font-size:11.5px;color:var(--im);margin-bottom:7px">이 조건이면 하루에 대략</div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12.5px">
+          <span style="color:var(--ik)">사고파는 횟수</span><span class="n" id="trN">—</span></div>
+        <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid var(--hl);font-size:12.5px">
+          <span style="color:var(--ik)">한 번에 나가는 수수료</span><span class="n" id="feeN">—</span></div>
+        <div class="warn" id="feeWarn" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dock">
+    <div class="dh"><b>지금 조건이면 이런 종목이 걸립니다</b><span id="dockN"></span>
+      <span style="margin-left:auto;color:var(--if)">오늘 기준 · 조건을 바꾸면 즉시 바뀝니다</span></div>
+    <div class="cands" id="cands"></div>
+  </div>
+</div>
+
+<div class="tips">
+  <div class="tip"><b>슬라이더를 밀어 보세요</b>회사 크기·거래 활발한 순서를 바꾸면 <b style="color:var(--ik);display:inline">후보 종목 수</b>와 아래 목록이 즉시 바뀝니다.</div>
+  <div class="tip"><b>조건을 켜고 꺼보세요</b>「살 때」 조건 세 개를 조합할 수 있습니다. <b style="color:var(--ik);display:inline">전부 만족</b>과 <b style="color:var(--ik);display:inline">하나라도</b>는 완전히 다른 봇이 됩니다.</div>
+  <div class="tip"><b>돈과 종목 수를 바꿔 보세요</b>한 종목에 얼마가 들어가는지, <b style="color:var(--ik);display:inline">수수료가 얼마나 나가는지</b>가 같이 계산됩니다.</div>
+</div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const won=v=>Math.round(v).toLocaleString();
+  const S={mkt:'kr',cap:3,liq:200,ex:{risk:1,loss:1,new:0},
+           rules:{ma:1,rsi:1,vol:0},comb:'and',ma:20,rsi:30,sl:7,tp:15,money:1600,slots:8};
+  const CAPS=[0,50,100,300,500,1000,3000,5000,10000,30000,100000]; // 억
+  const TOTAL={kr:2847,us:5100};
+
+  const NAMES={kr:[['삼성전자','005930',1.71],['SK하이닉스','000660',3.04],['NAVER','035420',-0.85],
+    ['카카오','035720',-2.11],['LG에너지솔루션','373220',0.62],['현대차','005380',-1.20],
+    ['셀트리온','068270',0.34],['기아','000270',-0.44],['POSCO홀딩스','005490',1.12],
+    ['삼성바이오','207940',0.28],['한화에어로','012450',2.34],['HD현대중공업','329180',1.87]],
+   us:[['Apple','AAPL',0.94],['Microsoft','MSFT',-0.32],['NVIDIA','NVDA',2.61],
+    ['Alphabet','GOOGL',0.18],['Amazon','AMZN',-1.04],['Meta','META',1.37],
+    ['Tesla','TSLA',-2.88],['Broadcom','AVGO',1.55],['Eli Lilly','LLY',0.41],
+    ['JPMorgan','JPM',-0.22],['Visa','V',0.63],['Exxon Mobil','XOM',1.08]]};
+
+  function calc(){
+    const capBn=CAPS[S.cap];
+    let pool = Math.min(S.liq, TOTAL[S.mkt]);
+    // 시총 조건이 셀수록 후보가 준다
+    pool = Math.round(pool * (1 - Math.min(0.72, S.cap*0.085)));
+    if(S.ex.risk) pool = Math.round(pool*0.94);
+    if(S.ex.loss) pool = Math.round(pool*0.82);
+    if(S.ex.new)  pool = Math.round(pool*0.93);
+    const rules = Object.values(S.rules).filter(Boolean).length;
+    const hitRate = rules===0 ? 0 : (S.comb==='and' ? Math.pow(0.14, rules)*4.2 : 1-Math.pow(1-0.14, rules));
+    // 슬롯이 다 차면 더 못 산다 — 하루 매수는 비어 있는 슬롯 수를 넘을 수 없다
+    const raw = pool*hitRate;
+    const perDay = Math.min(raw, S.slots/3);
+    const per = S.money/S.slots;
+    const fee = per*10000*0.00015*2 + per*10000*0.0018*0.5;  // 위탁수수료 0.015%(왕복) + 증권거래세 0.18%(매도만)
+    return {capBn,pool,rules,perDay,per,fee};
+  }
+
+  function render(){
+    const c=calc();
+    const capTxt = c.capBn===0 ? '제한 없음' : (c.capBn>=10000? (c.capBn/10000)+'조 이상' : c.capBn+'억 이상');
+    const rank = c.capBn===0 ? '전체' : ('상위 약 '+Math.max(20,Math.round(TOTAL[S.mkt]*(1-Math.min(0.93,S.cap*0.093))))+'개');
+    $('capV').innerHTML = capTxt+`<div style="font-size:10.5px;color:var(--if);font-weight:400">${rank}</div>`;
+    $('liqV').textContent = '상위 '+S.liq+'개';
+    $('maV').textContent=S.ma+'일'; $('maT').textContent=S.ma;
+    $('rsiV').textContent=S.rsi;
+    $('rsiPlain').innerHTML = S.rsi<=20
+      ? `<b style="color:var(--ik)">아주 많이 떨어졌을 때만</b> 삽니다. 기회가 드물어 <b style="color:var(--ik)">거래가 확 줄어듭니다.</b><br><span style="color:var(--if)">최근 14일 중 내린 날의 하락폭 합이 오른 날의 상승폭 합보다 훨씬 클 때를 뜻합니다 (RSI ${S.rsi}).</span>`
+      : (S.rsi>=40
+        ? `<b style="color:#D9B45C">조금만 떨어져도</b> 삽니다. 기회는 많은데 <b style="color:#D9B45C">더 떨어질 종목까지 잡습니다.</b><br><span style="color:var(--if)">최근 14일 중 내린 날의 하락폭 합이 오른 날보다 조금만 커도 삽니다 (RSI ${S.rsi}).</span>`
+        : `<b style="color:var(--ik)">웬만큼 떨어졌을 때</b> 삽니다. 숫자를 내리면 더 신중해지고, 올리면 더 자주 삽니다.<br><span style="color:var(--if)">최근 14일 중 내린 날의 하락폭 합과 오른 날의 상승폭 합을 견줍니다 (RSI ${S.rsi}).</span>`); $('slV').textContent='−'+S.sl+'%'; $('tpV').textContent='+'+S.tp+'%';
+    $('moneyV').textContent=won(S.money)+'만원'; $('slotsV').textContent=S.slots+'종목';
+
+    $('candN').textContent = c.pool.toLocaleString()+'종목';
+    $('candCap').innerHTML = `전체 ${TOTAL[S.mkt].toLocaleString()}종목 중 이만큼이 봇의 후보가 됩니다.`;
+    const cw=$('candWarn');
+    if(c.pool<25){ cw.style.display=''; cw.innerHTML='후보가 너무 적습니다. 한두 종목 사정에 성적이 통째로 흔들립니다.'; }
+    else if(c.pool>800){ cw.style.display=''; cw.innerHTML='후보가 많으면 데이터를 받아오는 데 오래 걸리고, 잘 안 팔리는 종목이 섞입니다.'; }
+    else cw.style.display='none';
+
+    $('exitPlain').innerHTML = `산 가격보다 <b style="color:var(--dn)">${S.sl}%</b> 떨어지면 손해를 확정하고 팔고, `+
+      `<b style="color:var(--up)">${S.tp}%</b> 오르면 이익을 챙기고 팝니다. `+
+      (S.tp/S.sl<1.5 ? `<b style="color:#D9B45C">10번 중 ${Math.ceil(10*S.sl/(S.sl+S.tp))}번은 맞아야 본전</b>입니다 — 벌 때와 잃을 때 폭이 비슷해서 이기는 횟수가 많아야 합니다.</b>`
+                     : `<b style="color:var(--ik)">10번 중 ${Math.ceil(10*S.sl/(S.sl+S.tp))}번만 맞아도 본전</b>입니다 — 한 번 벌 때 잃을 때의 ${(S.tp/S.sl).toFixed(1)}배를 벌기 때문입니다.`);
+
+    $('perN').textContent = won(c.per)+'만원';
+    $('perCap').innerHTML = `한 종목에 이만큼씩, 최대 ${S.slots}종목 → 다 채우면 <b style="color:var(--ik)">${won(S.money)}만원</b>을 씁니다.`;
+    const pw=$('perWarn');
+    if(c.per<30){ pw.style.display=''; pw.innerHTML='한 종목에 들어가는 돈이 너무 적습니다. 수수료 비중이 커지고, 비싼 종목은 아예 못 삽니다.'; }
+    else pw.style.display='none';
+
+    $('trN').textContent = c.rules===0 ? '0번 (살 조건 없음)'
+      : (c.perDay<0.5 ? '1주에 '+(c.perDay*5).toFixed(1)+'번' : c.perDay.toFixed(1)+'번');
+    $('feeN').textContent = won(c.fee)+'원';
+    const fw=$('feeWarn'); const dailyFee=c.fee*c.perDay*2;
+    if(dailyFee > S.money*10000*0.0012){ fw.style.display='';
+      fw.innerHTML=`하루 수수료가 <b>${won(dailyFee)}원</b>입니다 — 1년이면 <b>${won(dailyFee*245/10000)}만원</b>. 이만큼을 먼저 벌어야 본전입니다.`;
+    } else fw.style.display='none';
+
+    // 후보 목록
+    const LIST=NAMES[S.mkt];
+    const n=Math.min(LIST.length, Math.max(3, Math.round(c.pool/28)));
+    $('cands').innerHTML = LIST.slice(0,n).map(([nm,cd,ch])=>
+      `<div class="cand"><b>${nm}</b><span class="n">${cd}</span>`+
+      `<u class="n" style="color:${ch>=0?'var(--up)':'var(--dn)'}">${ch>=0?'+':''}${ch.toFixed(2)}%</u></div>`).join('');
+    $('dockN').textContent = `${c.pool.toLocaleString()}종목 중 앞 ${n}개`;
+  }
+
+  const bind=(id,key,fn)=>$(id).addEventListener('input',e=>{S[key]=+e.target.value; if(fn)fn(); render();});
+  ['cap','liq','ma','rsi','sl','tp','money','slots'].forEach(k=>bind(k==='ma'?'maP':k==='rsi'?'rsiP':k,k));
+  document.querySelectorAll('.seg').forEach(sg=>sg.addEventListener('click',e=>{
+    const b=e.target.closest('b'); if(!b)return;
+    sg.querySelectorAll('b').forEach(x=>x.classList.toggle('on',x===b));
+    S[sg.id==='mkt'?'mkt':'comb']=b.dataset.v; render();
+  }));
+  document.querySelectorAll('.chk').forEach(c=>c.onclick=()=>{
+    c.classList.toggle('on'); S.ex[c.dataset.k]=c.classList.contains('on')?1:0; render();});
+  document.querySelectorAll('.rule').forEach(r=>r.querySelector('.rh').onclick=()=>{
+    r.classList.toggle('on'); S.rules[r.dataset.r]=r.classList.contains('on')?1:0; render();});
+
+  render();
+})();
+</script>
+</body>
+</html>

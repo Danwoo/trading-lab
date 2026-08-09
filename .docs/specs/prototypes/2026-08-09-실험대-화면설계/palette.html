@@ -1,0 +1,180 @@
+<style>
+  .pl-evi { background:#1A1414; border:1px solid #4A2A2A; border-radius:10px; padding:15px 18px; margin:14px 0 24px; font-size:13px; line-height:1.6; color:#E8D5D5; font-family:Pretendard,system-ui,sans-serif; }
+  .pl-evi code { font-family:ui-monospace,monospace; font-size:12px; }
+  .pl-chip { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-1px; margin-right:5px; }
+
+  .pl-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin:16px 0 8px; }
+  @media (max-width:1100px){ .pl-grid{grid-template-columns:1fr;} }
+  .pl-card { border-radius:10px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color .12s, transform .12s; }
+  .pl-card:hover { transform:translateY(-2px); }
+  .pl-card.selected { border-color:#4f8cff; }
+  .pl-shot { padding:18px; }
+  .pl-note { padding:13px 16px; font-size:12.5px; line-height:1.55; font-family:Pretendard,system-ui,sans-serif; }
+  .pl-note b.t { display:block; font-size:14.5px; margin-bottom:5px; }
+  .pl-sw { display:flex; gap:0; margin-top:10px; border-radius:4px; overflow:hidden; }
+  .pl-sw i { flex:1; height:22px; }
+  .pl-hex { font-family:ui-monospace,monospace; font-size:10.5px; opacity:.62; margin-top:6px; line-height:1.5; }
+
+  /* 공통 H2 골격 — 팔레트만 다르다 */
+  .pl-card .p { border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.28); }
+  .pl-card .p + .p { margin-top:13px; }
+  .pl-card .hd { display:flex; justify-content:space-between; align-items:center; padding:15px 17px 0; }
+  .pl-card .nm { font-size:14.5px; font-weight:600; letter-spacing:-.015em; }
+  .pl-card .cd { font-size:12px; }
+  .pl-card .bd { padding:10px 17px 17px; }
+  .pl-card .px { font-family:ui-monospace,monospace; font-variant-numeric:tabular-nums; font-size:30px; font-weight:620; letter-spacing:-.025em; line-height:1.1; }
+  .pl-card .dl { font-family:ui-monospace,monospace; font-size:12.5px; margin-top:3px; }
+  .pl-card .rw { display:flex; justify-content:space-between; font-size:12.5px; padding:7px 0; }
+  .pl-card .rw span:last-child { font-family:ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  .pl-card .bt { display:inline-block; font-size:12.5px; padding:7px 15px; border-radius:7px; font-weight:600; margin-top:14px; }
+  .pl-card .tag { font-size:11px; padding:3px 8px; border-radius:6px; }
+
+  /* ---- P1 잉크 & 주철 ---- */
+  .P1 { background:#070A0F; color:#BFC9D4; font-family:Pretendard,system-ui,sans-serif; }
+  .P1 .p { background:#121821; border:1px solid rgba(191,201,212,.085); }
+  .P1 .cd, .P1 .rw span:first-child { color:#6E7C8C; }
+  .P1 .px, .P1 .dl { color:#D9483C; }
+  .P1 .rw + .rw { border-top:1px solid rgba(191,201,212,.06); }
+  .P1 .bt { background:#D9A441; color:#070A0F; }
+  .P1 .tag { color:#E0B25C; background:rgba(217,164,65,.15); }
+  .P1 .dn { color:#3E88B8; }
+
+  /* ---- P2 한지 & 먹 ---- */
+  .P2 { background:#0C0B09; color:#D6CFC4; font-family:Pretendard,system-ui,sans-serif; }
+  .P2 .p { background:#1A1815; border:1px solid rgba(214,207,196,.09); }
+  .P2 .cd, .P2 .rw span:first-child { color:#8A8175; }
+  .P2 .px, .P2 .dl { color:#C6453A; }
+  .P2 .rw + .rw { border-top:1px solid rgba(214,207,196,.07); }
+  .P2 .bt { background:#C9973F; color:#0C0B09; }
+  .P2 .tag { color:#D4A855; background:rgba(201,151,63,.16); }
+  .P2 .dn { color:#4C6FA8; }
+
+  /* ---- P3 심해 ---- */
+  .P3 { background:#061218; color:#C2D3DB; font-family:Pretendard,system-ui,sans-serif; }
+  .P3 .p { background:#0E2029; border:1px solid rgba(194,211,219,.1); }
+  .P3 .cd, .P3 .rw span:first-child { color:#6C8794; }
+  .P3 .px, .P3 .dl { color:#E2564C; }
+  .P3 .rw + .rw { border-top:1px solid rgba(194,211,219,.07); }
+  .P3 .bt { background:#E8A33F; color:#061218; }
+  .P3 .tag { color:#EFB861; background:rgba(232,163,63,.16); }
+  .P3 .dn { color:#3FA3C4; }
+</style>
+
+<h2>팔레트를 다시 짭니다 — "아무도 색을 고르지 않은" 상태를 끝냅니다</h2>
+
+<div class="pl-evi">
+  <b>증거:</b> <code>lib/terminal/marketColorPreset.ts</code> 의 값 네 개 중 <b>셋이 Tailwind 기본 팔레트 원본</b>입니다.
+  <div style="margin-top:8px">
+    <span class="pl-chip" style="background:#3B82F6"></span><code>59 130 246</code> = <code>blue-500</code> &nbsp;·&nbsp;
+    <span class="pl-chip" style="background:#22C55E"></span><code>34 197 94</code> = <code>green-500</code> &nbsp;·&nbsp;
+    <span class="pl-chip" style="background:#EF4444"></span><code>239 68 68</code> = <code>red-500</code>
+  </div>
+  <div style="margin-top:8px;opacity:.85">
+    화면에서 가장 자주·가장 크게 보이는 색이 이것들입니다. 사람 눈은 "촌스럽다"가 아니라
+    <b>"어디서 본 것 같다"</b>로 읽고, 그게 AI 티의 정체입니다.
+  </div>
+</div>
+
+<p class="subtitle" style="margin-bottom:4px">
+  아래 셋은 <b>골격이 완전히 동일한 H2 패널</b>이고, <b>팔레트만</b> 다릅니다. 세 팔레트 모두 규칙 셋을 지킵니다 —
+  ① <b>Tailwind 기본값 0개</b> ② 모든 회색이 <b>한 색상에서 파생</b>(순수 무채색 없음)
+  ③ 상승·하락·액센트가 그 회색과 <b>같은 세계</b>에서 나옴.
+</p>
+
+<div class="pl-grid options">
+
+  <div class="pl-card option P1" data-choice="p1" onclick="toggleSelect(this)">
+    <div class="pl-shot">
+      <div class="p">
+        <div class="hd"><span class="nm">삼성전자</span><span class="cd">005930</span></div>
+        <div class="bd">
+          <div class="px">71,400</div><div class="dl">▲ 1,200 (+1.71%)</div>
+          <div style="margin-top:8px">
+            <div class="rw"><span>거래량</span><span>12,847,301</span></div>
+            <div class="rw"><span>시가총액</span><span>426.1조</span></div>
+            <div class="rw"><span>PER</span><span>13.4</span></div>
+          </div>
+          <span class="bt">관심종목 추가</span>
+        </div>
+      </div>
+      <div class="p"><div class="hd"><span class="nm">수급</span><span class="tag">임시 데이터</span></div>
+        <div class="bd"><div class="rw"><span>외국인</span><span class="dn">-84,120</span></div></div></div>
+    </div>
+    <div class="pl-note" style="background:#121821;color:#BFC9D4">
+      <b class="t">P1 — 잉크 &amp; 주철</b>
+      회색을 <b style="display:inline">차가운 청회색</b>으로 통일. 상승은 <b style="display:inline;color:#D9483C">벽돌빛 주홍</b>(분홍기 뺌),
+      하락은 <b style="display:inline;color:#3E88B8">강철 청색</b>(Tailwind 파랑보다 탁하고 낮음).
+      현행에서 가장 적게 움직이면서 프레임워크 냄새만 지웁니다. <b style="display:inline">가장 안전한 선택.</b>
+      <div class="pl-sw"><i style="background:#070A0F"></i><i style="background:#121821"></i><i style="background:#6E7C8C"></i><i style="background:#BFC9D4"></i><i style="background:#D9A441"></i><i style="background:#D9483C"></i><i style="background:#3E88B8"></i></div>
+      <div class="pl-hex">#070A0F · #121821 · #6E7C8C · #BFC9D4 · #D9A441 · #D9483C · #3E88B8</div>
+    </div>
+  </div>
+
+  <div class="pl-card option P2" data-choice="p2" onclick="toggleSelect(this)">
+    <div class="pl-shot">
+      <div class="p">
+        <div class="hd"><span class="nm">삼성전자</span><span class="cd">005930</span></div>
+        <div class="bd">
+          <div class="px">71,400</div><div class="dl">▲ 1,200 (+1.71%)</div>
+          <div style="margin-top:8px">
+            <div class="rw"><span>거래량</span><span>12,847,301</span></div>
+            <div class="rw"><span>시가총액</span><span>426.1조</span></div>
+            <div class="rw"><span>PER</span><span>13.4</span></div>
+          </div>
+          <span class="bt">관심종목 추가</span>
+        </div>
+      </div>
+      <div class="p"><div class="hd"><span class="nm">수급</span><span class="tag">임시 데이터</span></div>
+        <div class="bd"><div class="rw"><span>외국인</span><span class="dn">-84,120</span></div></div></div>
+    </div>
+    <div class="pl-note" style="background:#1A1815;color:#D6CFC4">
+      <b class="t">P2 — 한지 &amp; 먹</b>
+      회색을 <b style="display:inline">따뜻한 먹빛</b>으로 기울임. 다크인데 차갑지 않습니다.
+      상승은 <b style="display:inline;color:#C6453A">진사 빨강</b>, 하락은 <b style="display:inline;color:#4C6FA8">군청</b>, 액센트는 <b style="display:inline;color:#C9973F">황동</b>.
+      <b style="display:inline">이 방향을 쓰는 금융 앱은 거의 없습니다</b> — 가장 확실하게 "사람이 골랐다"로 읽힙니다. 대신 가장 낯섭니다.
+      <div class="pl-sw"><i style="background:#0C0B09"></i><i style="background:#1A1815"></i><i style="background:#8A8175"></i><i style="background:#D6CFC4"></i><i style="background:#C9973F"></i><i style="background:#C6453A"></i><i style="background:#4C6FA8"></i></div>
+      <div class="pl-hex">#0C0B09 · #1A1815 · #8A8175 · #D6CFC4 · #C9973F · #C6453A · #4C6FA8</div>
+    </div>
+  </div>
+
+  <div class="pl-card option P3" data-choice="p3" onclick="toggleSelect(this)">
+    <div class="pl-shot">
+      <div class="p">
+        <div class="hd"><span class="nm">삼성전자</span><span class="cd">005930</span></div>
+        <div class="bd">
+          <div class="px">71,400</div><div class="dl">▲ 1,200 (+1.71%)</div>
+          <div style="margin-top:8px">
+            <div class="rw"><span>거래량</span><span>12,847,301</span></div>
+            <div class="rw"><span>시가총액</span><span>426.1조</span></div>
+            <div class="rw"><span>PER</span><span>13.4</span></div>
+          </div>
+          <span class="bt">관심종목 추가</span>
+        </div>
+      </div>
+      <div class="p"><div class="hd"><span class="nm">수급</span><span class="tag">임시 데이터</span></div>
+        <div class="bd"><div class="rw"><span>외국인</span><span class="dn">-84,120</span></div></div></div>
+    </div>
+    <div class="pl-note" style="background:#0E2029;color:#C2D3DB">
+      <b class="t">P3 — 심해</b>
+      회색에 <b style="display:inline">청록(teal)</b>을 확실히 넣어 어둠 자체에 채도가 있습니다.
+      상승 <b style="display:inline;color:#E2564C">산호</b>, 하락 <b style="display:inline;color:#3FA3C4">시안청</b>, 액센트 <b style="display:inline;color:#E8A33F">호박</b>.
+      대비가 가장 높아 시원합니다. 대신 <b style="display:inline;color:#F0A0A0">하락 시안청이 배경 청록과 가까워</b> 작은 숫자에서 덜 튑니다.
+      <div class="pl-sw"><i style="background:#061218"></i><i style="background:#0E2029"></i><i style="background:#6C8794"></i><i style="background:#C2D3DB"></i><i style="background:#E8A33F"></i><i style="background:#E2564C"></i><i style="background:#3FA3C4"></i></div>
+      <div class="pl-hex">#061218 · #0E2029 · #6C8794 · #C2D3DB · #E8A33F · #E2564C · #3FA3C4</div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <p class="label">제 의견</p>
+  <p style="line-height:1.65">
+    <b>P2(한지 &amp; 먹)를 권합니다.</b> "AI 같다"를 실제로 끊는 건 P2 뿐입니다 —
+    P1·P3 은 <b>차가운 다크</b>라는 가장 흔한 자리에 여전히 머물러 있고, 잘 다듬어도 "본 적 있는 화면"으로 읽힐 여지가 남습니다.
+    따뜻한 뉴트럴은 드물고, 드문 이유가 기술적 결함이 아니라 <b>아무도 고르지 않아서</b>입니다.
+    한국어 본문(Pretendard)과도 따뜻한 잉크가 더 잘 맞습니다.
+    <br><br>
+    반대 근거도 정직하게 답니다 — <b>따뜻한 다크는 장시간 차트 응시에서 호불호가 갈립니다.</b>
+    캔들·틱 차트가 화면의 절반을 차지하는 제품이라 이건 취향이 아니라 사용 조건입니다.
+    확신이 안 서시면 <b>P2 로 터미널 한 화면만 실제로 만들어 하루 써보고</b> 결정하는 게 가장 싸게 검증하는 길입니다.
+  </p>
+</div>

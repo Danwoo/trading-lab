@@ -1,0 +1,204 @@
+<style>
+  .ac { font-family:Pretendard,system-ui,sans-serif; }
+  .ac-fix { background:#16191C; border:1px solid #262B30; border-radius:10px; padding:13px 16px; margin:14px 0 20px; color:#E6E4E0; font-size:12.5px; line-height:1.6; }
+  .ac-fix code { font-family:ui-monospace,monospace; font-size:11px; }
+  .ac-fix .sw { display:flex; gap:0; border-radius:5px; overflow:hidden; margin-top:9px; }
+  .ac-fix .sw i { flex:1; height:22px; position:relative; }
+  .ac-fix .sw i s { position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:7.5px; text-decoration:none; font-family:ui-monospace,monospace; }
+
+  .ac-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:16px 0 8px; }
+  @media (max-width:1100px){ .ac-grid{grid-template-columns:1fr;} }
+  .a { border-radius:11px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color .12s, transform .12s; background:#16191C; }
+  .a:hover { transform:translateY(-2px); }
+  .a.selected { border-color:#4f8cff; }
+  .a .shot { padding:14px; background:#0D0F11; }
+
+  /* in-situ 미니 터미널 */
+  .a .mini { border:1px solid #262B30; border-radius:9px; overflow:hidden; background:#16191C; }
+  .a .tabs { display:flex; background:#1E2226; border-bottom:1px solid #262B30; }
+  .a .tabs div { font-size:10.5px; padding:7px 11px; color:#8B877F; }
+  .a .row { display:flex; align-items:center; padding:6px 10px; font-size:11px; border-left:2px solid transparent; font-variant-numeric:tabular-nums; }
+  .a .row b { flex:1; font-weight:400; color:#E6E4E0; }
+  .a .row u { text-decoration:none; width:52px; text-align:right; }
+  .a .sep { height:1px; background:#262B30; }
+
+  .a .pb { padding:11px 12px 12px; }
+  .a .lbl { font-size:9.5px; letter-spacing:.11em; font-weight:700; color:#625E58; margin:11px 0 6px; }
+  .a .st { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .a .btn { font-size:11.5px; font-weight:600; padding:6px 13px; border-radius:7px; border:1px solid transparent; }
+  .a .bdg { font-size:9.5px; padding:2px 7px; border-radius:5px; border:1px solid; }
+  .a .fld { font-size:11px; padding:5px 9px; border-radius:7px; background:#1E2226; border:1px solid #262B30; color:#E6E4E0; }
+
+  .a .lite { margin-top:11px; border-radius:8px; padding:10px 11px; background:#F4F5F6; border:1px solid #D6D9DC; }
+  .a .lite .lb { font-size:9.5px; letter-spacing:.12em; font-weight:700; color:#6E6A63; margin-bottom:7px; }
+
+  .a .meta { padding:12px 15px 15px; font-size:11.5px; line-height:1.55; color:#E6E4E0; }
+  .a .meta b.t { display:block; font-size:14px; margin-bottom:4px; letter-spacing:-.01em; }
+  .a .hex { font-family:ui-monospace,monospace; font-size:9.5px; color:#8B877F; margin-top:8px; line-height:1.6; }
+</style>
+
+<div class="ac">
+<h2>3단계 — 액센트. 남은 자리가 좁습니다.</h2>
+
+<div class="ac-fix">
+  <b>고정됨 — N4 바탕 + M2 등락.</b> 세 후보 모두 이 값이 동일하고, 바뀌는 건 액센트 하나뿐입니다.
+  <div class="sw">
+    <i style="background:#0D0F11"><s style="color:#7A7670">bg</s></i>
+    <i style="background:#16191C"><s style="color:#7A7670">panel</s></i>
+    <i style="background:#262B30"><s style="color:#9A968E">line</s></i>
+    <i style="background:#8B877F"><s style="color:#16191C">muted</s></i>
+    <i style="background:#E6E4E0"><s style="color:#16191C">ink</s></i>
+    <i style="background:#DB4F3E"><s style="color:#2A0A06">up</s></i>
+    <i style="background:#4A8CC8"><s style="color:#04182A">down</s></i>
+  </div>
+  <div style="margin-top:10px;font-size:11.5px;opacity:.88">
+    <b>이미 임자가 있는 색:</b> 빨강(상승·한 / 하락·미) · 파랑(하락·한) · 초록(상승·미).
+    <b>배제:</b> 분홍 · 마젠타 · 보라.
+    <br><b>불변식:</b> 액센트는 <b>숫자에 쓰지 않습니다.</b> 액센트가 등락 색과 같은 자리에 나타나지 않으면 혼동은 구조적으로 생기지 않습니다.
+  </div>
+</div>
+
+<p class="subtitle">
+  액센트는 스와치로 보면 다 괜찮습니다. <b>무너지는 곳은 포커스 링과 선택된 행</b>입니다 —
+  그래서 실제 쓰이는 자리 전부(활성 탭 · 선택 행 · 기본 버튼 · 배지 · 포커스 · 라이트)에 올렸습니다.
+</p>
+
+<div class="ac-grid options">
+
+<!-- ═══ A1 무채 ═══ -->
+<div class="a option" data-choice="a1" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="mini">
+      <div class="tabs">
+        <div style="color:#F2F0EC;font-weight:700;box-shadow:inset 0 -2px 0 #E6E4E0">관심종목</div>
+        <div>보유</div><div>스크리너</div>
+      </div>
+      <div class="row" style="background:#1E2226;border-left-color:#E6E4E0"><b style="font-weight:600">삼성전자</b><u style="color:#DB4F3E">+1.71%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>NAVER</b><u style="color:#4A8CC8">-0.85%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>카카오</b><u style="color:#4A8CC8">-2.11%</u></div>
+      <div class="pb">
+        <div class="lbl">버튼 · 배지</div>
+        <div class="st">
+          <span class="btn" style="background:#E6E4E0;color:#0D0F11">관심종목 추가</span>
+          <span class="bdg" style="color:#0D0F11;background:#8B877F;border-color:#8B877F;font-weight:700">임시</span>
+        </div>
+        <div class="lbl">포커스</div>
+        <div class="st"><span class="fld" style="outline:2px solid #E6E4E0;outline-offset:2px">종목 검색</span></div>
+      </div>
+    </div>
+    <div class="lite">
+      <div class="lb">라이트</div>
+      <div class="st">
+        <span class="btn" style="background:#201E1A;color:#F4F5F6">관심종목 추가</span>
+        <span class="bdg" style="color:#F4F5F6;background:#6E6A63;border-color:#6E6A63;font-weight:700">임시</span>
+      </div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">A1. 액센트 없음 — 반전</b>
+    강조를 <b>색이 아니라 명도 반전</b>으로 합니다. 종이 블록이 버튼이 되고, 선택은 밝은 세로선입니다.
+    <b>N4 지면 논리에 가장 충실</b>하고, 유행을 탈 색 자체가 없어 <b>몇 년이 지나도 안 낡습니다.</b>
+    <br>대신 <b style="color:#E8A090">화면에 위계가 하나 줄어듭니다</b> — "중요한 것"과 "누를 수 있는 것"이
+    같은 흰색이라, 타이포·여백 규율이 나머지 둘보다 훨씬 엄격해야 합니다.
+    <div class="hex">accent &nbsp;#E6E4E0 (= ink)<br>light &nbsp;#201E1A (= ink)</div>
+  </div>
+</div>
+
+<!-- ═══ A2 황 ═══ -->
+<div class="a option" data-choice="a2" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="mini">
+      <div class="tabs">
+        <div style="color:#F2F0EC;font-weight:700;box-shadow:inset 0 -2px 0 #E8B33E">관심종목</div>
+        <div>보유</div><div>스크리너</div>
+      </div>
+      <div class="row" style="background:#1E2226;border-left-color:#E8B33E"><b style="font-weight:600">삼성전자</b><u style="color:#DB4F3E">+1.71%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>NAVER</b><u style="color:#4A8CC8">-0.85%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>카카오</b><u style="color:#4A8CC8">-2.11%</u></div>
+      <div class="pb">
+        <div class="lbl">버튼 · 배지</div>
+        <div class="st">
+          <span class="btn" style="background:#E8B33E;color:#14120C">관심종목 추가</span>
+          <span class="bdg" style="color:#E8B33E;background:rgba(232,179,62,.14);border-color:rgba(232,179,62,.45)">임시</span>
+        </div>
+        <div class="lbl">포커스</div>
+        <div class="st"><span class="fld" style="outline:2px solid #E8B33E;outline-offset:2px">종목 검색</span></div>
+      </div>
+    </div>
+    <div class="lite">
+      <div class="lb">라이트</div>
+      <div class="st">
+        <span class="btn" style="background:#6E5210;color:#F4F5F6">관심종목 추가</span>
+        <span class="bdg" style="color:#6E5210;background:rgba(110,82,16,.12);border-color:rgba(110,82,16,.4)">임시</span>
+      </div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">A2. 전광판 황</b>
+    객장 전광판·항공 계기의 <b>주의(caution) 표준색</b>. 도메인 근거가 가장 단단하고,
+    임자 있는 세 색(적·청·녹) 어디와도 안 겹칩니다. <b>판별력이 가장 높습니다.</b>
+    <br>단점 두 개. ① <b style="color:#E8A090">라이트에서 대비를 맞추려면 노랑을 갈색까지 어둡게</b> 해야 해서
+    두 모드의 인상이 갈립니다(위 라이트 버튼 참조). ② 따뜻함이 늘어나 <b>N4가 피해 온 자리로 조금 되돌아갑니다.</b>
+    <div class="hex">accent &nbsp;#E8B33E &nbsp;hover #F5C558<br>light &nbsp;#6E5210 &nbsp;(대비 확보용 강제 암전)</div>
+  </div>
+</div>
+
+<!-- ═══ A3 청록 ═══ -->
+<div class="a option" data-choice="a3" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="mini">
+      <div class="tabs">
+        <div style="color:#F2F0EC;font-weight:700;box-shadow:inset 0 -2px 0 #3FAFA8">관심종목</div>
+        <div>보유</div><div>스크리너</div>
+      </div>
+      <div class="row" style="background:#1E2226;border-left-color:#3FAFA8"><b style="font-weight:600">삼성전자</b><u style="color:#DB4F3E">+1.71%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>NAVER</b><u style="color:#4A8CC8">-0.85%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>카카오</b><u style="color:#4A8CC8">-2.11%</u></div>
+      <div class="pb">
+        <div class="lbl">버튼 · 배지</div>
+        <div class="st">
+          <span class="btn" style="background:#3FAFA8;color:#06201F">관심종목 추가</span>
+          <span class="bdg" style="color:#3FAFA8;background:rgba(63,175,168,.14);border-color:rgba(63,175,168,.45)">임시</span>
+        </div>
+        <div class="lbl">포커스</div>
+        <div class="st"><span class="fld" style="outline:2px solid #3FAFA8;outline-offset:2px">종목 검색</span></div>
+      </div>
+    </div>
+    <div class="lite">
+      <div class="lb">라이트</div>
+      <div class="st">
+        <span class="btn" style="background:#1F7A74;color:#F4F5F6">관심종목 추가</span>
+        <span class="bdg" style="color:#1F7A74;background:rgba(31,122,116,.11);border-color:rgba(31,122,116,.38)">임시</span>
+      </div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">A3. 청록</b>
+    차가움을 유지하는 유일한 안. <b>다크·라이트에서 인상이 거의 안 갈립니다</b>(A2의 문제가 없습니다) —
+    청록은 어둡게 해도 청록으로 남습니다.
+    <br>대신 <b style="color:#E8A090">하락 파랑(<code>#4A8CC8</code>)과 이웃</b>입니다. 위 화면에서
+    <b>선택된 행의 세로선</b>과 그 옆 <b>하락 숫자</b>를 함께 보시고, 두 파랑이 헷갈리는지 확인해 주십시오.
+    이 안의 유일한 탈락 조건입니다.
+    <div class="hex">accent &nbsp;#3FAFA8 &nbsp;hover #55C4BC<br>light &nbsp;#1F7A74</div>
+  </div>
+</div>
+
+</div>
+
+<div class="section" style="margin-top:24px">
+  <p class="label">함께 정해지는 규칙 — 액센트 면적</p>
+  <p style="line-height:1.7">
+    어느 것을 고르셔도 규칙은 같습니다. <b>액센트는 화면 면적의 2%를 넘지 않고, 한 화면에 채워진(solid) 액센트는 하나뿐</b>입니다 —
+    그 화면에서 <b>가장 하고 싶은 행동 하나</b>에만 씁니다. 나머지는 테두리·밑줄·세로선처럼 <b>선으로만</b> 씁니다.
+    액센트를 여기저기 채우는 순간 위계가 사라지고, 그때부터는 어떤 색을 골랐든 화면이 다시 산만해집니다.
+    <br><br>
+    <b>이걸 정하면 색은 끝납니다.</b> 그다음은 스펙 문서를 써서 커밋하고, 리드 검토 후 구현 계획으로 넘어갑니다.
+  </p>
+</div>
+</div>
