@@ -402,13 +402,42 @@ ARM_CASES = [
         {"arm": True, "self_vendor": False},
     ),
     (
-        "사람 저자(에이전트 신원 없음) → 자기리뷰 축 미해당, risk: low 면 arm",
+        "사람 저자(에이전트형이 아닌 이메일) → 자기리뷰 축 미해당, risk: low 면 arm",
         {
             "marker_model": "claude",
             "commit_author_emails": ["dev@example.test"],
             "head_ref": "feature/x",
         },
         {"arm": True, "self_vendor": False, "identity_source": "none"},
+    ),
+    (
+        "어휘 밖 티어 신원(claude-opus5-agent@) → 사람 저자로 접지 않고 arm 거부  (공격 ⑨)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["claude-opus5-agent@noreply.local"],
+            "head_ref": "feature/x",
+        },
+        {"arm": False, "unknown_agentish": ["claude-opus5-agent@noreply.local"]},
+    ),
+    (
+        "어휘 밖 벤더형 신원(gemini-agent@) → arm 거부  (공격 ⑨)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["gemini-agent@noreply.local"],
+            "head_ref": "feature/x",
+        },
+        {"arm": False, "unknown_agentish": ["gemini-agent@noreply.local"]},
+    ),
+    (
+        "어휘 안 신원 + 어휘 밖 신원 혼재 → arm 거부 (한 건이라도 판독 불가면 접는다)",
+        {
+            "marker_model": "kimi",
+            "commit_author_emails": [
+                "claude-opus-agent@noreply.local",
+                "claude-opus5-agent@noreply.local",
+            ],
+        },
+        {"arm": False, "author_models": "claude"},
     ),
     (
         "커밋 저자 이메일 0건(조회 실패) → arm 거부 (fail-closed)",

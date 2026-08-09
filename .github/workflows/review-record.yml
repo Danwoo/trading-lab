@@ -22,7 +22,9 @@
 # 자동 머지 arm 은 전부 참일 때만: ① required 게이트(`test: gate`) 초록 — 완료까지 재조회,
 #   상한 초과는 실패로 접는다 ② 봇 승인 리뷰의 commit_id == 현재 head ③ 리뷰어 벤더 ≠ 저자
 #   벤더, 또는 같은 벤더여도 작성 티어를 안다 (cross-review 의 동일-벤더 자기리뷰 차단 승계 —
-#   신원을 못 읽으면 arm 하지 않는다) ④ risk: low 또는 저자가 봇이면서 major 상승이 아니다.
+#   신원을 못 읽으면 arm 하지 않는다. 어휘 밖 에이전트형 신원은 사람 저자가 아니라 판독
+#   불가로 접고, 티어 판독은 claude 신원에만 있다) ④ risk: low 또는 저자가 봇이면서 major
+#   상승이 아니다.
 #   위험도의 SoT 는 이슈의 risk 라벨(fresh 조회)이고, 이슈 연결은 PR 본문 파싱으로 읽는다 —
 #   `Refs #N` 도 위험도 출처다 (2026-08-09 리드 결정. closingIssuesReferences 는 closing
 #   키워드만 잡아, 그것만 보면 위험도를 읽히려고 PR 마다 전용 이슈를 만들게 된다).
@@ -238,6 +240,10 @@ jobs:
                 issue_refs: $refs, commit_author_emails: $emails}' \
             | python3 scripts/review_record.py arm)
           echo "arm 판정: $ARM"
+          if [ -z "$ARM" ]; then
+            echo "::warning::arm 판정부가 출력을 내지 못했다 — arm 하지 않는다 (fail-closed)"
+            exit 0
+          fi
           echo "위험도 근거: $(jq -r .risk_evidence <<<"$ARM") · PR 이라 제외한 참조: $(jq -r '.excluded_pr_refs | if length == 0 then "없음" else map("#\(.)") | join(",") end' <<<"$ARM")"
           if [ "$(jq -r .arm <<<"$ARM")" != "true" ]; then
             echo "arm 하지 않는다 — $(jq -r .reason <<<"$ARM")"

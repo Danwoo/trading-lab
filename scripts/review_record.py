@@ -289,6 +289,16 @@ def judge_author_identity(payload) -> dict:
     같은 벤더면 교차 축이 티어뿐이다. 티어를 모르면 동일-티어 자기리뷰 가능성을 배제할 수
     없으므로 arm 을 거부한다 (리뷰 자체와 코멘트·네이티브 리뷰 기록은 그대로 남는다).
     신원을 아예 못 읽어도 거부한다 — 못 읽으면 arm 하지 않는다.
+
+    **어휘 밖 에이전트형 이메일은 「사람 저자」가 아니라 「판독 불가」다.** 어휘
+    (`review_route` 의 티어·벤더 목록)는 새 모델이 붙을 때 사람이 갱신하므로, 디스패치가
+    어휘보다 먼저 도는 창이 반드시 생긴다. 그 창에서 저자 벤더를 모른 채 통과시키면
+    자기리뷰가 조용히 arm 된다 — `review_route.decide()` 는 같은 입력에 `author_kind=human`
+    을 내어 리뷰어로 claude 를 배정한다.
+
+    작성 티어는 현재 claude 신원에서만 판독된다 (`review_route` 가 `claude_tiers_seen` 만
+    모은다). 따라서 동일-벤더 kimi·codex 는 티어를 실어도 늘 사람 경로다 — fail-closed 쪽
+    비대칭이라 그대로 두되, 「티어를 알면 arm」이 claude 에서만 성립한다는 뜻이다.
     """
     emails = payload.get("commit_author_emails")
     reviewer = payload.get("marker_model") or ""
@@ -297,6 +307,7 @@ def judge_author_identity(payload) -> dict:
         "author_models": None,
         "author_tier": None,
         "identity_source": None,
+        "unknown_agentish": None,
         "block": None,
     }
     if not isinstance(emails, list) or not [e for e in emails if e]:
@@ -313,14 +324,23 @@ def judge_author_identity(payload) -> dict:
 
     identity = review_route.identify_author(emails, payload.get("head_ref") or "")
     author_models = identity["author_models"]
+    unknown_agentish = identity["unknown_agentish"]
     self_vendor = reviewer in [v for v in author_models.split(",") if v]
     result = {
         "self_vendor": self_vendor,
         "author_models": author_models or None,
         "author_tier": identity["author_tier"],
         "identity_source": identity["identity_source"],
+        "unknown_agentish": unknown_agentish or None,
         "block": None,
     }
+    if unknown_agentish:
+        return {
+            **result,
+            "block": "어휘 밖 에이전트형 커밋 신원("
+            + ", ".join(unknown_agentish)
+            + ") — 저자 벤더를 판정할 수 없어 arm 하지 않는다 (fail-closed)",
+        }
     if self_vendor and not identity["author_tier"]:
         return {
             **result,
@@ -348,6 +368,7 @@ def decide_arm(payload) -> dict:
         "author_models": identity["author_models"],
         "author_tier": identity["author_tier"],
         "identity_source": identity["identity_source"],
+        "unknown_agentish": identity["unknown_agentish"],
     }
 
     if payload.get("verdict") != "merge_ok":
