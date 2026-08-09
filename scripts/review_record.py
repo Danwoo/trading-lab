@@ -243,7 +243,9 @@ def scan_refs(body) -> dict:
     코드는 버린다 — 펜스(중첩 포함)·4칸 들여쓰기 블록·인라인 코드, 그리고 인용은 lazy
     연속행(`>` 없는 다음 줄)까지. 거기 적힌 `Refs #N` 은 선언이 아니라 인용이다.
     **렌더되지 않는 HTML 주석도 버린다** — 사람 눈에 안 보이는 한 줄이 위험도 출처가 되면
-    본문만 읽는 사람은 그 PR 이 왜 저위험으로 접혔는지 알 수 없다.
+    본문만 읽는 사람은 그 PR 이 왜 저위험으로 접혔는지 알 수 없다. 주석 판별은 **펜스 판별
+    뒤에** 온다: 코드 블록 안의 `<!--` 는 주석이 아니고, 먼저 보면 그 뒤 펜스가 통째로
+    주석에 먹혀 좁힘이 풀린다.
 
     **`dropped` 는 「본문 전체에서 보이는 후보」 빼기 「산문 후보」로 구한다.** 버린 줄에서만
     긁어모으면 판별 자체의 빈틈이 그대로 구멍이 된다 — 펜스 구분선(여는 줄의 info string·
@@ -257,26 +259,26 @@ def scan_refs(body) -> dict:
     자리표시를 남겨 참조 문법의 공백 건너뛰기가 그 경계를 넘지 못하게 한다.
     """
     raw = body or ""
-    # 주석은 줄 수를 보존해 가린다 — 한 줄로 접으면 앞뒤 산문이 이어붙는다.
-    # 닫히지 않은 `<!--` 는 그 자리부터 끝까지 주석으로 본다 (fail-closed)
-    masked = _HTML_COMMENT.sub(
-        lambda m: "\n".join(_DROP_MARK for _ in m.group(0).splitlines()), raw
-    )
-    if "<!--" in masked:
-        head, _, tail = masked.partition("<!--")
-        masked = head + "\n".join(_DROP_MARK for _ in ("<!--" + tail).splitlines())
-
     prose: list[str] = []
     fence: str | None = None
     in_quote = False
+    in_comment = False
 
     def drop():
         # 비-공백 자리표시 — 버린 자리를 사이에 두고 앞뒤 산문이 한 문장으로 붙지 않게
         prose.append(_DROP_MARK)
 
-    for line in masked.splitlines():
+    for line in raw.splitlines():
+        if in_comment:
+            if "-->" not in line:
+                drop()
+                continue
+            in_comment = False
+            line = _DROP_MARK + line.split("-->", 1)[1]
+
         opened = _FENCE.match(line)
         if fence is not None:
+            # 닫는 것은 같은 문자로 여는 길이 이상일 때만 (중첩 펜스 보호)
             if (
                 opened
                 and opened.group("mark")[0] == fence[0]
@@ -289,6 +291,18 @@ def scan_refs(body) -> dict:
             fence = opened.group("mark")
             drop()
             continue
+
+        # 인라인 코드를 먼저 지운다 — 코드 스팬 안의 `<!--` 는 주석이 아니다. 이 순서가
+        # 아니면 산문이 인용한 짝 없는 `<!--` 하나가 그 뒤 본문을 통째로 주석으로 먹는다
+        line = _INLINE_CODE.sub(_DROP_MARK, line)
+
+        # 주석 판별은 펜스·인라인 코드 밖에서만 — 한 줄에 닫힌 것은 지우고, 안 닫혔으면 잇는다
+        if "<!--" in line:
+            line = _HTML_COMMENT.sub(_DROP_MARK, line)
+            if "<!--" in line:
+                line = line.split("<!--", 1)[0] + _DROP_MARK
+                in_comment = True
+
         if not line.strip():
             in_quote = False
             prose.append("")
@@ -300,7 +314,7 @@ def scan_refs(body) -> dict:
         if in_quote or _INDENTED_CODE.match(line):
             drop()
             continue
-        prose.append(_INLINE_CODE.sub(_DROP_MARK, line))
+        prose.append(line)
 
     refs = _numbers_in("\n".join(prose))
     return {"refs": sorted(refs), "dropped": sorted(_numbers_in(raw) - refs)}
