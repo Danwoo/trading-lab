@@ -42,9 +42,9 @@ PR 마다 전용 이슈를 만들게 된다). 여러 이슈면 가장 높은 위
 ## 서브커맨드 (stdin JSON → stdout JSON, `gate` 만 종료코드 프로토콜)
 
   record  코멘트 목록 + head 에서 기록할 리뷰를 판정한다
-  refs    PR 본문의 산문에서 참조 이슈 번호를 뽑는다 (한 줄에 하나)
-  dropped-refs
-          코드·인용으로 접혀 버린 참조 후보를 뽑는다 — 위험도를 올리는 쪽으로만 쓴다
+  scan-refs
+          PR 본문을 산문 참조(`refs`)와 버린 후보(`dropped`)로 갈라 낸다 — 한 번의 호출로
+          둘을 함께 주므로, 한쪽만 실패해 조용히 빈 목록이 되는 경로가 없다
   arm     승인·위험도·봇 상승 종류로 arm 여부를 판정한다
   gate    check-runs JSON 에서 required 게이트(`test: gate`)의 상태를 판정한다
           — 종료코드 0 초록 · 1 실패 · 2 미완(재조회 요망), `--final` 은 미완을 실패로 접는다
@@ -236,46 +236,41 @@ def scan_refs(body) -> dict:
     코드는 버린다 — 펜스(중첩 포함)·4칸 들여쓰기 블록·인라인 코드, 그리고 인용은 lazy
     연속행(`>` 없는 다음 줄)까지. 거기 적힌 `Refs #N` 은 선언이 아니라 인용이다.
 
-    **버린 자리의 후보를 그냥 없애면 위험도가 내려갈 수 있다** — 고위험 참조가 리스트
-    연속행(4칸 들여쓰기)이라 접히고 저위험 참조만 남으면 high 가 low 로 내려간다. 그래서
-    버린 후보를 `dropped` 로 함께 돌려주고 `read_risk` 가 그것을 **미선언 쪽으로만** 쓴다.
-    좁히는 것이 fail-closed 이려면 「버린 자리에 후보가 있었다」가 판정까지 가야 한다.
+    **`dropped` 는 「본문 전체에서 보이는 후보」 빼기 「산문 후보」로 구한다.** 버린 줄에서만
+    긁어모으면 판별 자체의 빈틈이 그대로 구멍이 된다 — 펜스 구분선(여는 줄의 info string·
+    닫는 줄의 꼬리)처럼 산문도 코드도 아닌 자리, 줄바꿈으로 이어진 참조 목록의 둘째 줄처럼
+    줄 단위 스캔이 놓치는 자리가 실제로 있었다. 차집합으로 구하면 **좁힘이 무엇을 잃든**
+    그 번호가 `dropped` 로 남아 위험도를 올리는 쪽으로만 작용한다 (`read_risk` 가 그렇게 쓴다).
     """
-    refs: set[int] = set()
-    dropped: set[int] = set()
+    prose: list[str] = []
     fence: str | None = None
     in_quote = False
     for line in (body or "").splitlines():
         opened = _FENCE.match(line)
         if fence is not None:
-            # 닫는 것은 같은 문자로 여는 길이 이상일 때만 (중첩 펜스 보호)
             if (
                 opened
                 and opened.group("mark")[0] == fence[0]
                 and len(opened.group("mark")) >= len(fence)
             ):
                 fence = None
-            else:
-                dropped |= _numbers_in(line)
             continue
         if opened:
             fence = opened.group("mark")
             continue
         if not line.strip():
             in_quote = False
+            prose.append("")
             continue
         if line.lstrip().startswith(">"):
             in_quote = True
-            dropped |= _numbers_in(line)
             continue
         if in_quote or _INDENTED_CODE.match(line):
-            dropped |= _numbers_in(line)
             continue
-        prose = _INLINE_CODE.sub(" ", line)
-        refs |= _numbers_in(prose)
-        # 인라인 코드로 지운 조각에도 후보가 있었으면 그 사실을 남긴다
-        dropped |= _numbers_in(line) - _numbers_in(prose)
-    return {"refs": sorted(refs), "dropped": sorted(dropped - refs)}
+        prose.append(_INLINE_CODE.sub(" ", line))
+
+    refs = _numbers_in("\n".join(prose))
+    return {"refs": sorted(refs), "dropped": sorted(_numbers_in(body or "") - refs)}
 
 
 def parse_refs(body) -> list[int]:
@@ -569,20 +564,15 @@ def main(argv) -> int:
     payload = json.load(sys.stdin)
     if command == "record":
         json.dump(decide_record(payload), sys.stdout, ensure_ascii=False)
-    elif command == "refs":
-        for number in parse_refs(payload.get("body")):
-            print(number)
-        return 0
-    elif command == "dropped-refs":
-        for number in scan_refs(payload.get("body"))["dropped"]:
-            print(number)
+    elif command == "scan-refs":
+        json.dump(scan_refs(payload.get("body")), sys.stdout, ensure_ascii=False)
+        print()
         return 0
     elif command == "arm":
         json.dump(decide_arm(payload), sys.stdout, ensure_ascii=False)
     else:
         print(
-            f"::error::알 수 없는 서브커맨드: {command!r} "
-            "(record|refs|dropped-refs|arm|gate)"
+            f"::error::알 수 없는 서브커맨드: {command!r} (record|scan-refs|arm|gate)"
         )
         return 1
     print()

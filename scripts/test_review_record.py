@@ -665,6 +665,24 @@ DROPPED_CASES = [
         [],
     ),
     ("버릴 것이 없으면 빈 목록", "Refs #23\n", [23], []),
+    (
+        "펜스 여는 줄의 info string 에 적힌 참조 (산문도 코드도 아닌 자리)",
+        "Refs #1\n\n```text Closes #23\nx\n```\n",
+        [1],
+        [23],
+    ),
+    (
+        "펜스 닫는 줄 꼬리에 적힌 참조",
+        "Refs #1\n\n```\nx\n``` Closes #23\n",
+        [1],
+        [23],
+    ),
+    (
+        "줄바꿈으로 이어진 참조 목록은 둘 다 읽는다 (산문이므로)",
+        "Refs #1,\n#23\n",
+        [1, 23],
+        [],
+    ),
 ]
 
 GATE_CASES = [
@@ -787,6 +805,19 @@ def main() -> int:
         want = {"refs": expected_refs, "dropped": expected_dropped}
         if got != want:
             failures.append(f"scan_refs: {desc}: 기대 {want!r} ≠ 실제 {got!r}")
+
+    # 불변식: 좁히기 전(본문 전체 탐욕 판독)이 보던 번호는 하나도 사라지지 않는다 —
+    # refs 로 남거나 dropped 로 남는다. 마크다운 판별이 어디서 틀리든 위험도는 안 내려간다.
+    for desc, body, *_ in REFS_CASES + DROPPED_CASES:
+        total += 1
+        got = rr.scan_refs(body)
+        greedy = rr._numbers_in(body or "")
+        missing = greedy - set(got["refs"]) - set(got["dropped"])
+        if missing:
+            failures.append(
+                f"보존 불변식: {desc}: 탐욕 판독의 {sorted(missing)!r} 이 "
+                f"refs·dropped 어디에도 없다 (위험도가 내려갈 수 있다)"
+            )
 
     for desc, records, final, expected_state in GATE_CASES:
         total += 1
