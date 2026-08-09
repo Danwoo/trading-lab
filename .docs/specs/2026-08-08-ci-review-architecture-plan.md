@@ -297,6 +297,11 @@ gh api repos/Danwoo/trading-lab/rulesets/<id>
   이 설정을 다루는 task 는 여기뿐이므로, 안 켜면 계획의 완료 조건 「저위험·봇 PR 은 자동 머지가
   arm 된다」가 **이 계획만으로 도달 불가**다. 설정 변경이므로 사람이 켠다:
   Settings → General → Pull Requests → *Allow auto-merge*
+- **required 항목은 GitHub Actions 앱에 고정한다** (`integration_id: 15368`, 2026-08-09 리드 결정).
+  현행 3종 중 `test: repo-scan`·`test: repo-scan-app` 만 고정돼 있고 **`test: ci-coverage` 는
+  없다.** 고정이 없으면 같은 이름을 보고하는 다른 앱도 그 required 를 만족시킨다. 지금 그런 앱은
+  설치돼 있지 않아 실제 구멍은 아니지만, 이번에 **`ci-coverage` 와 새 게이트 잡 둘 다 고정해**
+  맞춘다. 앱 id 는 `gh api apps/github-actions --jq .id` 로 확인한다
 - 기존 required 3종을 **빼지 마라.** 게이트 잡을 **더하는** 것이지 대체하는 것이 아니다.
   뺄지 말지는 게이트 잡이 그 셋을 실제로 대표하는지 확인한 뒤 별도로 판단한다
 
@@ -337,10 +342,18 @@ gh api repos/Danwoo/trading-lab/rulesets/<id>
   `git show origin/main:.github/workflows/merge-router.yml` 머리 주석: **SoT 는 이슈의 risk
   라벨이고 판정 시점마다 fresh 조회한다. PR 의 risk 라벨은 가시화 미러일 뿐 판정 입력이 아니다**
   (미러가 낡아 오통과되지 않게). 이슈 연결은 `closingIssuesReferences` 로 읽는데 그것은
-  **closing 키워드(Closes/Fixes/Resolves)만** 잡는다 — **`Refs #N` 만 쓴 PR 은 연결 이슈가 없어
-  미선언으로 읽히고 사람 대기열로 간다.** 이 계획의 task PR 은 전부 `Refs #23` 을 쓰므로
-  **전부 그 경로다** (2026-08-09 실측: #49·#47·#24 셋 다 연결 이슈 0건). 이것이 의도인지
-  아닌지를 이 task 에서 정하고 근거를 PR 본문에 적어라
+  **closing 키워드(Closes/Fixes/Resolves)만** 잡는다 — `Refs #N` 만 쓴 PR 은 그 API 로는
+  연결 이슈가 0건이다 (2026-08-09 실측: #49·#47·#24 셋 다).
+- **`Refs #N` 도 위험도 출처로 읽는다** (2026-08-09 리드 결정). `closingIssuesReferences` 만
+  보면 **위험도를 읽히려고 PR 마다 전용 이슈를 만들게 되고, 그것이 이슈를 문어발로 늘린다.**
+  이 레포가 이미 겪은 실패다 — 리드가 「이슈는 보수적으로」를 반복해 요청한 이유가 그것이다.
+  이슈 하나에 PR 여럿을 `Refs` 로 매달 수 있어야 이슈가 안 는다. 구현 규칙:
+  - `closingIssuesReferences` 로 못 읽으므로 **PR 본문에서 직접 파싱**한다
+  - **여러 이슈를 참조하면 가장 높은 위험을 취한다** (fail-closed)
+  - **하나도 못 읽으면 미선언 = 고위험** (현행과 같다)
+  - 참조한 이슈에 risk 라벨이 없어도 미선언이다
+  - 이 계획의 task PR 은 전부 `Refs #23` 인데 **#23 은 `risk: high`** 라 여전히 사람 경로다 —
+    이 결정이 이번 작업의 흐름을 바꾸지는 않는다
 - **disarm 경로를 반드시 함께 만든다.** `pull_request: [synchronize]` 를 듣고 `--disable-auto`
   로 arm 을 푼다. arm 조건만 옮기면 「승인 → arm → push → 아무도 안 본 커밋이 머지」가 뚫린다
   (설계 §4 참조). 지금 그 일을 `merge-router.yml` 이 하고 있고 Task 8 이 그 파일을 지운다 —
