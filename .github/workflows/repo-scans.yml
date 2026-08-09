@@ -95,10 +95,6 @@ jobs:
 
       # 절대 날짜 리터럴 (#269 안 A) — */app/clients/**·*/app/schemas/** 에 "시간이 지나면
       # 낡는 고정 날짜" 재유입 차단. 글롭이 서비스 이름을 안 가리므로 새 서비스도 자동 대상.
-      - name: PROBE 상류 고의 실패
-        if: ${{ !cancelled() }}
-        run: exit 1
-
       - name: 절대 날짜 리터럴 스캔
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_no_absolute_dates.py
@@ -182,6 +178,7 @@ jobs:
   # ── 앱 모듈을 import 하는 전수 스캔 (uv 필요) ────────────────────────────
   repo-scan-app:
     name: "test: repo-scan-app"
+    if: ${{ false }}   # PROBE: 상류를 skipped 로 만든다
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
