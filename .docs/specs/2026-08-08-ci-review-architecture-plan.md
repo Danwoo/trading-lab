@@ -226,6 +226,14 @@ claude 경로에서 영원히 참이 되지 않으므로 **타임아웃을 늘�
   새로 짜지 말고 그것을 읽고 옮겨라
 - **게이트 잡은 자기 자신을 제외해야 한다.** 게이트도 `test: ` 접두 체크라, 전수 조회하면
   자기 자신이 `in_progress` 로 잡혀 **영영 초록이 안 된다.** 제외가 실제로 동작하는지 케이스로 못박아라
+- **게이트는 상류가 끝날 때까지 기다린다.** `repo-scans.yml` 과 `ci.yml`·`frontend-ci.yml` 은
+  **같은 `pull_request` 이벤트로 동시에** 시작하므로, 게이트가 개시 직후 한 번만 조회하면
+  상류가 `in_progress` 로 잡혀 **빨강**이 된다. required 로 걸린 잡이 코드 PR 마다 빨가면
+  **사람 머지까지 막히는 작업 정지 장치**가 된다 — 설계 §4 가 금지한 것이다.
+  완료까지 다시 조회하고, **대기 상한을 못박고, 상한을 넘기면 미완을 실패로 접어라**(fail-closed).
+  잡의 `timeout-minutes` 도 그 상한보다 크게 둔다.
+  실측(2026-08-09 PR #49): 상류 마지막 `test: frontend` 가 `01:46:02`, 게이트가 `01:46:16` —
+  **14초 뒤에 초록**. 같은 SHA 의 `test: ` 체크런 시각을 `check-runs` 로 뽑으면 이 간격이 보인다
 - **판정부는 순수 함수로 `scripts/` 에 둔다** — check-runs JSON 을 받아 판정을 내는 함수면
   로컬에서 돈다
 - 통과 조건은 **`success` 또는 `skipped`** 인 것뿐이다
@@ -238,6 +246,9 @@ claude 경로에서 영원히 참이 되지 않으므로 **타임아웃을 늘�
 - [ ] 상류 하나를 일부러 실패시킨 상태에서 게이트가 **빨간지** 확인한다
 - [ ] 상류가 `skipped` 일 때 게이트가 **초록인지**도 확인한다 — 한쪽만 보면 반쪽이다
 - [ ] 같은 이름의 체크런이 재실행으로 여러 개일 때 **최신 것만 보는지** 확인한다
+- [ ] **상류가 아직 안 끝난 입력에서 「통과」로 접히지 않는지** 확인한다 — 위 다섯은 전부
+      상류가 이미 완료된 상태를 전제한다. 이 케이스가 빠지면 가장 흔한 실제 상황이 안 덮인다
+- [ ] **상한을 넘겼을 때 실패하는지** 확인한다 (fail-closed)
 
 ---
 
@@ -270,14 +281,22 @@ gh api repos/Danwoo/trading-lab/rulesets/<id>
   장치가 된다 (2026-08-06 결정 취지 · 2026-08-08 리드 결정). **현행이 이미 0 이므로 건드리지
   않는 것이 곧 결정 이행이다**
 - required 목록에 넣는 것은 **Task 4 에서 `skipping` 이 확인된 것만**이다
-- **`ci.yml`·`frontend-ci.yml` 의 `test: ` 잡을 required 에 넣는 것은 선택이 아니다 —
-  Task 8 의 선행 조건이다.** 지금 `merge-router.yml` 이 자동 머지 전에 **`test: ` 접두 체크런
+- **`ci.yml`·`frontend-ci.yml` 의 `test: ` 잡 대표는 선택이 아니다 — Task 8 의 선행 조건이다.**
+  **2026-08-09 리드 결정으로 ㉡(게이트 잡이 `check-runs` 로 전수 대표)를 택했고 Task 5 가 그것을
+  구현한다.** 따라서 이 task 에서 required 에 더할 것은 **게이트 잡 하나**다. 아래는 그 결정의 근거다. 지금 `merge-router.yml` 이 자동 머지 전에 **`test: ` 접두 체크런
   전부**(13개)를 확인하는데, ruleset 의 required 는 `repo-scans.yml` 의 3종뿐이다. Task 5 의
   게이트 잡은 같은 워크플로 안만 `needs` 로 묶으므로 나머지 10종을 대표하지 못한다.
   **이 상태로 Task 8 이 `merge-router.yml` 을 지우면 자동 머지가 backend·frontend 테스트 결과를
   안 보고 머지한다.** 사람 머지 경로는 원래 3종만 걸려 변화가 없지만 자동 경로가 약해진다.
   대안은 둘이다 — ㉠ 그 10종을 required 에 넣는다 ㉡ 게이트 잡이 `check-runs` 조회로 대표한다
   (`merge-router` 가 지금 하는 방식). **어느 쪽이든 Task 8 전에 서 있어야 한다**
+- **`allow_auto_merge` 를 켠다.** 2026-08-09 실측으로 **꺼져 있다**(`gh api repos/Danwoo/trading-lab
+  --jq .allow_auto_merge` → `false`). 머지된 PR 40건 중 `autoMergeRequest` 가 있던 것은 **0건** —
+  이 레포에서 네이티브 auto-merge 는 한 번도 선 적이 없다. 지금 흐름이 도는 것은
+  `merge-router.yml` 의 **거부되면 직접 머지하는 폴백** 덕분인데 **Task 8 이 그 파일을 지운다.**
+  이 설정을 다루는 task 는 여기뿐이므로, 안 켜면 계획의 완료 조건 「저위험·봇 PR 은 자동 머지가
+  arm 된다」가 **이 계획만으로 도달 불가**다. 설정 변경이므로 사람이 켠다:
+  Settings → General → Pull Requests → *Allow auto-merge*
 - 기존 required 3종을 **빼지 마라.** 게이트 잡을 **더하는** 것이지 대체하는 것이 아니다.
   뺄지 말지는 게이트 잡이 그 셋을 실제로 대표하는지 확인한 뒤 별도로 판단한다
 
@@ -314,6 +333,14 @@ gh api repos/Danwoo/trading-lab/rulesets/<id>
   `commit_id` 가 현재 head 와 같다 ③ `risk: low` **또는** 저자가 봇이면서 **major 상승이 아니다**
 - **`source=manual` 마커는 arm 하지 않는다** — 사람이 타이핑한 한 줄일 수 있다
 - 봇 PR 의 상승 종류는 PR 제목에서 읽는다. **읽지 못하면 arm 하지 않는다** (fail-closed)
+- **arm 조건 ③ 의 `risk: low` 를 어디서 읽는지 명시하라.** 현행이 이미 못 박아 뒀으니 옮겨라 —
+  `git show origin/main:.github/workflows/merge-router.yml` 머리 주석: **SoT 는 이슈의 risk
+  라벨이고 판정 시점마다 fresh 조회한다. PR 의 risk 라벨은 가시화 미러일 뿐 판정 입력이 아니다**
+  (미러가 낡아 오통과되지 않게). 이슈 연결은 `closingIssuesReferences` 로 읽는데 그것은
+  **closing 키워드(Closes/Fixes/Resolves)만** 잡는다 — **`Refs #N` 만 쓴 PR 은 연결 이슈가 없어
+  미선언으로 읽히고 사람 대기열로 간다.** 이 계획의 task PR 은 전부 `Refs #23` 을 쓰므로
+  **전부 그 경로다** (2026-08-09 실측: #49·#47·#24 셋 다 연결 이슈 0건). 이것이 의도인지
+  아닌지를 이 task 에서 정하고 근거를 PR 본문에 적어라
 - **disarm 경로를 반드시 함께 만든다.** `pull_request: [synchronize]` 를 듣고 `--disable-auto`
   로 arm 을 푼다. arm 조건만 옮기면 「승인 → arm → push → 아무도 안 본 커밋이 머지」가 뚫린다
   (설계 §4 참조). 지금 그 일을 `merge-router.yml` 이 하고 있고 Task 8 이 그 파일을 지운다 —
