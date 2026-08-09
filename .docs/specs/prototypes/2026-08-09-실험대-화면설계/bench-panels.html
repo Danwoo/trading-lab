@@ -1,0 +1,415 @@
+<style>
+  .bp { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --ok:#7FA05A; --wr:#D9A441; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .bp .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+  .bp h2 { font-size:17px; font-weight:700; color:var(--is); margin:0 0 5px; }
+  .bp h3 { font-size:14.5px; font-weight:700; color:var(--is); margin:30px 0 4px; }
+  .bp h3 em { font-style:normal; color:var(--if); font-weight:400; font-size:12.5px; margin-left:7px; }
+  .bp p.lead { font-size:12.5px; color:var(--im); line-height:1.7; margin:0 0 13px; max-width:80ch; }
+  .bp p.lead b { color:var(--ik); font-weight:500; }
+
+  /* 패널 하나를 실제 372px 로 */
+  .rack { display:flex; gap:15px; flex-wrap:wrap; align-items:flex-start; }
+  .pw { flex:0 0 372px; }
+  .pw > .lbl { font-size:11px; color:var(--if); margin-bottom:5px; }
+  .pw > .lbl b { color:var(--im); font-weight:600; }
+  .panel { width:372px; background:var(--pn); border:1px solid var(--ln); border-radius:11px;
+           overflow:hidden; display:flex; flex-direction:column; }
+  .panel.w620 { width:620px; }
+  .pw.wide { flex:0 0 620px; }
+  .ptop { display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--ln);
+          background:var(--pn); }
+  .ptop b { font-size:12.5px; color:var(--is); }
+  .ptop .sub { font-size:11px; color:var(--im); }
+  .ptop .r { margin-left:auto; display:flex; gap:7px; color:var(--if); font-size:12px; }
+  .pbd { padding:11px 12px; font-size:11.5px; color:var(--im); line-height:1.6; }
+
+  .pin { font-size:10.5px; color:var(--if); padding:4px 8px; border:1px solid var(--ln);
+         border-radius:6px; background:var(--rs); margin-bottom:10px; }
+  .pin b { color:var(--im); font-weight:600; }
+
+  /* 탭 */
+  .tabs { display:flex; gap:4px; padding:7px 12px 0; border-bottom:1px solid var(--ln); }
+  .tabs u { text-decoration:none; font-size:11.5px; padding:5px 10px; border-radius:7px 7px 0 0;
+            color:var(--if); border:1px solid transparent; border-bottom:0; margin-bottom:-1px; }
+  .tabs u.on { color:var(--is); background:var(--bg); border-color:var(--ln); }
+
+  /* 목록 행 */
+  .row { display:flex; align-items:center; gap:9px; padding:8px 0; border-bottom:1px solid var(--hl); }
+  .row:last-child { border-bottom:0; }
+  .row .nm { flex:1; min-width:0; color:var(--ik); font-size:12px; }
+  .row .nm s { display:block; text-decoration:none; font-size:10.5px; color:var(--if); margin-top:1px; }
+  .row .v { flex:0 0 auto; text-align:right; font-size:12px; }
+  .row .v s { display:block; text-decoration:none; font-size:10.5px; color:var(--if); }
+  .badge { font-size:9.5px; padding:2px 6px; border-radius:4px; border:1px solid var(--ls); color:var(--im); }
+  .badge.live { color:#E2837A; border-color:#6E3A33; }
+  .badge.paper { color:var(--im); }
+
+  /* 접이 단계 */
+  .step { border:1px solid var(--ln); border-radius:9px; margin-bottom:8px; overflow:hidden; }
+  .step > .h { display:flex; align-items:center; gap:8px; padding:9px 11px; background:var(--rs);
+               font-size:11.5px; color:var(--ik); cursor:pointer; }
+  .step > .h u { text-decoration:none; width:17px; height:17px; border-radius:50%; font-size:10px;
+                 display:flex; align-items:center; justify-content:center; background:var(--ln); color:var(--im); }
+  .step > .h u.done { background:var(--ok); color:var(--bg); }
+  .step > .h .r { margin-left:auto; color:var(--if); font-size:10.5px; }
+  .step > .c { padding:10px 11px; border-top:1px solid var(--ln); }
+
+  .fld { margin-bottom:9px; }
+  .fld label { display:block; font-size:11px; color:var(--im); margin-bottom:4px; }
+  .fld label s { text-decoration:none; color:var(--if); }
+  .inp { background:var(--bg); border:1px solid var(--ls); border-radius:7px; padding:7px 9px;
+         font-size:11.5px; color:var(--is); }
+  .inp.ph { color:var(--if); }
+  .two { display:flex; gap:7px; } .two > * { flex:1; min-width:0; }
+
+  /* 기준 카드 */
+  .gate { display:flex; align-items:center; gap:9px; padding:9px 0; border-bottom:1px solid var(--hl); }
+  .gate:last-child { border-bottom:0; }
+  .gate .k { flex:1; min-width:0; font-size:11.5px; color:var(--ik); }
+  .gate .k s { display:block; text-decoration:none; font-size:10.5px; color:var(--if); margin-top:1px; }
+  .gate .mine { flex:0 0 74px; text-align:right; }
+  .gate .mine .inp { padding:4px 7px; font-size:11px; display:inline-block; }
+  .gate .now { flex:0 0 58px; text-align:right; font-size:11.5px; }
+
+  /* 차트 */
+  svg.c { width:100%; height:78px; display:block; margin:6px 0 2px; }
+
+  .note { border-left:2px solid var(--ls); padding:2px 0 2px 11px; margin:12px 0 0;
+          font-size:11.5px; color:var(--im); line-height:1.65; max-width:80ch; }
+  .note b { color:var(--ik); }
+  .note.good { border-left-color:var(--ok); } .note.warn { border-left-color:var(--wr); }
+  .note.bad { border-left-color:var(--dg); }
+  .cap { font-size:11px; color:var(--if); margin-top:6px; line-height:1.6; }
+
+  table.t { width:100%; border-collapse:collapse; font-size:11.5px; margin:8px 0 2px; max-width:940px; }
+  table.t th { text-align:left; font-weight:600; color:var(--im); padding:5px 7px;
+               border-bottom:1px solid var(--ln); font-size:11px; }
+  table.t td { padding:6px 7px; border-bottom:1px solid var(--hl); color:var(--im); vertical-align:top; }
+  table.t td b { color:var(--ik); font-weight:600; }
+  table.t tr:last-child td { border-bottom:0; }
+</style>
+
+<div class="bp">
+
+<h2>화면 8개를 패널로 재배치 — 실제 372px</h2>
+<p class="lead">
+  <b>줄여서 되는지 확인하려고 실제 폭으로 그렸습니다.</b> 넓은 화면에서 3열로 그린 것을
+  372px 에 넣으면 대개 안 들어가는데, 어디가 안 들어가고 무엇을 버렸는지를 같이 적었습니다.<br>
+  <b>구조 정리 하나</b> — <code>bot-make</code>·<code>bot-live</code>·<code>bot-run</code> 셋은
+  레일 아이콘이 <b>하나(◫ 봇)</b>입니다. 별개 패널 셋이 아니라 <b>한 패널 안에서 목록 → 상세(탭 3개)</b>로 접습니다.
+</p>
+
+<table class="t">
+  <tr><th style="width:20%">지금 화면</th><th style="width:24%">가는 자리</th><th>어떻게 접었나</th></tr>
+  <tr><td><code>home</code></td><td><b>보드</b> (전체 폭)</td><td>「어젯밤에 한 일」·「정해야 할 것」만 보드 하단 띠로. 나머지는 각 패널로 흩어짐</td></tr>
+  <tr><td><code>board-live</code></td><td><b>보드</b> (전체 폭)</td><td>격자·곡선 그대로. 레일 순서만 새로</td></tr>
+  <tr><td><code>bot-make</code></td><td rowspan="3"><b>봇 패널</b> 372px</td><td>3열 → <b>접이 3단계</b> (조건 → 자금 → 이름)</td></tr>
+  <tr><td><code>bot-live</code></td><td>봇 상세의 <b>「검진」 탭</b></td></tr>
+  <tr><td><code>bot-run</code></td><td>봇 상세의 <b>「운용」 탭</b></td></tr>
+  <tr><td><code>trades</code></td><td><b>거래 로그 패널</b> 372px</td><td>7열 표 → <b>2열 + 펼침.</b> 펼침 안에 차트가 붙음</td></tr>
+  <tr><td><code>rules</code></td><td><b>내 기준 패널</b> 372px</td><td>기준 6줄은 그대로 (원래 세로라 잘 맞음)</td></tr>
+  <tr><td><code>bot-agent</code></td><td><b>에이전트 패널</b> 372 ↔ 620</td><td>그대로. 넓힘 토글</td></tr>
+  <tr><td><code>golive</code></td><td><b>전체 폭</b> (예외)</td><td>접지 않음 — §21.2 결정</td></tr>
+</table>
+
+<!-- ── 봇 패널 ── -->
+<h3>① 봇 패널 <em>— 목록 → 상세(탭 3개)</em></h3>
+
+<div class="rack">
+  <div class="pw">
+    <div class="lbl"><b>목록</b> — 레일 ◫ 를 눌렀을 때</div>
+    <div class="panel">
+      <div class="ptop"><b>봇</b><span class="sub">3개</span>
+        <div class="r"><span>＋</span><span>✕</span></div></div>
+      <div class="pbd">
+        <div class="pin">보드와 연결됨 · 고르면 <b>격자·곡선</b>이 그 봇 것으로 바뀝니다</div>
+        <div class="row">
+          <span class="nm">대형주 20일선 눌림목<s>모의 47거래일 · 131건</s></span>
+          <span class="v" style="color:var(--up)">+72.0만<s>4/6 기준</s></span>
+          <span class="badge paper">모의</span>
+        </div>
+        <div class="row">
+          <span class="nm">눌림목봇<s>모의 12거래일 · 18건</s></span>
+          <span class="v" style="color:var(--dn)">−3.1만<s>2/6 기준</s></span>
+          <span class="badge paper">모의</span>
+        </div>
+        <div class="row">
+          <span class="nm">반도체 실험<s>격자만 · 시도 147회</s></span>
+          <span class="v" style="color:var(--im)">—<s style="color:#D9B45C">한계 초과</s></span>
+          <span class="badge">실험</span>
+        </div>
+        <div class="cap" style="border-top:1px solid var(--hl);padding-top:8px;margin-top:4px">
+          한 줄을 누르면 <b style="color:var(--im)">상세</b>로 들어갑니다. 되돌아오는 건 ← 하나입니다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pw">
+    <div class="lbl"><b>새로 만들기</b> — 3열이 접이 3단계로</div>
+    <div class="panel">
+      <div class="ptop"><span style="color:var(--if)">←</span><b>새 봇</b>
+        <div class="r"><span>✕</span></div></div>
+      <div class="pbd">
+        <div class="step">
+          <div class="h"><u class="done">✓</u>언제 사고 팔까<span class="r">조건 2개</span></div>
+          <div class="c">
+            <div class="fld"><label>살 조건</label>
+              <div class="inp">20일 평균선까지 눌렸다 반등</div></div>
+            <div class="fld"><label>거를 것 <s>— 안 켜도 됩니다</s></label>
+              <div class="inp">최근 3개월 급등 상위 20% 제외</div></div>
+            <div class="fld"><label>팔 조건</label>
+              <div class="two"><div class="inp">손절 −7%</div><div class="inp">익절 +15%</div></div></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="h"><u>2</u>얼마씩 넣을까<span class="r">기본값 그대로</span></div>
+        </div>
+        <div class="step">
+          <div class="h"><u>3</u>이름<span class="r">비어 있음</span></div>
+        </div>
+        <div class="cap">
+          <b style="color:var(--im)">한 번에 한 단계만 펼칩니다.</b> 3열로 다 보이던 것을
+          세로로 늘어놓으면 스크롤만 길어지고, 무엇부터 정해야 하는지가 사라집니다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pw">
+    <div class="lbl"><b>상세</b> — 탭으로 <code>bot-live</code>·<code>bot-run</code> 을 접음</div>
+    <div class="panel">
+      <div class="ptop"><span style="color:var(--if)">←</span><b>대형주 20일선 눌림목</b>
+        <div class="r"><span>✕</span></div></div>
+      <div class="tabs"><u>조건</u><u class="on">검진</u><u>운용</u></div>
+      <div class="pbd" style="background:var(--bg)">
+        <div class="row"><span class="nm">1년에 얼마</span><span class="v" style="color:var(--up)">+18.4%</span></div>
+        <div class="row"><span class="nm">최악일 때<s>전 고점 아래 최장 194거래일</s></span>
+          <span class="v" style="color:var(--dn)">−22.1%</span></div>
+        <div class="row"><span class="nm">증거<s>131거래 × 유효 종목 2.83 ÷ 41</s></span>
+          <span class="v" style="color:#E2837A">9건어치</span></div>
+        <div class="row"><span class="nm">내 기준 통과<s>「모의 표본」·「몰린 정도」 미달</s></span>
+          <span class="v" style="color:#D9B45C">4 / 6</span></div>
+        <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--hl)">
+          <div style="font-size:11px;color:var(--im);margin-bottom:3px">번 돈이 어디서 나왔나</div>
+          <div style="display:flex;align-items:center;gap:7px;font-size:11px;margin:3px 0">한화에어로
+            <span style="flex:1;height:6px;background:var(--rs);border-radius:3px;overflow:hidden"><i style="display:block;width:100%;height:100%;background:var(--up)"></i></span>
+            <b style="color:var(--ik)">+19.8</b></div>
+          <div style="display:flex;align-items:center;gap:7px;font-size:11px;margin:3px 0">HD현대
+            <span style="flex:1;height:6px;background:var(--rs);border-radius:3px;overflow:hidden"><i style="display:block;width:70%;height:100%;background:var(--up)"></i></span>
+            <b style="color:var(--ik)">+13.9</b></div>
+          <div style="display:flex;align-items:center;gap:7px;font-size:11px;margin:3px 0;color:var(--if)">나머지 38
+            <span style="flex:1;height:6px;background:var(--rs);border-radius:3px;overflow:hidden"><i style="display:block;width:10%;height:100%;background:var(--dn)"></i></span>
+            <b style="color:var(--dn)">−2.0</b></div>
+          <div class="cap" style="color:#E2837A">상위 3종목이 88% — 셋을 빼면 −2.0%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note good">
+  <b>탭으로 접은 것이 오히려 낫습니다.</b> 원래 <code>bot-live</code>(검진)와 <code>bot-run</code>(운용)은
+  별개 화면이라 <b>같은 봇을 두 곳에서 봐야</b> 했습니다. 한 패널의 탭이 되면서
+  「조건 → 검진 → 운용」이 <b>한 봇의 세 얼굴</b>로 읽힙니다.
+</div>
+
+<!-- ── 거래 로그 ── -->
+<h3>② 거래 로그 패널 <em>— 7열 표를 2열 + 펼침으로</em></h3>
+
+<div class="rack">
+  <div class="pw">
+    <div class="lbl"><b>접힌 상태</b></div>
+    <div class="panel">
+      <div class="ptop"><b>거래 로그</b><span class="sub">131건</span>
+        <div class="r"><span>⤓</span><span>✕</span></div></div>
+      <div class="pbd">
+        <div class="pin">보드와 연결됨 · 고르면 <b>격자·곡선</b>이 그 시점을 표시합니다</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:9px">
+          <div style="border:1px solid var(--ln);border-radius:8px;padding:7px 9px">
+            <div style="font-size:10.5px;color:var(--if)">실현 손익</div>
+            <div style="font-size:15px;color:var(--up);font-weight:600">+46.2만</div>
+            <div style="font-size:10px;color:var(--if)">종료 125건</div></div>
+          <div style="border:1px solid var(--ln);border-radius:8px;padding:7px 9px">
+            <div style="font-size:10.5px;color:var(--if)">보유 6건 평가</div>
+            <div style="font-size:15px;color:var(--up);font-weight:600">+25.8만</div>
+            <div style="font-size:10px;color:var(--if)">합 +72.0만</div></div>
+        </div>
+        <div class="row"><span class="nm">카카오<s>07-27 → 08-07 · 손절</s></span>
+          <span class="v" style="color:var(--dn)">−14.2만<s>−7.02%</s></span></div>
+        <div class="row"><span class="nm">삼성전자<s>08-07 → 보유중</s></span>
+          <span class="v" style="color:var(--up)">+3.4만<s>+1.7%</s></span></div>
+        <div class="row"><span class="nm">현대차<s>08-07 → 보유중</s></span>
+          <span class="v" style="color:var(--up)">+8.1만<s>+3.3%</s></span></div>
+        <div class="cap" style="border-top:1px solid var(--hl);padding-top:8px;margin-top:4px">
+          <b style="color:var(--im)">버린 열 다섯</b> — 샀을 때·팔았을 때·보유기간·비용·태그.
+          전부 <b style="color:var(--im)">펼치면 나옵니다.</b> 목록에서는 「무엇을, 얼마 벌었나」 둘만 봅니다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pw">
+    <div class="lbl"><b>한 건을 펼쳤을 때</b> — 터미널의 차트가 여기 붙습니다</div>
+    <div class="panel">
+      <div class="ptop"><span style="color:var(--if)">←</span><b>카카오</b><span class="sub">035720 · 45주</span>
+        <div class="r"><span>✕</span></div></div>
+      <div class="pbd" style="background:var(--bg)">
+        <svg class="c" viewBox="0 0 340 78" preserveAspectRatio="none">
+          <line x1="0" y1="26" x2="340" y2="26" stroke="#3A4249" stroke-width="1" stroke-dasharray="3 3"/>
+          <polyline points="0,40 30,34 60,22 92,18 120,26 150,32 180,30 210,44 240,52 270,58 300,66 340,70"
+                    fill="none" stroke="#4A8CC8" stroke-width="1.5"/>
+          <circle cx="30" cy="34" r="3" fill="#DB4F3E"/><circle cx="300" cy="66" r="3" fill="#4A8CC8"/>
+          <text x="36" y="31" fill="#8B877F" font-size="8">샀다 45,050</text>
+          <text x="240" y="76" fill="#8B877F" font-size="8">팔았다 41,887</text>
+          <text x="4" y="23" fill="#625E58" font-size="8">20일 평균선</text>
+        </svg>
+        <div class="row"><span class="nm">왜 샀나<s>07-24(금) 종가 판정 → 07-27(월) 시가 체결</s></span></div>
+        <div class="row"><span class="nm">✓ 20일 평균선까지 눌렸다 반등<s>저가 44,150이 평균선 44,320 찍고 종가 +1.7%</s></span></div>
+        <div class="row"><span class="nm">· 거래량 급증<s style="color:var(--if)">이 조건은 안 켰습니다</s></span></div>
+        <div class="row"><span class="nm">밀린 정도<s>손절선 −7.0% / 실제 −7.02%</s></span>
+          <span class="v" style="color:var(--im)">−0.02%p</span></div>
+        <div class="cap">「밀린 정도」를 누르면 <b style="color:var(--im)">그 시각 호가</b>가 그 자리에서 펼쳐집니다 — 터미널을 열지 않습니다.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note warn">
+  <b>여기만 폭이 아슬아슬합니다.</b> 차트가 340px 라 캔들 하나가 2px 수준입니다.
+  <b>일봉 3개월치까지가 한계</b>이고, 그보다 길게 보려면 「시세」(전체 폭)로 넘겨야 합니다.
+  <b>목록 헤더의 ⤓ 는 CSV 내보내기</b>입니다 — 좁은 화면에서 다 못 보여주는 것에 대한 답이기도 합니다.
+</div>
+
+<!-- ── 내 기준 ── -->
+<h3>③ 내 기준 패널 <em>— 원래 세로라 거의 그대로</em></h3>
+
+<div class="rack">
+  <div class="pw">
+    <div class="lbl"><b>기준 6줄</b></div>
+    <div class="panel">
+      <div class="ptop"><b>내 기준</b><span class="sub">모든 봇에 같이</span>
+        <div class="r"><span>✕</span></div></div>
+      <div class="pbd">
+        <div class="pin" style="border-color:rgba(126,156,196,.3);background:rgba(126,156,196,.06)">
+          <b style="color:var(--ik)">마음대로 정하십시오 — 무엇도 막지 않습니다.</b> 넘겼다는 사실만 남습니다
+        </div>
+        <div class="gate"><span class="k">1년에 이 정도는<s>과거 데이터로</s></span>
+          <span class="mine"><span class="inp">10</span>%</span><span class="now" style="color:var(--ok)">18.4 ✓</span></div>
+        <div class="gate"><span class="k">최악일 때 이 안으로<s>고점 대비</s></span>
+          <span class="mine"><span class="inp">20</span>%</span><span class="now" style="color:#E2837A">22.1 ✕</span></div>
+        <div class="gate"><span class="k">회복까지<s>거래 수로 잽니다</s></span>
+          <span class="mine"><span class="inp">200</span>건</span><span class="now" style="color:var(--ok)">158 ✓</span></div>
+        <div class="gate"><span class="k">이길 때 : 질 때</span>
+          <span class="mine"><span class="inp">2.0</span>배</span><span class="now" style="color:var(--ok)">2.0 ✓</span></div>
+        <div class="gate"><span class="k">모의 표본<s>지금 131건</s></span>
+          <span class="mine"><span class="inp">250</span>건</span><span class="now" style="color:#E2837A">131 ✕</span></div>
+        <div class="gate"><span class="k">수익 몰린 정도<s>지금 88%</s></span>
+          <span class="mine"><span class="inp">60</span>%</span><span class="now" style="color:#E2837A">88 ✕</span></div>
+        <div class="cap" style="border-top:1px solid var(--hl);padding-top:8px;margin-top:6px">
+          <b style="color:var(--im)">금액을 정하는 값은 여기 없습니다</b> — 측정 결과라 고칠 수 없고,
+          실전 전환 화면에서 판단 재료로만 나옵니다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pw">
+    <div class="lbl"><b>손실 한계선</b> — 같은 패널 아래쪽</div>
+    <div class="panel">
+      <div class="ptop"><b>내 기준</b><span class="sub">손실 한계선</span>
+        <div class="r"><span>✕</span></div></div>
+      <div class="pbd">
+        <div style="border:1px solid #6B5A2E;border-radius:9px;padding:10px 11px;background:rgba(217,164,65,.05)">
+          <div style="font-size:11px;color:var(--im);margin-bottom:6px">
+            계좌가 여기 닿으면 <b style="color:var(--ik)">전부 정리하고 3개월 쉰다</b></div>
+          <div class="two" style="margin-bottom:7px">
+            <div class="inp" style="text-align:right">160</div>
+            <div style="flex:0 0 34px;padding-top:7px;font-size:11px">만원</div></div>
+          <div style="font-size:11px;color:var(--im);line-height:1.65">
+            지금 계좌는 고점 대비 <b style="color:#D9B45C">−58만원</b>,
+            한계선의 <b style="color:#D9B45C">36%</b>를 쓴 상태입니다.<br>
+            <span style="color:var(--if)">완전히 평온하지는 않지만 아직 여유가 있습니다 —
+            <b style="color:var(--im)">더 내려가기 전에 지금 정하십시오.</b></span>
+          </div>
+        </div>
+        <div class="cap" style="margin-top:9px">
+          <b style="color:var(--im)">이것만은 시스템이 아니라 본인이 건 선</b>입니다 —
+          금액 상한은 없앴지만 이건 남깁니다. 자기 자신에게 한 약속이라서입니다.
+        </div>
+        <div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--hl)">
+          <div style="font-size:11px;color:var(--im);margin-bottom:5px">바꾼 이력</div>
+          <div class="row"><span class="nm">08-09 처음 적음<s>고점 대비 −58만 (한계선의 36%)</s></span></div>
+          <div class="row"><span class="nm" style="color:#E2837A">07-17 낙폭 기준 15 → 20% 완화
+            <s style="color:#E2837A">그때 한계선의 71%를 쓴 상태</s></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 에이전트 ── -->
+<h3>④ 에이전트 패널 <em>— 372 ↔ 620 (§21.3 결정)</em></h3>
+<p class="lead">
+  좁혀 놓으면 <b>보드가 넓어 격자가 잘 보이고</b>, 넓히면 <b>대화가 읽기 편합니다.</b>
+  둘 다 필요한 순간이 있어 토글로 뒀습니다 — 전체 폭은 없습니다.
+</p>
+
+<div class="rack">
+  <div class="pw">
+    <div class="lbl"><b>372px</b> — 보드를 보며 시킬 때</div>
+    <div class="panel">
+      <div class="ptop"><b>에이전트</b><div class="r"><span>⇤</span><span>✕</span></div></div>
+      <div class="pbd">
+        <div style="color:var(--ik)">반도체 쪽으로 하나 만들어봐 줘</div>
+        <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--hl)">
+          <b style="color:var(--is)">조건 두 개로 세워 보겠습니다.</b>
+          20일 평균선까지 눌렸다 반등 · 최근 3개월 급등 상위 20% 제외.
+          <span style="color:var(--if)">반도체 41종목이 대상입니다.</span><br><br>
+          격자 100조합을 돌리고 있습니다 — <b style="color:var(--ik)">68/100</b>.
+          <span style="color:var(--im)">보드에서 차오르는 게 보입니다.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pw wide">
+    <div class="lbl"><b>620px</b> — 결과를 같이 읽을 때</div>
+    <div class="panel w620">
+      <div class="ptop"><b>에이전트</b><div class="r"><span>⇥</span><span>✕</span></div></div>
+      <div class="pbd">
+        <b style="color:var(--is)">다 돌았습니다. 가장 좋은 칸은 1년 +40.2% 인데, 먼저 보실 게 있습니다.</b><br>
+        번 돈의 <b style="color:#E2837A">88%가 3종목</b>(한화에어로 +19.8 · HD현대 +13.9 · SK하이닉스 +8.5)에서 나왔고,
+        그 셋을 빼면 <b style="color:#E2837A">1년에 −2.0%</b> 입니다.
+        <span style="color:var(--im)">봇이 잘한 건지 저 셋이 잘 간 건지 지금은 가릴 수 없습니다.</span><br><br>
+        <span style="color:var(--im)">고치는 길은 둘입니다 — <b style="color:var(--ik)">종목을 늘리거나</b>,
+        <b style="color:var(--ik)">거래를 더 쌓거나.</b>
+        파라미터를 다시 돌려 낙폭 작은 조합을 고르는 건 봇을 고친 게 아니라
+        운 좋은 조합을 찾은 것이라, 시도 횟수만 올라갑니다(지금 147/45).</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note bad">
+  <b>620px 에서도 전체 폭은 안 씁니다.</b> 에이전트가 격자를 돌리면 <b>보드에서 차오르는 것이 보여야</b> 합니다.
+  안 보이면 무엇을 했는지 확인할 방법이 없고, 그러면 이 제품이 내세우는
+  <b>「증명하라, 주장하지 마라」가 무너집니다.</b>
+</div>
+
+<h3>재배치하며 드러난 것</h3>
+<table class="t">
+  <tr><th style="width:26%">항목</th><th>결과</th></tr>
+  <tr><td><b>봇 화면 3개 → 1패널</b></td><td><b>개선.</b> 원래 같은 봇을 세 화면에서 봐야 했다. 탭이 되면서 「한 봇의 세 얼굴」로 읽힌다</td></tr>
+  <tr><td><b>거래 로그 7열 → 2열</b></td><td>버린 다섯 열은 <b>펼치면 전부</b> 나온다. 목록에서는 「무엇을, 얼마」 둘만 본다</td></tr>
+  <tr><td><b>내 기준</b></td><td>원래 세로 목록이라 <b>거의 그대로</b> 들어갔다. 폭이 문제된 적 없다</td></tr>
+  <tr><td><b>차트</b></td><td><b>아슬아슬.</b> 340px 라 일봉 3개월치가 한계. 더 길게는 「시세」로 넘긴다</td></tr>
+  <tr><td><b>CSV 내보내기</b></td><td>거래 로그 헤더 <b>⤓</b> 로 들어갔다 — 좁은 화면에서 다 못 보여주는 것에 대한 답이기도 하다.
+    <span style="color:var(--if)">규격(열·인코딩·기간)은 아직 안 정했다</span></td></tr>
+  <tr><td><b>손절·익절 운용 중 변경</b></td><td><b>자리가 생겼다</b> — 봇 상세의 「조건」 탭. 다만 <span style="color:#D9B45C">운용 중에 바꿀 때의
+    규칙(이미 들고 있는 포지션에 적용할지)은 아직 안 정했다</span></td></tr>
+</table>
+
+</div>
