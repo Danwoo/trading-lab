@@ -34,32 +34,57 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # ── required 게이트 — 아래 잡 전부를 체크 하나로 대표한다 (#23 Task 5) ──────
+  # ── required 게이트 — `test: ` 체크런 전부를 체크 하나로 대표한다 (#23 Task 5) ──
   # 테스트를 개별로 required 로 걸면 pending 창이 잡 수만큼 생긴다. `review-gate.yml` 머리의
   # 「Orca 판정 규칙」 실측대로 pending 이 하나만 있어도 머지 버튼이 잠기므로, 대표 잡 하나만
   # 건다. required 로 **거는 것**은 레포 설정(ruleset) 소관이라 여기서는 걸 대상만 세운다.
   #
-  # 판정은 `scripts/verify_upstream_gate.py` 가 한다 — 셸에서 그대로 돌려 볼 수 있어야
-  # 「needs 가 비면 실패한다」를 로컬에서 증명할 수 있다. 그 스크립트는 구조(needs 가 나머지
-  # 잡을 전부 담는가)도 함께 보므로, 아래에 잡을 더하고 needs 를 안 고치면 게이트가 빨개진다.
+  # 판정 근거가 `needs:` 가 아니라 **head SHA 의 체크런 조회**인 이유: `needs:` 는 같은
+  # 워크플로 안만 묶어 ci.yml 7종·frontend-ci.yml 3종을 대표하지 못한다. 지금 그 열을 보는
+  # 것은 merge-router.yml 의 전수 초록 게이트인데 이 재설계(Task 8)가 그 파일을 지운다 —
+  # 지운 순간 자동 머지가 backend·frontend 테스트를 안 보게 된다. 그래서 판정 근거를
+  # merge-router 와 같은 것으로 맞춘다. 판정부는 scripts/verify_upstream_gate.py 의 순수
+  # 함수라 체크런 JSON 만 있으면 로컬에서 그대로 돈다.
   #
-  # `if: always()` 인 이유 — `!cancelled()` 로 두면 취소된 실행에서 이 잡이 **skipped** 로
-  # 끝나는데, GitHub 은 skipped 를 required check 통과로 센다. 상류가 취소됐는데 게이트가
-  # 통과로 읽히는 창을 막으려면 취소된 실행에서도 돌아 결과를 봐야 한다.
+  # 게이트 자신도 `test: ` 접두 체크라 전수 조회에 자기가 잡힌다 — 판정부가 자기 이름을
+  # 빼지 않으면 스스로를 기다린다. 그 이름 대조도 판정부가 한다.
   gate:
     name: "test: gate"
-    needs: [ci-coverage, repo-scan, repo-scan-app]
-    if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      checks: read
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 상류 잡 결과 판정
-        if: always()
+      - name: 테스트 체크런 전수 판정
         env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-        run: python3 scripts/verify_upstream_gate.py
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -uo pipefail
+          set +e   # 판정부의 종료 코드를 직접 분류한다 (Actions 기본 셸은 `bash -e {0}`)
+          # 같은 SHA 의 다른 워크플로가 아직 도는 중일 수 있으므로 끝날 때까지 다시 조회한다.
+          # 한도를 넘기면 --final 로 미완을 실패로 접는다 (fail-closed).
+          DEADLINE=$(( $(date +%s) + 1200 ))
+          while :; do
+            CHECKS=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" --paginate \
+                     --jq '.check_runs[] | {id, name, status, conclusion}') || CHECKS=""
+            NOW=$(date +%s)
+            FINAL=""
+            [ "$NOW" -ge "$DEADLINE" ] && FINAL="--final"
+            OUT=$(printf '%s\n' "$CHECKS" | python3 scripts/verify_upstream_gate.py $FINAL)
+            RC=$?
+            if [ "$RC" -ne 2 ]; then
+              printf '%s\n' "$OUT"
+              exit "$RC"
+            fi
+            echo "대기 — $(printf '%s' "$OUT" | tail -1) (남은 한도 $(( DEADLINE - NOW ))초)"
+            sleep 15
+          done
 
   # ── CI 배선 대조 — 이 레포가 반복해서 데인 클래스를 닫는다 ────────────────
   # #241 · #252 · #269 · #290 · #302 · #335 는 전부 같은 부류였다: 검증은 실재하는데 CI 가
