@@ -76,12 +76,17 @@ _FULL_SHA = re.compile(r"[0-9a-f]{40}\Z")
 
 # PR 본문의 이슈 참조 — 키워드 + `#N` 목록 (`Refs #23, #24` 꼴 허용). closing 키워드도
 # 위험도 출처로 같이 읽는다 (Closes 를 쓴 PR 이 Refs 만 못 읽혀 미선언이 되지 않게).
+# **코드 펜스·인용·인라인 코드는 참조가 아니다** — 본문 어디에 있든 읽으면 재현 스크립트
+# 인자·인용·서술 속 `Refs #<저위험 이슈>` 가 위험도 출처가 된다 (PR #67 본문 실측: 뽑힌 4건
+# 중 진짜 참조는 1건. 나머지는 코드 펜스 안 테스트 인자와 인라인 코드 서술이었다).
 _REF_BLOCK = re.compile(
     r"\b(?:refs?|close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b:?\s*"
     r"(#\d+(?:\s*(?:,|and)?\s*#\d+)*)",
     re.IGNORECASE,
 )
 _REF_NUMBER = re.compile(r"#(\d+)")
+_FENCE = re.compile(r"^\s*(?:```|~~~)")
+_INLINE_CODE = re.compile(r"`[^`]*`")
 
 # dependabot 제목 형식: `build(deps): bump X from A to B in /path` (설계 §2-1 실측).
 _TITLE_BUMP = re.compile(r"\bfrom\s+(\S+)\s+to\s+(\S+)")
@@ -209,11 +214,22 @@ def decide_record(payload) -> dict:
 
 
 def parse_refs(body) -> list[int]:
-    """PR 본문에서 참조 이슈 번호를 뽑는다 (중복 제거, 오름차순)."""
+    """PR 본문의 산문에서 참조 이슈 번호를 뽑는다 (중복 제거, 오름차순).
+
+    코드 펜스·인용(`>`)·인라인 코드는 버린다 — 거기 적힌 `Refs #N` 은 선언이 아니라 인용이다.
+    못 읽으면 미선언 = 사람 경로라 좁히는 방향이 fail-closed 다 (레포 전 PR 본문 60건 실측:
+    달라지는 것은 2건 — 위 실측 PR 과, 참조를 인라인 코드로만 적은 확인용 PR 하나).
+    """
     numbers: set[int] = set()
-    for m in _REF_BLOCK.finditer(body or ""):
-        for n in _REF_NUMBER.findall(m.group(1)):
-            numbers.add(int(n))
+    in_fence = False
+    for line in (body or "").splitlines():
+        if _FENCE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence or line.lstrip().startswith(">"):
+            continue
+        for m in _REF_BLOCK.finditer(_INLINE_CODE.sub(" ", line)):
+            numbers.update(int(n) for n in _REF_NUMBER.findall(m.group(1)))
     return sorted(numbers)
 
 
