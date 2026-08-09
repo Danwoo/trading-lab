@@ -1,0 +1,282 @@
+<style>
+  .tu { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --ok:#7FA05A; --wr:#D9A441; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .tu .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+  .tu h2 { font-size:17px; font-weight:700; color:var(--is); margin:0 0 5px; }
+  .tu h3 { font-size:14.5px; font-weight:700; color:var(--is); margin:28px 0 4px; }
+  .tu h3 em { font-style:normal; color:var(--if); font-weight:400; font-size:12.5px; margin-left:7px; }
+  .tu p.lead { font-size:12.5px; color:var(--im); line-height:1.7; margin:0 0 14px; max-width:80ch; }
+  .tu p.lead b { color:var(--ik); font-weight:500; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:12px; overflow:hidden; max-width:1320px; }
+  .hud { display:flex; align-items:center; gap:10px; padding:9px 13px; background:var(--pn);
+         border-bottom:1px solid var(--ln); font-size:11.5px; color:var(--im); }
+  .hud .wm { font-size:10px; letter-spacing:.16em; color:var(--if); font-weight:700; }
+  .hud .sp { flex:1; }
+  .hud s { text-decoration:none; color:var(--if); }
+
+  .body { display:flex; min-height:400px; }
+  .rail { flex:0 0 46px; background:var(--pn); border-right:1px solid var(--ln); display:flex;
+          flex-direction:column; align-items:center; padding:9px 0; gap:5px; }
+  .rail i { width:30px; height:30px; border-radius:8px; display:flex; align-items:center;
+            justify-content:center; font-style:normal; font-size:15px; color:var(--if); }
+  .rail i.act { background:var(--is); color:var(--bg); font-weight:700; }
+  .rail i.dim { opacity:.32; }
+  .rail .gap { flex:1; }
+  .rail hr { width:22px; border:0; border-top:1px solid var(--ln); margin:4px 0; }
+
+  .board { flex:1; padding:0; min-width:0; display:flex; flex-direction:column; }
+
+  /* 튜토리얼 띠 */
+  .tbar { display:flex; align-items:center; gap:11px; padding:8px 15px; background:var(--rs);
+          border-bottom:1px solid var(--ln); font-size:11.5px; }
+  .tbar > b { color:var(--is); font-size:12px; }
+  .steps { display:flex; align-items:center; gap:5px; }
+  .steps u { text-decoration:none; width:19px; height:19px; border-radius:50%; display:flex;
+             align-items:center; justify-content:center; font-size:10.5px; color:var(--if);
+             border:1px solid var(--ln); }
+  .steps u.on { background:var(--is); color:var(--bg); border-color:var(--is); font-weight:700; }
+  .steps u.done { color:var(--ok); border-color:rgba(127,160,90,.5); }
+  .steps span { width:9px; height:1px; background:var(--ln); }
+  .tbar .sp { flex:1; }
+  .tbar .skip { color:var(--if); border:1px solid var(--ln); border-radius:6px; padding:3px 9px; cursor:pointer; }
+
+  .inner { flex:1; padding:14px 16px; }
+  .lay { display:grid; grid-template-columns:1.05fr 1.35fr; gap:11px; }
+  .zone { border:1px solid var(--ln); border-radius:10px; background:var(--pn); padding:11px 12px; min-height:150px; }
+  .zone > b { display:block; font-size:11.5px; color:var(--im); font-weight:600; margin-bottom:8px; }
+
+  /* 격자 */
+  .g { display:grid; grid-template-columns:repeat(10,1fr); gap:2px; }
+  .g i { aspect-ratio:1; border-radius:2px; background:var(--rs); font-style:normal; }
+  .g i.q1 { background:#22303A; } .g i.q2 { background:#2E4450; }
+  .g i.q3 { background:#3B5C6B; } .g i.q4 { background:#4A7386; }
+  .g i.best { background:var(--is); box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--is); }
+  .g i.pend { background:var(--hl); }
+
+  /* 곡선 */
+  svg.c { width:100%; height:118px; display:block; }
+
+  .kv { display:flex; gap:14px; margin-top:9px; font-size:11.5px; color:var(--im); flex-wrap:wrap; }
+  .kv b { color:var(--is); font-weight:600; }
+
+  /* 말풍선 */
+  .say { margin-top:11px; border:1px solid var(--ls); border-radius:10px; background:var(--rs);
+         padding:11px 13px; font-size:12px; color:var(--ik); line-height:1.7; position:relative; }
+  .say::before { content:''; position:absolute; top:-6px; left:24px; width:10px; height:10px;
+                 background:var(--rs); border-left:1px solid var(--ls); border-top:1px solid var(--ls);
+                 transform:rotate(45deg); }
+  .say .who { font-size:10px; letter-spacing:.14em; color:var(--if); font-weight:700; margin-bottom:5px; }
+  .say b { color:var(--is); }
+  .say.trap { border-color:#6E3A33; background:rgba(201,74,59,.07); }
+  .say.trap::before { border-color:#6E3A33; background:#1A1315; }
+  .acts { display:flex; gap:7px; margin-top:10px; flex-wrap:wrap; }
+  .acts span { font-size:11.5px; padding:5px 11px; border-radius:7px; border:1px solid var(--ls);
+               color:var(--ik); cursor:pointer; }
+  .acts span.pri { background:var(--is); color:var(--bg); border-color:var(--is); font-weight:600; }
+  .acts span.ask { border-style:dashed; color:var(--im); }
+
+  .note { border-left:2px solid var(--ls); padding:2px 0 2px 11px; margin:11px 0 0;
+          font-size:11.5px; color:var(--im); line-height:1.65; max-width:80ch; }
+  .note b { color:var(--ik); }
+  .note.good { border-left-color:var(--ok); }
+  .note.warn { border-left-color:var(--wr); }
+  .cap { font-size:11px; color:var(--if); margin-top:7px; line-height:1.6; }
+
+  table.t { width:100%; border-collapse:collapse; font-size:11.5px; margin:8px 0 2px; max-width:900px; }
+  table.t th { text-align:left; font-weight:600; color:var(--im); padding:5px 7px;
+               border-bottom:1px solid var(--ln); font-size:11px; }
+  table.t td { padding:6px 7px; border-bottom:1px solid var(--hl); color:var(--im); vertical-align:top; }
+  table.t td b { color:var(--ik); font-weight:600; }
+  table.t tr:last-child td { border-bottom:0; }
+</style>
+
+<div class="tu">
+
+<h2>첫 진입 — 튜토리얼 한 바퀴</h2>
+<p class="lead">
+  봇이 하나도 없는 사람이 처음 들어오면 <b>튜토리얼이 자동으로 시작</b>합니다.
+  버튼 위치를 알려주는 안내가 아니라 <b>「만들기 → 돌리기 → 의심하기 → 기준정하기 → 전환보기」 한 바퀴</b>를
+  에이전트와 함께 실제로 돕니다.<br>
+  핵심은 <b>③에 함정이 있다</b>는 것입니다 — 자기가 방금 고른 봇을 자기가 의심하게 됩니다.
+  남의 봇을 의심하는 것보다 훨씬 오래 남습니다.
+</p>
+
+<!-- ❷ 돌리기 -->
+<h3>❷ 돌리기 <em>— 격자가 채워지는 동안</em></h3>
+<p class="lead">
+  100조합은 <b>몇 분 걸립니다.</b> 다 끝날 때까지 빈 화면을 보여주지 않고
+  <b>끝난 칸부터 색이 차오릅니다</b> — 기다리는 시간이 구경거리가 됩니다.
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span><s>모의 · 실제 주문 나가지 않음</s>
+    <div class="sp"></div><s>튜토리얼 진행 중</s>
+  </div>
+  <div class="body">
+    <div class="rail">
+      <i class="act">▦</i><i class="dim">◫</i><i class="dim">≡</i><i class="dim">◈</i>
+      <hr><i class="dim">◷</i><i class="dim">◵</i><i class="dim">⌸</i>
+      <span class="gap"></span><i class="dim">⚙</i>
+    </div>
+    <div class="board">
+      <div class="tbar">
+        <b>튜토리얼</b>
+        <div class="steps"><u class="done">1</u><span></span><u class="on">2</u><span></span><u>3</u><span></span><u>4</u><span></span><u>5</u></div>
+        <div class="sp"></div><span class="skip">그만보기</span>
+      </div>
+      <div class="inner">
+        <div class="lay">
+          <div class="zone">
+            <b>격자 — 68 / 100 돌아감</b>
+            <div class="g">
+              <i class="q2"></i><i class="q1"></i><i class="q3"></i><i class="q2"></i><i class="q4"></i><i class="q3"></i><i class="q1"></i><i class="q2"></i><i class="q3"></i><i class="q2"></i>
+              <i class="q3"></i><i class="q4"></i><i class="q2"></i><i class="q3"></i><i class="q4"></i><i class="q4"></i><i class="q2"></i><i class="q1"></i><i class="q2"></i><i class="q3"></i>
+              <i class="q1"></i><i class="q2"></i><i class="q4"></i><i class="q4"></i><i class="best"></i><i class="q4"></i><i class="q3"></i><i class="q2"></i><i class="q1"></i><i class="q2"></i>
+              <i class="q2"></i><i class="q3"></i><i class="q3"></i><i class="q4"></i><i class="q4"></i><i class="q3"></i><i class="q2"></i><i class="q3"></i><i class="q2"></i><i class="q1"></i>
+              <i class="q1"></i><i class="q2"></i><i class="q2"></i><i class="q3"></i><i class="q3"></i><i class="q2"></i><i class="q1"></i><i class="q2"></i><i class="q1"></i><i class="q2"></i>
+              <i class="q2"></i><i class="q1"></i><i class="q3"></i><i class="q2"></i><i class="q2"></i><i class="q3"></i><i class="q2"></i><i class="q1"></i><i class="q2"></i><i class="q1"></i>
+              <i class="q1"></i><i class="q2"></i><i class="q1"></i><i class="q2"></i><i class="q3"></i><i class="q2"></i><i class="q1"></i><i class="q1"></i><i class="pend"></i><i class="pend"></i>
+              <i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i>
+              <i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i>
+              <i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i><i class="pend"></i>
+            </div>
+            <div class="kv"><span>지금까지 가장 좋은 칸 <b style="color:var(--up)">+40.2%</b></span><span style="color:var(--if)">약 2분 남음</span></div>
+          </div>
+          <div class="zone">
+            <b>곡선 — 가장 좋은 칸</b>
+            <svg class="c" viewBox="0 0 300 118" preserveAspectRatio="none">
+              <line x1="0" y1="96" x2="300" y2="96" stroke="#262B30" stroke-width="1"/>
+              <polyline points="0,96 26,90 52,84 78,72 104,76 130,58 156,50 182,54 208,36 234,30 260,18 300,12"
+                        fill="none" stroke="#DB4F3E" stroke-width="1.6"/>
+            </svg>
+            <div class="kv"><span>1년 <b style="color:var(--up)">+40.2%</b></span><span>최대 낙폭 <b>11.4%</b></span><span>거래 <b>218건</b></span></div>
+          </div>
+        </div>
+        <div class="say">
+          <div class="who">에이전트</div>
+          <b>가장 좋은 칸이 나왔습니다 — 1년에 +40.2%.</b>
+          아직 32칸이 남았지만 이 정도면 상위권입니다.
+          <span style="color:var(--im)">다 끝나면 이 칸이 정말 쓸 만한지 같이 보겠습니다.</span>
+          <div class="acts"><span class="pri">이 칸으로 정하기</span><span>다 끝날 때까지 기다리기</span><span class="ask">이 숫자 뭐예요?</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b>「이 칸으로 정하기」를 누르게 만드는 것이 의도입니다.</b>
+  +40.2%를 보면 누구나 그렇게 합니다. 그 선택이 ③의 재료가 됩니다 —
+  <b>튜토리얼이 사용자를 속이는 게 아니라, 원래 일어나는 일을 안전한 자리에서 미리 겪게 하는 것</b>입니다.
+</div>
+
+<!-- ❸ 의심하기 -->
+<h3>❸ 의심하기 <em>— 함정</em></h3>
+<p class="lead">
+  방금 고른 칸의 성적이 <b>어디서 나왔는지</b>를 처음으로 뜯어봅니다.
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span><s>모의 · 실제 주문 나가지 않음</s>
+    <div class="sp"></div><s>튜토리얼 진행 중</s>
+  </div>
+  <div class="body">
+    <div class="rail">
+      <i class="act">▦</i><i class="dim">◫</i><i>≡</i><i class="dim">◈</i>
+      <hr><i class="dim">◷</i><i class="dim">◵</i><i class="dim">⌸</i>
+      <span class="gap"></span><i class="dim">⚙</i>
+    </div>
+    <div class="board">
+      <div class="tbar">
+        <b>튜토리얼</b>
+        <div class="steps"><u class="done">1</u><span></span><u class="done">2</u><span></span><u class="on">3</u><span></span><u>4</u><span></span><u>5</u></div>
+        <div class="sp"></div><span class="skip">그만보기</span>
+      </div>
+      <div class="inner">
+        <div class="lay">
+          <div class="zone">
+            <b>번 돈이 어디서 나왔나</b>
+            <div style="font-size:11.5px;color:var(--im);line-height:2.05">
+              <div style="display:flex;align-items:center;gap:8px">한화에어로
+                <span style="flex:1;height:7px;background:var(--rs);border-radius:3px;overflow:hidden"><i style="display:block;width:100%;height:100%;background:var(--up)"></i></span>
+                <b style="color:var(--ik);flex:0 0 42px;text-align:right">+19.8%p</b></div>
+              <div style="display:flex;align-items:center;gap:8px">HD현대중공업
+                <span style="flex:1;height:7px;background:var(--rs);border-radius:3px;overflow:hidden"><i style="display:block;width:70%;height:100%;background:var(--up)"></i></span>
+                <b style="color:var(--ik);flex:0 0 42px;text-align:right">+13.9%p</b></div>
+              <div style="display:flex;align-items:center;gap:8px">SK하이닉스
+                <span style="flex:1;height:7px;background:var(--rs);border-radius:3px;overflow:hidden"><i style="display:block;width:44%;height:100%;background:var(--up)"></i></span>
+                <b style="color:var(--ik);flex:0 0 42px;text-align:right">+8.5%p</b></div>
+              <div style="display:flex;align-items:center;gap:8px;color:var(--if)">나머지 38종목
+                <span style="flex:1;height:7px;background:var(--rs);border-radius:3px;overflow:hidden"><i style="display:block;width:10%;height:100%;background:var(--dn)"></i></span>
+                <b style="color:var(--dn);flex:0 0 42px;text-align:right">−2.0%p</b></div>
+            </div>
+            <div class="kv"><span style="color:#E2837A">상위 3종목이 <b style="color:#E2837A">88%</b></span></div>
+          </div>
+          <div class="zone">
+            <b>그 셋을 빼면</b>
+            <svg class="c" viewBox="0 0 300 118" preserveAspectRatio="none">
+              <line x1="0" y1="60" x2="300" y2="60" stroke="#262B30" stroke-width="1"/>
+              <polyline points="0,96 26,90 52,84 78,72 104,76 130,58 156,50 182,54 208,36 234,30 260,18 300,12"
+                        fill="none" stroke="#3A4249" stroke-width="1.2" stroke-dasharray="3 3"/>
+              <polyline points="0,60 26,58 52,63 78,57 104,66 130,61 156,68 182,63 208,70 234,64 260,69 300,66"
+                        fill="none" stroke="#4A8CC8" stroke-width="1.6"/>
+            </svg>
+            <div class="kv"><span>1년 <b style="color:var(--dn)">−2.0%</b></span><span style="color:var(--if)">점선은 원래 곡선</span></div>
+          </div>
+        </div>
+        <div class="say trap">
+          <div class="who">에이전트</div>
+          <b>방금 고르신 칸, 번 돈의 88%가 3종목에서 나왔습니다.</b>
+          그 셋을 빼면 <b style="color:#E2837A">1년에 −2.0%</b> 입니다.
+          <span style="color:var(--im)">이 봇이 잘한 걸까요, 저 세 종목이 잘 간 걸까요?
+          — 지금은 <b style="color:var(--ik)">가릴 수 없습니다.</b> 그래서 「거래를 더 쌓거나, 골고루 벌거나」가 필요합니다.</span>
+          <div class="acts">
+            <span class="pri">알겠습니다, 다음</span><span>다른 칸도 이런지 보기</span><span class="ask">그럼 뭘 고쳐야 해요?</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note warn">
+  <b>여기서 「그만보기」를 누르는 사람이 나옵니다.</b> 그건 괜찮습니다 —
+  <b>그 사람은 이미 배웠습니다.</b> 튜토리얼을 끝까지 봤는지가 아니라,
+  <b>+40.2%를 다시 볼 때 「어디서 나왔지」를 떠올리는지</b>가 성공 기준입니다.
+  ③까지만 와도 그건 됩니다. 그래서 함정을 ③에 두고 ④⑤를 뒤에 뒀습니다.
+</div>
+
+<div class="note good">
+  <b>「이 숫자 뭐예요?」·「그럼 뭘 고쳐야 해요?」는 매 단계에 있습니다.</b>
+  튜토리얼이 일방적으로 흐르지 않고, 언제든 <b>에이전트에게 되물을 수 있습니다</b> —
+  이 제품의 기본 동작이 대화라서, 튜토리얼도 같은 방식으로 굴러야 합니다.
+</div>
+
+<h3>다섯 단계가 각각 무엇을 남기나</h3>
+<table class="t">
+  <tr><th style="width:15%">단계</th><th style="width:34%">하는 일</th><th>남기려는 것</th></tr>
+  <tr><td><b>❶ 만들기</b></td><td>예제 조건 2개로 봇을 세움 (빈칸 채우기 아님 — 이미 채워진 걸 <b>고쳐보게</b> 함)</td><td>봇 = 「어떤 조건일 때 사고 판다」를 정해 둔 것</td></tr>
+  <tr><td><b>❷ 돌리기</b></td><td>격자 100조합. 끝난 칸부터 차오름. 가장 좋은 칸 <b>+40.2%</b></td><td>설정 하나를 바꾸면 결과가 바뀐다 — <b>고를 게 많다</b></td></tr>
+  <tr><td><b>❸ 의심하기</b></td><td><b>함정.</b> 88%가 3종목 → 빼면 <b>−2.0%</b></td><td><b>좋아 보이는 숫자를 그대로 믿지 않는 습관</b></td></tr>
+  <tr><td><b>❹ 기준정하기</b></td><td>「어느 정도면 쓸 만한가」를 직접 적음 (기본값 제시하되 고칠 수 있게)</td><td>내 잣대는 내가 정한다 — 그리고 <b>평온할 때 정해야 한다</b></td></tr>
+  <tr><td><b>❺ 전환보기</b></td><td>실전 화면을 <b>보기만</b> 함. 주문 키가 없어 실제로는 못 넘어감</td><td>돈이 나가려면 무엇이 필요한지 — <b>미리 알고 있게</b></td></tr>
+</table>
+<div class="cap">
+  ❺에서 실제로 전환시키지 않는 이유 — 튜토리얼이 <b>실전 진입을 연습시키는 것</b>이 되면 안 됩니다.
+  「어떻게 생겼는지」까지만 보여주고 끝냅니다.
+</div>
+
+<h3>튜토리얼이 끝난 뒤</h3>
+<table class="t">
+  <tr><th style="width:26%">상태</th><th>보드</th></tr>
+  <tr><td><b>끝까지 봄</b></td><td>예제 봇이 <b>내 봇 1개</b>로 남습니다. 「이건 예제입니다 — 지우기」가 카드에 붙어 있고, 지우면 빈 보드가 됩니다</td></tr>
+  <tr><td><b>중간에 그만봄</b></td><td>거기까지의 상태 그대로 보드에 남습니다. 상단에 <b>「튜토리얼 이어보기 (③부터)」</b> 한 줄</td></tr>
+  <tr><td><b>나중에 다시</b></td><td>설정 → 「튜토리얼 다시 하기」. 언제든 부를 수 있어야 <b>안심하고 그만볼 수 있습니다</b></td></tr>
+</table>
+
+</div>
