@@ -3,10 +3,10 @@ name: Frontend CI
 # frontend 의 테스트·린트·타입체크·정적 그물을 돌린다.
 #
 # ── ci.yml 과 왜 파일을 나눴나 ────────────────────────────────────────────
-# Actions 의 경로 필터는 잡별이 아니라 **워크플로별**이다. 이 잡을 ci.yml 에 넣으면 양방향으로
-# 헛돈다: 프론트만 바꾼 PR 에 백엔드 계약 스위트가 전부 돌고, 백엔드만 바꾼 PR 에 npm ci 가
-# 돈다. 워크플로를 나누는 것은 "변경 감지 잡 + 잡마다 if" 흉내와 다르다 — GitHub 가 제공하는
-# 정식 수단이고 조용한 스킵(skipped 인데 초록)이 생기지 않는다.
+# 두 워크플로의 경로 목록이 서로 다르다 — 프론트만 바꾼 PR 에 백엔드 계약 스위트가 전부 돌고,
+# 백엔드만 바꾼 PR 에 npm ci 가 도는 것을 피한다. 파일을 나누면 목록·러너 셋업·concurrency
+# 그룹이 각자의 것이 되어 그 경계가 파일 경계와 일치한다.
+# **경로 필터를 잡 레벨로 옮긴 것과는 무관한 이유다** — 필터는 아래 `changes` 잡이 낸다.
 #
 # ── 잡을 둘로 묶었다 (2026-08-06) ────────────────────────────────────────
 # 종전 8잡은 검사 하나당 잡 하나였고 npm ci 가 5중복이었다(잡당 40~70초). 이제 셋업 클래스로
@@ -21,40 +21,14 @@ name: Frontend CI
 #   (frontend/prisma/generated 는 .gitignore 대상이라 체크아웃 직후에는 실재하지 않는다 —
 #    이 경계는 CI 에서 실제로 성립한다.)
 #
-# ── 경로 필터 ────────────────────────────────────────────────────────────
-# `frontend/**` 가 빠지면 잡이 아예 안 돈다 — 그물이 걸려 있지 않은 상태(#241·#252 계열).
-# 워크플로 파일이 바뀔 때도 돌린다 (#217).
-# `scripts/verify_filter_negation.mjs` 는 레포 루트 scripts/ 아래라 `frontend/**` 밖이다.
-# `scripts/fixtures/filter_conformance_cases.json` 은 그 스크립트가 #389 형식 오류 축을 읽는 곳.
-# `backend-service/alembic/**` 은 frontend-db 잡이 public 스키마를 세우는 데 쓴다 (#363).
-# `THIRD-PARTY-NOTICES.md`·`scripts/verify_notice_counts.py` 는 레포 루트다 (#365) — 고지 문서만
-# 손대는 커밋에서 그 대조가 안 도는 구멍을 막는다. 문서가 서술하는 대상(프로덕션 의존성)이
-# 바뀌는 축은 `frontend/**` 안의 package-lock.json 이 이미 덮는다.
+# ── 경로 필터는 잡 레벨이다 (#23 Task 4) ──────────────────────────────────
+# 목록은 아래 `changes` 잡의 FILTER_PATTERNS 한 벌뿐이다 (종전엔 on.pull_request.paths 와
+# on.push.paths 두 벌이 어긋날 수 있었다). 각 경로의 근거는 그 목록 옆 주석에 있다.
 # pull_request 에 branches(base) 제한을 안 두는 이유는 스택 PR (#281).
-#
-# ⚠ 아래 두 paths 목록은 같아야 한다 (Actions 는 YAML 앵커를 지원하지 않아 두 벌로 적는다).
 on:
-  pull_request:
-    paths:
-      - "frontend/**"
-      - "scripts/verify_filter_negation.mjs"
-      - "scripts/fixtures/filter_conformance_cases.json"
-      - "backend-service/alembic/**"
-      - "THIRD-PARTY-NOTICES.md"
-      - "scripts/verify_notice_counts.py"
-      - "scripts/generate_notices.py"
-      - ".github/workflows/**"
+  pull_request: {}
   push:
     branches: [main]
-    paths:
-      - "frontend/**"
-      - "scripts/verify_filter_negation.mjs"
-      - "scripts/fixtures/filter_conformance_cases.json"
-      - "backend-service/alembic/**"
-      - "THIRD-PARTY-NOTICES.md"
-      - "scripts/verify_notice_counts.py"
-      - "scripts/generate_notices.py"
-      - ".github/workflows/**"
 
 # 낡은 실행을 끊는다 (PR 한정). group 키 선택 근거는 ci.yml 의 같은 블록과 동일하다 —
 # PR 은 번호로 갈라 서로를 취소하지 않게, main push 는 커밋 SHA 로 갈라 큐잉·취소 자체가
@@ -64,9 +38,59 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # ── 경로 판정 (#23 Task 4) ───────────────────────────────────────────────
+  # 아래 두 잡이 같은 목록을 쓰므로 출력은 boolean 하나다 — 종전 on.paths 와 판정이 같다.
+  #
+  # ⚠ **이 잡 자신이 게이트 대상이어야 한다.** 이 잡이 빨개지면 아래 잡은 전부 `skipped` 가
+  #   되고 GitHub 은 skipped 를 통과로 센다 — 판정이 죽으면 검사가 통째로 조용히 사라진다.
+  #   체크 이름의 `test: ` 접두사가 그 방어다 (근거는 ci.yml 의 같은 블록).
+  changes:
+    name: "test: frontend-ci-paths"
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.filter.outputs.run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # base…head 를 로컬에서 diff 하려면 두 커밋이 다 있어야 한다 (얕은 클론 불가).
+          fetch-depth: 0
+
+      - name: 경로 판정
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          FILTER_PATTERNS: |
+            # 이것이 빠지면 잡이 아예 안 돈다 — 그물이 걸려 있지 않은 상태(#241·#252 계열)
+            frontend/**
+            # 레포 루트 scripts/ 아래라 frontend/** 밖이다
+            scripts/verify_filter_negation.mjs
+            # 위 스크립트가 #389 형식 오류 축을 읽는 곳
+            scripts/fixtures/filter_conformance_cases.json
+            # frontend-db 잡이 public 스키마를 세우는 데 쓴다 (#363)
+            backend-service/alembic/**
+            # 레포 루트다 (#365) — 고지 문서만 손대는 커밋에서 그 대조가 안 도는 구멍을 막는다.
+            # 문서가 서술하는 대상(프로덕션 의존성)이 바뀌는 축은 frontend/** 안의
+            # package-lock.json 이 이미 덮는다.
+            THIRD-PARTY-NOTICES.md
+            scripts/verify_notice_counts.py
+            scripts/generate_notices.py
+            # 게이트를 고치는 변경이 자기 검증을 못 받으면 러너 위 동작은 머지 후에야 드러난다 (#217)
+            .github/workflows/**
+        run: |
+          if changed=$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" 2>&1); then
+            printf '%s\n' "$changed" | python3 scripts/ci_path_filter.py >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::변경 파일 목록을 못 구했다 (base=${BASE_SHA} head=${HEAD_SHA}) — 전 잡을 돌린다: ${changed}"
+            python3 scripts/ci_path_filter.py --unknown >> "$GITHUB_OUTPUT"
+          fi
+
   # 체크 이름은 ci.yml 과 같은 `test:` 접두사 규약.
   frontend:
     name: "test: frontend"
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -199,6 +223,8 @@ jobs:
   # 가드를 두지 않았으므로, public 스키마가 없으면 조용히 통과하지 않고 빨강이 된다.
   frontend-db:
     name: "test: frontend-db"
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
