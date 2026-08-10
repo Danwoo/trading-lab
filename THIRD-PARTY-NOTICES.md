@@ -3029,7 +3029,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `better-result` | 2.9.2 | MIT |
 | `bidi-js` | 1.0.3 | MIT |
 | `bluebird` | 3.7.2 | MIT |
-| `brace-expansion` | 2.0.3 | MIT |
+| `brace-expansion` | 2.1.4 | MIT |
 | `buffer-crc32` | 1.0.0 | MIT |
 | `buffer-equal-constant-time` | 1.0.1 | BSD-3-Clause |
 | `buffer` | 6.0.3 | MIT |
