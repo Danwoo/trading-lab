@@ -53,7 +53,7 @@ permissive 로 흘려보내지 않고 멈춘다(사람이 판단할 자리다).
 
 본문 텍스트 변형 15종(대체로 표준 Apache-2.0 원문, 일부 패키지가 자체 저작권 줄을 덧붙임)으로 묶는다.
 
-<details><summary>변형 1 — 27개 패키지: `@opentelemetry/semantic-conventions@1.41.1`, `@prisma/adapter-pg@7.9.0`, `@prisma/client-runtime-utils@7.8.0`, `@prisma/client@7.8.0`, `@prisma/config@7.8.0`, `@prisma/debug@7.2.0`, `@prisma/debug@7.8.0`, `@prisma/debug@7.9.0`, `@prisma/driver-adapter-utils@7.9.0`, `@prisma/engines-version@7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a`, `@prisma/engines@7.8.0`, `@prisma/fetch-engine@7.8.0`, `@prisma/get-platform@7.2.0`, `@prisma/get-platform@7.8.0`, `@prisma/query-plan-executor@7.2.0`, `b4a@1.8.0`, `bare-events@2.8.2`, `bare-fs@4.5.6`, `bare-os@3.8.0`, `bare-path@3.0.0`, `bare-stream@2.10.0`, `bare-url@2.4.0`, `baseline-browser-mapping@2.10.29`, `events-universal@1.0.1`, `long@5.3.2`, `prisma@7.8.0`, `text-decoder@1.2.7`</summary>
+<details><summary>변형 1 — 27개 패키지: `@opentelemetry/semantic-conventions@1.43.0`, `@prisma/adapter-pg@7.9.0`, `@prisma/client-runtime-utils@7.8.0`, `@prisma/client@7.8.0`, `@prisma/config@7.8.0`, `@prisma/debug@7.2.0`, `@prisma/debug@7.8.0`, `@prisma/debug@7.9.0`, `@prisma/driver-adapter-utils@7.9.0`, `@prisma/engines-version@7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a`, `@prisma/engines@7.8.0`, `@prisma/fetch-engine@7.8.0`, `@prisma/get-platform@7.2.0`, `@prisma/get-platform@7.8.0`, `@prisma/query-plan-executor@7.2.0`, `b4a@1.8.0`, `bare-events@2.8.2`, `bare-fs@4.5.6`, `bare-os@3.8.0`, `bare-path@3.0.0`, `bare-stream@2.10.0`, `bare-url@2.4.0`, `baseline-browser-mapping@2.10.29`, `events-universal@1.0.1`, `long@5.3.2`, `prisma@7.8.0`, `text-decoder@1.2.7`</summary>
 
 ```
 Apache License
@@ -2871,15 +2871,15 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 |---|---|---|
 | `@asamuzakjp/css-color` | 6.0.5 | MIT |
 | `@asamuzakjp/dom-selector` | 8.3.0 | MIT |
-| `@better-auth/core` | 1.6.11 | MIT |
-| `@better-auth/drizzle-adapter` | 1.6.11 | MIT |
-| `@better-auth/kysely-adapter` | 1.6.11 | MIT |
-| `@better-auth/memory-adapter` | 1.6.11 | MIT |
-| `@better-auth/mongo-adapter` | 1.6.11 | MIT |
-| `@better-auth/prisma-adapter` | 1.6.11 | MIT |
-| `@better-auth/telemetry` | 1.6.11 | MIT |
-| `@better-auth/utils` | 0.4.0 | MIT |
-| `@better-fetch/fetch` | 1.1.21 | MIT* |
+| `@better-auth/core` | 1.6.22 | MIT |
+| `@better-auth/drizzle-adapter` | 1.6.22 | MIT |
+| `@better-auth/kysely-adapter` | 1.6.22 | MIT |
+| `@better-auth/memory-adapter` | 1.6.22 | MIT |
+| `@better-auth/mongo-adapter` | 1.6.22 | MIT |
+| `@better-auth/prisma-adapter` | 1.6.22 | MIT |
+| `@better-auth/telemetry` | 1.6.22 | MIT |
+| `@better-auth/utils` | 0.4.2 | MIT |
+| `@better-fetch/fetch` | 1.3.1 | MIT |
 | `@bramus/specificity` | 2.4.2 | MIT |
 | `@csstools/color-helpers` | 6.1.0 | MIT-0 |
 | `@csstools/css-calc` | 3.3.0 | MIT |
@@ -3023,8 +3023,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `bail` | 2.0.2 | MIT |
 | `balanced-match` | 1.0.2 | MIT |
 | `base64-js` | 1.5.1 | MIT |
-| `better-auth` | 1.6.11 | MIT |
-| `better-call` | 1.3.5 | MIT |
+| `better-auth` | 1.6.22 | MIT |
+| `better-call` | 1.3.7 | MIT |
 | `better-result` | 2.9.2 | MIT |
 | `bidi-js` | 1.0.3 | MIT |
 | `bluebird` | 3.7.2 | MIT |
@@ -3154,7 +3154,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `isexe` | 2.0.0 | ISC |
 | `jackspeak` | 3.4.3 | BlueOak-1.0.0 |
 | `jiti` | 2.7.0 | MIT |
-| `jose` | 6.2.3 | MIT |
+| `jose` | 6.2.8 | MIT |
 | `js-tokens` | 4.0.0 | MIT |
 | `jsdom` | 30.0.1 | MIT |
 | `json-schema-traverse` | 1.0.0 | MIT |
@@ -3243,7 +3243,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `mysql2` | 3.15.3 | MIT |
 | `named-placeholders` | 1.1.6 | MIT |
 | `nanoid` | 3.3.16 | MIT |
-| `nanostores` | 1.3.0 | MIT |
+| `nanostores` | 1.4.2 | MIT |
 | `next` | 16.3.0 | MIT |
 | `node-int64` | 0.4.0 | MIT |
 | `nodemailer` | 8.0.10 | MIT-0 |
@@ -3325,7 +3325,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `scheduler` | 0.27.0 | MIT |
 | `semver` | 7.8.5 | ISC |
 | `seq-queue` | 0.0.5 | MIT* |
-| `set-cookie-parser` | 3.1.0 | MIT |
+| `set-cookie-parser` | 3.1.2 | MIT |
 | `setimmediate` | 1.0.5 | MIT |
 | `shebang-command` | 2.0.0 | MIT |
 | `shebang-regex` | 3.0.0 | MIT |

@@ -214,7 +214,7 @@ jobs:
             # cross-review 의 다른 4개 마커 소비자(리뷰 폴러·publish 폴백·멱등 가드)와 동일 필터.
             if ! gh api "repos/$REPO/issues/$PR/comments" --paginate \
                  --jq '.[] | select(.author_association=="OWNER" or .author_association=="MEMBER" or .author_association=="COLLABORATOR") | .body' \
-                 | grep -qE "^<!-- cross-review v1 model=(claude|kimi|codex) verdict=merge_ok sha=${SHA} -->$"; then
+                 | grep -qE "^<!-- cross-review v1 model=(claude|kimi|codex)( tier=[a-z0-9.-]+)? verdict=merge_ok sha=${SHA} -->\$"; then
               add_label "human: merge"
               say "**사람 머지 대기열 등록** (\`human: merge\`) — 저위험이나 cross-review 판정 코멘트의 기계 마커(merge_ok · ${SHA}) 부재. 판정 라벨 단독으로는 arm 하지 않는다 (라벨은 자기 신고 표면 — 수동·로컬 리뷰 부착분은 사람 경로). 위험 판독: ${EVIDENCE:-연결 이슈 없음}"
               echo "판정 마커 부재 — human: merge 강등 (라벨 단독 arm 금지)"

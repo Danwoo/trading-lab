@@ -23,7 +23,9 @@ CLAUDE_TIERS = ("opus", "sonnet", "fable", "haiku")
 KIMI_TIERS = ("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed")
 CODEX_TIERS = ("gpt-5.6-terra",)
 
-_VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS}
+# 신원 판독(여기)과 마커의 `tier=` 판독(`review_record.read_marker_tier`)이 같은 어휘를
+# 봐야 한다 — 갈리면 한쪽이 인정한 티어를 다른 쪽이 미상으로 접는다. 그래서 공개 이름이다.
+VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS}
 # 줄 전체가 신원이어야 한다. 앞뒤 공백을 다듬지 않는다 — 다듬으면 원본 grep 앵커보다
 # 관대해지고, 그 관대함이 label_allowed(게이트 입력)를 사람에서 에이전트로 뒤집는다.
 _IDENTITY = re.compile(
@@ -103,13 +105,17 @@ def _identity_note(
     return "; ".join(parts)
 
 
-def decide(emails, head_ref, issue_risks, codex_on):
+def identify_author(emails, head_ref):
+    """커밋 author 이메일·브랜치명으로 저자 신원을 판별한다 — 신원 형식 판독의 단일 자리.
+
+    `review_record` 의 자기리뷰 차단(동일-벤더 + 티어 미상 → arm 거부)도 이것을 부른다.
+    """
     vendors, claude_tiers_seen, unknown_agentish = set(), set(), []
     for raw in emails:
         m = _IDENTITY.match(raw)
         if m and (
             m.group("tier") is None
-            or m.group("tier") in _VENDOR_TIERS[m.group("vendor")]
+            or m.group("tier") in VENDOR_TIERS[m.group("vendor")]
         ):
             vendors.add(m.group("vendor"))
             if m.group("vendor") == "claude":
@@ -141,8 +147,31 @@ def decide(emails, head_ref, issue_risks, codex_on):
     else:
         author_kind, author_vendor, identity_source = "human", None, "none"
 
-    # 저자 표기 — 혼재는 벤더 목록, 브랜치명 단독 판별은 그 벤더 (커밋 신원이 없다)
-    author_models = ",".join(sorted(vendors)) or (author_vendor or "")
+    return {
+        "author_kind": author_kind,
+        "author_vendor": author_vendor,
+        # 저자 표기 — 혼재는 벤더 목록, 브랜치명 단독 판별은 그 벤더 (커밋 신원이 없다)
+        "author_models": ",".join(sorted(vendors)) or (author_vendor or ""),
+        "author_tier": author_tier,
+        "identity_source": identity_source,
+        "branch_vendor": branch_vendor,
+        "unknown_agentish": unknown_agentish,
+        "claude_tiers_seen": sorted(claude_tiers_seen),
+        "vendors": sorted(vendors),
+    }
+
+
+def decide(emails, head_ref, issue_risks, codex_on):
+    identity = identify_author(emails, head_ref)
+    author_kind = identity["author_kind"]
+    author_vendor = identity["author_vendor"]
+    author_models = identity["author_models"]
+    author_tier = identity["author_tier"]
+    identity_source = identity["identity_source"]
+    branch_vendor = identity["branch_vendor"]
+    unknown_agentish = identity["unknown_agentish"]
+    claude_tiers_seen = identity["claude_tiers_seen"]
+    vendors = identity["vendors"]
 
     risk, risk_source = _read_risk(issue_risks)
 
