@@ -1,0 +1,154 @@
+# notices-autofix — dependabot PR 의 고지 문서를 자동으로 다시 만들어 그 브랜치에 커밋한다
+#
+# 왜: THIRD-PARTY-NOTICES.md 는 scripts/generate_notices.py 가 만들고 frontend-ci 가
+# --check 로 검사만 한다. 갱신이 사람 몫이라 npm 의존성 PR 마다 `test: frontend` 가
+# 빨개졌다 (실측 2026-08-10: dependabot PR 4건 #63~#66 이 전부 같은 이유로 실패,
+# 지휘자가 넷 다 손으로 생성기를 돌려 커밋. 8/9 의 #20 도 동일). 그 손일을 없앤다.
+#
+# 성립 조건 둘 — 이 파일의 형태는 전부 여기서 나온다:
+#   1) dependabot 이 트리거한 push·pull_request(_review·_comment) 이벤트는 fork 취급이라
+#      Actions 시크릿이 안 보인다 (Dependabot secrets 만 — docs.github.com
+#      "Troubleshooting Dependabot on GitHub Actions"). pull_request_target 은 그 제한이
+#      없다. PROJECT_TOKEN 을 읽을 수 있는 유일한 PR 이벤트라 이 트리거를 쓴다.
+#   2) GITHUB_TOKEN 으로 push 한 커밋은 후속 워크플로 실행을 만들지 않는다 (GitHub 의
+#      재귀 방지 — docs "Automatic token authentication"). 그래서 push 는
+#      secrets.PROJECT_TOKEN (classic PAT, board-status 용 재사용 — 신규 발급 없음) 으로
+#      한다: 사용자 발 push 라 frontend-ci 가 새 SHA 로 실제로 다시 돈다. PROJECT_TOKEN
+#      미설정이면 GITHUB_TOKEN 으로 폴백하지 않고 실패한다 (fail-closed — 고침을 얹고도
+#      CI 가 낡은 빨강으로 남는 「고쳤는데 고쳐 보이지 않는」 상태가 최악 실패 모양이다).
+#
+# pull_request_target 은 base(main)의 워크플로 정의로 돌되 체크아웃은 PR head 다. 경계:
+#   - 잡 레벨 if (값싼 스킵) + 잡 안 fresh 재확인 (fail-closed): 저자 dependabot[bot] ·
+#     head 가 이 레포(fork 아님) · OPEN 이 전부 확인될 때만 얹는다. 사람 PR·fork PR 은
+#     여기서 끝난다 — 확실하지 않으면 안 얹는다.
+#   - npm ci --ignore-scripts — PR 이 가져온 패키지의 lifecycle 스크립트를 돌리지 않는다
+#     (frontend-ci 와 같은 계약). 스캐너는 검사기가 버전을 박아 둔
+#     license-checker-rseidelsohn@5.0.1 을 npx 로 받는 것이라 PR 이 내용을 바꿀 수 없다.
+#   - 커밋 대상은 THIRD-PARTY-NOTICES.md 하나뿐 — 그 외 변경이 생기면 커밋하지 않고
+#     실패한다 (락파일 불변 계약).
+#
+# 루프 방어: 자동 커밋이 일으킨 synchronize 재실행은 생성기 출력 == 문서 상태에서 시작하므로
+# 아무것도 안 얹고 끝난다 (멱등 — 라벨·마커 같은 상태 방어가 아니라 구조 방어다).
+#
+# workflow_dispatch: autofix 실행이 유실된 dependabot PR 의 수동 구제용. 같은 잡 안 게이트를
+# 그대로 타므로 사람 PR 번호를 줘도 안 얹는다 (거부 = 빨강 — 조용한 무시보다 낫다).
+#
+# 체크 이름에 `test: ` 접두를 쓰지 않는다 — required 게이트가 그 접두 체크런을 전수
+# 판정한다 (scripts/verify_upstream_gate.py). 이 잡은 게이트가 아니다: 생성기 실패의
+# 가시화는 이 잡의 빨강으로 충분하고, 머지 차단은 같은 원인으로 빨개지는 `test: frontend`
+# 가 이미 맡고 있다.
+
+name: notices-autofix
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "대상 PR 번호 — dependabot PR 이 아니면 게이트가 거부한다"
+        required: true
+
+permissions: {} # 기본 토큰 미사용 — 조회·체크아웃·push 전부 PROJECT_TOKEN (머리 주석 2)
+
+concurrency:
+  group: notices-autofix-${{ github.event.pull_request.number || github.event.inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    name: "notices: autofix (비게이트)"
+    # 1차 게이트 (값싼 스킵) — 저자·fork 는 아래 gate 스텝이 fresh 로 다시 확인한다
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository) }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 게이트 — dependabot PR 인지 fresh 재확인 (fail-closed)
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PR: ${{ github.event.pull_request.number || github.event.inputs.pr }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::PROJECT_TOKEN 미설정 — GITHUB_TOKEN 으로 push 하면 CI 가 다시 안 돈다. 폴백 없이 실패한다 (머리 주석 2)"
+            exit 1
+          fi
+          if ! grep -qxE '[0-9]+' <<<"$PR"; then
+            echo "::error::PR 번호가 숫자가 아니다 (${PR}) — dispatch 입력이 API 경로에 들어가므로 검증한다"
+            exit 1
+          fi
+          pr_json=$(gh api "repos/${REPO}/pulls/${PR}")
+          author=$(jq -r '.user.login' <<<"$pr_json")
+          head_repo=$(jq -r '.head.repo.full_name' <<<"$pr_json")
+          state=$(jq -r '.state' <<<"$pr_json")
+          head_ref=$(jq -r '.head.ref' <<<"$pr_json")
+          echo "PR #${PR}: author=${author} · head_repo=${head_repo} · state=${state} · head_ref=${head_ref}"
+          if [ "$author" != "dependabot[bot]" ]; then
+            echo "::error::저자가 dependabot[bot] 이 아니다 (${author}) — 사람이 연 PR 에는 얹지 않는다 (fail-closed)"
+            exit 1
+          fi
+          if [ "$head_repo" != "$REPO" ]; then
+            echo "::error::fork PR 이다 (head=${head_repo}) — 시크릿 노출·남의 브랜치 push 가 되므로 돌지 않는다"
+            exit 1
+          fi
+          if [ "$state" != "open" ]; then
+            echo "::error::PR 이 open 이 아니다 (${state}) — 닫힌 브랜치에 얹지 않는다"
+            exit 1
+          fi
+          files=$(gh api "repos/${REPO}/pulls/${PR}/files" --paginate --jq '.[].filename')
+          if ! grep -qxE 'frontend/package(-lock)?\.json' <<<"$files"; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "frontend 락파일·package.json 이 안 바뀐 PR — 고지 실측 입력이 그대로라 아무것도 안 한다"
+            exit 0
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+          echo "head_ref=${head_ref}" >> "$GITHUB_OUTPUT"
+
+      # 게이트를 통과한 브랜치만 체크아웃한다 — PROJECT_TOKEN 을 물려 마지막 push 에 쓴다
+      - name: Checkout (PR head 브랜치)
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.gate.outputs.head_ref }}
+          token: ${{ secrets.PROJECT_TOKEN }}
+
+      - name: Setup Node
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      # 실패(스캔 불능·미분류 라이선스 등)는 그대로 이 잡의 빨강이다 — 조용히 넘어가지 않는다.
+      # 「스캔이 안 돌았다」는 「위반이 없다」가 아니다 (생성기 자신이 fail-closed 로 짜여 있다).
+      - name: 고지 문서 재생성
+        if: steps.gate.outputs.run == 'true'
+        run: python3 scripts/generate_notices.py
+
+      - name: 변경 있으면 커밋 → PROJECT_TOKEN push (없으면 조용히 끝 — 루프 방어)
+        if: steps.gate.outputs.run == 'true'
+        env:
+          HEAD_REF: ${{ steps.gate.outputs.head_ref }}
+        run: |
+          status=$(git status --porcelain)
+          if [ -z "$status" ]; then
+            echo "고지가 이미 실측과 같다 — 아무것도 안 얹는다 (자동 커밋의 synchronize 재실행은 여기로 와서 루프가 끝난다)"
+            exit 0
+          fi
+          if [ "$status" != " M THIRD-PARTY-NOTICES.md" ]; then
+            echo "::error::고지 문서 외의 변경이 생겼다 — 커밋하지 않는다 (락파일 불변 계약):"
+            printf '%s\n' "$status"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: 고지 문서를 갱신한 락파일 기준으로 다시 만든다"
+          git push origin "HEAD:refs/heads/${HEAD_REF}"
+          echo "push 완료: $(git rev-parse HEAD) → ${HEAD_REF} — 사용자 PAT push 라 frontend-ci 가 이 SHA 로 다시 돈다"
