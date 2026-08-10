@@ -137,9 +137,12 @@ CI 밖(Orca)에 둔다.
 - 좋으면 → 승인 → (저위험이면) 자동 머지
 - 피드백이면 → `Request changes` → **자동 머지가 안 걸린다** → 저자가 고쳐 push → 재리뷰
 
-**「Require approvals」는 켜지 않는다** (아래 결정 로그). 그래서 `Request changes` 는 사람 머지를
-막지 않는다 — 자동 경로만 멈춘다. AI 판정이 작업 정지 장치가 되지 않는다는 원칙(2026-08-06)의
-직접적 귀결이다.
+**「Require approvals」는 켜지 않는다** (아래 결정 로그). 설계 시점에는 「그래서 `Request changes`
+는 사람 머지를 막지 않는다 — 자동 경로만 멈춘다」로 적었는데, **실측은 다르다** (2026-08-10 정정,
+#23 Task 10): ruleset 에 `pull_request` 규칙이 있으면 `required_approving_review_count` 가 0 이어도
+살아 있는 `CHANGES_REQUESTED` 리뷰가 머지를 막는다 (PR #68 실측 — 체크 전부 초록 +
+mergeStateStatus=BLOCKED). 리뷰 판정이 이빨을 가진 것 자체는 의도에 부합해 수용하고, 리뷰 경로가
+죽었을 때의 출구(교착 해제)를 §4 에 둔다.
 
 **승인이 낡았는지는 기록기가 본다.** 승인을 required 로 걸지 않으므로 GitHub 의
 「dismiss stale approvals」에 기댈 수 없다. 대신 리뷰 API 가 리뷰마다 `commit_id` 를 주므로,
@@ -216,6 +219,26 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 **「Require approvals」는 켜지 않는다** (2026-08-08 리드 결정). 켜면 승인 없이는 사람도 머지할 수
 없어 1번이 깨지고, AI 리뷰가 죽었을 때 그대로 작업 정지 장치가 된다. 승인은 **자동 머지를 arm
 하는 신호**일 뿐이고, 사람의 머지 권한은 테스트 초록에만 걸린다.
+
+**교착 출구 — 리뷰 경로가 죽으면 dismiss 가 유일한 출구다** (2026-08-10, #23 Task 10). 승인
+하한이 0 이어도 ruleset 의 `pull_request` 규칙은 살아 있는 `CHANGES_REQUESTED` 리뷰를 존중해
+머지를 막는다 (§2 정정 참조). 새 판정은 재리뷰(push → cross-review → 기록기)가 내므로, **리뷰
+경로가 죽으면(kimi·codex 한도 + claude 폴백 실패 등) 낡은 `CHANGES_REQUESTED` 를 걷어낼 자동
+경로가 없다** — 영영 못 미는 교착이 된다. 그때는 사람이 리뷰를 해제한다:
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<N>/reviews          # 리뷰 ID 확인
+gh api -X PUT repos/<owner>/<repo>/pulls/<N>/reviews/<리뷰ID>/dismissals \
+  -f message="<사유>" -f event=DISMISS
+```
+
+같은 안내가 빨간 체크 `review: verdict (비게이트)` 의 로그(`scripts/review_verdict.py` 출력)에도
+실린다 — 막힌 사람이 처음 여는 자리가 거기다.
+
+**판정은 체크로도 보인다** (#23 Task 10). `review: verdict (비게이트)` 가 판정을 체크 색으로
+확정한다 — `merge_ok` 만 초록, `needs_changes`·`unable`·판정 미산출은 빨강 (fail-closed).
+required 가 아니고 `test: ` 접두도 아니라서 1번(사람 머지)·자동 머지 어느 쪽도 막지 않는다 —
+「초록인데 못 민다」(PR #68 실측)를 체크 목록에서 읽히게 하는 알림이다.
 
 **required checks 에 무엇을 넣나**: 테스트 9종을 개별로 걸지 말고 「전부 초록인가」를 대표하는
 **게이트 잡 하나**만 required 로 건다. pending 창이 하나로 줄어 Orca 머지 버튼이 닫혀 있는

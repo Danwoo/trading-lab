@@ -82,7 +82,7 @@ INVENTORY_AXES: list[tuple[str, str, int]] = [
     # 있었지만 **인벤토리에는 없었다** — 배선을 지워도 이 검사가 초록이었다는 뜻이다. 서비스
     # 쪽 `*/tests` 축이 있는데 루트만 비어 있던 자리이고, 이 스크립트가 막으려는 바로 그
     # 클래스라 채운다 (#23 Task 2).
-    ("scripts", "test_*.py", 9),
+    ("scripts", "test_*.py", 10),
     ("*/tests", "test_*.py", 35),  # 서비스별 standalone 테스트 (#335)
     ("frontend/scripts", "check-*.js", 3),  # frontend 정적 스캔
     ("frontend/scripts", "generate-*.js", 1),  # 생성물 재현 대조 (--check 모드, #361)
