@@ -69,7 +69,13 @@
   `verdict` 는 세 값 중 하나, `sha` 는 판정 대상 head 40자 전체(접두 금지)다.
 
 ```
-<!-- cross-review v1 model=<claude|kimi|codex> verdict=<merge_ok|needs_changes|unable> sha=<head_sha 40자> -->
+<!-- cross-review v1 model=<claude|kimi|codex>[ tier=<티어>] verdict=<merge_ok|needs_changes|unable> sha=<head_sha 40자> -->
 ```
+
+`tier=` 는 **선택 필드**이고 **네가 정하는 값이 아니다** — 워크플로가 너를 띄운 뒤 기동 배너에서
+읽어 확인한 티어를 프롬프트의 마커 본에 이미 박아 준다. 프롬프트에 있으면 **그대로 복사**하고,
+없으면 **넣지 마라**(확인되지 않은 티어를 적는 것은 없는 사실을 기록하는 것이다 — 자기 보고로
+채우면 그 순간 이 필드는 근거가 아니라 주장이 된다). 티어 없는 마커는 「미상」으로 읽히며,
+그것이 이미 달린 옛 마커와 kimi·codex 리뷰의 정상 상태다.
 
 **판정 라벨은 붙이지 마라** — `publish` 잡 소관이다.

@@ -19,9 +19,13 @@ HEAD = "a" * 40
 OTHER = "b" * 40
 
 
-def marker(sha=HEAD, verdict="merge_ok", model="kimi", manual=False):
+def marker(sha=HEAD, verdict="merge_ok", model="kimi", manual=False, tier=None):
     tail = " source=manual" if manual else ""
-    return f"<!-- cross-review v1 model={model} verdict={verdict} sha={sha}{tail} -->"
+    tier_field = f" tier={tier}" if tier else ""
+    return (
+        f"<!-- cross-review v1 model={model}{tier_field} "
+        f"verdict={verdict} sha={sha}{tail} -->"
+    )
 
 
 def comment(
@@ -260,12 +264,69 @@ RECORD_CASES = [
         },
         {"post_review": False, "marker_sha": None},
     ),
+    # ── 리뷰어 티어 필드 (#23 Task 9) — 옛 마커·새 마커 양쪽에서 판정이 서야 한다 ────
+    (
+        "티어 없는 옛 마커 → 그대로 읽히고 tier 는 미상(None)",
+        {"head_sha": HEAD, "comments": [comment(marker())], "existing_reviews": []},
+        {"post_review": True, "arm_candidate": True, "model": "kimi", "tier": None},
+    ),
+    (
+        "티어 있는 새 마커 → 읽히고 tier 가 실린다",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker(model="claude", tier="sonnet"))],
+            "existing_reviews": [],
+        },
+        {
+            "post_review": True,
+            "arm_candidate": True,
+            "model": "claude",
+            "tier": "sonnet",
+        },
+    ),
+    (
+        "어휘 밖 티어(claude tier=opus5) → 마커는 읽되 tier 는 미상으로 접는다",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker(model="claude", tier="opus5"))],
+            "existing_reviews": [],
+        },
+        {"post_review": True, "model": "claude", "tier": None},
+    ),
+    (
+        "남의 벤더 티어(kimi tier=opus) → 마커는 읽되 tier 는 미상으로 접는다",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker(model="kimi", tier="opus"))],
+            "existing_reviews": [],
+        },
+        {"post_review": True, "model": "kimi", "tier": None},
+    ),
+    (
+        "티어 + source=manual → 티어를 실어도 arm 후보가 되지 않는다  (공격 ④)",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker(model="claude", tier="sonnet", manual=True))],
+            "existing_reviews": [],
+        },
+        {"post_review": True, "arm_candidate": False, "manual": True, "tier": "sonnet"},
+    ),
+    (
+        "티어 필드가 낡은 sha 를 실어도 head 대조가 먼저다  (공격 ③)",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker(sha=OTHER, model="claude", tier="sonnet"))],
+            "existing_reviews": [],
+        },
+        {"post_review": False, "marker_sha": None, "tier": None},
+    ),
 ]
 
 ARM_BASE = {
     "head_sha": HEAD,
     "marker_sha": HEAD,
     "marker_model": "kimi",  # 저자(claude)와 교차 벤더
+    "marker_tier": None,  # 교차 벤더라 티어 축이 필요 없다 (kimi 는 티어를 안 싣는다)
     "verdict": "merge_ok",
     "manual": False,
     "reviews": [approval()],
@@ -410,13 +471,68 @@ ARM_CASES = [
         },
         {"arm": False, "self_vendor": True, "author_tier": None},
     ),
+    # ── 동일-벤더의 티어 대조 (#23 Task 9) — 「작성 티어를 안다」만으로는 못 푼다 ────
+    # 종전엔 이 케이스가 arm=True 였다. 근거는 「폴백이 반대 티어를 고른다」는 cross-review
+    # 쪽 계약이었는데, `--agent claude` 가 모델 인자를 못 받아 그 계약이 실제로는 안 지켜지고
+    # 있었다 (배정 sonnet · 기동 배너 Opus 5 실측). 이제 양쪽 티어를 직접 대조한다.
     (
-        "동일-벤더 + 작성 티어 명시 → arm (반대 티어가 배정된다)",
+        "동일-벤더 + 작성 티어 명시 + **리뷰어 티어 미상** → arm 거부  (공격 ⑨)",
         {
             "marker_model": "claude",
             "commit_author_emails": ["claude-opus-agent@noreply.local"],
         },
-        {"arm": True, "self_vendor": True, "author_tier": "opus"},
+        {
+            "arm": False,
+            "self_vendor": True,
+            "author_tier": "opus",
+            "reviewer_tier": None,
+        },
+    ),
+    (
+        "동일-벤더 + 작성 opus + 리뷰어 sonnet → 교차 축이 살아 있어 arm",
+        {
+            "marker_model": "claude",
+            "marker_tier": "sonnet",
+            "commit_author_emails": ["claude-opus-agent@noreply.local"],
+        },
+        {
+            "arm": True,
+            "self_vendor": True,
+            "author_tier": "opus",
+            "reviewer_tier": "sonnet",
+        },
+    ),
+    (
+        "동일-벤더 + **동일 티어**(opus 가 opus 를 리뷰) → arm 거부  (공격 ⑨)",
+        {
+            "marker_model": "claude",
+            "marker_tier": "opus",
+            "commit_author_emails": ["claude-opus-agent@noreply.local"],
+        },
+        {
+            "arm": False,
+            "self_vendor": True,
+            "author_tier": "opus",
+            "reviewer_tier": "opus",
+        },
+    ),
+    (
+        "동일-벤더 + 리뷰어 티어는 아는데 **작성 티어 미상** → arm 거부  (공격 ⑨)",
+        {
+            "marker_model": "claude",
+            "marker_tier": "sonnet",
+            "commit_author_emails": ["claude-agent@noreply.local"],
+        },
+        {"arm": False, "self_vendor": True, "author_tier": None},
+    ),
+    (
+        "동일-벤더 kimi + 리뷰어 티어를 실어도 → 티어 축이 없어 arm 거부  (공격 ⑨)",
+        {
+            "marker_model": "kimi",
+            "marker_tier": "k3",
+            "commit_author_emails": ["kimi-agent@noreply.local"],
+        },
+        {"arm": False, "self_vendor": True},
     ),
     (
         "동일-벤더 + claude 티어 혼재 → 티어 미상으로 접혀 arm 거부  (공격 ⑨)",
@@ -739,6 +855,95 @@ DROPPED_CASES = [
     ),
 ]
 
+# ── 위임 머지 (#23 Task 9) — 조건 하나씩 깨뜨린 입력이 **각각** 거부돼야 한다 ──────
+# base 는 셋 다 맞는 입력이다. 저자는 claude·리뷰어는 kimi 라 교차 벤더이고, 위험도는 low,
+# 게이트는 pass. 여기서 조건을 하나씩만 깨뜨린다.
+DELEGATE_BASE = {**ARM_BASE, "gate_state": "pass"}
+
+DELEGATE_CASES = [
+    # (설명, payload 덮어쓰기, 기대 allow, 사유에 들어 있어야 할 조각)
+    ("셋 다 충족 → 머지 허용", {}, True, None),
+    # ① 리뷰 통과 마커
+    (
+        "① 판정이 needs_changes → 거부",
+        {"verdict": "needs_changes"},
+        False,
+        "① 리뷰 통과 마커",
+    ),
+    ("① 마커 없음(판정 빈 값) → 거부", {"verdict": ""}, False, "① 리뷰 통과 마커"),
+    (
+        "① source=manual 마커 → 거부 (사람이 타이핑한 한 줄일 수 있다)",
+        {"manual": True},
+        False,
+        "source=manual",
+    ),
+    (
+        "① 낡은 sha 마커 → 거부",
+        {"marker_sha": OTHER},
+        False,
+        "① 마커가 현재 head 의 것이 아님",
+    ),
+    # ② required 게이트
+    ("② 게이트 fail → 거부", {"gate_state": "fail"}, False, "② required 게이트 비초록"),
+    (
+        "② 게이트 wait(아직 도는 중) → 거부 — 위임 머지는 기다리지 않는다",
+        {"gate_state": "wait"},
+        False,
+        "기다리지 않는다",
+    ),
+    (
+        "② 게이트 상태 미상 → 거부 (fail-closed)",
+        {"gate_state": None},
+        False,
+        "② required 게이트 비초록",
+    ),
+    # ③ 저위험 확정
+    (
+        "③ risk: high → 거부",
+        {"issue_refs": [{"number": 23, "labels": ["risk: high"]}]},
+        False,
+        "③ 저위험 확정 아님",
+    ),
+    (
+        "③ 미선언(라벨 없음) → 거부",
+        {"issue_refs": [{"number": 23, "labels": []}]},
+        False,
+        "③ 저위험 확정 아님",
+    ),
+    ("③ 연결 이슈 없음 → 거부", {"issue_refs": []}, False, "③ 저위험 확정 아님"),
+    (
+        "③ 봇 major 아님이어도 저위험이 아니면 거부 — 위임 경로는 봇 예외를 안 탄다",
+        {
+            "issue_refs": [],
+            "pr_author_is_bot": True,
+            "pr_title": "bump x from 1.0 to 1.1",
+        },
+        False,
+        "③ 저위험 확정 아님",
+    ),
+    # 부가 조건 — 셋으로 환원되지 않는 것도 막는다
+    ("승인 리뷰 없음 → 거부 (부가 조건)", {"reviews": []}, False, "부가 조건 미충족"),
+    (
+        "동일-벤더·동일-티어 자기리뷰 → 거부 (부가 조건)",
+        {"marker_model": "claude", "marker_tier": "opus"},
+        False,
+        "부가 조건 미충족",
+    ),
+    (
+        "커밋 신원 0건 → 거부 (부가 조건 — fail-closed)",
+        {"commit_author_emails": []},
+        False,
+        "부가 조건 미충족",
+    ),
+    # 사유는 하나만 내지 않는다
+    (
+        "조건 셋이 동시에 깨지면 사유 셋을 **모두** 돌려준다",
+        {"verdict": "needs_changes", "gate_state": "fail", "issue_refs": []},
+        False,
+        None,
+    ),
+]
+
 GATE_CASES = [
     # (설명, records, final, 기대 상태)
     (
@@ -882,6 +1087,39 @@ def main() -> int:
                 f"보존 불변식(대칭): {desc}: 탐욕 판독에 없던 {sorted(invented)!r} 이 "
                 f"refs 에 생겼다 (버린 자리가 앞뒤 산문을 이었다)"
             )
+
+    for desc, override, expect_allow, needle in DELEGATE_CASES:
+        total += 1
+        got = rr.decide_delegate({**DELEGATE_BASE, **override})
+        if got["allow"] != expect_allow:
+            failures.append(
+                f"delegate: {desc}: allow 기대 {expect_allow} ≠ 실제 {got['allow']} "
+                f"({got['reasons']})"
+            )
+            continue
+        if needle and not any(needle in r for r in got["reasons"]):
+            failures.append(
+                f"delegate: {desc}: 사유에 {needle!r} 이 없다 ({got['reasons']})"
+            )
+        # 허용은 사유 0건, 거부는 사유 1건 이상 — 둘이 어긋나면 코멘트가 비거나 거짓이 된다
+        if bool(got["reasons"]) == got["allow"]:
+            failures.append(f"delegate: {desc}: allow 와 사유 목록이 어긋난다 ({got})")
+
+    # 사유를 하나만 내고 끊지 않는지 — 지휘자가 고치고 다시 요청할 때마다 하나씩 나오면 안 된다
+    total += 1
+    multi = rr.decide_delegate(
+        {
+            **DELEGATE_BASE,
+            "verdict": "needs_changes",
+            "gate_state": "fail",
+            "issue_refs": [],
+        }
+    )
+    if len(multi["reasons"]) < 3:
+        failures.append(
+            f"delegate: 조건 셋이 동시에 깨졌는데 사유가 {len(multi['reasons'])}건뿐이다 "
+            f"({multi['reasons']})"
+        )
 
     for desc, records, final, expected_state in GATE_CASES:
         total += 1
