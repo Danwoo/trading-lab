@@ -2,20 +2,35 @@
 
 ## 왜 있나
 
-테스트를 개별로 required 로 걸면 pending 창이 잡 수만큼 생긴다. `review-gate.yml` 머리의
-「Orca 판정 규칙」 실측대로 pending 이 하나만 있어도 머지 버튼이 잠기므로, 전부를 대표하는
+테스트를 개별로 required 로 걸면 pending 창이 잡 수만큼 생긴다. 아래 「Orca 판정 규칙」
+실측대로 pending 이 하나만 있어도 머지 버튼이 잠기므로, 전부를 대표하는
 잡 **하나**만 required 로 건다. `repo-scans.yml` 은 경로 필터가 없어 모든 PR 에서 도므로
 그 게이트의 자리다.
+
+## Orca 판정 규칙 (app.asar 실측, 2026-08-06 — 구 review-gate.yml 머리에서 옮김)
+
+머지 버튼 활성 여부 = `presentGitHubPRMergeState().directMergeAvailable`.
+  · mergeStateStatus 를 GitHub 이 준 경우: DIRTY·BEHIND·**BLOCKED** 이면 비활성.
+    UNSTABLE(비필수 체크가 빨강)은 mergeable=MERGEABLE 이라 **활성**이다.
+  · mergeStateStatus 가 UNKNOWN 인 경우(=대다수): `checksPassed(item)` 로 떨어져
+    **모든 체크가 passed 여야** 활성이다.
+체크 분류(`classifyCheckOutcome`):
+  passed  = conclusion ∈ {success, **skipped**}
+  failed  = conclusion ∈ {failure, error, startup_failure, timed_out, cancelled, action_required}
+  pending = conclusion == "pending" **또는 status != "completed"** (실행 중·큐 대기 포함)
+  neutral = 그 외 (막지 않는다)
+커밋 상태(commit status)는 conclusion 자리에 state 가 들어가므로 `pending` 도 `failure` 도
+그대로 막는다. **끝나지 않는 pending 상태가 최악**이다.
 
 ## 왜 `needs:` 가 아니라 체크런 조회인가
 
 `needs:` 는 **같은 워크플로 안**만 묶는다. 그러면 게이트는 `repo-scans.yml` 의 3종만 대표하고
-`ci.yml` 7종·`frontend-ci.yml` 3종은 대표하지 못한다. 지금 그 열을 보는 것은
-`merge-router.yml` 의 전수 초록 게이트인데, 그 파일은 이 재설계(#23 Task 8)가 지운다 —
-지운 순간 자동 머지가 backend·frontend 테스트를 안 보고 머지하게 된다. 그래서 판정 근거를
-`merge-router` 와 같은 것(head SHA 의 `test: ` 접두 체크런 전수)으로 맞춘다.
+`ci.yml` 7종·`frontend-ci.yml` 3종은 대표하지 못한다. 종전엔 그 열을 구 `merge-router.yml`
+의 전수 초록 게이트가 봤는데 그 파일은 #23 Task 8 이 지웠다 — 대비 없이 지우면 자동 머지가
+backend·frontend 테스트를 안 보고 머지하게 되므로, 판정 근거를 그 게이트와 같은 것
+(head SHA 의 `test: ` 접두 체크런 전수)으로 맞춰 이 게이트가 그 자리를 승계했다.
 
-## 판정 규칙 (merge-router.yml 의 전수 초록 게이트와 동일)
+## 판정 규칙 (구 merge-router.yml 의 전수 초록 게이트 승계)
 
 1. head SHA 의 체크런에서 `test: ` 접두만 고른다
 2. **자기 자신(`test: gate`)은 뺀다** — 안 빼면 자기 체크가 `in_progress` 로 잡혀 영영
@@ -53,7 +68,7 @@ SELF_CHECK_NAME = "test: gate"
 CHECK_NAME_PREFIX = "test: "
 
 # 통과로 세는 conclusion. `neutral` 은 GitHub 이 required check 통과로 세지만 여기서는
-# 빼 둔다 — merge-router.yml 의 전수 초록 게이트와 같은 기준을 쓴다.
+# 빼 둔다 — 구 merge-router.yml 의 전수 초록 게이트 기준을 승계한다.
 PASSING_CONCLUSIONS = ("success", "skipped")
 
 # 게이트가 대표해야 하는 `test: ` 체크의 하한 (자기 자신 제외).
@@ -375,7 +390,7 @@ def check_structure(
     if not SELF_CHECK_NAME.startswith(CHECK_NAME_PREFIX):
         problems.append(
             f"게이트 이름 {SELF_CHECK_NAME!r} 이 `{CHECK_NAME_PREFIX}` 접두가 아닙니다 — "
-            "merge-router.yml 의 전수 초록 게이트가 그 접두로 판정 잡을 고릅니다"
+            "이 게이트와 review-record 의 소비자가 그 접두로 판정 잡을 고릅니다"
         )
 
     represented = {n: wf for n, wf in test_job_names.items() if n != SELF_CHECK_NAME}

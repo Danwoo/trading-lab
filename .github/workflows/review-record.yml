@@ -243,7 +243,7 @@ jobs:
 
           # 위험도: PR 본문의 참조 이슈(Refs·Closes 류)를 fresh 조회한다. `issues/$N` 은 **PR 에도
           # 응답**하므로 `.pull_request` 로 PR 여부를 함께 읽어 판정부에 넘긴다 — PR 의 risk 라벨은
-          # merge-router 가 붙인 가시화 미러라 판정 입력이 아니다. 조회 실패는 lookup_failed 로
+          # 구 merge-router 가 붙이던 가시화 미러라 판정 입력이 아니다. 조회 실패는 lookup_failed 로
           # 실어 미선언 = 사람 경로로 접힌다 (fail-closed. 빈 목록으로 흡수하면 실패가 low 에 묻힌다)
           # 산문 참조와 「코드·인용에서 버린 후보」를 한 번에 받는다 — 버린 후보는 위험도를
           # **올리는 쪽으로만** 쓴다(그냥 버리면 고위험 참조가 접히고 저위험만 남아 위험도가

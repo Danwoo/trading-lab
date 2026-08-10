@@ -33,7 +33,7 @@ GitHub 이 자기 PR 자기 승인을 금지해 로컬 `gh`(리드 계정)로는
 브랜치명으로 읽고, 리뷰어 티어는 마커의 `tier=`(기동 배너 관측값)로 읽는다. **어느 쪽이든
 판독이 안 되면 arm 하지 않는다** (fail-closed). 신원 형식의 SoT 는 `review_route` 하나다.
 
-위험도의 SoT 는 **이슈의 risk 라벨**이고 판정 시점마다 fresh 조회한다 (merge-router.yml 이
+위험도의 SoT 는 **이슈의 risk 라벨**이고 판정 시점마다 fresh 조회한다 (구 merge-router.yml 이
 못 박은 규칙 승계). 이슈 연결은 `closingIssuesReferences` 가 아니라 **PR 본문 파싱**으로 읽는다
 (`Refs #N` 도 위험도 출처 — 2026-08-09 리드 결정. closing 키워드만 잡으면 위험도를 읽히려고
 PR 마다 전용 이슈를 만들게 된다). 여러 이슈면 가장 높은 위험, 하나도 못 읽으면 미선언 = 고위험.
@@ -74,7 +74,7 @@ REVIEWER_VENDORS = ("claude", "kimi", "codex")
 # 이유로 kimi 리뷰의 차단이 풀리면, 아는 티어와 겹치는 벤더가 달라 아무것도 배제하지 못한다.
 TIER_KNOWN_VENDOR = "claude"
 
-# cross-review.yml 의 마커 게시부·merge-router.yml 의 arm 가드와 같은 문법. sha 자릿수는
+# cross-review.yml 의 마커 게시부와 같은 문법 (구 merge-router 의 arm 가드에서 승계). sha 자릿수는
 # 여기서 안 좁힌다 — 접두 sha 를 정규식에서 거르면 「40자 동등 비교」가 검증 불가능한
 # 암묵이 된다. 아래 판정이 길이 40 + 문자열 동등을 명시적으로 검사한다.
 #

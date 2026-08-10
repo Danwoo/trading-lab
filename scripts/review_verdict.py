@@ -21,8 +21,8 @@ mergeStateStatus=BLOCKED).
 
   · **required 가 아니다** — 리뷰 인프라가 죽어도(unable) 사람 머지를 막지 않는다
     (설계 §4 「AI 판정이 작업 정지 장치가 되지 않는다」). 빨강은 알림이지 차단이 아니다.
-  · **`test: ` 접두를 쓰지 않는다** — required 게이트(`verify_upstream_gate.py`)와
-    merge-router 의 전수 초록 게이트가 그 접두를 전수 판정하므로, 판정 체크가 그 접두를
+  · **`test: ` 접두를 쓰지 않는다** — required 게이트(`verify_upstream_gate.py`)가
+    그 접두를 전수 판정하므로, 판정 체크가 그 접두를
     달면 `needs_changes` 하나가 사람 머지까지 막는다.
   · 머지를 실제로 막는 것은 기록기(review-record)가 남기는 네이티브 `CHANGES_REQUESTED`
     리뷰다 — 이 체크는 그 사실을 체크 목록에 보이게만 한다.
