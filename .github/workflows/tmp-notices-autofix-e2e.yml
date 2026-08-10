@@ -1,0 +1,190 @@
+# ⚠ 임시 — notices-autofix.yml 의 e2e 검증 하네스. 이 브랜치에서만 존재하고 머지되지 않으며
+# 검증이 끝나면 브랜치째 삭제된다.
+#
+# 왜 하네스인가: 실물의 트리거 pull_request_target 은 base(main)의 워크플로 정의로 돌아
+# 머지 전에는 실물 트리거로 검증할 수 없고, workflow_dispatch 도 기본 브랜치에 없는
+# 워크플로를 404 로 거부한다 (실측 2026-08-10). 그래서 검증 대상을 셋으로 갈라 돈다:
+#   autofix 잡        — 실물의 체크아웃 이후 스텝을 그대로 복사 (의도적 차이: 트리거가 이
+#                       브랜치 push · 저자 게이트 없음 · head_ref 하드코딩)
+#   gate-negative 잡  — 실물의 게이트 run 블록을 그대로 복사해 사람 PR(#78)에 적용 → 거부돼야 통과
+#   gate-positive 잡  — 같은 블록을 열린 dependabot PR(#65)에 적용 → run=true 여야 통과
+#                       (읽기 전용 — gh api 조회뿐, #65 에는 아무것도 쓰지 않는다)
+name: tmp-notices-autofix-e2e
+
+on:
+  push:
+    branches: [notices-autofix-e2e-target]
+
+permissions: {}
+
+jobs:
+  autofix:
+    name: "notices: autofix e2e (임시)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: PROJECT_TOKEN 확인 (fail-closed)
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::PROJECT_TOKEN 미설정 — 폴백 없이 실패한다"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: notices-autofix-e2e-target
+          token: ${{ secrets.PROJECT_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      - name: 고지 문서 재생성
+        run: python3 scripts/generate_notices.py
+
+      - name: 변경 있으면 커밋 → PROJECT_TOKEN push (없으면 조용히 끝 — 루프 방어)
+        run: |
+          status=$(git status --porcelain)
+          if [ -z "$status" ]; then
+            echo "고지가 이미 실측과 같다 — 아무것도 안 얹는다 (자동 커밋의 재실행은 여기로 와서 루프가 끝난다)"
+            exit 0
+          fi
+          if [ "$status" != " M THIRD-PARTY-NOTICES.md" ]; then
+            echo "::error::고지 문서 외의 변경이 생겼다 — 커밋하지 않는다:"
+            printf '%s\n' "$status"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: 고지 문서를 갱신한 락파일 기준으로 다시 만든다"
+          git push origin "HEAD:refs/heads/notices-autofix-e2e-target"
+          echo "push 완료: $(git rev-parse HEAD)"
+
+  # 실물 게이트 run 블록 그대로 + 사람 PR → 거부(exit 1)돼야 이 잡이 통과
+  gate-negative:
+    name: "notices: gate 거부 e2e — 사람 PR (임시)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 게이트 — dependabot PR 인지 fresh 재확인 (fail-closed)
+        id: gate
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PR: "78"
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::PROJECT_TOKEN 미설정 — GITHUB_TOKEN 으로 push 하면 CI 가 다시 안 돈다. 폴백 없이 실패한다 (머리 주석 2)"
+            exit 1
+          fi
+          if ! grep -qxE '[0-9]+' <<<"$PR"; then
+            echo "::error::PR 번호가 숫자가 아니다 (${PR}) — dispatch 입력이 API 경로에 들어가므로 검증한다"
+            exit 1
+          fi
+          pr_json=$(gh api "repos/${REPO}/pulls/${PR}")
+          author=$(jq -r '.user.login' <<<"$pr_json")
+          head_repo=$(jq -r '.head.repo.full_name' <<<"$pr_json")
+          state=$(jq -r '.state' <<<"$pr_json")
+          head_ref=$(jq -r '.head.ref' <<<"$pr_json")
+          echo "PR #${PR}: author=${author} · head_repo=${head_repo} · state=${state} · head_ref=${head_ref}"
+          if [ "$author" != "dependabot[bot]" ]; then
+            echo "::error::저자가 dependabot[bot] 이 아니다 (${author}) — 사람이 연 PR 에는 얹지 않는다 (fail-closed)"
+            exit 1
+          fi
+          if [ "$head_repo" != "$REPO" ]; then
+            echo "::error::fork PR 이다 (head=${head_repo}) — 시크릿 노출·남의 브랜치 push 가 되므로 돌지 않는다"
+            exit 1
+          fi
+          if [ "$state" != "open" ]; then
+            echo "::error::PR 이 open 이 아니다 (${state}) — 닫힌 브랜치에 얹지 않는다"
+            exit 1
+          fi
+          files=$(gh api "repos/${REPO}/pulls/${PR}/files" --paginate --jq '.[].filename')
+          if ! grep -qxE 'frontend/package(-lock)?\.json' <<<"$files"; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "frontend 락파일·package.json 이 안 바뀐 PR — 고지 실측 입력이 그대로라 아무것도 안 한다"
+            exit 0
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+          echo "head_ref=${head_ref}" >> "$GITHUB_OUTPUT"
+
+      - name: 판정 — 게이트가 거부했어야 한다
+        env:
+          OUTCOME: ${{ steps.gate.outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::사람 PR 인데 게이트가 거부하지 않았다 (outcome=${OUTCOME})"
+            exit 1
+          fi
+          echo "게이트가 사람 PR 을 거부했다 (fail-closed 확인)"
+
+  # 실물 게이트 run 블록 그대로 + 열린 dependabot PR(#65) → run=true 여야 이 잡이 통과.
+  # 읽기 전용이다 — gh api 조회뿐, #65 에는 push·라벨·코멘트 등 아무것도 하지 않는다.
+  gate-positive:
+    name: "notices: gate 통과 e2e — dependabot PR 읽기 전용 (임시)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 게이트 — dependabot PR 인지 fresh 재확인 (fail-closed)
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PR: "65"
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::PROJECT_TOKEN 미설정 — GITHUB_TOKEN 으로 push 하면 CI 가 다시 안 돈다. 폴백 없이 실패한다 (머리 주석 2)"
+            exit 1
+          fi
+          if ! grep -qxE '[0-9]+' <<<"$PR"; then
+            echo "::error::PR 번호가 숫자가 아니다 (${PR}) — dispatch 입력이 API 경로에 들어가므로 검증한다"
+            exit 1
+          fi
+          pr_json=$(gh api "repos/${REPO}/pulls/${PR}")
+          author=$(jq -r '.user.login' <<<"$pr_json")
+          head_repo=$(jq -r '.head.repo.full_name' <<<"$pr_json")
+          state=$(jq -r '.state' <<<"$pr_json")
+          head_ref=$(jq -r '.head.ref' <<<"$pr_json")
+          echo "PR #${PR}: author=${author} · head_repo=${head_repo} · state=${state} · head_ref=${head_ref}"
+          if [ "$author" != "dependabot[bot]" ]; then
+            echo "::error::저자가 dependabot[bot] 이 아니다 (${author}) — 사람이 연 PR 에는 얹지 않는다 (fail-closed)"
+            exit 1
+          fi
+          if [ "$head_repo" != "$REPO" ]; then
+            echo "::error::fork PR 이다 (head=${head_repo}) — 시크릿 노출·남의 브랜치 push 가 되므로 돌지 않는다"
+            exit 1
+          fi
+          if [ "$state" != "open" ]; then
+            echo "::error::PR 이 open 이 아니다 (${state}) — 닫힌 브랜치에 얹지 않는다"
+            exit 1
+          fi
+          files=$(gh api "repos/${REPO}/pulls/${PR}/files" --paginate --jq '.[].filename')
+          if ! grep -qxE 'frontend/package(-lock)?\.json' <<<"$files"; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "frontend 락파일·package.json 이 안 바뀐 PR — 고지 실측 입력이 그대로라 아무것도 안 한다"
+            exit 0
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+          echo "head_ref=${head_ref}" >> "$GITHUB_OUTPUT"
+
+      - name: 판정 — 게이트가 통과시켰어야 한다
+        env:
+          RUN: ${{ steps.gate.outputs.run }}
+          HEAD_REF: ${{ steps.gate.outputs.head_ref }}
+        run: |
+          if [ "$RUN" != "true" ]; then
+            echo "::error::열린 dependabot PR 인데 게이트가 통과시키지 않았다 (run=${RUN})"
+            exit 1
+          fi
+          echo "게이트가 dependabot PR 을 통과시켰다 (head_ref=${HEAD_REF}) — 여기서 멈춘다 (읽기 전용)"
