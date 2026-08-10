@@ -1,6 +1,6 @@
 # 서드파티 라이선스 고지 (THIRD-PARTY-NOTICES)
 
-프론트엔드(`frontend/`) 프로덕션 의존성 599개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 599개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
+프론트엔드(`frontend/`) 프로덕션 의존성 598개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 599개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
 
 **2026-08-06 갱신(#341 완주 — DevExtreme 제거 반영)** — 상용 6종과 그 전이 의존이 빠져 623→599개가 됐다. 사라진 24개: 상용 6종(`devextreme`·`devextreme-react`·`@devexpress/utils`·`devexpress-diagram`·`devexpress-gantt`·`@devextreme/runtime`)과 그것들만 쓰던 18개(`inferno` 계열 5 · `devextreme-quill`·`parchment`·`quill-delta`·`fast-diff`·`rrule`·`core-js`·`@babel/runtime`·`es6-object-assign`·`eventemitter3`·`lodash.clonedeep`·`lodash.isequal`·`lodash.merge`·`opencollective-postinstall`). 갱신은 손으로 지우지 않고 **아래 재현 명령의 새 출력을 정본으로 삼아 문서의 패키지 목록과 대조**했다 — 그 결과 「문서에 있는데 지금 없음」 24개 = 위 목록, 「지금 있는데 문서에 없음」 0개. 남은 599개에 DevExpress 계열은 `devextreme-exceljs-fork`(MIT 포크) 하나뿐이다.
 
