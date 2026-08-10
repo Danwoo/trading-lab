@@ -3246,7 +3246,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `nanostores` | 1.4.2 | MIT |
 | `next` | 16.3.0 | MIT |
 | `node-int64` | 0.4.0 | MIT |
-| `nodemailer` | 8.0.10 | MIT-0 |
+| `nodemailer` | 9.0.1 | MIT-0 |
 | `normalize-path` | 3.0.0 | MIT |
 | `object-assign` | 4.1.1 | MIT |
 | `obug` | 2.1.4 | MIT |
