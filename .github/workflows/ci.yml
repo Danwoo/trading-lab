@@ -74,8 +74,8 @@ jobs:
   #
   # ⚠ **이 잡 자신이 게이트 대상이어야 한다.** 이 잡이 빨개지면 아래 잡은 전부 `skipped` 가
   #   되고 GitHub 은 skipped 를 통과로 센다 — 판정이 죽으면 검사가 통째로 조용히 사라진다.
-  #   체크 이름에 `test: ` 접두사를 붙인 것이 그 방어다 (merge-router 의 전수 초록 게이트가
-  #   그 접두사로 대상을 잡고, Task 6 의 required 목록도 이 이름을 포함해야 한다).
+  #   체크 이름에 `test: ` 접두사를 붙인 것이 그 방어다 (required 게이트 `test: gate`
+  #   — scripts/verify_upstream_gate.py — 가 그 접두사로 대상을 잡는다).
   changes:
     name: "test: ci-paths"
     runs-on: ubuntu-latest

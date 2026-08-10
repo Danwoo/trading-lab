@@ -10,7 +10,7 @@
 #                           대행하고 자동 머지를 arm/disarm 한다 (계약은 그 파일 머리)
 #   판정 라벨 4종은 부착하지 않는다 — GitHub 리뷰 상태가 그 일을 한다. 폴백 가시화용
 #   `review: fallback-claude` 만 남는다. merge-router·review-labels(review-gate.yml)·
-#   board-status 는 Task 8 이 지운다 — 라벨 부착이 끊긴 지금 그 라벨 트리거 경로는 휴면이고,
+#   board-status 는 #23 Task 8 이 지웠다 — 라벨 부착이 끊겨 그 라벨 트리거 경로는 휴면이었고,
 #   물려받을 기능(push 시 disarm)은 review-record 가 이미 가졌다.
 #
 # ⚠ **2026-08-06 — `review-gate` 커밋 상태는 없앴다.** (요약: private + Free 플랜 시절엔
@@ -93,7 +93,7 @@
 #      현재 head 와 40자 동등 비교로 낡은 판정을 거른다 (push 경합 창 봉합)
 #   3) 판정 라벨은 부착하지 않는다 (#23 Task 7 — 설계 결정 3). 남은 라벨 쓰기는 폴백 가시화
 #      (`review: fallback-claude`) 하나이고 **REST(issues/labels) 경유**로 부착한다 —
-#      PROJECT_TOKEN(classic PAT, board-status 재사용)에 read:org 가 없어 `gh pr edit
+#      PROJECT_TOKEN(classic PAT, 구 board-status 용 재사용)에 read:org 가 없어 `gh pr edit
 #      --add-label` 의 GraphQL 라벨 조회가 스코프 오류로 실패한다 (실측: run 29984682991)
 #   4) docs-only PR 은 트리거 자체 제외 (T1 결정 3 전)
 #
@@ -126,8 +126,8 @@
 #   (2026-08-09 리드 결정 — 위험도를 읽히려고 PR 마다 전용 이슈를 만들지 않게).
 #
 # 리뷰어 라우팅 (§9 배정표): kimi 작성 → claude / claude 작성 → kimi (고위험은 codex —
-#   단 한도 복귀 ~2026-08-08 까지 레포 변수 CROSS_REVIEW_CODEX≠on 이면 kimi 로 대체, 게이트는
-#   어차피 merge-router 가 사람 대기열로) / codex 작성 → claude / 사람 작성 → claude (기본)
+#   단 한도 복귀 ~2026-08-08 까지 레포 변수 CROSS_REVIEW_CODEX≠on 이면 kimi 로 대체, 고위험은
+#   어차피 review-record 의 arm 조건이 사람 경로로 넘긴다) / codex 작성 → claude / 사람 작성 → claude (기본)
 #
 # 리뷰어 폴백 체인 (2026-07-29 사용자 확정 — kimi·codex 동시 한도 소진으로 리뷰 게이트가
 #   통째로 멎은 실사건이 계기):
@@ -416,9 +416,9 @@ jobs:
           # Resolves 키워드만 잡음)에서만 채웠는데, 이 레포 최근 PR 은 전부 `Refs #N` 관행이라
           # 연결 이슈가 늘 0건으로 판독돼 아래 plan-comments.md 가 항상 완전히 빈 채로 나갔다
           # (실측: PR #354·#359·#357·#334·#347·#350 전부 closingIssuesReferences=[]).
-          # **위험도 판독(ISSUE_RISKS, 위 판정부)은 건드리지 않는다** — 자동 머지 arm 의 위험
-          # 라벨 조회는 merge-router 와 동일하게 closing 키워드만 신뢰하는 게 의도된 fail-closed
-          # 경계다(이 파일 「이슈 연결 판독의 경계」 그대로 유지). 여기서 넓히는 것은 리뷰어에게
+          # **위험도 판독(ISSUE_RISKS, 위 판정부)은 건드리지 않는다** — 여기 위험도는 라우팅
+          # 참고값이고, 머지 경로의 위험도는 review-record 가 별도로 판독한다(그쪽은 산문
+          # `Refs #N` 도 읽는다 — 2026-08-09 리드 결정). 여기서 넓히는 것은 리뷰어에게
           # 주입할 계획 후보뿐이다. 자기 자신(PR 번호)은 제외 — PR 본문이 자기 번호를 언급해도
           # 자기 자신을 계획으로 삼지 않는다.
           #
@@ -600,8 +600,8 @@ jobs:
     #     job-level continue-on-error + 잡 타임아웃 → conclusion=cancelled
     #     스텝 레벨 continue-on-error         → conclusion=success
     #     `if: false` 로 스킵 / 스킵된 잡을 needs → conclusion=skipped
-    #   Orca 는 conclusion 이 failure·cancelled 면 머지를 막는다 (review-gate.yml 머리의
-    #   「Orca 판정 규칙」). 그래도 이 줄은 남긴다 — 워크플로 run 을 초록으로 유지해 후속
+    #   Orca 는 conclusion 이 failure·cancelled 면 머지를 막는다 (scripts/verify_upstream_gate.py
+    #   머리의 「Orca 판정 규칙」). 그래도 이 줄은 남긴다 — 워크플로 run 을 초록으로 유지해 후속
     #   워크플로·배지가 리뷰 실패로 오염되지 않게 하는 원래 부수 효과는 여전히 유효하다.
     #   체크 색 자체를 없애는 것(= PR head SHA 에 체크런을 안 만드는 것)은 트리거를
     #   workflow_run/ workflow_dispatch 로 옮겨야 가능한데, 그러면 이 워크플로가 **PR 에서
@@ -1516,7 +1516,7 @@ jobs:
       issues: read           # 게시 멱등화 — 같은 SHA 마커 코멘트 존재 조회 (Orca 경로 정합)
     env:
       GH_TOKEN: ${{ github.token }}                # 코멘트 게시 — bot 명의 유지 (판정 provenance 는 첫 줄 신원)
-      PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}  # 폴백 라벨(review: fallback-claude) 부착용 (계약 3. board-status 용 classic PAT 재사용 — 신규 발급 없음)
+      PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}  # 폴백 라벨(review: fallback-claude) 부착용 (계약 3. 구 board-status 용 classic PAT 재사용 — 신규 발급 없음)
       REPO: ${{ github.repository }}
       PR: ${{ github.event.pull_request.number }}
       HEAD_SHA: ${{ needs.route.outputs.head_sha }}
@@ -1603,8 +1603,8 @@ jobs:
           fi
 
           # 0.5) 실효 리뷰어 — 폴백이 돌았으면 claude 다. 마커 model 필드·신원 줄·라벨이 이 값을 쓴다.
-          #      **마커 model 은 벤더값(claude|kimi|codex)을 유지한다** — merge-router 의 자동 머지 arm
-          #      가드가 `model=(claude|kimi|codex)` 로 정확 매칭하므로 여기에 티어를 넣으면 저위험
+          #      **마커 model 은 벤더값(claude|kimi|codex)을 유지한다** — review-record 판정부의 마커
+          #      정규식이 `model=(claude|kimi|codex)` 로 정확 매칭하므로 여기에 티어를 넣으면 저위험
           #      폴백의 자동 머지가 조용히 막힌다 (사용자 결정: 저위험 폴백은 자동 머지 허용).
           #      티어는 코멘트 첫 줄과 폴백 라벨로만 드러낸다.
           #      Orca 경로·체인 소진 시 EFFECTIVE_REVIEWER 는 비므로 route 의 1순위로 되돌아간다.
@@ -1650,7 +1650,7 @@ jobs:
           #   있어 아티팩트만 믿으면 unable 로 새어 게이트가 pending 에 갇힌다. 마커는 취약한
           #   아티팩트 전달과 달리 GitHub 에 확실히 존재하므로 이를 폴백 근거로 삼는다.
           #   위조 방지: model==REVIEWER ∧ verdict∈3값 ∧ sha==HEAD_SHA 전건 일치 + 저자 필터
-          #   (OWNER/MEMBER/COLLABORATOR) — 리뷰 잡 폴링 파서·review-gate·merge-router 와 동일
+          #   (OWNER/MEMBER/COLLABORATOR) — 리뷰 잡 폴링 파서·review-record 판정부와 동일
           #   마커 형식·필터(§3.5 멱등 가드와도 동일). 복수면 마지막. 못 찾으면 unable (fail-closed).
           scan_marker_verdict() {
             gh api "repos/$REPO/issues/$PR/comments" --paginate \
@@ -1747,7 +1747,7 @@ jobs:
             printf '리뷰 모델: 배정 %s → 실제 판정 %s%s\n' \
               "${ROUTED_REVIEWER:-?}" "${EFFECTIVE_REVIEWER:-없음(판정 산출 실패)}" \
               "$([ "${EFFECTIVE_REVIEWER:-}" = claude ] && printf ' (%s)' "$TIER_KO")"
-            printf '위험도 판독(라우팅 참고): risk: %s (출처: %s — 머지 경로 판정은 merge-router 가 재판독)\n' "$RISK" "$RISK_SOURCE"
+            printf '위험도 판독(라우팅 참고): risk: %s (출처: %s — 머지 경로 판정은 review-record 가 재판독)\n' "$RISK" "$RISK_SOURCE"
             printf '저자 판별: %s (근거: %s)\n' "${AUTHOR_MODELS:-사람(에이전트 신원 없음)}" "$IDENTITY_SOURCE"
             if [ -n "$FALLBACK_NOTE" ]; then
               printf '리뷰어 폴백: 1순위 %s → 실효 %s(%s). 발동 근거: %s. (한도는 즉시 다음 리뷰어, 일시 장애는 재시도 후 다음 리뷰어, 그 밖의 실패는 폴백하지 않고 리뷰 불가로 간다.)\n' \
@@ -1872,10 +1872,10 @@ jobs:
   #     사람도 머지 못 하는 작업 정지 장치가 된다 (설계 §4 금지). ruleset `main protection` 의
   #     required checks 는 `test: ` 4종뿐이다. 빨강은 알림이고, 머지를 실제로 막는 것은
   #     기록기(review-record)가 남기는 CHANGES_REQUESTED 리뷰다.
-  #   · **`test: ` 접두 금지** — required 게이트(scripts/verify_upstream_gate.py)와
-  #     merge-router 의 전수 초록 게이트가 그 접두를 전수 판정한다. 판정 체크가 끼면
+  #   · **`test: ` 접두 금지** — required 게이트(scripts/verify_upstream_gate.py)가
+  #     그 접두를 전수 판정한다. 판정 체크가 끼면
   #     needs_changes 하나가 required 게이트를 빨갛게 만들어 사람 머지까지 막는다.
-  #     같은 이유로 이 잡의 빨강은 그 게이트들에 안 보인다 (의도 — 실측 검증 항목).
+  #     같은 이유로 이 잡의 빨강은 그 게이트에 안 보인다 (의도 — 실측 검증 항목).
   #   · **교착 출구**: 리뷰 경로가 죽어 새 판정이 안 나오면 CHANGES_REQUESTED 가 영영 남아
   #     머지가 막힌다. 출구는 사람이 리뷰를 해제(dismiss)하는 것뿐 — 명령은 이 체크의 빨간
   #     로그(scripts/review_verdict.py 출력)와 설계 문서
