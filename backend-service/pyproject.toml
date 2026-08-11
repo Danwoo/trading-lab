@@ -23,7 +23,7 @@ dependencies = [
 [dependency-groups]
 main = [
     # file 모듈 — SFTP 업로드·이미지 프리뷰
-    "pillow~=12.2.0",
+    "pillow~=12.3.0",
     "asyncssh~=2.23.0",
     # chat·report 모듈 — LangGraph 멀티 MCP 에이전트 + APScheduler
     "mcp>=1.27,<2",
