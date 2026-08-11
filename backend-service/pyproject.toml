@@ -11,7 +11,7 @@ dependencies = [
     "python-multipart~=0.0.29",
     "uvicorn[standard]~=0.47.0",
     "fastapi~=0.136.1",
-    "pydantic-settings~=2.14.1",
+    "pydantic-settings~=2.14.2",
     "pyjwt~=2.13.0",
     # 데이터베이스
     "sqlalchemy~=2.0.49",
