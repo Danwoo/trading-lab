@@ -1,11 +1,15 @@
-"""review_verdict.judge 회귀 그물 — 판정 → 체크 색 대응이 fail-closed 로 서 있는지 못박는다.
+"""review_verdict 회귀 그물 — 판정 → 체크 색 대응이 fail-closed 로 서 있는지 못박는다.
 
-뒤집히기 쉬운 세 자리를 케이스로 잡는다:
+뒤집히기 쉬운 자리를 케이스로 잡는다:
   ① 초록은 `merge_ok` **정확 일치** 하나뿐이다 — 대소문자·공백 관대함이 배관 오류를 삼키면
      이 스크립트가 막으려는 「초록인데 못 민다」가 「빨개야 하는데 초록」으로 재발한다
-  ② `unable`·빈 값·미지 값도 빨강이다 — 판정을 못 낸 것이 통과로 읽히면 안 된다
+  ② 빈 값·미지 값은 빨강이다 — 판정을 못 낸 것이 통과로 읽히면 안 된다. `unable` 은 정상
+     배선에서 잡 `if:` 가 스킵하지만, judge 까지 왔다면(배선 어긋남) 빨강이다 (fail-closed)
   ③ 빨간 출력에는 교착 출구(dismiss 명령)가 실린다 — 빨간 체크의 로그가 사람이 막혔을 때
      여는 자리라, 출구 안내가 빠지면 문서를 아는 사람만 탈출한다
+  ④ CHECK_CONCLUSION 표와 check_payload(기록기 경로)가 같은 색을 낸다 — 표가 두 소비자
+     (verdict 잡 `if:` · review-record 체크런)의 단일 출처라, 여기가 갈리면 늦게 도착한
+     판정이 잡과 다른 색을 칠한다
 """
 
 import sys
@@ -39,6 +43,28 @@ CASES = [
 ]
 
 
+# (설명, 입력 verdict, 기대 conclusion, summary 에 있어야 하는 조각들)  — check_payload (④)
+PAYLOAD_CASES = [
+    ("merge_ok → success", "merge_ok", "success", []),
+    (
+        "needs_changes → failure + 교착 출구",
+        "needs_changes",
+        "failure",
+        ["dismissals", "event=DISMISS"],
+    ),
+    ("unable → skipped + 조치 안내", "unable", "skipped", ["사람 판단", "arm"]),
+    ("미지 값 → failure (fail-closed)", "success", "failure", []),
+    ("빈 값 → failure (fail-closed)", "", "failure", []),
+]
+
+# CHECK_CONCLUSION 표 자체 — 어휘 셋 정확히, 값도 정확히 (④의 뿌리)
+EXPECTED_TABLE = {
+    "merge_ok": "success",
+    "needs_changes": "failure",
+    "unable": "skipped",
+}
+
+
 def main() -> int:
     failures = 0
     for desc, verdict, want_code, want_bits, ban_bits in CASES:
@@ -55,8 +81,47 @@ def main() -> int:
             if bit in out:
                 print(f"FAIL [{desc}] 출력에 {bit!r} 있으면 안 됨")
                 failures += 1
-    print(f"review_verdict 케이스 {len(CASES)}건 검사 · 실패 {failures}건")
-    if not CASES:
+
+    if rv.CHECK_CONCLUSION != EXPECTED_TABLE:
+        print(
+            f"FAIL CHECK_CONCLUSION 표가 기대와 다르다: {rv.CHECK_CONCLUSION!r} "
+            f"(기대 {EXPECTED_TABLE!r}) — 표를 바꿨다면 cross-review.yml verdict 잡 if: 와 "
+            "review-record 체크런 경로도 같이 봐야 한다"
+        )
+        failures += 1
+
+    for desc, verdict, want_conclusion, want_bits in PAYLOAD_CASES:
+        payload = rv.check_payload(verdict)
+        for key in ("conclusion", "title", "summary"):
+            if not payload.get(key):
+                print(f"FAIL [payload {desc}] {key} 가 비었다")
+                failures += 1
+        if payload.get("conclusion") != want_conclusion:
+            print(
+                f"FAIL [payload {desc}] conclusion: got {payload.get('conclusion')!r}, "
+                f"want {want_conclusion!r}"
+            )
+            failures += 1
+        joined = payload.get("title", "") + "\n" + payload.get("summary", "")
+        for bit in want_bits:
+            if bit not in joined:
+                print(f"FAIL [payload {desc}] 출력에 {bit!r} 없음")
+                failures += 1
+
+    # judge ↔ 표 정합: 표가 success 인 값만 judge 가 0 이다 (unable 은 표상 skipped 지만
+    # judge 는 배선 어긋남 방어로 1 — 초록이 아니면 된다)
+    for verdict, conclusion in rv.CHECK_CONCLUSION.items():
+        code, _ = rv.judge(verdict)
+        if (code == 0) != (conclusion == "success"):
+            print(
+                f"FAIL judge({verdict!r})={code} 인데 표는 {conclusion!r} — "
+                "초록 판정이 표와 어긋난다"
+            )
+            failures += 1
+
+    total = len(CASES) + len(PAYLOAD_CASES) + 1 + len(rv.CHECK_CONCLUSION)
+    print(f"review_verdict 케이스 {total}건 검사 · 실패 {failures}건")
+    if not CASES or not PAYLOAD_CASES:
         print("FAIL 검사 대상 0건")
         return 1
     return 1 if failures else 0
