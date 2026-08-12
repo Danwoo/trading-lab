@@ -25,6 +25,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma/client";
 import { Prisma } from "@/prisma/generated/client";
 import {
+  AUDIT_ANONYMIZED_TABLES,
+  deletedUserAuditId,
   deleteUserCascade,
   emailVerificationOtpIdentifier,
   EMAIL_VERIFICATION_OTP_PREFIX,
@@ -409,7 +411,9 @@ describe("deleteUserCascade — FK 가 없어 조용히 남던 축 (#363)", () =
     // `th_email_log.to` 가 정확히 이 사각지대에 있었다 (#363 리드 결정으로 삭제 목록에 편입).
     // `ba_verification.identifier` 도 같은 자리였다 (#3 리드 결정으로 편입).
     // 감사 컬럼(`reg_id`·`mod_id`)은 이 대조의 대상이 아니다 — 행의 주체가 아니라 조작한 사람을
-    // 적는 자리라 삭제 여부가 별개 판단이다 (#3 ㉡ 로 실측만 하고 정책은 리드 대기).
+    // 적는 자리라 처리가 삭제가 아니라 **익명화**다 (#3 ㉡, 2026-08-12 리드 결정). 그 축은 아래
+    // "감사 컬럼 익명화" describe 의 전용 그물(AUDIT_ANONYMIZED_TABLES 양방향 완전 일치)이 맡는다
+    // — 두 그물의 경계: 이 대조는 「행째 지울 테이블」, 저 대조는 「행은 남기고 값만 바꿀 컬럼」.
     const rows = await prisma.$queryRaw<{ table_schema: string; table_name: string; column_name: string }[]>`
       SELECT c.table_schema, c.table_name, c.column_name
       FROM information_schema.columns c
@@ -639,6 +643,140 @@ describe("deleteUserCascade — 인증 토큰(ba_verification)도 사용자 축�
       await prisma.baVerification.deleteMany({ where: { identifier: { in: identifiers } } });
       await prisma.workspaceMember.deleteMany({ where: { user_id: { in: [userId, otherId] } } });
       await prisma.user.deleteMany({ where: { id: { in: [userId, otherId] } } });
+      await prisma.workspace.deleteMany({ where: { workspace_code: workspaceCode } });
+    }
+  });
+});
+
+/** 감사 컬럼에 이 이메일이 남은 행 수 — 테이블별로 세어 어느 테이블이 안 처리됐는지 이름으로 드러낸다. */
+async function countAuditRowsFor(email: string): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  for (const table of AUDIT_ANONYMIZED_TABLES) {
+    const rows = await prisma.$queryRaw<{ count: bigint }[]>(
+      Prisma.sql`SELECT count(*) AS count FROM ${Prisma.raw(table)}
+                  WHERE lower(reg_id) = lower(${email}) OR lower(mod_id) = lower(${email})`,
+    );
+    counts[table] = Number(rows[0].count);
+  }
+  return counts;
+}
+
+describe("deleteUserCascade — 감사 컬럼(reg_id·mod_id)은 지우지 않고 익명화한다 (#3 ㉡, 2026-08-12 리드 결정)", () => {
+  it("감사 컬럼을 가진 테이블이 익명화 목록과 양방향으로 완전히 일치한다", async () => {
+    // 기존 두 그물(workspace_id·식별자 컬럼)은 「행째 지울 테이블」의 대조라 감사 컬럼을 의도적으로
+    // 범위 밖에 뒀다. 이 축은 「행은 남기고 값만 바꿀 컬럼」이라 별도 그물이 필요하고, 제외 목록이
+    // 없으므로(감사 컬럼이 있으면 예외 없이 익명화 대상) accounted 방식이 아니라 **완전 일치**로
+    // 대조한다 — 감사 컬럼을 가진 테이블이 새로 생기면 빨강, 목록의 테이블이 사라져도 빨강.
+    const rows = await prisma.$queryRaw<{ tbl: string }[]>`
+      SELECT DISTINCT c.table_schema || '.' || c.table_name AS tbl
+      FROM information_schema.columns c
+      JOIN information_schema.tables t
+        ON t.table_schema = c.table_schema AND t.table_name = c.table_name AND t.table_type = 'BASE TABLE'
+      WHERE c.table_schema IN ('frontend', 'public') AND c.column_name IN ('reg_id', 'mod_id')
+    `;
+    const found = rows.map((r) => r.tbl).sort();
+    // 통과가 "위반 없음"인지 "아무것도 안 봤음"인지 구분할 수 있게 검사한 수를 남긴다 — 0건이면 실패.
+    console.log(`[#3] 감사 컬럼 대조: 테이블 ${found.length}개 검사`);
+    expect(found.length).toBeGreaterThan(0);
+    expect(AUDIT_ANONYMIZED_TABLES.length).toBeGreaterThan(0);
+    expect(found).toEqual([...AUDIT_ANONYMIZED_TABLES].sort());
+  });
+
+  it("탈퇴자의 이메일만 deleted-user-<id> 로 바뀌고, 남의 값·같은 행의 남의 컬럼은 그대로다", async () => {
+    const userId = randomUUID();
+    const email = `${userId}@dbtest.example.com`;
+    const survivorId = randomUUID();
+    const survivorEmail = `survivor-${userId}@dbtest.example.com`;
+    // 두 사용자가 함께 쓰는 공용 워크스페이스 — 탈퇴 후에도 남아, 남은 행의 감사 컬럼을 검증할 수 있다.
+    const workspaceCode = `ws-dbaud-${userId.slice(0, 21)}`; // 9자 + 21자 = 30자
+    const portfolioId = `p-aud-${userId.slice(0, 8)}`;
+    const anonymized = deletedUserAuditId(userId);
+
+    try {
+      // 워크스페이스 행 자체가 검증 대상이다: reg_id 는 탈퇴자(대문자 레거시 변형), mod_id 는
+      // 생존자 — 컬럼 단위 치환이면 reg_id 만 바뀌고 mod_id 는 그대로여야 한다.
+      const workspace = await prisma.workspace.create({
+        data: {
+          workspace_code: workspaceCode,
+          workspace_nm: "dbtest 감사컬럼 워크스페이스",
+          is_personal: false,
+          reg_id: email.toUpperCase(),
+          mod_id: survivorEmail,
+        },
+      });
+      await prisma.user.create({
+        data: { id: userId, email, name: "dbtest-audit", appr_at: "Y", use_at: "Y", workspace_id: workspace.id },
+      });
+      // 생존자 행을 탈퇴자(관리자 역할)가 만든 상황 — 행은 남고 감사 컬럼만 익명화돼야 한다.
+      await prisma.user.create({
+        data: {
+          id: survivorId,
+          email: survivorEmail,
+          name: "dbtest-audit-survivor",
+          appr_at: "Y",
+          use_at: "Y",
+          workspace_id: workspace.id,
+          reg_id: email,
+          mod_id: email,
+        },
+      });
+      await prisma.workspaceMember.create({
+        data: { workspace_id: workspace.id, user_id: userId, role: "member", is_default: true },
+      });
+      // 생존자 자신의 감사 값 — 익명화가 남의 값을 쓸어가면 이 행이 바뀌어 빨강이 된다.
+      await prisma.workspaceMember.create({
+        data: {
+          workspace_id: workspace.id,
+          user_id: survivorId,
+          role: "member",
+          is_default: true,
+          reg_id: survivorEmail,
+          mod_id: survivorEmail,
+        },
+      });
+      // public 스키마 축 — 공용 워크스페이스의 행이라 삭제 축에 안 걸리고 남는다.
+      await prisma.$executeRaw`INSERT INTO public.tn_portfolio (workspace_id, portfolio_id, portfolio_nm, reg_id, mod_id)
+                               VALUES (${workspace.id}, ${portfolioId}, 'dbtest 감사 포트폴리오', ${email}, ${email})`;
+
+      // 심은 것이 실제로 들어갔는지 먼저 확인한다 — 0건이면 "처리 후 0건" 은 아무것도 증명하지 못한다.
+      const before = await countAuditRowsFor(email);
+      expect(before["frontend.tn_user"]).toBeGreaterThan(0);
+      expect(before["frontend.tn_workspace"]).toBeGreaterThan(0);
+      expect(before["public.tn_portfolio"]).toBeGreaterThan(0);
+
+      await expect(deleteUserCascade(email)).resolves.toBeUndefined();
+
+      // 전수 소거: 26개 테이블 어디에도 탈퇴자 이메일이 감사 컬럼에 남지 않는다.
+      const after = await countAuditRowsFor(email);
+      for (const table of AUDIT_ANONYMIZED_TABLES) {
+        expect.soft(`${table}=${after[table]}`).toBe(`${table}=0`);
+      }
+      // 값 수준: 같은 사람의 행위는 같은 값으로 묶이고, NULL 이 아니며, 같은 행의 남의 컬럼은 그대로다.
+      const survivorRow = await prisma.user.findUniqueOrThrow({
+        where: { id: survivorId },
+        select: { reg_id: true, mod_id: true },
+      });
+      expect(survivorRow.reg_id).toBe(anonymized);
+      expect(survivorRow.mod_id).toBe(anonymized);
+      const workspaceRow = await prisma.workspace.findUniqueOrThrow({
+        where: { id: workspace.id },
+        select: { reg_id: true, mod_id: true },
+      });
+      expect(workspaceRow.reg_id).toBe(anonymized); // 대문자 레거시 변형도 잡는다
+      expect(workspaceRow.mod_id).toBe(survivorEmail); // 같은 행이라도 남의 컬럼은 불변
+      const portfolioRow = await prisma.$queryRaw<{ reg_id: string; mod_id: string }[]>`
+        SELECT reg_id, mod_id FROM public.tn_portfolio WHERE portfolio_id = ${portfolioId}`;
+      expect(portfolioRow[0]).toEqual({ reg_id: anonymized, mod_id: anonymized });
+      // 생존자 자신의 감사 값은 안 건드렸다 — 「대상을 잘못 고르지 않았다」의 증명.
+      const survivorMembership = await prisma.workspaceMember.findUniqueOrThrow({
+        where: { workspace_id_user_id: { workspace_id: workspace.id, user_id: survivorId } },
+        select: { reg_id: true, mod_id: true },
+      });
+      expect(survivorMembership).toEqual({ reg_id: survivorEmail, mod_id: survivorEmail });
+    } finally {
+      await prisma.$executeRaw`DELETE FROM public.tn_portfolio WHERE portfolio_id = ${portfolioId}`;
+      await prisma.workspaceMember.deleteMany({ where: { user_id: { in: [userId, survivorId] } } });
+      await prisma.user.deleteMany({ where: { id: { in: [userId, survivorId] } } });
       await prisma.workspace.deleteMany({ where: { workspace_code: workspaceCode } });
     }
   });
