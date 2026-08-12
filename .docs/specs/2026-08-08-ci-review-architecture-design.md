@@ -232,13 +232,22 @@ gh api -X PUT repos/<owner>/<repo>/pulls/<N>/reviews/<리뷰ID>/dismissals \
   -f message="<사유>" -f event=DISMISS
 ```
 
-같은 안내가 빨간 체크 `review: verdict (비게이트)` 의 로그(`scripts/review_verdict.py` 출력)에도
-실린다 — 막힌 사람이 처음 여는 자리가 거기다.
+같은 안내가 빨간 체크 `review: verdict (비게이트)` 의 로그(`scripts/review_verdict.py` 출력 —
+`needs_changes` 경로)와, `unable` 일 때는 publish 의 판정 코멘트 CAUTION 배너에도 실린다 —
+막힌 사람이 처음 여는 자리가 거기다.
 
-**판정은 체크로도 보인다** (#23 Task 10). `review: verdict (비게이트)` 가 판정을 체크 색으로
-확정한다 — `merge_ok` 만 초록, `needs_changes`·`unable`·판정 미산출은 빨강 (fail-closed).
+**판정은 체크로도 보인다** (#23 Task 10 · 2026-08-12 개정). `review: verdict (비게이트)` 가
+판정을 체크 색으로 확정한다 — `merge_ok` 만 초록, `needs_changes`·판정 미산출은 빨강,
+`unable` 은 **Skipped** (매핑의 SoT 는 `scripts/review_verdict.py` `CHECK_CONCLUSION`).
+`unable` 을 빨강에서 뺀 이유: Orca 는 required 여부와 무관하게 빨간 체크 하나로 머지 버튼을
+잠그는데, 판정을 못 낸 것(인프라·연결)은 코드 결함이 아니다 (PR #104 실측 — kimi 접수 확인
+오판으로 unable 빨강이 3회 남았고 그중 2회는 리뷰가 7~8분 뒤 실제 `merge_ok` 로 끝났다).
+`needs_changes` 의 빨강은 그대로다 — 그건 막는 게 목적이다.
 required 가 아니고 `test: ` 접두도 아니라서 1번(사람 머지)·자동 머지 어느 쪽도 막지 않는다 —
 「초록인데 못 민다」(PR #68 실측)를 체크 목록에서 읽히게 하는 알림이다.
+워크플로가 끝난 뒤 도착한 판정은 기록기(review-record)가 같은 이름의 체크런을 새로 써
+반영한다 (`checks: write`, 같은 매핑 표 재사용) — 판정을 읽는 곳과 체크를 쓰는 곳이 같아
+늦은 판정이 체크에서 어긋나지 않는다.
 
 **required checks 에 무엇을 넣나**: 테스트 9종을 개별로 걸지 말고 「전부 초록인가」를 대표하는
 **게이트 잡 하나**만 required 로 건다. pending 창이 하나로 줄어 Orca 머지 버튼이 닫혀 있는

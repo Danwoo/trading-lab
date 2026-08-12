@@ -3,6 +3,8 @@
 # 무엇: 리뷰어(Orca 워커 또는 사람)가 남긴 판정 코멘트의 기계 마커
 #   (`<!-- cross-review v1 model=… [tier=…] verdict=… sha=… -->`)를 읽어 `github-actions[bot]` 명의의
 #   네이티브 리뷰로 대행한다 — merge_ok → Approve, needs_changes → Request changes.
+#   판정 체크런(`review: verdict (비게이트)`)도 같은 마커로 갱신한다 — 워크플로가 끝난 뒤
+#   도착한 판정이 체크 색에 반영되는 유일한 경로다 (매핑: scripts/review_verdict.py, 잡 스텝 1.5).
 #   이어서 자동 머지 arm 조건(설계 §4)을 판정해 arm 하고, push(synchronize)가 오면 disarm 한다.
 #
 # 왜 봇 명의 대행인가: GitHub 이 자기 PR 자기 승인을 금지해, Orca 리뷰어가 쓰는 로컬 `gh`
@@ -79,7 +81,13 @@ concurrency:
 permissions:
   contents: write        # 자동 머지 arm/disarm·직접 머지
   pull-requests: write   # 네이티브 리뷰·코멘트 게시
-  checks: read           # required 게이트 체크런 조회
+  # checks 를 read → write 로 넓힌 이유 (2026-08-12): cross-review 의 verdict 잡은 **그 실행
+  # 자신의 출력**만 읽어서, 워크플로가 끝난 뒤 도착한 판정 마커를 영영 못 본다 (PR #104 실측:
+  # unable 로 끝난 뒤 7~8분 뒤 merge_ok 마커가 왔는데 재실행해도 unable 그대로). 기록기는
+  # 마커가 올 때마다 깨어나므로, 여기서 같은 이름의 체크런(`review: verdict (비게이트)`)을
+  # 새로 써 체크 색을 판정과 일치시킨다 — 판정을 읽는 곳과 체크를 쓰는 곳이 같아진다.
+  # 쓰는 대상은 이 체크런 하나뿐이다 (게이트 조회는 종전대로 읽기).
+  checks: write          # required 게이트 체크런 조회 + 판정 체크런 게시
   issues: read           # 참조 이슈의 risk 라벨 조회
 
 jobs:
@@ -155,6 +163,33 @@ jobs:
           MARKER_SHA=$(jq -r '.marker_sha // empty' <<<"$DECISION")
           COMMENT_URL=$(jq -r '.comment_url // empty' <<<"$DECISION")
           ARM_CANDIDATE=$(jq -r .arm_candidate <<<"$DECISION")
+
+          # ── 1.5) 판정 → 체크런 — 늦게 도착한 판정을 체크 색에 반영한다 (2026-08-12) ──────
+          # cross-review 의 verdict 잡은 자기 run 의 출력만 읽어, 워크플로 종료 후 도착한
+          # 마커를 못 본다 (PR #104 실측 — 재실행해도 unable 그대로). 기록기는 마커가 올
+          # 때마다 깨어나므로 여기서 체크를 쓴다. **같은 이름**으로 쓴다 — GitHub 은 같은
+          # 앱(github-actions)·같은 이름의 체크런 중 최신 것을 PR 체크 목록에 보이므로,
+          # unable 로 스킵된(또는 needs_changes 로 빨간) 잡 체크를 이 체크런이 덮어쓴다.
+          # 색 매핑은 scripts/review_verdict.py CHECK_CONCLUSION 한 표다 (merge_ok→success ·
+          # needs_changes→failure · unable→skipped) — verdict 잡과 갈릴 수 없다.
+          # head_sha 는 마커 sha 를 쓴다 — decide_record 가 현재 head 와 40자 동등 비교를
+          # 이미 통과시킨 값이라 낡은 판정이 현재 head 에 칠해지는 경로는 없다.
+          # 게시 실패는 경고로만 남긴다 — 체크 가시화가 죽어도 기록·arm 경로는 살아야 한다.
+          if [ -n "$VERDICT" ] && [ -n "$MARKER_SHA" ]; then
+            CHECK_PAYLOAD=$(VERDICT="$VERDICT" python3 scripts/review_verdict.py check-payload)
+            if [ -n "$CHECK_PAYLOAD" ]; then
+              if CHECK_OUT=$(jq -n --arg sha "$MARKER_SHA" --argjson p "$CHECK_PAYLOAD" \
+                    '{name: "review: verdict (비게이트)", head_sha: $sha, status: "completed",
+                      conclusion: $p.conclusion, output: {title: $p.title, summary: $p.summary}}' \
+                  | gh api -X POST "repos/$REPO/check-runs" --input - --jq .id 2>&1); then
+                echo "판정 체크런 게시: verdict=${VERDICT} → $(jq -r .conclusion <<<"$CHECK_PAYLOAD") (check-run id ${CHECK_OUT}, sha=${MARKER_SHA})"
+              else
+                echo "::warning::판정 체크런 게시 실패 — 체크 색이 판정과 어긋난 채 남는다. ${CHECK_OUT}"
+              fi
+            else
+              echo "::warning::check-payload 산출 실패 — 판정 체크런을 쓰지 못했다"
+            fi
+          fi
 
           # ── 2) 네이티브 리뷰 게시 — commit_id 를 마커 sha 로 고정한다 (게시와 head 이동이
           #      경합해도 리뷰가 판정 대상 커밋에 박힌다. arm 은 어차피 head 동등을 재검한다) ──
