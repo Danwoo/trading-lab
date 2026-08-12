@@ -2990,7 +2990,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@types/katex` | 0.16.8 | MIT |
 | `@types/mdast` | 4.0.4 | MIT |
 | `@types/ms` | 2.1.0 | MIT |
-| `@types/node` | 25.9.1 | MIT |
+| `@types/node` | 26.2.0 | MIT |
 | `@types/pg` | 8.20.0 | MIT |
 | `@types/react-dom` | 19.2.3 | MIT |
 | `@types/react` | 19.2.15 | MIT |
@@ -3366,7 +3366,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `trough` | 2.2.0 | MIT |
 | `tslib` | 2.3.0 | 0BSD |
 | `tslib` | 2.8.1 | 0BSD |
-| `undici-types` | 7.24.6 | MIT |
+| `undici-types` | 8.3.0 | MIT |
 | `undici` | 8.9.0 | MIT |
 | `unified` | 11.0.5 | MIT |
 | `unist-util-find-after` | 5.0.0 | MIT |
