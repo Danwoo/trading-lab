@@ -303,6 +303,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_terminal_state.py
 
+      # 러너 동결 재실행 판정 — runner-freeze-rerun.yml 이 부르는 순수 판정. 동결 서명
+      # 정확 일치 + 여파(verdict unable)만 재실행하고, 진짜 실패가 섞이면 재실행하지
+      # 않는지를 실제 API 픽스처(fixtures/runner_freeze_annotations.json)로 못박는다.
+      # 케이스를 0건 모으면 실패한다 (fail-closed).
+      - name: 러너 동결 재실행 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_runner_freeze_rerun.py
+
       # 경로 필터 판정 (#23 Task 4) — ci.yml·frontend-ci.yml 의 `changes` 잡이 부르는 순수
       # 판정 + **배선 구조 자체**. 글롭 의미만 보면 "판정은 맞는데 아무도 안 부르는" 상태가
       # 초록이므로, on.paths 재유입·판정 잡 부재·`if:` 안 읽는 잡·추적 파일을 하나도 안 무는
