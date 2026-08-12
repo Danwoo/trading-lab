@@ -1,6 +1,6 @@
 # 서드파티 라이선스 고지 (THIRD-PARTY-NOTICES)
 
-프론트엔드(`frontend/`) 프로덕션 의존성 595개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 595개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
+프론트엔드(`frontend/`) 프로덕션 의존성 598개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 598개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
 
 **2026-08-06 갱신(#341 완주 — DevExtreme 제거 반영)** — 상용 6종과 그 전이 의존이 빠져 623→599개가 됐다. 사라진 24개: 상용 6종(`devextreme`·`devextreme-react`·`@devexpress/utils`·`devexpress-diagram`·`devexpress-gantt`·`@devextreme/runtime`)과 그것들만 쓰던 18개(`inferno` 계열 5 · `devextreme-quill`·`parchment`·`quill-delta`·`fast-diff`·`rrule`·`core-js`·`@babel/runtime`·`es6-object-assign`·`eventemitter3`·`lodash.clonedeep`·`lodash.isequal`·`lodash.merge`·`opencollective-postinstall`). 갱신은 손으로 지우지 않고 **아래 재현 명령의 새 출력을 정본으로 삼아 문서의 패키지 목록과 대조**했다 — 그 결과 「문서에 있는데 지금 없음」 24개 = 위 목록, 「지금 있는데 문서에 없음」 0개. 남은 599개에 DevExpress 계열은 `devextreme-exceljs-fork`(MIT 포크) 하나뿐이다.
 
@@ -2850,9 +2850,9 @@ MIT 조건으로 사용(추가 의무 없음). GPL 조건은 선택하지 않았
 
 ---
 
-## 2. 그 외 permissive 라이선스 (542개)
+## 2. 그 외 permissive 라이선스 (545개)
 
-MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 542개 중 539개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
+MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 545개 중 542개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
 
 ### 예외 — 원문 파일 없이 선언만 있는 패키지 (3개)
 
@@ -2864,7 +2864,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `client-only` | 0.0.1 | MIT |
 | `fancy-canvas` | 2.1.0 | MIT |
 
-<details><summary>펼치기 — 나머지 539개: 패키지 · 버전 · 라이선스</summary>
+<details><summary>펼치기 — 나머지 542개: 패키지 · 버전 · 라이선스</summary>
 
 | 패키지 | 버전 | 라이선스 |
 |---|---|---|
@@ -2977,9 +2977,11 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@standard-schema/spec` | 1.1.0 | MIT |
 | `@t3-oss/env-core` | 0.13.11 | MIT |
 | `@t3-oss/env-nextjs` | 0.13.11 | MIT |
-| `@tanstack/react-table` | 8.21.3 | MIT |
+| `@tanstack/react-store` | 0.11.1 | MIT |
+| `@tanstack/react-table` | 9.1.2 | MIT |
 | `@tanstack/react-virtual` | 3.14.8 | MIT |
-| `@tanstack/table-core` | 8.21.3 | MIT |
+| `@tanstack/store` | 0.11.1 | MIT |
+| `@tanstack/table-core` | 9.1.2 | MIT |
 | `@tanstack/virtual-core` | 3.17.6 | MIT |
 | `@types/chai` | 5.2.3 | MIT |
 | `@types/debug` | 4.1.13 | MIT |
@@ -3380,6 +3382,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `unzipper` | 0.12.3 | MIT |
 | `use-callback-ref` | 1.3.3 | MIT |
 | `use-sidecar` | 1.1.3 | MIT |
+| `use-sync-external-store` | 1.6.0 | MIT |
 | `util-deprecate` | 1.0.2 | MIT |
 | `uuid` | 14.0.0 | MIT |
 | `valibot` | 1.2.0 | MIT |
