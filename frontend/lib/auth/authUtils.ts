@@ -126,6 +126,59 @@ export const USER_SCOPED_IDENTIFIER_TABLES_EXCLUDED = [
 ] as const;
 
 /**
+ * 감사 컬럼(`reg_id`·`mod_id`)을 가진 테이블 전부 — 탈퇴 시 **삭제가 아니라 익명화**하는 축 (#3
+ * 리드 결정 2026-08-12). 위 두 축(워크스페이스·식별자)과 성격이 다르다: 저 컬럼들은 「그 행의
+ * 주체」가 아니라 **「그 행을 조작한 사람」**을 적으므로, 지우면 남의 행의 감사 이력이 통째로
+ * 비고, 두면 탈퇴자 이메일이 남는다. 표준 처리는 연결을 끊되 기록은 남기는 것이다 —
+ * 식별 데이터(이메일)는 `deletedUserAuditId(user.id)` 로 치환하고 행 자체는 보존한다.
+ *
+ * 제외 목록이 없다 — 감사 컬럼을 가진 테이블이면 예외 없이 이 축의 대상이다. 회귀 그물이
+ * `information_schema` 를 원천으로 이 목록과 **양방향 완전 일치**를 대조하므로, 감사 컬럼을 가진
+ * 테이블이 새로 생기면 그물이 빨강이 되고 여기 추가해야 한다 (deleteUserCascade.dbtest.ts).
+ */
+export const AUDIT_ANONYMIZED_TABLES = [
+  "frontend.ai_chat_history",
+  "frontend.tc_code",
+  "frontend.tc_group_code",
+  "frontend.tn_author",
+  "frontend.tn_author_member",
+  "frontend.tn_author_menu",
+  "frontend.tn_menu",
+  "frontend.tn_user",
+  "frontend.tn_workspace",
+  "frontend.tn_workspace_domain",
+  "frontend.tn_workspace_member",
+  "frontend.tn_workspace_menu",
+  "public.tn_board",
+  "public.tn_file",
+  "public.tn_file_detail",
+  "public.tn_holding",
+  "public.tn_ingest_run",
+  "public.tn_instrument",
+  "public.tn_message_queue",
+  "public.tn_nav",
+  "public.tn_portfolio",
+  "public.tn_research_document",
+  "public.tn_scheduler",
+  "public.tn_scheduler_member",
+  "public.tn_symbol_alias",
+  "public.tn_watchlist",
+] as const;
+
+/**
+ * 탈퇴자의 감사 컬럼 대체값. 세 성질을 만족한다 (#3):
+ * - **복원 불가** — `tn_user` 행이 같은 트랜잭션에서 지워지므로 이 id 는 커밋 시점에 아무
+ *   신원에도 닿지 않는다 (이 id 를 담던 다른 자리 — `ba_*`·`tn_scheduler_member.account_id`·
+ *   개인 워크스페이스 — 도 전부 같은 연쇄에서 지워진다).
+ * - **같은 사람은 묶임** — 사용자당 id 가 하나이므로 여러 테이블에 흩어진 행위가 같은 값으로
+ *   남는다. 모두를 하나의 상수로 뭉개면 탈퇴자 간 행위 구분이 사라져 감사 이력의 의미가
+ *   절반 없어진다.
+ * - **충돌 없음** — uuid 라 다른 탈퇴자·실사용자 값과 겹치지 않고, `@` 가 없어 이메일 모양의
+ *   실값과도 구분된다. `reg_id`/`mod_id` 는 VarChar(100), 이 값은 49자다.
+ */
+export const deletedUserAuditId = (userId: string) => `deleted-user-${userId}`;
+
+/**
  * 사용자와 그에 매달린 행 전부를 지운다 (회원탈퇴·관리자 삭제 공통 경로).
  *
  * `tn_user` 를 참조하는 자식 테이블은 넷이고(`tn_workspace_member`·`ba_session`·`ba_account` 는
@@ -184,6 +237,21 @@ export const USER_SCOPED_IDENTIFIER_TABLES_EXCLUDED = [
  *   이메일로 못 찾는다. 대신 `value` 가 `tn_user.id` 원문이므로 그 완전일치로 지운다
  *   (uuid 라 남의 행과 겹치지 않는다). 남겨 두면 탈퇴자의 **아직 안 쓴 재설정 토큰**이 만료까지
  *   테이블에 남는다.
+ *
+ * **감사 컬럼(`reg_id`·`mod_id`)은 지우지 않고 익명화한다** — 2026-08-12 리드 결정(#3 ㉡):
+ * 삭제 대상은 「그 사람을 식별하는 데이터」이고, 감사 컬럼은 「그 사람이 한 행위의 기록」이라
+ * 연결만 끊고 기록은 보존한다. 남의 행에 남은 탈퇴자 이메일(예: 관리자였던 탈퇴자가 만든
+ * 타 사용자 행)이 대상이므로 `AUDIT_ANONYMIZED_TABLES` 전체를 쓸며, 치환값은
+ * `deletedUserAuditId(user.id)` 다 (성질 셋은 그 함수 주석에). 규칙:
+ * - **NULL 로 만들지 않는다** — 「누가 했는지 모른다」와 「탈퇴한 사람이 했다」는 다르다.
+ * - **컬럼 단위로 치환한다** — 같은 행이라도 `reg_id` 만 탈퇴자면 `mod_id` 는 남의 값 그대로다.
+ * - **대소문자 무관 비교** — `th_email_log`·OTP 삭제와 같은 근거 (정규화 규칙 이전의 과거 행).
+ *   `MGR`·`migration`·`system` 같은 비이메일 액터 값은 이메일과 대소문자 무관으로도 겹칠 수
+ *   없어 안전하다 (alembic 0007 전수 조사).
+ * - **같은 트랜잭션이다** — 삭제와 익명화가 따로 커밋되면 실패 시 「지워졌는데 이메일은 남은」
+ *   반쪽 상태가 된다. 삭제 문들 뒤에 두어 지워질 행은 갱신하지 않는다.
+ * 익명화는 되돌릴 수 없다 — 그게 목적이다. 이미 탈퇴한 사용자의 잔존 값은 이 함수가 못 다루므로
+ * (tn_user 행이 없어 id 를 모른다) alembic `0013_anonymize_withdrawn_audit` 이 별도로 정리한다.
  */
 export async function deleteUserCascade(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -196,7 +264,7 @@ export async function deleteUserCascade(email: string): Promise<void> {
       ).map((m) => m.workspace_id)
     : [];
 
-  await prisma.$transaction([
+  const results = await prisma.$transaction([
     prisma.authorMember.deleteMany({ where: { user_id: email } }),
     // 대화 이력은 워크스페이스가 아니라 사용자 이메일에 매달려 있다 — 공용 워크스페이스에만
     // 속했던 사용자(소유 개인 워크스페이스 0개)의 이력도 지워져야 한다.
@@ -231,7 +299,27 @@ export async function deleteUserCascade(email: string): Promise<void> {
           prisma.workspace.deleteMany({ where: { id: { in: ownedWorkspaceIds }, is_personal: true } }),
         ]
       : []),
+    ...(user
+      ? AUDIT_ANONYMIZED_TABLES.map(
+          (table) =>
+            prisma.$executeRaw`UPDATE ${Prisma.raw(table)}
+               SET reg_id = CASE WHEN lower(reg_id) = lower(${email}) THEN ${deletedUserAuditId(user.id)} ELSE reg_id END,
+                   mod_id = CASE WHEN lower(mod_id) = lower(${email}) THEN ${deletedUserAuditId(user.id)} ELSE mod_id END
+             WHERE lower(reg_id) = lower(${email}) OR lower(mod_id) = lower(${email})`,
+        )
+      : []),
   ]);
+
+  // 무엇을 몇 건 처리했는지 남긴다 — 익명화는 비가역이라 처리 건수가 로그에 있어야 사후 검증이
+  // 가능하다. 이메일은 PII 라 남기지 않고 익명화 id 로 적는다.
+  if (user) {
+    const counts = results.slice(-AUDIT_ANONYMIZED_TABLES.length) as number[];
+    const touched = AUDIT_ANONYMIZED_TABLES.map((table, i) => `${table}=${counts[i]}`).filter((_, i) => counts[i] > 0);
+    console.info(
+      `[deleteUserCascade] 감사 컬럼 익명화(${deletedUserAuditId(user.id)}): ` +
+        `${AUDIT_ANONYMIZED_TABLES.length}개 테이블 검사, 행 갱신 ${touched.length > 0 ? touched.join(", ") : "0건"}`,
+    );
+  }
 }
 
 /**
