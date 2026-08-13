@@ -689,6 +689,166 @@ ARM_CASES = [
         {"verdict": "needs_changes"},
         {"arm": False},
     ),
+    # ── 새 제목 형식(`update X requirement from ~=A to ~=B`) — #106 버전 업데이트로 생겼다 ──
+    (
+        "봇 PR 새 형식 patch 상승(실물 #118) → 위험 미선언이어도 arm",
+        {
+            "pr_author_is_bot": True,
+            "pr_author_login": "dependabot[bot]",
+            "pr_title": (
+                "build(deps): update uvicorn[standard] requirement "
+                "from ~=0.47.0 to ~=0.52.1 in /backend-service"
+            ),
+            "issue_refs": [],
+            "commit_author_emails": [
+                "49699333+dependabot[bot]@users.noreply.github.com"
+            ],
+        },
+        {"arm": True, "bot_bump": "non-major", "self_vendor": False},
+    ),
+    (
+        "봇 PR 새 형식 major 상승 → 사람 경로 (제약 연산자를 걷어낸 숫자로 가른다)",
+        {
+            "pr_author_is_bot": True,
+            "pr_title": (
+                "build(deps): update psycopg[binary] requirement "
+                "from ~=3.2.13 to ~=4.0.1 in /multi-agent-service"
+            ),
+            "issue_refs": [],
+            "commit_author_emails": [
+                "49699333+dependabot[bot]@users.noreply.github.com"
+            ],
+        },
+        {"arm": False, "bot_bump": "major"},
+    ),
+    (
+        "봇 PR 묶음 제목(실물 #114) → 형식 밖이라 arm 금지  (공격 ⑥ fail-closed)",
+        {
+            "pr_author_is_bot": True,
+            "pr_title": (
+                "build(deps): bump the non-major group across 10 directories "
+                "with 19 updates"
+            ),
+            "issue_refs": [],
+            "commit_author_emails": [
+                "49699333+dependabot[bot]@users.noreply.github.com"
+            ],
+        },
+        {"arm": False, "bot_bump": None},
+    ),
+]
+
+# (설명, 제목, 기대 상승 종류) — 판정부는 순수 함수라 여기서 직접 못박는다.
+# **제목은 실물이다** (`gh pr list --state all` 2026-08-13). 실물이 없어 지은 것은 설명에
+# 그렇게 적었다 — 지금 열린·머지된 PR 에 새 형식 major 와 범위 제약이 아직 없다.
+TITLE_CASES = [
+    # ── ① 종전 형식 `bump X from A to B` — 깨지지 않았는지 ──
+    (
+        "bump 형식 patch 상승 (실물 #9)",
+        "build(deps): bump mcp from 1.27.2 to 1.28.1 in /web-mcp-service",
+        "non-major",
+    ),
+    (
+        "bump 형식 major 상승 (실물 #54)",
+        "build(deps): bump cryptography from 48.0.1 to 50.0.0 in /market-data-mcp-service",
+        "major",
+    ),
+    (
+        "bump 형식 major 상승 — deps-dev·스코프 패키지 (실물 #109)",
+        "build(deps): bump @tanstack/react-table from 8.21.3 to 9.1.2 in /frontend",
+        "major",
+    ),
+    (
+        "bump 형식 major 상승 — deps-dev (실물 #124)",
+        "build(deps-dev): bump mcp from 1.28.1 to 2.0.0 in /multi-agent-service",
+        "major",
+    ),
+    # ── ② 새 형식 `update X requirement from ~=A to ~=B` — extras 대괄호 + 제약 연산자 ──
+    (
+        "새 형식 patch 상승 — extras 대괄호 (실물 #118)",
+        "build(deps): update uvicorn[standard] requirement "
+        "from ~=0.47.0 to ~=0.52.1 in /backend-service",
+        "non-major",
+    ),
+    (
+        "새 형식 minor 상승 — extras 대괄호 (실물 #115)",
+        "build(deps): update alembic[tz] requirement "
+        "from ~=1.18.4 to ~=1.19.1 in /backend-service",
+        "non-major",
+    ),
+    (
+        "새 형식 minor 상승 — major 자리 3 유지 (실물 #122)",
+        "build(deps): update psycopg[binary] requirement "
+        "from ~=3.2.13 to ~=3.3.4 in /multi-agent-service",
+        "non-major",
+    ),
+    (
+        "새 형식 major 상승 — 실물 #122 의 버전만 major 넘게 바꾼 변형 "
+        "(새 형식 major 실물은 아직 열린 적 없다)",
+        "build(deps): update psycopg[binary] requirement "
+        "from ~=3.2.13 to ~=4.0.1 in /multi-agent-service",
+        "major",
+    ),
+    (
+        "새 형식 — 제약 연산자 없는 버전도 읽는다 (실물 #115 에서 `~=` 만 뗀 변형)",
+        "build(deps): update alembic[tz] requirement "
+        "from 1.18.4 to 2.0.0 in /backend-service",
+        "major",
+    ),
+    # ── 못 읽는 제목은 그대로 못 읽어야 한다 (fail-closed — arm 거부로 이어진다) ──
+    (
+        "묶음 PR — from/to 가 없다 (실물 #114)",
+        "build(deps): bump the non-major group across 10 directories with 19 updates",
+        None,
+    ),
+    (
+        "보안 업데이트 — 버전이 제목에 없다 (실물 #63)",
+        "build(deps): bump brace-expansion in /frontend",
+        None,
+    ),
+    (
+        "복수 패키지 — 버전이 제목에 없다 (실물 #130)",
+        "build(deps): bump @hono/node-server and prisma in /frontend",
+        None,
+    ),
+    (
+        "동사 없는 `from A to B` 는 상승 선언이 아니다 — 아무 제목의 두 토막을 읽지 않는다",
+        "docs: 마이그레이션 노트를 from 1.0 to 2.0 기준으로 고쳐 쓴다",
+        None,
+    ),
+    (
+        "`update` 인데 `requirement` 가 없다 — 아는 형식이 아니다",
+        "build(deps): update uvicorn[standard] from ~=0.47.0 to ~=0.52.1 in /backend-service",
+        None,
+    ),
+    (
+        "범위 제약 — major 가 하나로 안 정해진다 (지어낸 제목: 범위 실물은 아직 없다)",
+        "build(deps): update requests requirement "
+        "from >=2.0,<3.0 to >=2.0,<4.0 in /backend-service",
+        None,
+    ),
+    (
+        "숫자로 시작하지 않는 버전 — 못 읽는다 (지어낸 제목)",
+        "build(deps): bump mcp from latest to next in /web-mcp-service",
+        None,
+    ),
+    (
+        "상승이 둘 실린 제목 — 뒤의 major 가 앞의 non-major 뒤에 숨는다 (지어낸 제목)",
+        "build(deps): bump mcp from 1.0.0 to 1.1.0 and starlette from 1.0.0 to 2.0.0",
+        None,
+    ),
+    (
+        "상승이 둘 — 앞이 major 여도 마찬가지로 안 읽는다 (지어낸 제목)",
+        "build(deps): bump mcp from 1.0.0 to 2.0.0 and starlette from 1.0.0 to 1.1.0",
+        None,
+    ),
+    (
+        "epoch 버전 — major 자리를 단정할 수 없다 (지어낸 제목)",
+        "build(deps): bump foo from 1!2.0 to 1!3.0 in /backend-service",
+        None,
+    ),
+    ("제목 없음", "", None),
+    ("제목 None", None, None),
 ]
 
 REFS_CASES = [
@@ -1051,6 +1211,12 @@ def main() -> int:
         check_subset(
             rr.decide_arm({**ARM_BASE, **override}), expected, f"arm: {desc}", failures
         )
+
+    for desc, title, expected in TITLE_CASES:
+        total += 1
+        got = rr.classify_bump(title)
+        if got != expected:
+            failures.append(f"title: {desc}: 기대 {expected!r} ≠ 실제 {got!r}")
 
     for desc, body, expected in REFS_CASES:
         total += 1

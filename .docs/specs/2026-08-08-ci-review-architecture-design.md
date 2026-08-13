@@ -202,6 +202,18 @@ build(deps): bump pyjwt from 2.12.1 to 2.13.0 in /template-mcp-service
 때문이다. 제목 형식이 바뀌면 판별이 `None` 이 되고 **그때는 자동 머지를 arm 하지 않는다**
 (fail-closed).
 
+> **추가 (2026-08-13).** 그 「형식이 바뀌면」이 실제로 왔다 — 버전 업데이트(#106)를 켜자
+> uv 매니페스트의 제약을 올리는 PR 이 두 번째 형식으로 온다:
+>
+> ```
+> build(deps): update uvicorn[standard] requirement from ~=0.47.0 to ~=0.52.1 in /backend-service
+> ```
+>
+> 설계대로 자동 머지가 멈췄고(12건이 초록인 채 대기), 틀린 판정으로 흐른 것은 없다.
+> 판별부는 이제 **두 형식을 다 읽는다** — 패키지에 붙는 extras 대괄호와 버전에 붙는 제약
+> 연산자를 걷어낸 숫자로 major 를 가른다. 못 읽는 제목(묶음 PR·버전 없는 보안 업데이트·
+> 범위 제약)은 그대로 `None` 이고 arm 하지 않는다.
+
 ### 3. 상태 — 라벨은 위험도만
 
 라벨이 하던 상태 저장을 GitHub 이 가져간다. 남는 라벨은 **`risk: low|high` 하나**이고, 그

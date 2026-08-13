@@ -17,8 +17,8 @@ GitHub 이 자기 PR 자기 승인을 금지해 로컬 `gh`(리드 계정)로는
    판정을 통과시킨다.
 3. **`source=manual` 마커는 arm 하지 않는다**: 사람이 타이핑한 한 줄일 수 있다 (#285 규약 —
    수동 리뷰 마커는 기록은 되지만 자동 머지 권한을 얻지 못한다).
-4. **봇 PR 의 상승 종류를 못 읽으면 arm 하지 않는다**: 종류는 PR 제목(`bump X from A to B`)에서
-   읽고, 파싱 실패는 fail-closed 다.
+4. **봇 PR 의 상승 종류를 못 읽으면 arm 하지 않는다**: 종류는 PR 제목(`bump X from A to B`
+   또는 `update X requirement from ~=A to ~=B`)에서 읽고, 파싱 실패는 fail-closed 다.
 
 ## 자동 머지 arm 조건 (전부 참일 때만 — 설계 §4)
 
@@ -116,8 +116,28 @@ _HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # 스팬으로 먹어 안쪽이 산문으로 남는다
 _INLINE_CODE = re.compile(r"(`+)[\s\S]*?\1")
 
-# dependabot 제목 형식: `build(deps): bump X from A to B in /path` (설계 §2-1 실측).
-_TITLE_BUMP = re.compile(r"\bfrom\s+(\S+)\s+to\s+(\S+)")
+# dependabot 제목 형식 **둘** (2026-08-13 실측 — 열린·머지된 PR 제목에서 떴다):
+#
+#   ① bump    `build(deps): bump mcp from 1.27.2 to 1.28.1 in /web-mcp-service`
+#   ② update  `build(deps): update uvicorn[standard] requirement from ~=0.47.0 to ~=0.52.1
+#              in /backend-service`
+#
+# ② 는 버전 업데이트를 켜면서(#106) 생겼다 — 패키지에 extras 대괄호가, 버전에 제약 연산자가
+# 붙는다. 두 형식 다 상승 종류의 근거는 `from A to B` 이지만, **동사까지 요구한다**:
+# `from … to …` 만 보면 dependabot 이 아닌 아무 제목의 두 토막이 상승 종류가 되고,
+# 그 판독이 봇 PR 의 자동 머지 arm 조건 ④ 를 연다.
+_TITLE_FORMS = (
+    re.compile(r"\bbump\s+\S+\s+from\s+(?P<old>\S+)\s+to\s+(?P<new>\S+)"),
+    re.compile(
+        r"\bupdate\s+\S+\s+requirement\s+from\s+(?P<old>\S+)\s+to\s+(?P<new>\S+)"
+    ),
+)
+# 동사와 무관하게 「A 에서 B 로」 꼴을 세는 자 — 제목에 상승이 몇 개 실렸는지 본다.
+_ANY_VERSION_PAIR = re.compile(r"\bfrom\s+\S+\s+to\s+\S+")
+# 버전 토큰 — 제약 연산자(`~=`·`>=`·`^`)를 걷어낸 **숫자로 시작하는 단일 버전**만 읽는다.
+# 끝을 `\Z` 로 못 박는 이유: 범위(`>=2.0,<3.0`)는 major 가 하나로 정해지지 않는데, 앞자리만
+# 보는 판독은 그것을 `2` 로 접어 상한을 넘는 상승을 non-major 로 흘린다.
+_VERSION_TOKEN = re.compile(r"[~^><=!]*v?(?P<major>\d+)(?:\.[0-9A-Za-z.\-+]*)?\Z")
 
 VERDICT_TO_EVENT = {"merge_ok": "APPROVE", "needs_changes": "REQUEST_CHANGES"}
 EVENT_TO_STATE = {"APPROVE": "APPROVED", "REQUEST_CHANGES": "CHANGES_REQUESTED"}
@@ -355,16 +375,38 @@ def parse_refs(body) -> list[int]:
 
 
 def _major_of(version):
-    m = re.match(r"v?(\d+)", version or "")
-    return int(m.group(1)) if m else None
+    """제약 연산자를 걷어낸 뒤 major 자리를 읽는다 — 단일 버전이 아니면 None."""
+    m = _VERSION_TOKEN.match(version or "")
+    return int(m.group("major")) if m else None
+
+
+def parse_bump_versions(title):
+    """PR 제목에서 (이전, 이후) 버전 토큰을 읽는다 — 아는 형식이 아니면 None.
+
+    형식 판별은 `_TITLE_FORMS` 하나가 관장한다. 묶음 PR(`bump the non-major group across
+    10 directories with 19 updates`)처럼 `from A to B` 가 없는 제목은 여기서 None 이 되고,
+    그대로 arm 거부로 이어진다 (fail-closed).
+
+    **상승이 둘 이상 실린 제목도 None 이다.** 첫 짝만 읽으면 뒤에 있는 major 상승이
+    non-major 판정 뒤에 숨는다 — 한 제목이 상승 하나를 말할 때만 그 종류를 안다고 한다.
+    세는 것은 **동사와 무관한** `from A to B` 다: 형식 정규식으로 세면 동사가 한 번만 붙는
+    `bump a from … to … and b from … to …` 를 한 건으로 읽어 뒤쪽을 놓친다.
+    """
+    if len(_ANY_VERSION_PAIR.findall(title or "")) != 1:
+        return None
+    for form in _TITLE_FORMS:
+        m = form.search(title or "")
+        if m:
+            return m.group("old"), m.group("new")
+    return None
 
 
 def classify_bump(title):
     """PR 제목에서 버전 상승 종류를 읽는다 — 못 읽으면 None (fail-closed)."""
-    m = _TITLE_BUMP.search(title or "")
-    if not m:
+    parsed = parse_bump_versions(title)
+    if parsed is None:
         return None
-    old, new = _major_of(m.group(1)), _major_of(m.group(2))
+    old, new = _major_of(parsed[0]), _major_of(parsed[1])
     if old is None or new is None:
         return None
     return "major" if new != old else "non-major"
