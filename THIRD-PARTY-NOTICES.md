@@ -1,6 +1,6 @@
 # 서드파티 라이선스 고지 (THIRD-PARTY-NOTICES)
 
-프론트엔드(`frontend/`) 프로덕션 의존성 595개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 595개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
+프론트엔드(`frontend/`) 프로덕션 의존성 567개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 567개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
 
 **2026-08-06 갱신(#341 완주 — DevExtreme 제거 반영)** — 상용 6종과 그 전이 의존이 빠져 623→599개가 됐다. 사라진 24개: 상용 6종(`devextreme`·`devextreme-react`·`@devexpress/utils`·`devexpress-diagram`·`devexpress-gantt`·`@devextreme/runtime`)과 그것들만 쓰던 18개(`inferno` 계열 5 · `devextreme-quill`·`parchment`·`quill-delta`·`fast-diff`·`rrule`·`core-js`·`@babel/runtime`·`es6-object-assign`·`eventemitter3`·`lodash.clonedeep`·`lodash.isequal`·`lodash.merge`·`opencollective-postinstall`). 갱신은 손으로 지우지 않고 **아래 재현 명령의 새 출력을 정본으로 삼아 문서의 패키지 목록과 대조**했다 — 그 결과 「문서에 있는데 지금 없음」 24개 = 위 목록, 「지금 있는데 문서에 없음」 0개. 남은 599개에 DevExpress 계열은 `devextreme-exceljs-fork`(MIT 포크) 하나뿐이다.
 
@@ -49,11 +49,11 @@ permissive 로 흘려보내지 않고 멈춘다(사람이 판단할 자리다).
 
 ### Apache License 2.0
 
-45개 패키지. Apache-2.0 은 재배포 시 라이선스 사본 동봉 + NOTICE 고지 승계 의무가 있다 — echarts·lightweight-charts 는 클라이언트 번들에 실려 브라우저로 나간다.
+44개 패키지. Apache-2.0 은 재배포 시 라이선스 사본 동봉 + NOTICE 고지 승계 의무가 있다 — echarts·lightweight-charts 는 클라이언트 번들에 실려 브라우저로 나간다.
 
 본문 텍스트 변형 15종(대체로 표준 Apache-2.0 원문, 일부 패키지가 자체 저작권 줄을 덧붙임)으로 묶는다.
 
-<details><summary>변형 1 — 27개 패키지: `@opentelemetry/semantic-conventions@1.43.0`, `@prisma/adapter-pg@7.9.0`, `@prisma/client-runtime-utils@7.8.0`, `@prisma/client@7.8.0`, `@prisma/config@7.8.0`, `@prisma/debug@7.2.0`, `@prisma/debug@7.8.0`, `@prisma/debug@7.9.0`, `@prisma/driver-adapter-utils@7.9.0`, `@prisma/engines-version@7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a`, `@prisma/engines@7.8.0`, `@prisma/fetch-engine@7.8.0`, `@prisma/get-platform@7.2.0`, `@prisma/get-platform@7.8.0`, `@prisma/query-plan-executor@7.2.0`, `b4a@1.8.0`, `bare-events@2.8.2`, `bare-fs@4.5.6`, `bare-os@3.8.0`, `bare-path@3.0.0`, `bare-stream@2.10.0`, `bare-url@2.4.0`, `baseline-browser-mapping@2.10.29`, `events-universal@1.0.1`, `long@5.3.2`, `prisma@7.8.0`, `text-decoder@1.2.7`</summary>
+<details><summary>변형 1 — 26개 패키지: `@opentelemetry/semantic-conventions@1.43.0`, `@prisma/adapter-pg@7.9.1`, `@prisma/client-runtime-utils@7.9.1`, `@prisma/client@7.9.1`, `@prisma/config@7.8.0`, `@prisma/debug@7.2.0`, `@prisma/debug@7.8.0`, `@prisma/debug@7.9.1`, `@prisma/driver-adapter-utils@7.9.1`, `@prisma/engines-version@7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a`, `@prisma/engines@7.8.0`, `@prisma/fetch-engine@7.8.0`, `@prisma/get-platform@7.2.0`, `@prisma/get-platform@7.8.0`, `@prisma/query-plan-executor@7.2.0`, `b4a@1.8.1`, `bare-events@2.9.1`, `bare-fs@4.8.0`, `bare-path@3.1.1`, `bare-stream@2.13.3`, `bare-url@2.5.2`, `baseline-browser-mapping@2.11.14`, `events-universal@1.0.1`, `long@5.3.2`, `prisma@7.8.0`, `text-decoder@1.2.7`</summary>
 
 ```
 Apache License
@@ -2523,7 +2523,7 @@ Apache License
 ```
 </details>
 
-<details><summary>변형 14 — 1개 패키지: `readdir-glob@1.1.3`</summary>
+<details><summary>변형 14 — 1개 패키지: `readdir-glob@3.0.0`</summary>
 
 ```
 Apache License
@@ -2830,7 +2830,7 @@ MIT 조건으로 사용(추가 의무 없음). GPL 조건은 선택하지 않았
 
 | 패키지 | 버전 |
 |---|---|
-| `caniuse-lite` | 1.0.30001792 |
+| `caniuse-lite` | 1.0.30001809 |
 
 ### mdn-data — 퍼블릭 도메인 동등
 
@@ -2850,9 +2850,9 @@ MIT 조건으로 사용(추가 의무 없음). GPL 조건은 선택하지 않았
 
 ---
 
-## 2. 그 외 permissive 라이선스 (542개)
+## 2. 그 외 permissive 라이선스 (515개)
 
-MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 542개 중 539개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
+MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 515개 중 512개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
 
 ### 예외 — 원문 파일 없이 선언만 있는 패키지 (3개)
 
@@ -2864,19 +2864,19 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `client-only` | 0.0.1 | MIT |
 | `fancy-canvas` | 2.1.0 | MIT |
 
-<details><summary>펼치기 — 나머지 539개: 패키지 · 버전 · 라이선스</summary>
+<details><summary>펼치기 — 나머지 512개: 패키지 · 버전 · 라이선스</summary>
 
 | 패키지 | 버전 | 라이선스 |
 |---|---|---|
 | `@asamuzakjp/css-color` | 6.0.5 | MIT |
 | `@asamuzakjp/dom-selector` | 8.3.0 | MIT |
-| `@better-auth/core` | 1.6.22 | MIT |
-| `@better-auth/drizzle-adapter` | 1.6.22 | MIT |
-| `@better-auth/kysely-adapter` | 1.6.22 | MIT |
-| `@better-auth/memory-adapter` | 1.6.22 | MIT |
-| `@better-auth/mongo-adapter` | 1.6.22 | MIT |
-| `@better-auth/prisma-adapter` | 1.6.22 | MIT |
-| `@better-auth/telemetry` | 1.6.22 | MIT |
+| `@better-auth/core` | 1.6.26 | MIT |
+| `@better-auth/drizzle-adapter` | 1.6.26 | MIT |
+| `@better-auth/kysely-adapter` | 1.6.26 | MIT |
+| `@better-auth/memory-adapter` | 1.6.26 | MIT |
+| `@better-auth/mongo-adapter` | 1.6.26 | MIT |
+| `@better-auth/prisma-adapter` | 1.6.26 | MIT |
+| `@better-auth/telemetry` | 1.6.26 | MIT |
 | `@better-auth/utils` | 0.4.2 | MIT |
 | `@better-fetch/fetch` | 1.3.1 | MIT |
 | `@bramus/specificity` | 2.4.2 | MIT |
@@ -2895,7 +2895,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@floating-ui/utils` | 0.2.12 | MIT |
 | `@hono/node-server` | 1.19.11 | MIT |
 | `@img/colour` | 1.1.0 | MIT |
-| `@isaacs/cliui` | 8.0.2 | ISC |
 | `@jridgewell/sourcemap-codec` | 1.5.5 | MIT |
 | `@kurkle/color` | 0.3.4 | MIT |
 | `@next/env` | 16.3.0 | MIT |
@@ -2903,7 +2902,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@noble/ciphers` | 2.1.1 | MIT |
 | `@noble/hashes` | 2.2.0 | MIT |
 | `@oxc-project/types` | 0.139.0 | MIT |
-| `@pkgjs/parseargs` | 0.11.0 | MIT |
 | `@radix-ui/number` | 1.1.3 | MIT |
 | `@radix-ui/primitive` | 1.1.3 | MIT |
 | `@radix-ui/primitive` | 1.1.7 | MIT |
@@ -2978,9 +2976,9 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@t3-oss/env-core` | 0.13.11 | MIT |
 | `@t3-oss/env-nextjs` | 0.13.11 | MIT |
 | `@tanstack/react-table` | 8.21.3 | MIT |
-| `@tanstack/react-virtual` | 3.14.8 | MIT |
+| `@tanstack/react-virtual` | 3.14.9 | MIT |
 | `@tanstack/table-core` | 8.21.3 | MIT |
-| `@tanstack/virtual-core` | 3.17.6 | MIT |
+| `@tanstack/virtual-core` | 3.17.7 | MIT |
 | `@types/chai` | 5.2.3 | MIT |
 | `@types/debug` | 4.1.13 | MIT |
 | `@types/deep-eql` | 4.0.2 | MIT |
@@ -2992,8 +2990,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@types/ms` | 2.1.0 | MIT |
 | `@types/node` | 26.2.0 | MIT |
 | `@types/pg` | 8.20.0 | MIT |
-| `@types/react-dom` | 19.2.3 | MIT |
-| `@types/react` | 19.2.15 | MIT |
+| `@types/react-dom` | 19.2.4 | MIT |
+| `@types/react` | 19.2.18 | MIT |
 | `@types/unist` | 2.0.11 | MIT |
 | `@types/unist` | 3.0.3 | MIT |
 | `@ungap/structured-clone` | 1.3.1 | ISC |
@@ -3007,12 +3005,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `abort-controller` | 3.0.0 | MIT |
 | `agent-base` | 6.0.2 | MIT |
 | `ajv` | 8.20.0 | MIT |
-| `ansi-regex` | 5.0.1 | MIT |
-| `ansi-regex` | 6.2.2 | MIT |
-| `ansi-styles` | 4.3.0 | MIT |
-| `ansi-styles` | 6.2.3 | MIT |
-| `archiver-utils` | 5.0.2 | MIT |
-| `archiver` | 7.0.1 | MIT |
+| `archiver` | 8.0.0 | MIT |
 | `aria-hidden` | 1.2.6 | MIT |
 | `assertion-error` | 2.0.1 | MIT |
 | `async` | 3.2.6 | MIT |
@@ -3020,14 +3013,14 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `aws-ssl-profiles` | 1.1.2 | MIT |
 | `axios` | 1.19.0 | MIT |
 | `bail` | 2.0.2 | MIT |
-| `balanced-match` | 1.0.2 | MIT |
+| `balanced-match` | 4.0.4 | MIT |
 | `base64-js` | 1.5.1 | MIT |
-| `better-auth` | 1.6.22 | MIT |
+| `better-auth` | 1.6.26 | MIT |
 | `better-call` | 1.3.7 | MIT |
 | `better-result` | 2.9.2 | MIT |
 | `bidi-js` | 1.0.3 | MIT |
 | `bluebird` | 3.7.2 | MIT |
-| `brace-expansion` | 2.1.4 | MIT |
+| `brace-expansion` | 5.0.9 | MIT |
 | `buffer-crc32` | 1.0.0 | MIT |
 | `buffer-equal-constant-time` | 1.0.1 | BSD-3-Clause |
 | `buffer` | 6.0.3 | MIT |
@@ -3042,21 +3035,19 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `chart.js` | 4.5.1 | MIT |
 | `chokidar` | 5.0.0 | MIT |
 | `clsx` | 2.1.1 | MIT |
-| `color-convert` | 2.0.1 | MIT |
-| `color-name` | 1.1.4 | MIT |
 | `combined-stream` | 1.0.8 | MIT |
 | `comma-separated-tokens` | 2.0.3 | MIT |
 | `commander` | 8.3.0 | MIT |
-| `compress-commons` | 6.0.2 | MIT |
+| `compress-commons` | 7.0.1 | MIT |
 | `confbox` | 0.2.4 | MIT |
 | `convert-source-map` | 2.0.0 | MIT |
 | `core-util-is` | 1.0.3 | MIT |
-| `crc32-stream` | 6.0.0 | MIT |
+| `crc32-stream` | 7.0.1 | MIT |
 | `cross-spawn` | 7.0.6 | MIT |
 | `css-tree` | 3.2.1 | MIT |
 | `csstype` | 3.2.3 | MIT |
 | `data-urls` | 7.0.0 | MIT |
-| `date-fns` | 4.3.0 | MIT |
+| `date-fns` | 4.4.0 | MIT |
 | `dayjs` | 1.11.20 | MIT |
 | `debug` | 4.4.3 | MIT |
 | `decimal.js` | 10.6.0 | MIT |
@@ -3067,16 +3058,13 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `dequal` | 2.0.3 | MIT |
 | `destr` | 2.0.5 | MIT |
 | `detect-node-es` | 1.1.0 | MIT |
-| `devextreme-exceljs-fork` | 4.4.10 | MIT |
+| `devextreme-exceljs-fork` | 4.4.13 | MIT |
 | `devlop` | 1.1.0 | MIT |
 | `dotenv` | 17.4.2 | BSD-2-Clause |
 | `dunder-proto` | 1.0.1 | MIT |
 | `duplexer2` | 0.1.4 | BSD-3-Clause |
-| `eastasianwidth` | 0.2.0 | MIT |
 | `echarts-for-react` | 3.0.6 | MIT |
 | `effect` | 3.20.0 | MIT |
-| `emoji-regex` | 8.0.0 | MIT |
-| `emoji-regex` | 9.2.2 | MIT |
 | `empathic` | 2.0.0 | MIT |
 | `entities` | 6.0.1 | BSD-2-Clause |
 | `entities` | 8.0.0 | BSD-2-Clause |
@@ -3104,7 +3092,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `follow-redirects` | 1.16.0 | MIT |
 | `foreground-child` | 3.3.1 | ISC |
 | `form-data` | 4.0.6 | MIT |
-| `fs-extra` | 11.3.4 | MIT |
+| `fs-extra` | 11.3.1 | MIT |
 | `function-bind` | 1.1.2 | MIT |
 | `generate-function` | 2.3.1 | MIT |
 | `get-intrinsic` | 1.3.0 | MIT |
@@ -3112,7 +3100,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `get-port-please` | 3.2.0 | MIT |
 | `get-proto` | 1.0.1 | MIT |
 | `giget` | 3.2.0 | MIT |
-| `glob` | 10.5.0 | ISC |
 | `gopd` | 1.2.0 | MIT |
 | `graceful-fs` | 4.2.11 | ISC |
 | `grammex` | 3.1.12 | MIT |
@@ -3143,15 +3130,13 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `is-alphabetical` | 2.0.1 | MIT |
 | `is-alphanumerical` | 2.0.1 | MIT |
 | `is-decimal` | 2.0.1 | MIT |
-| `is-fullwidth-code-point` | 3.0.0 | MIT |
 | `is-hexadecimal` | 2.0.1 | MIT |
 | `is-plain-obj` | 4.1.0 | MIT |
 | `is-potential-custom-element-name` | 1.0.1 | MIT |
 | `is-property` | 1.0.2 | MIT |
-| `is-stream` | 2.0.1 | MIT |
+| `is-stream` | 4.0.1 | MIT |
 | `isarray` | 1.0.0 | MIT |
 | `isexe` | 2.0.0 | ISC |
-| `jackspeak` | 3.4.3 | BlueOak-1.0.0 |
 | `jiti` | 2.7.0 | MIT |
 | `jose` | 6.2.8 | MIT |
 | `js-tokens` | 4.0.0 | MIT |
@@ -3162,7 +3147,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `jwa` | 2.0.1 | MIT |
 | `jws` | 4.0.1 | MIT |
 | `katex` | 0.16.47 | MIT |
-| `katex` | 0.17.0 | MIT |
+| `katex` | 0.18.4 | MIT |
 | `kysely` | 0.28.17 | MIT |
 | `lazystream` | 1.0.1 | MIT |
 | `lie` | 3.3.0 | MIT |
@@ -3179,10 +3164,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `lodash.isundefined` | 3.0.1 | MIT |
 | `lodash.once` | 4.1.1 | MIT |
 | `lodash.uniq` | 4.5.0 | MIT |
-| `lodash` | 4.18.1 | MIT |
 | `longest-streak` | 3.1.0 | MIT |
 | `loose-envify` | 1.4.0 | MIT |
-| `lru-cache` | 10.4.3 | ISC |
 | `lru-cache` | 11.5.2 | BlueOak-1.0.0 |
 | `lru.min` | 1.1.4 | MIT |
 | `magic-string` | 0.30.21 | MIT |
@@ -3235,27 +3218,23 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `micromark` | 4.0.2 | MIT |
 | `mime-db` | 1.52.0 | MIT |
 | `mime-types` | 2.1.35 | MIT |
-| `minimatch` | 5.1.9 | ISC |
-| `minimatch` | 9.0.9 | ISC |
-| `minipass` | 7.1.3 | BlueOak-1.0.0 |
+| `minimatch` | 10.2.5 | BlueOak-1.0.0 |
 | `ms` | 2.1.3 | MIT |
 | `mysql2` | 3.15.3 | MIT |
 | `named-placeholders` | 1.1.6 | MIT |
-| `nanoid` | 3.3.16 | MIT |
+| `nanoid` | 3.3.18 | MIT |
 | `nanostores` | 1.4.2 | MIT |
 | `next` | 16.3.0 | MIT |
 | `node-int64` | 0.4.0 | MIT |
-| `nodemailer` | 9.0.1 | MIT-0 |
+| `nodemailer` | 9.0.5 | MIT-0 |
 | `normalize-path` | 3.0.0 | MIT |
 | `object-assign` | 4.1.1 | MIT |
 | `obug` | 2.1.4 | MIT |
 | `ohash` | 2.0.11 | MIT |
-| `package-json-from-dist` | 1.0.1 | BlueOak-1.0.0 |
 | `parse-entities` | 4.0.2 | MIT |
 | `parse5` | 7.3.0 | MIT |
 | `parse5` | 8.0.1 | MIT |
 | `path-key` | 3.1.1 | MIT |
-| `path-scurry` | 1.11.1 | BlueOak-1.0.0 |
 | `pathe` | 2.0.3 | MIT |
 | `perfect-debounce` | 2.1.0 | MIT |
 | `pg-cloudflare` | 1.4.0 | MIT |
@@ -3271,7 +3250,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `picomatch` | 4.0.5 | MIT |
 | `pkg-types` | 2.3.1 | MIT |
 | `postcss` | 8.5.23 | MIT |
-| `postcss` | 8.5.24 | MIT |
+| `postcss` | 8.5.26 | MIT |
 | `postgres-array` | 2.0.0 | MIT |
 | `postgres-array` | 3.0.4 | MIT |
 | `postgres-bytea` | 1.0.1 | MIT |
@@ -3287,10 +3266,10 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `pure-rand` | 6.1.0 | MIT |
 | `radix-ui` | 1.6.7 | MIT |
 | `rc9` | 3.0.1 | MIT |
-| `react-dom` | 19.2.6 | MIT |
+| `react-dom` | 19.2.8 | MIT |
 | `react-draggable` | 4.7.1 | MIT |
-| `react-grid-layout` | 2.2.3 | MIT |
-| `react-icons` | 5.6.0 | MIT |
+| `react-grid-layout` | 2.2.4 | MIT |
+| `react-icons` | 5.7.0 | MIT |
 | `react-is` | 16.13.1 | MIT |
 | `react-markdown` | 10.1.0 | MIT |
 | `react-remove-scroll-bar` | 2.3.8 | MIT |
@@ -3298,8 +3277,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `react-resizable-panels` | 4.12.2 | MIT |
 | `react-resizable` | 3.2.0 | MIT |
 | `react-style-singleton` | 2.2.3 | MIT |
-| `react-virtuoso` | 4.18.7 | MIT |
-| `react` | 19.2.6 | MIT |
+| `react-virtuoso` | 4.18.11 | MIT |
+| `react` | 19.2.8 | MIT |
 | `readable-stream` | 2.3.8 | MIT |
 | `readable-stream` | 3.6.2 | MIT |
 | `readable-stream` | 4.7.0 | MIT |
@@ -3339,19 +3318,15 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `stackback` | 0.0.2 | MIT |
 | `std-env` | 3.10.0 | MIT |
 | `std-env` | 4.2.0 | MIT |
-| `streamx` | 2.25.0 | MIT |
-| `string-width` | 4.2.3 | MIT |
-| `string-width` | 5.1.2 | MIT |
+| `streamx` | 2.28.0 | MIT |
 | `string_decoder` | 1.1.1 | MIT |
 | `string_decoder` | 1.3.0 | MIT |
 | `stringify-entities` | 4.0.4 | MIT |
-| `strip-ansi` | 6.0.1 | MIT |
-| `strip-ansi` | 7.2.0 | MIT |
 | `style-to-js` | 1.1.21 | MIT |
 | `style-to-object` | 1.0.14 | MIT |
 | `styled-jsx` | 5.1.6 | MIT |
 | `symbol-tree` | 3.2.4 | MIT |
-| `tar-stream` | 3.1.8 | MIT |
+| `tar-stream` | 3.2.0 | MIT |
 | `teex` | 1.0.1 | MIT |
 | `tinybench` | 2.9.0 | MIT |
 | `tinyexec` | 1.2.4 | MIT |
@@ -3377,11 +3352,11 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `unist-util-visit-parents` | 6.0.2 | MIT |
 | `unist-util-visit` | 5.1.0 | MIT |
 | `universalify` | 2.0.1 | MIT |
-| `unzipper` | 0.12.3 | MIT |
+| `unzipper` | 0.12.5 | MIT |
 | `use-callback-ref` | 1.3.3 | MIT |
 | `use-sidecar` | 1.1.3 | MIT |
 | `util-deprecate` | 1.0.2 | MIT |
-| `uuid` | 14.0.0 | MIT |
+| `uuid` | 14.0.1 | MIT |
 | `valibot` | 1.2.0 | MIT |
 | `vfile-location` | 5.0.3 | MIT |
 | `vfile-message` | 4.0.3 | MIT |
@@ -3396,13 +3371,11 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `whatwg-url` | 17.1.0 | MIT |
 | `which` | 2.0.2 | ISC |
 | `why-is-node-running` | 2.3.0 | MIT |
-| `wrap-ansi` | 7.0.0 | MIT |
-| `wrap-ansi` | 8.1.0 | MIT |
 | `xmlchars` | 2.2.0 | MIT |
 | `xtend` | 4.0.2 | MIT |
 | `yaml` | 2.8.3 | ISC |
 | `zeptomatch` | 2.1.0 | MIT |
-| `zip-stream` | 6.0.1 | MIT |
+| `zip-stream` | 7.0.5 | MIT |
 | `zod` | 4.4.3 | MIT |
 | `zrender` | 6.1.0 | BSD-3-Clause |
 | `zustand` | 5.0.14 | MIT |
