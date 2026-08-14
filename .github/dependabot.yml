@@ -87,6 +87,39 @@ updates:
       #   이 항목도 함께 지운다.
       - dependency-name: "kysely"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # 아래 셋은 major 만 막는다 — 8.x·3.x·6.x 안의 minor·patch 는 계속 받는다
+      #   (보안 패치가 거기서 온다). 셋 다 코드·설정 마이그레이션이 함께 가야 하는 변경이고,
+      #   프론트 설계·디자인 축이 별도 브랜치에서 도는 중이라 2026-08-13 리드 결정으로 미뤘다.
+      #   PR #109·#110·#112 를 이 사유로 닫았다.
+      # 경고: ignore 는 보안 업데이트 PR 까지 막는다 — 다만 막는 것이 major 뿐이라
+      #   각자의 현재 메이저 계열로 나오는 보안 릴리스는 종전대로 온다.
+      #
+      # react-table 9 는 v8 의 최상위 export 를 갈아엎는다 — `getCoreRowModel`·`useReactTable`
+      #   이 사라지고(`createCoreRowModel` 등으로 개명) 테이블 제네릭이 `TableFeatures` 를
+      #   요구한다. components/shared/DataTable/{DataTable,DataTableBody,DataTableHeader}.tsx
+      #   가 tsc 21건 + 런타임 `getCoreRowModel is not a function` 으로 죽는다 (PR #109
+      #   test: frontend 로그).
+      # 해제 조건: DataTable 3종을 v9 API(createCoreRowModel + feature 등록)로 옮기면 지운다.
+      - dependency-name: "@tanstack/react-table"
+        update-types: ["version-update:semver-major"]
+      # tailwind 4 는 PostCSS 플러그인을 `@tailwindcss/postcss` 로 분리하고 설정을 CSS-first
+      #   로 바꾼다 — postcss.config 가 tailwindcss 를 직접 물고 있어 "trying to use
+      #   `tailwindcss` directly as a PostCSS plugin" 으로 죽고, tailwind API 시그니처가 바뀌어
+      #   tests/styles/tailwindOpacityModifier.test.ts 가 tsc TS2769/TS2554 로도 깨진다
+      #   (PR #110 test: frontend 로그).
+      # 해제 조건: @tailwindcss/postcss 도입 + tailwind.config 를 CSS-first 로 옮기고
+      #   opacity modifier 회귀 그물(#313)을 4.x 위에서 다시 세우면 지운다.
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      # typescript 7 은 `npm ci` 자체가 ERESOLVE 로 죽는다 — @typescript-eslint/eslint-plugin
+      #   8.60.0 의 peer 가 `typescript@">=4.8.4 <6.1.0"` 이라 7.x 를 못 받는다. 그 플러그인은
+      #   eslint-plugin-unused-imports 의 peerOptional 이기도 해서 함께 끌려온다. 설치가
+      #   실패하니 test: frontend·test: frontend-db·notices: autofix 가 전부 죽는다
+      #   (PR #112 Install dependencies 단계 로그).
+      # 해제 조건: @typescript-eslint 가 typescript 7 을 peer 범위에 넣은 릴리스를 내면 지운다
+      #   (frontend/package.json 의 @typescript-eslint 상승과 같은 PR 로 간다).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       non-major:
         patterns: ["*"]
