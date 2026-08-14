@@ -8,7 +8,9 @@
 #
 # 묶음 설계 (2026-08-09 결정 「major 만 사람」과의 결합):
 #   · non-major 그룹은 minor·patch 만 담는다 — major 는 그룹 밖이라 개별 PR 로 오고,
-#     제목(`bump X from A to B`)을 review-record 가 읽어 사람 경로로 보낸다
+#     제목을 review-record 가 읽어 사람 경로로 보낸다. 개별 PR 제목은 두 형식이다 —
+#     `bump X from A to B`(잠금 파일 상승)와 `update X requirement from ~=A to ~=B`
+#     (매니페스트 제약 상승, 버전 업데이트를 켜면서 생겼다)
 #   · 묶음 PR 제목에는 from/to 가 없어 classify_bump 가 못 읽는다 — fail-closed 로
 #     자동 머지가 arm 되지 않는다 (scripts/test_review_record.py 공격 ⑥). 즉 묶음 PR 은
 #     내용이 non-major 뿐이어도 사람이 머지한다 — 이 파일만으로는 풀 수 없는 결합이다
