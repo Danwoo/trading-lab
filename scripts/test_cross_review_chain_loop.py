@@ -68,8 +68,8 @@ try_candidate() {
 
 TUI_FAIL = "에이전트 TUI 준비 실패(60s — 입력 상자가 화면에 나타나지 않았다)"
 
-# (이름, 체인, rc 각본, 있어야 하는 조각들, 없어야 하는 조각들)
-CASES: list[tuple[str, str, str, list[str], list[str]]] = [
+# (이름, 체인, rc 각본, 있어야 하는 조각들, 없어야 하는 조각들, 판정부를 번들에 넣는가)
+CASES: list[tuple[str, str, str, list[str], list[str], bool]] = [
     (
         "기동 실패(TUI) → 다음 후보로 넘어간다  ← 이 개정의 계기",
         "kimi claude",
@@ -84,6 +84,7 @@ CASES: list[tuple[str, str, str, list[str], list[str]]] = [
             TUI_FAIL,
         ],
         [],
+        True,
     ),
     (
         "체인의 모든 후보가 실패하면 여전히 unable",
@@ -99,6 +100,7 @@ CASES: list[tuple[str, str, str, list[str], list[str]]] = [
             "CI 교차 리뷰 실패 — 판정 없음",
         ],
         [],
+        True,
     ),
     (
         "폴백이 성공해도 첫 후보의 실패 사유가 기록에 남는다",
@@ -111,6 +113,7 @@ CASES: list[tuple[str, str, str, list[str], list[str]]] = [
             "### 리뷰어 폴백 — 실효 리뷰어",
         ],
         [],
+        True,
     ),
     (
         "확정 실패(Orca 불가용)는 다음 후보를 시도하지 않는다",
@@ -123,6 +126,7 @@ CASES: list[tuple[str, str, str, list[str], list[str]]] = [
             "startup_failed=\n",
         ],
         ["리뷰 후보 실행: claude"],
+        True,
     ),
     (
         "예산 소진은 다음 후보를 시도하지 않는다 (남은 시간이 없다)",
@@ -130,6 +134,7 @@ CASES: list[tuple[str, str, str, list[str], list[str]]] = [
         "30 0",
         ["failure_kind=budget", "effective=\n"],
         ["리뷰 후보 실행: claude"],
+        True,
     ),
     (
         "한도 → 다음 후보 (종전 동작 유지)",
@@ -137,6 +142,7 @@ CASES: list[tuple[str, str, str, list[str], list[str]]] = [
         "10 0",
         ["effective=claude", "exhausted=kimi", "fallback_cause=kimi 한도 소진"],
         [],
+        True,
     ),
     (
         "타임아웃 → 다음 후보 (종전 동작 유지)",
@@ -144,6 +150,7 @@ CASES: list[tuple[str, str, str, list[str], list[str]]] = [
         "20 0",
         ["effective=claude", "degraded=kimi", "일시 장애"],
         [],
+        True,
     ),
     (
         "1순위가 성공하면 폴백 표기가 붙지 않는다",
@@ -151,6 +158,37 @@ CASES: list[tuple[str, str, str, list[str], list[str]]] = [
         "0",
         ["effective=kimi", "fallback=no", "attempts_note=kimi: 판정 산출"],
         ["리뷰 후보 실행: claude", "::warning::리뷰어 폴백"],
+        True,
+    ),
+    # ── 판정부가 번들에 없을 때 (부트스트랩 구간 — 이 판정부를 들여온 PR 자신이 여기 걸린다) ──
+    (
+        "판정부 부재 — 조기 종결을 되살리지 않고 남은 후보를 계속 시도한다",
+        "kimi claude",
+        "21 21",
+        [
+            "리뷰 후보 실행: kimi",
+            "리뷰 후보 실행: claude",
+            "::error::체인 처분 판정부",
+            "failure_kind=confirmed",
+            "effective=\n",
+        ],
+        [],
+        False,
+    ),
+    (
+        "판정부 부재 — 폴백이 낸 판정을 버리지 않는다  (PR #144 실측 결함)",
+        "kimi claude",
+        "21 0",
+        [
+            "리뷰 후보 실행: claude",
+            "effective=claude",  # ← 종전엔 빈 값이 되어 merge_ok 판정이 unable 로 덮였다
+            "fallback=yes",
+            "failure_kind=\n",
+            "unable_reason=\n",
+            "집계부 부재 — 분류 없음. 시도 이력",
+        ],
+        [],
+        False,
     ),
 ]
 
@@ -183,13 +221,14 @@ def extract_loop() -> str:
     return body
 
 
-def run_case(loop: str, chain: str, scripted: str) -> str:
+def run_case(loop: str, chain: str, scripted: str, bundle_judge: bool) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
         (work / "ctx").mkdir()
-        (work / "ctx" / "review_chain.py").write_text(
-            JUDGE.read_text(encoding="utf-8"), encoding="utf-8"
-        )
+        if bundle_judge:
+            (work / "ctx" / "review_chain.py").write_text(
+                JUDGE.read_text(encoding="utf-8"), encoding="utf-8"
+            )
         (work / "driver.sh").write_text(PREAMBLE + loop, encoding="utf-8")
         # **`bash -e`** — Actions 기본 셸과 같은 자세 (헤더 「셸 플래그 함정」)
         proc = subprocess.run(
@@ -224,8 +263,8 @@ def main() -> int:
     print(f"cross-review.yml 에서 뽑은 체인 루프: {len(loop.splitlines())}줄")
 
     failures: list[str] = []
-    for name, chain, scripted, expect, forbid in CASES:
-        combined = run_case(loop, chain, scripted)
+    for name, chain, scripted, expect, forbid, bundle_judge in CASES:
+        combined = run_case(loop, chain, scripted, bundle_judge)
         missing = [e for e in expect if e not in combined]
         present = [f for f in forbid if f in combined]
         if missing or present:

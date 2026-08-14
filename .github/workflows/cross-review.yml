@@ -562,8 +562,12 @@ jobs:
           #
           # 둘 다 없으면 **번들에 안 싣고 넘어간다**(경고만). 없을 때 리뷰 잡이 어떻게 접히는지는
           # 각 판정부의 호출부가 정한다 — terminal_state 부재는 준비 실패(확정, 후보 무관),
-          # review_chain 부재는 「남은 후보를 계속 시도」다 (그 자리 주석). 어느 쪽이든 PR 이
-          # 막히지는 않는다.
+          # review_chain 부재는 「남은 후보를 계속 시도 + 판정이 났으면 그것을 살린다」다
+          # (그 자리 주석). 어느 쪽이든 PR 이 막히지는 않는다.
+          # ⚠ **새 판정부를 들이는 PR 자신은 이 구간에 걸린다** — base 에도 기본 브랜치에도
+          #   아직 그 파일이 없기 때문이다. 그래서 부재 시 동작이 「리뷰를 버린다」가 되면
+          #   그 PR 은 자기 리뷰를 못 받는다 (실측: PR #144 — 폴백 claude 가 낸 merge_ok 이
+          #   4초 뒤 unable 로 덮였다). 판정부를 추가할 때 이 구간을 먼저 설계하라.
           for JUDGE in terminal_state.py review_chain.py; do
             gh api "repos/$REPO/contents/scripts/$JUDGE?ref=$BASE_SHA" --jq '.content // empty' 2>/dev/null \
               | base64 -d > "ctx/$JUDGE" 2>/dev/null || true
@@ -769,9 +773,10 @@ jobs:
           # 준비 타임아웃으로 끝나는데 그 메시지는 원인을 안 가리키므로 미리 드러낸다.
           # 스텝을 죽이지는 않는다 — 실패 분류·확정 코멘트는 아래 정규화가 내야 한다.
           [ -s "$TERM_STATE" ] || echo "::warning::[orca] 준비·접수 판정부(ctx/terminal_state.py)가 번들에 없다 — 리뷰는 준비 실패로 끝난다"
-          # 체인 처분·집계 판정부. 없으면 후보 실패의 처분을 못 가리므로 **계속**으로 접고(조기
-          # 종결을 되살리지 않는다) 집계는 fail-closed 로 unable 을 낸다 — 각 호출부 주석 참조.
-          [ -s "$CHAIN_STATE" ] || echo "::error::[orca] 체인 처분·집계 판정부(ctx/review_chain.py)가 번들에 없다 — 후보 처분은 「계속」으로, 집계는 판정 없음으로 접힌다"
+          # 체인 처분·집계 판정부. 없으면 후보 실패의 **분류**를 못 하므로 처분은 「계속」으로
+          # 접고(조기 종결을 되살리지 않는다), 집계는 분류를 포기하되 판정 산출 여부는 살린다
+          # — 각 호출부 주석 참조.
+          [ -s "$CHAIN_STATE" ] || echo "::error::[orca] 체인 처분·집계 판정부(ctx/review_chain.py)가 번들에 없다 — 후보 처분은 「계속」으로, 집계는 실패 분류 없이 판정 산출 여부만 살린다"
           WT_PATH_INTERVAL="${ORCA_WT_PATH_POLL_SECS:-3}"
           WT_PATH_TIMEOUT="${ORCA_WT_PATH_TIMEOUT_SECS:-30}"
           WT_DELETE_RETRY="${ORCA_WT_DELETE_RETRY_SECS:-2}"
@@ -1433,21 +1438,37 @@ jobs:
             case "$out" in *continue=yes*) return 0 ;; esac
             return 1
           }
+          # rc 0 을 여기서 따로 붙잡아 둔다 — **분류가 아니라 사실**이다. rc 0 이면 run_orca 가
+          # 마커를 검출해 out/verdict.json 을 이미 썼다는 뜻이라, 집계부가 없어도 그것만은 안다.
+          FIRST_HOP=$(printf '%s' "${CHAIN:-$ROUTED}" | awk '{print $1}')
+          VERDICT_BY=""
           for CAND in ${CHAIN:-$ROUTED}; do
             try_candidate "$CAND"; CRC=$?
             printf '%s\t%s\t%s\n' "$CAND" "$CRC" "$(head -c 200 err.txt 2>/dev/null | tr '\n\t' '  ')" >> attempts.tsv
+            [ "$CRC" -eq 0 ] && VERDICT_BY="$CAND"
             chain_continue || break
           done
 
           # ── 집계 — 실효 리뷰어·폴백 여부·실패 분류·사람이 읽는 문구까지 순수 함수가 낸다 ──
           python3 "$CHAIN_STATE" summarize "${CHAIN:-$ROUTED}" < attempts.tsv > chain.env 2>/dev/null
           if [ ! -s chain.env ]; then
-            echo "::error::체인 집계부(ctx/review_chain.py)를 실행하지 못했다 — 판정 없음(fail-closed)으로 종결한다"
-            { echo "effective="; echo "fallback=no"; echo "exhausted="; echo "degraded="
-              echo "startup_failed="; echo "failure_kind=confirmed"
-              echo "stuck_at=체인 집계부(ctx/review_chain.py) 실행 실패"
-              echo "attempts_note="; echo "fallback_cause="
-              echo "unable_reason=체인 집계부(ctx/review_chain.py) 실행 실패 — fail-closed(리뷰 불가)"
+            # 집계부가 없으면 **분류**(한도인가 기동 실패인가)는 포기한다. 그러나 판정을 낸
+            # 후보가 있다는 것은 사실이므로 **그 리뷰를 버리지 않는다.**
+            # ⚠ 종전 이 자리는 무조건 unable 이었고, 그 때문에 이 판정부를 들여온 PR 자신의
+            #   리뷰가 통째로 버려졌다 — 실측(PR #144 run 31849173327): kimi 가 TUI 준비
+            #   실패(rc 21)로 죽고 폴백한 claude 가 23:16:10 에 merge_ok 판정 코멘트를 올렸는데,
+            #   4초 뒤 이 블록이 그것을 unable 로 덮었다. 판정을 못 낸 것과 판정을 버리는 것은
+            #   다르다 — fail-closed 는 앞의 것에만 건다.
+            echo "::error::체인 집계부(ctx/review_chain.py)를 실행하지 못했다 — 실패 분류는 포기하고 판정 산출 여부만 살린다"
+            SALVAGE_NOTE="집계부 부재 — 분류 없음. 시도 이력(모델 rc 사유): $(tr '\t' ' ' < attempts.tsv | tr '\n' ';')"
+            { echo "effective=${VERDICT_BY}"
+              echo "fallback=$([ -n "$VERDICT_BY" ] && [ "$VERDICT_BY" != "$FIRST_HOP" ] && printf yes || printf no)"
+              echo "exhausted="; echo "degraded="; echo "startup_failed="
+              echo "failure_kind=$([ -n "$VERDICT_BY" ] || printf confirmed)"
+              echo "stuck_at=$([ -n "$VERDICT_BY" ] || printf '체인 집계부(ctx/review_chain.py) 실행 실패')"
+              echo "attempts_note=${SALVAGE_NOTE}"
+              echo "fallback_cause=$([ -n "$VERDICT_BY" ] && [ "$VERDICT_BY" != "$FIRST_HOP" ] && printf '1순위 리뷰어 실패(집계부 부재로 사유 분류 없음 — 잡 로그의 시도 이력 참조)')"
+              echo "unable_reason=$([ -n "$VERDICT_BY" ] || printf '체인 집계부(ctx/review_chain.py) 실행 실패 — fail-closed(리뷰 불가)')"
             } > chain.env
           fi
           cval() { sed -n "s/^$1=//p" chain.env; }
