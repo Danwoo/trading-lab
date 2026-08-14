@@ -208,6 +208,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_notices_generator.py
 
+      # 프록시 라우트 ↔ 서비스 소비자 (#2) — `frontend/app/api/external/**` 를 스스로 순회해
+      # 대상을 찾는 stdlib 스캔이라 이 잡의 클래스다. 경로 필터가 있는 워크플로에 두면 이
+      # 그물이 존재해야 할 바로 그 PR 클래스(고아 라우트 추가·소비자 삭제·체커만 수정)에서
+      # 목록에 안 걸려 조용히 skip 된다 — 실제로 ci.yml 의 repo-contracts 에 있던 동안
+      # 그 상태였다. 여기서는 경로 필터가 없어 매 PR 마다 돈다.
+      - name: 프록시 라우트 소비자 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_proxy_route_consumers.py
+
   # ── 앱 모듈을 import 하는 전수 스캔 (uv 필요) ────────────────────────────
   repo-scan-app:
     name: "test: repo-scan-app"
