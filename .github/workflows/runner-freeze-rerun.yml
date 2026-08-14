@@ -1,0 +1,160 @@
+# runner-freeze-rerun — 러너 동결로 버려진 cross-review 를 자동 재실행한다
+#
+# 문제: cross-review 의 리뷰 잡은 WSL 위 self-hosted 러너에서 돈다. 호스트가 절전에 들면
+#   러너 프로세스가 얼고, GitHub 은 심장박동이 끊긴 잡을 ~10분 뒤 버린다. 러너는 깨어나
+#   하던 리뷰를 끝내고 결과를 올리려다 403(job is completed)으로 거절당한다 — **리뷰는
+#   실제로 정상 수행됐는데 올릴 자리가 사라진 것**이다. 실측(2026-08-11 재측정): 최근
+#   30 run 중 3건(31371433703·31456627687·31456676162 각 attempt 1), 전부 수동
+#   `gh run rerun <id> --failed` 로 해소됐다. 호스트 절전은 물리적으로 막을 수 없다는
+#   것이 리드 판단이라, 안 얼게 하는 것이 아니라 **얼었을 때 밖에서 자동 복구**한다.
+#
+# 왜 밖(workflow_run + GitHub-hosted)인가: 이미 버려진 잡을 러너 쪽에서 되살릴 방법은
+#   없다. 우리 러너가 자도 ubuntu-latest 는 깨어 있다. cross-review.yml 은 수정하지
+#   않는다 — 이 워크플로는 완결된 run 의 결과만 보고 판단한다.
+#
+# ⚠ 덮으면 안 된다 — 무조건 재시도는 진짜 결함을 「몇 번 돌리면 초록」으로 덮는다:
+#   · 판정은 scripts/runner_freeze_rerun.py (순수 함수 — 픽스처 기반 회귀 그물 있음).
+#     동결 서명(GitHub 생성 고정 문자열) 정확 일치 + 그 여파(verdict unable)만 있을 때만
+#     재실행하고, 그 밖의 failure annotation 이 하나라도 섞이면 재실행하지 않는다.
+#   · annotation 조회 실패 → 재실행하지 않는다 (fail-closed).
+#   · 재시도 상한 attempt 3 (자동 재실행 최대 2회) — 근거는 판정부 머리 주석.
+#   · 조용히 초록으로 만들지 않는다 — 재실행·상한 초과 때마다 PR 에 코멘트를 남긴다
+#     (attempt 번호가 실려 몇 회차인지 누적이 읽힌다).
+#   · PR head 가 이미 전진했으면 재실행하지 않는다 — 새 run 이 새 head 를 리뷰한다.
+#
+# 이 워크플로가 아닌 것:
+#   · required 가 아니다 — 이 워크플로가 죽어도 사람 머지를 막지 않는다.
+#   · `test: ` 접두를 쓰지 않는다 — required 게이트가 그 접두를 전수 판정한다.
+#
+# ⚠ workflow_run 은 **기본 브랜치의 정의만** 실행된다 — 머지 전에는 이벤트로 못 띄운다.
+#   판정부는 로컬 테스트(scripts/test_runner_freeze_rerun.py)로 검증했고, 실환경 동작은
+#   머지 후 확인한다 (PR 「검증하지 못한 것」).
+
+name: runner-freeze-rerun
+
+on:
+  workflow_run:
+    workflows: ["cross-review"]
+    types: [completed]
+
+# 같은 run 의 이벤트가 겹쳐 들어와도 재실행·코멘트가 이중으로 나가지 않게 직렬화한다
+concurrency:
+  group: runner-freeze-rerun-${{ github.event.workflow_run.id }}
+
+permissions: {}   # 기본 0 — 잡별 최소 부여
+
+jobs:
+  rerun:
+    name: "freeze-watch: cross-review 재실행 판정 (비게이트)"
+    # 동결 attempt 는 failure 로 완결된다 (실측: 취소·성공 run 은 판정 대상이 아니다)
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read        # 판정 스크립트 체크아웃 (기본 브랜치 판본 — PR 이 못 건드린다)
+      actions: write        # gh run rerun
+      checks: read          # 실패 잡의 annotation 조회
+      pull-requests: write  # 재실행·상한 초과 코멘트
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: 판정 스크립트 체크아웃
+        uses: actions/checkout@v4   # ⚠ 배포 시 커밋 SHA 핀
+        with:
+          persist-credentials: false
+
+      - name: 실패 잡 annotation 수집
+        run: |
+          set -euo pipefail
+          # 트리거된 attempt 의 잡만 본다 — 최신 attempt 조회는 경합(그 사이 새 attempt 시작) 시
+          # 다른 attempt 를 판정하게 된다
+          gh api "repos/$REPO/actions/runs/$RUN_ID/attempts/$RUN_ATTEMPT/jobs?per_page=100" > jobs.json
+          JOB_COUNT=$(jq '.jobs | length' jobs.json)
+          echo "run $RUN_ID attempt $RUN_ATTEMPT — 잡 ${JOB_COUNT}건"
+
+          # 실패 잡의 annotation 을 개별 조회. 조회 실패는 null 로 실어 판정부가
+          # fail-closed(skip) 하게 한다 — 여기서 죽여 버리면 「조회 실패 = 재실행 안 함」이
+          # 로그에 판정으로 안 남는다.
+          : > anns.ndjson
+          while read -r ID; do
+            [ -n "$ID" ] || continue
+            if ANN=$(gh api "repos/$REPO/check-runs/$ID/annotations?per_page=100" 2>/dev/null); then
+              jq -nc --argjson id "$ID" --argjson ann "$ANN" '{id: $id, annotations: $ann}' >> anns.ndjson
+            else
+              echo "::warning::잡 $ID annotation 조회 실패 — fail-closed 로 재실행하지 않는다"
+              jq -nc --argjson id "$ID" '{id: $id, annotations: null}' >> anns.ndjson
+            fi
+          done < <(jq -r '.jobs[] | select(.conclusion=="failure") | .id' jobs.json)
+
+          jq -s --arg attempt "$RUN_ATTEMPT" '
+            (.[1:] | map({(.id|tostring): .annotations}) | add // {}) as $ann
+            | {run_attempt: ($attempt|tonumber),
+               jobs: [.[0].jobs[] | {name, conclusion,
+                      annotations: (if .conclusion == "failure"
+                                    then ($ann[.id|tostring] // null)
+                                    else [] end)}]}
+          ' jobs.json anns.ndjson > input.json
+
+      - name: 재실행 판정 (scripts/runner_freeze_rerun.py)
+        id: decide
+        run: |
+          set -euo pipefail
+          python3 scripts/runner_freeze_rerun.py < input.json | tee decision.txt
+          ACTION=$(tail -1 decision.txt)
+          case "$ACTION" in
+            action=rerun|action=skip|action=cap_exceeded) ;;
+            *) echo "::error::판정부 출력이 계약(action=…)과 다르다: $ACTION"; exit 1 ;;
+          esac
+          echo "${ACTION}" >> "$GITHUB_OUTPUT"
+
+      - name: 재실행 + PR 코멘트 (판정 근거를 남긴다)
+        if: ${{ steps.decide.outputs.action == 'rerun' || steps.decide.outputs.action == 'cap_exceeded' }}
+        env:
+          ACTION: ${{ steps.decide.outputs.action }}
+        run: |
+          set -euo pipefail
+          # 코멘트 대상 PR — head 브랜치의 열린 PR 중 head SHA 가 동결 run 과 일치하는 것.
+          # workflow_run.pull_requests 는 비어 올 수 있어(알려진 공백) 브랜치로 조회한다.
+          gh pr list -R "$REPO" --head "$HEAD_BRANCH" --state open \
+            --json number,headRefOid > prs.json
+          PR=$(jq -r --arg sha "$HEAD_SHA" \
+                 '.[] | select(.headRefOid == $sha) | .number' prs.json | head -1)
+          if [ -z "$PR" ]; then
+            # 닫혔거나 head 가 전진 — 새 head 의 run 이 대체하므로 재실행할 이유가 없고,
+            # 코멘트(가시성 의무)도 남길 자리가 없다. 재실행하지 않는다 (fail-closed).
+            echo "::warning::head $HEAD_SHA 의 열린 PR 이 없다 (닫힘 또는 head 전진) — 재실행하지 않는다"
+            exit 0
+          fi
+
+          BASIS="판정 근거: [run ${RUN_ID} attempt ${RUN_ATTEMPT}](${RUN_URL}) 의 실패 잡 annotation (freeze-watch run 로그에 전문)"
+
+          if [ "$ACTION" = "cap_exceeded" ]; then
+            {
+              printf '⚠ **러너 동결 감지 — 자동 재실행 상한 초과** (attempt %s ≥ 3)\n\n' "$RUN_ATTEMPT"
+              printf 'cross-review 가 러너 동결(호스트 절전)로 또 실패했지만, 자동 재실행 상한에 걸려 멈춘다. '
+              printf '러너가 계속 자고 있다 — 사람이 러너 상태를 확인한 뒤 필요하면 `gh run rerun %s --failed` 로 재실행하라.\n\n' "$RUN_ID"
+              printf '%s\n' "$BASIS"
+            } > comment.md
+            gh pr comment "$PR" -R "$REPO" --body-file comment.md
+            echo "상한 초과 코멘트 남김 — PR #$PR"
+            exit 0
+          fi
+
+          # 코멘트 먼저, 재실행은 그 다음 — 코멘트가 실패하면 재실행도 하지 않는다
+          # (조용한 초록 방지가 이 워크플로의 존재 이유라, 가시성 없는 재실행은 안 한다)
+          NEXT=$((RUN_ATTEMPT + 1))
+          {
+            printf '🔁 **러너 동결 감지 — cross-review 자동 재실행** (attempt %s → %s, 상한 3)\n\n' "$RUN_ATTEMPT" "$NEXT"
+            printf '리뷰는 실제로 돌았으나 self-hosted 러너가 얼어(호스트 절전) 결과를 올리기 전에 GitHub 이 잡을 버렸다. '
+            printf '실패 잡의 annotation 이 러너 동결 서명(과 그 여파인 verdict unable)뿐이라 실패 잡만 재실행한다.\n\n'
+            printf '%s\n' "$BASIS"
+          } > comment.md
+          gh pr comment "$PR" -R "$REPO" --body-file comment.md
+          gh run rerun "$RUN_ID" --failed -R "$REPO"
+          echo "재실행 개시 — run $RUN_ID (attempt $NEXT), PR #$PR 에 코멘트 남김"

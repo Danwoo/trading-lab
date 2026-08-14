@@ -1,0 +1,145 @@
+# dependabot 버전 업데이트 — 전 서비스 등록 (#14)
+#
+# 이 파일이 없으면 버전 업데이트는 아예 돌지 않는다 — 알림 기반 보안 업데이트만 온다.
+# 보안 업데이트는 이 파일과 무관하게 종전대로 개별 PR 로 흐른다 (groups 의 applies-to
+# 기본값이 version-updates 라 보안 업데이트는 묶이지 않는다).
+# 단, ignore 는 예외다 — 버전·보안 업데이트 둘 다에 적용된다. `update-types` 로 좁힌 항목은
+# 그 범위 안에서만 막으므로, 범위 밖으로 나오는 보안 릴리스는 계속 온다 (아래 각 ignore 주석).
+#
+# 묶음 설계 (2026-08-09 결정 「major 만 사람」과의 결합):
+#   · non-major 그룹은 minor·patch 만 담는다 — major 는 그룹 밖이라 개별 PR 로 오고,
+#     제목을 review-record 가 읽어 사람 경로로 보낸다. 개별 PR 제목은 두 형식이다 —
+#     `bump X from A to B`(잠금 파일 상승)와 `update X requirement from ~=A to ~=B`
+#     (매니페스트 제약 상승, 버전 업데이트를 켜면서 생겼다)
+#   · 묶음 PR 제목에는 from/to 가 없어 classify_bump 가 못 읽는다 — fail-closed 로
+#     자동 머지가 arm 되지 않는다 (scripts/test_review_record.py 공격 ⑥). 즉 묶음 PR 은
+#     내용이 non-major 뿐이어도 사람이 머지한다 — 이 파일만으로는 풀 수 없는 결합이다
+#
+# 서비스가 늘면 여기 directory 를 추가해야 한다 — 등록 목록 ↔ 실제 매니페스트 대조:
+#   git ls-tree -r --name-only origin/main | grep -E "(^|/)(package\.json|pyproject\.toml)$" | grep -v node_modules
+
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directories:
+      - "/backend-service"
+      - "/disclosure-mcp-service"
+      - "/doc-search-mcp-service"
+      - "/market-data-mcp-service"
+      - "/multi-agent-service"
+      - "/news-mcp-service"
+      - "/portfolio-mcp-service"
+      - "/single-agent-service"
+      - "/template-mcp-service"
+      - "/web-mcp-service"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Seoul"
+    # mcp 는 major 만 막는다 — 1.x 의 minor·patch 는 계속 받는다(보안 패치가 거기서 온다).
+    #   mcp 2.0.0 은 `mcp.shared.context.RequestContext` 를 없앤 파괴적 major 라
+    #   backend-service·multi-agent-service 의 검증 스크립트가 ImportError 로 죽는다
+    #   (PR #117·#124 의 test: backend / test: multi-agent 로그).
+    #   이 레포는 MCP 서버 6 + 소비자 2 라 8개 서비스가 함께 걸리는 마이그레이션이고,
+    #   2026-08-13 리드 결정으로 지금은 그 축을 하지 않는다.
+    # 경고: ignore 는 보안 업데이트 PR 까지 막는다 — 다만 여기서 막는 것은 major 뿐이라
+    #   1.x 로 나오는 보안 릴리스는 종전대로 온다.
+    # 해제 조건: 8개 서비스의 mcp 2.0 마이그레이션이 서면 이 항목을 지운다.
+    ignore:
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
+    groups:
+      non-major:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Seoul"
+    # prisma(CLI)만 막는다 — @prisma/client·@prisma/adapter-pg 는 대상이 아니다.
+    #   prisma ≥7.9.1 이 @prisma/studio-core ≥0.33.0 을 통해 elkjs(EPL-2.0 카피레프트)를
+    #   들이는데, prisma 는 devDependencies 뿐이어도 @prisma/client 가 optional peer 로
+    #   선언해 `npm ci --omit=dev` 배포 설치에도 실린다. 이 레포는 MIT (PR #83·#130 사유).
+    # 경고: ignore 는 보안 업데이트 PR 까지 막는다 — prisma 에 취약점이 나도 PR 이 안 온다.
+    #   Dependabot alerts 는 그대로 오므로 Security 탭으로 감시한다.
+    # 해제 조건: 상류가 @prisma/studio-core 를 필수 의존에서 빼거나(선택 설치화 포함),
+    #   prisma CLI 를 프로젝트 의존성 밖으로 옮기면 이 ignore 를 지운다.
+    ignore:
+      - dependency-name: "prisma"
+      # kysely 는 0.29 로 가는 길만 막는다 — 0.28 안의 patch 는 계속 받는다.
+      #   kysely 0.29 는 `DEFAULT_MIGRATION_TABLE` 을 없애 @better-auth/kysely-adapter 를
+      #   깨뜨린다. 이 레포가 `kysely` 를 직접 의존성으로 들고 있는 이유가 그 차단이다
+      #   (frontend/package.json 의 `//kysely` 주석 · frontend/CLAUDE.md · frontend/README.md
+      #   · .docs/2-개발가이드/react-nextjs-프론트개발.md · .docs/specs/m2-frontend-orders.md).
+      #   adapter 자신은 `kysely: "^0.28.17 || ^0.29.0"` 이라 0.29 를 받아들여, 직접 의존성을
+      #   놓으면 그대로 0.29 로 올라간다. dependabot 은 0.28→0.29 를 「non-major」로 분류해
+      #   묶음 PR 에 실어 보낸다(PR #132) — 0.x 의 minor 는 semver 상 파괴가 허용되므로
+      #   그 분류가 이 레포 기준으로는 틀린다. minor·major 를 함께 막아 분류 차이를 덮는다.
+      # patch 를 살려 둔 이유: 매니페스트가 이미 `^0.28.17`(= >=0.28.17 <0.29.0)이라 0.28 patch
+      #   는 설치 시점에 어차피 허용된다 — 여기서 막으면 락파일만 얼어 매니페스트와 어긋나고,
+      #   0.28 계열로 나오는 보안 릴리스까지 PR 이 끊긴다(ignore 는 보안 업데이트도 막는다).
+      # 해제 조건: adapter 가 0.29 대응을 마쳐 리드가 frontend 의 kysely 직접 의존성을 걷어내면
+      #   이 항목도 함께 지운다.
+      - dependency-name: "kysely"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # katex 는 0.18 로 가는 길만 막는다 — 0.17 안의 patch 는 계속 받는다.
+      #   실제 수식 마크업을 만드는 것은 최상위 katex 가 아니라, rehype-katex@7.0.1 과
+      #   micromark-extension-math@3.1.0 이 각각 `katex: ^0.16.0` 으로 물어 들이는 중첩
+      #   katex@0.16.47 이다. 최상위 katex 는 frontend/styles/globals.css 의
+      #   `@import "katex/dist/katex.min.css"` 한 줄을 위해 있는 직접 의존성이다 — 앱 코드는
+      #   katex 를 JS 로 import 하지 않는다.
+      #   katex 0.18.0 은 CSS 클래스를 접두어화하는 파괴적 변경이라, 0.18 스타일시트로
+      #   0.16 마크업을 칠하게 되어 MarkdownRenderer 의 수식 렌더가 깨진다. dependabot 은
+      #   0.17→0.18 을 「non-major」로 분류해 묶음 PR 에 실어 보낸다(PR #135) — 0.x 의 minor 는
+      #   semver 상 파괴가 허용되므로 그 분류가 이 레포 기준으로는 틀린다(kysely 와 같은 축).
+      #   minor·major 를 함께 막아 분류 차이를 덮는다.
+      #   CI 는 이 축을 못 본다 — 타입·린트·빌드가 전부 통과하고 수식은 브라우저에서만 깨진다.
+      # patch 를 살려 둔 이유: 매니페스트가 이미 `^0.17.0`(= >=0.17.0 <0.18.0)이라 0.17 patch
+      #   는 설치 시점에 어차피 허용된다 — 여기서 막으면 락파일만 얼어 매니페스트와 어긋나고,
+      #   0.17 계열로 나오는 보안 릴리스까지 PR 이 끊긴다(ignore 는 보안 업데이트도 막는다).
+      # 해제 조건: rehype-katex 와 micromark-extension-math 가 `katex: ^0.18.0` 을 무는 버전을
+      #   내면, frontend/package.json 의 katex 상승과 같은 PR 로 이 항목을 지운다.
+      - dependency-name: "katex"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # 아래 셋은 major 만 막는다 — 8.x·3.x·6.x 안의 minor·patch 는 계속 받는다
+      #   (보안 패치가 거기서 온다). 셋 다 코드·설정 마이그레이션이 함께 가야 하는 변경이고,
+      #   프론트 설계·디자인 축이 별도 브랜치에서 도는 중이라 2026-08-13 리드 결정으로 미뤘다.
+      #   PR #109·#110·#112 를 이 사유로 닫았다.
+      # 경고: ignore 는 보안 업데이트 PR 까지 막는다 — 다만 막는 것이 major 뿐이라
+      #   각자의 현재 메이저 계열로 나오는 보안 릴리스는 종전대로 온다.
+      #
+      # react-table 9 는 v8 의 최상위 export 를 갈아엎는다 — `getCoreRowModel`·`useReactTable`
+      #   이 사라지고(`createCoreRowModel` 등으로 개명) 테이블 제네릭이 `TableFeatures` 를
+      #   요구한다. components/shared/DataTable/{DataTable,DataTableBody,DataTableHeader}.tsx
+      #   가 tsc 21건 + 런타임 `getCoreRowModel is not a function` 으로 죽는다 (PR #109
+      #   test: frontend 로그).
+      # 해제 조건: DataTable 3종을 v9 API(createCoreRowModel + feature 등록)로 옮기면 지운다.
+      - dependency-name: "@tanstack/react-table"
+        update-types: ["version-update:semver-major"]
+      # tailwind 4 는 PostCSS 플러그인을 `@tailwindcss/postcss` 로 분리하고 설정을 CSS-first
+      #   로 바꾼다 — postcss.config 가 tailwindcss 를 직접 물고 있어 "trying to use
+      #   `tailwindcss` directly as a PostCSS plugin" 으로 죽고, tailwind API 시그니처가 바뀌어
+      #   tests/styles/tailwindOpacityModifier.test.ts 가 tsc TS2769/TS2554 로도 깨진다
+      #   (PR #110 test: frontend 로그).
+      # 해제 조건: @tailwindcss/postcss 도입 + tailwind.config 를 CSS-first 로 옮기고
+      #   opacity modifier 회귀 그물(#313)을 4.x 위에서 다시 세우면 지운다.
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      # typescript 7 은 `npm ci` 자체가 ERESOLVE 로 죽는다 — @typescript-eslint/eslint-plugin
+      #   8.60.0 의 peer 가 `typescript@">=4.8.4 <6.1.0"` 이라 7.x 를 못 받는다. 그 플러그인은
+      #   eslint-plugin-unused-imports 의 peerOptional 이기도 해서 함께 끌려온다. 설치가
+      #   실패하니 test: frontend·test: frontend-db·notices: autofix 가 전부 죽는다
+      #   (PR #112 Install dependencies 단계 로그).
+      # 해제 조건: @typescript-eslint 가 typescript 7 을 peer 범위에 넣은 릴리스를 내면 지운다
+      #   (frontend/package.json 의 @typescript-eslint 상승과 같은 PR 로 간다).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+    groups:
+      non-major:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

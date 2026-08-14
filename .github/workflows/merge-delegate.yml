@@ -1,0 +1,227 @@
+# merge-delegate — 지휘자가 버튼 대신 워크플로에 시키는 머지 (#23 Task 9)
+#
+# 무엇: `workflow_dispatch` 로 PR 번호를 받아 **머지 조건을 다시 판정하고** 미는 워크플로.
+#
+# 왜: 지금 「누가 머지했는가」가 안 남는다. 리드와 지휘자가 같은 GitHub 계정을 써서 둘 다
+#   `Danwoo` 로 찍히기 때문이다. 그런데 **워크플로가 민 PR 과 사람이 민 PR 은 GitHub 이 이미
+#   구분한다** (실측: `gh pr view 57 --json mergedBy --jq .mergedBy.login` → `app/github-actions`,
+#   같은 명령을 #67 에 쓰면 `Danwoo`). 그러니 지휘자가 라벨로 자기 신고할 필요가 없다 —
+#   버튼을 직접 안 누르고 여기에 시키면 액터가 자동으로 갈린다:
+#
+#     리드가 버튼      → mergedBy: Danwoo              (이벤트 없음)
+#     지휘자 위임 머지 → mergedBy: app/github-actions  (workflow_dispatch — 이 워크플로)
+#     완전 자동        → mergedBy: app/github-actions  (review-record 의 arm 경로)
+#
+#   `workflow_dispatch` 인지 아닌지가 지휘자와 자동을 가르므로, 이 워크플로는 자기 머지에
+#   `머지: 지휘자` 를 적고 review-record 의 자동 경로는 `머지: 자동` 을 적는다.
+#
+# **요청받았다고 그냥 밀지 않는다.** 위임의 대가는 재판정이다 (판정부는 순수 함수
+#   `scripts/review_record.py delegate` — 자동 머지와 **같은** 판정부를 재사용한다):
+#     ① 머지 대상 head 의 리뷰 통과 마커 (merge_ok · source=manual 아님 · sha 동등)
+#     ② required 게이트(`test: gate`) 초록 — **기다리지 않는다.** 지금 초록이 아니면 거부한다
+#     ③ 저위험 확정 (`risk: low` 로 읽힌 것만 — 미선언·고위험은 사람 경로)
+#   하나라도 안 맞으면 거부하고 **이유를 전부** 코멘트로 남긴다. 사유를 하나씩 흘리면
+#   지휘자가 고치고 다시 요청할 때마다 다음 사유가 하나 나온다.
+#
+# 머지 커밋 본문: `scripts/merge_provenance.py` 가 GitHub 이 만들 squash 본문을 재현하고
+#   `작성 · 리뷰 · 머지` 한 줄을 더한다. 재현하는 이유는 `--body` 가 GitHub 조립분을
+#   **대체**하기 때문이다 — 그냥 한 줄만 넘기면 커밋 메시지와 `Co-authored-by:` 가 사라진다.
+#
+# 킬 스위치: 레포 변수 `AUTO_MERGE` 가 'on' 이 아니면 밀지 않는다 (review-record 와 같은 스위치).
+
+name: merge-delegate
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "위임 머지할 PR 번호"
+        required: true
+
+# 같은 PR 에 대해 자동 경로(review-record)와 동시에 밀지 않게 **같은 그룹 키**를 쓴다.
+concurrency:
+  group: review-record-${{ inputs.pr }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # 머지
+  pull-requests: write # 거부 사유 코멘트
+  checks: read # required 게이트 체크런 조회
+  issues: read # 참조 이슈의 risk 라벨 조회
+
+jobs:
+  delegate:
+    name: "merge: delegate (비게이트)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ inputs.pr }}
+      AUTO_MERGE: ${{ vars.AUTO_MERGE }}
+      AUTO_MERGE_METHOD: ${{ vars.AUTO_MERGE_METHOD }}
+      ACTOR: ${{ github.actor }}
+    steps:
+      # 판정부는 **main 리비전**에서 온다 — PR 코드는 체크아웃도 실행도 하지 않는다 (신뢰 경계)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 머지 조건 재판정 → 위임 머지
+        run: |
+          # gh 실패를 직접 분류하므로 -e 를 끈다 (Actions 기본 셸은 `bash -e {0}`)
+          set -uo pipefail
+          set +e
+
+          # workflow_dispatch 입력 — 숫자 외에는 받지 않는다 (주입 방어)
+          case "$PR" in
+            ''|*[!0-9]*) echo "::error::PR 번호가 숫자가 아니다: ${PR@Q}"; exit 1 ;;
+          esac
+
+          say() {   # 거부·실패 사유는 요청자가 읽는 자리에 남긴다
+            gh pr comment "$PR" --repo "$REPO" --body "$1" >/dev/null \
+              || echo "::warning::코멘트 게시 실패 — 사유는 이 잡 로그에만 남는다"
+          }
+
+          if [ "$AUTO_MERGE" != "on" ]; then
+            echo "::error::킬 스위치 AUTO_MERGE=${AUTO_MERGE:-미설정} — 위임 머지를 하지 않는다"
+            say "위임 머지 거부 — 킬 스위치 \`AUTO_MERGE\` 가 \`${AUTO_MERGE:-미설정}\` 이다 (요청: @${ACTOR})."
+            exit 1
+          fi
+
+          # ── PR 상태 ───────────────────────────────────────────────────────────────
+          FRESH=$(gh pr view "$PR" --repo "$REPO" \
+            --json state,headRefOid,title,body,author,headRefName)
+          if [ -z "$FRESH" ]; then
+            echo "::error::PR #${PR} 조회 실패 — 판정을 시작하지 못했다 (fail-closed)"
+            exit 1
+          fi
+          STATE=$(jq -r .state <<<"$FRESH")
+          HEAD=$(jq -r .headRefOid <<<"$FRESH")
+          if [ "$STATE" != "OPEN" ]; then
+            echo "::error::PR #${PR} 상태 ${STATE} — 머지할 것이 없다"
+            exit 1
+          fi
+
+          # ── ① 리뷰 통과 마커 (record 판정부 재사용) ───────────────────────────────
+          COMMENTS=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            | jq -s 'add // [] | map({body, author_association, html_url,
+                                      user_login: .user.login, user_type: .user.type})')
+          REVIEWS=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
+            | jq -s 'add // [] | map({user_login: .user.login, state, commit_id})')
+          if [ -z "$COMMENTS" ] || [ -z "$REVIEWS" ]; then
+            echo "::error::코멘트·리뷰 조회 실패 — 판정 입력이 비었다 (fail-closed)"
+            exit 1
+          fi
+          DECISION=$(jq -n --arg head "$HEAD" --argjson comments "$COMMENTS" \
+              --argjson reviews "$REVIEWS" \
+              '{head_sha: $head, comments: $comments, existing_reviews: $reviews}' \
+            | python3 scripts/review_record.py record)
+          echo "마커 판정: $DECISION"
+
+          # ── ② required 게이트 — **기다리지 않는다** (--final 로 미완을 실패로 접는다) ──
+          CHECKS=$(gh api "repos/$REPO/commits/$HEAD/check-runs?per_page=100" --paginate \
+                   --jq '.check_runs[] | {id, name, status, conclusion}') || CHECKS=""
+          GATE_OUT=$(printf '%s\n' "$CHECKS" | python3 scripts/review_record.py gate --final)
+          GATE_RC=$?
+          printf '%s\n' "$GATE_OUT"
+          GATE_STATE=fail
+          [ "$GATE_RC" -eq 0 ] && GATE_STATE=pass
+
+          # ── ③ 위험도 — PR 본문의 참조 이슈를 fresh 조회 (review-record 와 같은 경로) ──
+          SCAN=$(jq -r '.body // ""' <<<"$FRESH" | jq -Rs '{body: .}' \
+            | python3 scripts/review_record.py scan-refs)
+          if [ -z "$SCAN" ]; then
+            echo "::error::참조 판독 실패 — 위임 머지를 하지 않는다 (fail-closed)"
+            say "위임 머지 거부 — PR 본문의 이슈 참조를 판독하지 못했다 (fail-closed, 요청: @${ACTOR})."
+            exit 1
+          fi
+          DROPPED=$(jq -c .dropped <<<"$SCAN")
+          REFS='[]'
+          for N in $(jq -r '.refs[]' <<<"$SCAN"); do
+            META=$(gh api "repos/$REPO/issues/$N" \
+              --jq '{number, is_pr: (.pull_request != null), labels: [.labels[].name]}') \
+              || META=""
+            [ -n "$META" ] || META=$(jq -n --argjson n "$N" '{number: $n, lookup_failed: true}')
+            REFS=$(jq --argjson m "$META" '. + [$m]' <<<"$REFS")
+          done
+
+          # 커밋 — 저자 신원(자기리뷰 판정)과 머지 본문 재현에 **같은 조회**를 쓴다
+          COMMITS=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate \
+            --jq '.[] | {message: .commit.message, author_name: .commit.author.name,
+                        author_email: .commit.author.email, parents: (.parents | length)}' \
+            | jq -s '.') || COMMITS=""
+          if [ -z "$COMMITS" ] || [ "$(jq 'length' <<<"$COMMITS")" -eq 0 ]; then
+            echo "::error::PR 커밋 조회 실패·0건 — 위임 머지를 하지 않는다 (fail-closed)"
+            say "위임 머지 거부 — PR 의 커밋을 읽지 못했다 (fail-closed, 요청: @${ACTOR})."
+            exit 1
+          fi
+          EMAILS=$(jq -c '[.[].author_email | select(length > 0)]' <<<"$COMMITS")
+
+          # ── 셋을 한 판정부에 넘긴다 ───────────────────────────────────────────────
+          VERDICT=$(jq -r '.verdict // ""' <<<"$DECISION")
+          MODEL=$(jq -r '.model // ""' <<<"$DECISION")
+          TIER=$(jq -r '.tier // ""' <<<"$DECISION")
+          MARKER_SHA=$(jq -r '.marker_sha // ""' <<<"$DECISION")
+          MANUAL=$(jq -r '.manual' <<<"$DECISION")
+          JUDGE=$(jq -n --arg head "$HEAD" --arg marker "$MARKER_SHA" --arg model "$MODEL" \
+              --arg tier "$TIER" --arg verdict "$VERDICT" --argjson manual "${MANUAL:-true}" \
+              --arg gate "$GATE_STATE" --argjson fresh "$FRESH" --argjson reviews "$REVIEWS" \
+              --argjson refs "$REFS" --argjson dropped "${DROPPED:-[]}" \
+              --argjson emails "${EMAILS:-[]}" \
+              '{head_sha: $head, marker_sha: $marker, marker_model: $model, marker_tier: $tier,
+                verdict: $verdict, manual: $manual, gate_state: $gate,
+                reviews: $reviews, pr_author_login: $fresh.author.login,
+                pr_author_is_bot: ($fresh.author.is_bot // false),
+                pr_title: $fresh.title, head_ref: $fresh.headRefName,
+                issue_refs: $refs, dropped_refs: $dropped,
+                commit_author_emails: $emails}' \
+            | python3 scripts/review_record.py delegate)
+          echo "위임 머지 판정: $JUDGE"
+          if [ -z "$JUDGE" ]; then
+            echo "::error::판정부가 출력을 내지 못했다 — 위임 머지를 하지 않는다 (fail-closed)"
+            exit 1
+          fi
+          if [ "$(jq -r .allow <<<"$JUDGE")" != "true" ]; then
+            REASONS=$(jq -r '.reasons[] | "- " + .' <<<"$JUDGE")
+            echo "::error::위임 머지 거부 — 조건 미충족"
+            printf '%s\n' "$REASONS"
+            say "$(printf '위임 머지 **거부** (요청: @%s · head `%s`)\n\n%s\n\n조건이 갖춰진 뒤 다시 실행하라 — 이 워크플로는 요청받았다고 밀지 않고 ① 리뷰 통과 마커 ② required 게이트 초록 ③ 저위험 확정을 다시 판정한다.' "$ACTOR" "$HEAD" "$REASONS")"
+            exit 1
+          fi
+
+          # ── 머지 방식 — merge|squash 화이트리스트 (rebase 는 단일 revert 앵커가 없다) ──
+          METHOD=squash
+          case "${AUTO_MERGE_METHOD:-}" in
+            merge|squash) METHOD="$AUTO_MERGE_METHOD" ;;
+            rebase) echo "::warning::AUTO_MERGE_METHOD=rebase 는 화이트리스트 밖 — squash 로 강제" ;;
+          esac
+
+          # ── 머지 본문 — GitHub 조립분을 재현하고 provenance 한 줄을 더한다 ────────────
+          BODY=$(jq -n --argjson commits "$COMMITS" --argjson fresh "$FRESH" \
+              --arg model "$MODEL" --arg tier "$TIER" \
+              '{commits: $commits, head_ref: $fresh.headRefName,
+                pr_author_is_bot: ($fresh.author.is_bot // false),
+                reviewer_model: $model, reviewer_tier: $tier, merged_by: "delegate"}' \
+            | python3 scripts/merge_provenance.py body)
+          if [ -z "$BODY" ]; then
+            echo "::error::머지 본문 생성 실패 — 머지하지 않는다 (본문 없이 밀면 provenance 가 빈다)"
+            exit 1
+          fi
+          printf '%s' "$BODY" | jq -r .body > merge-body.txt
+          echo "provenance: $(printf '%s' "$BODY" | jq -r .line)"
+
+          # 제목은 GitHub 기본과 같은 모양으로 만든다 (`<PR 제목> (#N)`) — 설정
+          # `squash_merge_commit_title=COMMIT_OR_PR_TITLE` 의 다중 커밋 결과와 같다
+          SUBJECT="$(jq -r .title <<<"$FRESH") (#${PR})"
+
+          # `--match-head-commit` — 판정과 머지 사이에 push 가 끼면 GitHub 이 거부한다.
+          # 없으면 아무도 안 본 커밋이 「판정은 있었다」는 이유로 머지된다.
+          if OUT=$(gh pr merge "$PR" --repo "$REPO" --"$METHOD" \
+                     --match-head-commit "$HEAD" \
+                     --subject "$SUBJECT" --body-file merge-body.txt 2>&1); then
+            echo "위임 머지 완료 (방식: $METHOD · 요청 @${ACTOR})"
+          else
+            echo "::error::위임 머지 실패 — ${OUT}"
+            say "위임 머지 실패 — GitHub 이 거부했다 (요청: @${ACTOR}). 오류: \`${OUT}\`"
+            exit 1
+          fi
