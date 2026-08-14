@@ -13,7 +13,7 @@ dependencies = [
     "pydantic-settings~=2.14.2",
     "pyjwt~=2.13.0",
     "sqlalchemy~=2.0.49",
-    "xmltodict~=0.14.2",
+    "xmltodict~=1.0.4",
 ]
 
 [dependency-groups]
