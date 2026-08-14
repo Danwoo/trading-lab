@@ -67,22 +67,22 @@ updates:
     #   Dependabot alerts 는 그대로 오므로 Security 탭으로 감시한다.
     # 해제 조건: 상류가 @prisma/studio-core 를 필수 의존에서 빼거나(선택 설치화 포함),
     #   prisma CLI 를 프로젝트 의존성 밖으로 옮기면 이 ignore 를 지운다.
-    # kysely 는 0.29 로 가는 길만 막는다 — 0.28 안의 patch 는 계속 받는다.
-    #   kysely 0.29 는 `DEFAULT_MIGRATION_TABLE` 을 없애 @better-auth/kysely-adapter 를
-    #   깨뜨린다. 이 레포가 `kysely` 를 직접 의존성으로 들고 있는 이유가 그 차단이다
-    #   (frontend/package.json 의 `//kysely` 주석 · frontend/CLAUDE.md · frontend/README.md
-    #   · .docs/2-개발가이드/react-nextjs-프론트개발.md · .docs/specs/m2-frontend-orders.md).
-    #   adapter 자신은 `kysely: "^0.28.17 || ^0.29.0"` 이라 0.29 를 받아들여, 직접 의존성을
-    #   놓으면 그대로 0.29 로 올라간다. dependabot 은 0.28→0.29 를 「non-major」로 분류해
-    #   묶음 PR 에 실어 보낸다(PR #132) — 0.x 의 minor 는 semver 상 파괴가 허용되므로
-    #   그 분류가 이 레포 기준으로는 틀린다. minor·major 를 함께 막아 분류 차이를 덮는다.
-    # patch 를 살려 둔 이유: 매니페스트가 이미 `^0.28.17`(= >=0.28.17 <0.29.0)이라 0.28 patch 는
-    #   설치 시점에 어차피 허용된다 — 여기서 막으면 락파일만 얼어 매니페스트와 어긋나고,
-    #   0.28 계열로 나오는 보안 릴리스까지 PR 이 끊긴다(ignore 는 보안 업데이트도 막는다).
-    # 해제 조건: adapter 가 0.29 대응을 마쳐 리드가 frontend 의 kysely 직접 의존성을 걷어내면
-    #   이 항목도 함께 지운다.
     ignore:
       - dependency-name: "prisma"
+      # kysely 는 0.29 로 가는 길만 막는다 — 0.28 안의 patch 는 계속 받는다.
+      #   kysely 0.29 는 `DEFAULT_MIGRATION_TABLE` 을 없애 @better-auth/kysely-adapter 를
+      #   깨뜨린다. 이 레포가 `kysely` 를 직접 의존성으로 들고 있는 이유가 그 차단이다
+      #   (frontend/package.json 의 `//kysely` 주석 · frontend/CLAUDE.md · frontend/README.md
+      #   · .docs/2-개발가이드/react-nextjs-프론트개발.md · .docs/specs/m2-frontend-orders.md).
+      #   adapter 자신은 `kysely: "^0.28.17 || ^0.29.0"` 이라 0.29 를 받아들여, 직접 의존성을
+      #   놓으면 그대로 0.29 로 올라간다. dependabot 은 0.28→0.29 를 「non-major」로 분류해
+      #   묶음 PR 에 실어 보낸다(PR #132) — 0.x 의 minor 는 semver 상 파괴가 허용되므로
+      #   그 분류가 이 레포 기준으로는 틀린다. minor·major 를 함께 막아 분류 차이를 덮는다.
+      # patch 를 살려 둔 이유: 매니페스트가 이미 `^0.28.17`(= >=0.28.17 <0.29.0)이라 0.28 patch
+      #   는 설치 시점에 어차피 허용된다 — 여기서 막으면 락파일만 얼어 매니페스트와 어긋나고,
+      #   0.28 계열로 나오는 보안 릴리스까지 PR 이 끊긴다(ignore 는 보안 업데이트도 막는다).
+      # 해제 조건: adapter 가 0.29 대응을 마쳐 리드가 frontend 의 kysely 직접 의존성을 걷어내면
+      #   이 항목도 함께 지운다.
       - dependency-name: "kysely"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
