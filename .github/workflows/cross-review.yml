@@ -140,17 +140,28 @@
 #     지키기 위해서다 (종전 라우팅과 동일 — 폴백이 codex 예산을 새로 쓰지 않는다).
 #   **발동 조건 — 실패 종류로 나눈다 (핵심 안전 속성)**. 아무 실패나 폴백하면 진짜로 고장난
 #     리뷰어가 조용히 claude 자기리뷰로 대체되고 아무도 눈치채지 못한다 (이 레포가 이미 이름
-#     붙인 결함 부류 "경로가 사라져도 검사는 초록" 의 재발). 그래서 세 갈래로 가른다:
+#     붙인 결함 부류 "경로가 사라져도 검사는 초록" 의 재발). 가르는 축은 **「그 리뷰어를 못
+#     쓴다」와 「리뷰가 불가능하다」의 차이**다 — 앞의 것은 다음 후보로 가고, 뒤의 것만 unable 이다:
 #       ① 관측된 한도 신호  → **즉시** 다음 리뷰어 (재시도해봐야 같은 답)
 #       ② 일시 장애(리뷰 워커 타임아웃 · 판정 폴링 조회 불가) → 다음 리뷰어. 폴백 사유를
 #                             코멘트에 "일시 장애" 로 **명시**한다 (한도와 구분해서 적는다)
-#       ③ 그 밖의 실패      → 폴백하지 않는다. fail-closed = 리뷰 불가(unable)
+#       ③ 기동 실패(워크트리·터미널·에이전트 핸들·TUI 준비·지시 전달) → 다음 리뷰어.
+#                             그 리뷰어가 **뜨지도 못한** 것이라 리뷰 가능성과는 무관하다
+#       ④ 어느 후보로도 실행 불가(Orca 런타임 불가용 · 판정부 번들 부재) · 예산 소진 · 미지 rc
+#                           → 폴백하지 않는다. fail-closed = 리뷰 불가(unable)
 #     ②가 폴백에 참여하는 것은 2026-07-29 사용자 정밀화다 — 계기 사건(kimi 900초 timeout)이
 #     정확히 ②라, ②를 확정 실패로 두면 가장 흔한 실패에서 게이트가 다시 통째로 멎는다.
-#     대신 "왜 폴백했는지" 를 사유별로 적어 ①과 ②가 코멘트에서 구분되게 한다 (아래 가시성 의무).
+#     ③을 가른 것은 2026-08-15 다. 종전엔 ③이 「그 밖의 실패」로 접혀 **첫 후보에서 체인이
+#     끝났다** — 실측(run 31815113895): 체인이 `kimi claude` 인데 `리뷰 후보 실행:` 이 kimi 한
+#     줄뿐이고 kimi TUI 준비 실패로 unable. unable 이 나면 낡은 CHANGES_REQUESTED 가 살아남아
+#     PR 이 교착에 빠지므로(#68·#70 이 그 상태였다) 비용이 실제로 컸다.
+#     대신 "왜 폴백했는지" 를 사유별로 적어 ①②③이 코멘트에서 구분되게 한다 (아래 가시성 의무).
 #     한도 판별식은 아래 잡의 `is_rate_limited` 이고 관측 원문이 그 주석에 인용돼 있다
-#     (2026-07-29 로컬 CLI 실행 실측). ②는 `run_orca` 의 반환값(타임아웃·폴링 조회 불가)이
-#     가른다 — `is_transient`·`classify` 는 지금 호출부가 없다 (그 정의 위 주석 참조).
+#     (2026-07-29 로컬 CLI 실행 실측). ②③은 `run_orca` 의 반환값이 가른다 —
+#     `is_transient`·`classify` 는 지금 호출부가 없다 (그 정의 위 주석 참조).
+#     **rc → 처분의 표는 `scripts/review_chain.py` 가 SoT 다** (워크플로 안 bash 가 아니다 —
+#     회귀 그물 `scripts/test_review_chain.py`). 판정 산출물의 **형식 위반**은 이 축이 아니다:
+#     그건 리뷰어가 돌긴 돌았다는 뜻이라 마커 미검출 → 타임아웃(②)으로 접힌다.
 #   **티어 규칙**: claude 폴백은 **작성 티어와 다른 티어**로 리뷰한다 (opus 작성 → sonnet 이,
 #     sonnet 작성 → opus 가). 입력은 §6.1 티어 신원. 티어 미상이면 동일-티어 자기리뷰
 #     가능성을 못 배제하므로 그 사실을 판정 코멘트에 남긴다 (사람이 읽는 신호).
@@ -295,7 +306,7 @@ jobs:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     outputs:
       reviewer: ${{ steps.decide.outputs.reviewer }}
-      chain: ${{ steps.decide.outputs.chain }}                 # 폴백 체인 (관측된 한도 신호일 때만 다음 홉)
+      chain: ${{ steps.decide.outputs.chain }}                 # 폴백 체인 (한도·일시 장애·기동 실패면 다음 홉)
       author_kind: ${{ steps.decide.outputs.author_kind }}
       author_models: ${{ steps.decide.outputs.author_models }}
       author_tier: ${{ steps.decide.outputs.author_tier }}     # opus|sonnet|'' (미상)
@@ -534,34 +545,38 @@ jobs:
           # 리뷰 프롬프트 — base 커밋에서 취득 (PR 의 프롬프트 변조 차단). 없으면 실패 = fail-closed.
           gh api "repos/$REPO/contents/.github/review-prompt.md?ref=$BASE_SHA" --jq .content | base64 -d > ctx/review-prompt.md
           test -s ctx/review-prompt.md
-          # 터미널 준비·접수 판정부 — 리뷰 잡은 체크아웃이 없으므로(아래 review 잡 머리 「보안 자세」)
-          # 이 번들로 실어 나른다. 루브릭과 같은 신뢰선인 **base 커밋을 먼저** 본다 — PR 이 자기
-          # 리뷰어를 띄우는 판정을 변조하지 못하게.
+          # 리뷰 실행부가 쓰는 **순수 판정부** — 리뷰 잡은 체크아웃이 없으므로(아래 review 잡 머리
+          # 「보안 자세」) 이 번들로 실어 나른다. 루브릭과 같은 신뢰선인 **base 커밋을 먼저** 본다 —
+          # PR 이 자기 리뷰어를 띄우는 판정·자기 실패를 분류하는 판정을 변조하지 못하게.
+          #   terminal_state.py — 에이전트 TUI 의 준비·접수 (화면 내용으로 판정)
+          #   review_chain.py   — 후보 실패의 처분(다음 후보로 갈 것인가)·체인 집계
           #
           # base 에 없으면 **기본 브랜치**에서 찾는다. 이 파일이 기본 브랜치에 없던 동안(또는
           # base 가 그보다 앞선 커밋일 때) base 조회는 404 인데, 그것을 fail-closed 로 두면
           # **모든 PR 의 route 잡이 죽는다** — 실제로 그렇게 죽는 것을 보고 넣은 갈래다.
           #
-          # **되찾는 출처로 head 를 쓰지 않는다.** 이 파일은 아래 review 잡이 self-hosted 러너에서
+          # **되찾는 출처로 head 를 쓰지 않는다.** 이것들은 아래 review 잡이 self-hosted 러너에서
           # `python3` 로 실행하는 코드다. head 는 PR 이 정하므로 그 경로를 열면 「PR 코드를
           # 체크아웃하지 않는다」는 이 잡의 자세를 우회하는 구멍이 된다. 기본 브랜치는 머지를
           # 거쳐야만 바뀌므로 PR 이 못 건드린다.
           #
-          # 둘 다 없으면 **번들에 안 싣고 넘어간다**(경고만). Orca 리뷰 워커 경로는 판정부가
-          # 없어 준비 실패로 끝나고 리뷰는 판정 없음으로 종결된다 — 리뷰가 하나 빠지는 것이지
-          # PR 이 막히지는 않는다. 이 상태는 이 파일이 기본 브랜치에 들어가기 전까지만이다.
-          gh api "repos/$REPO/contents/scripts/terminal_state.py?ref=$BASE_SHA" --jq '.content // empty' 2>/dev/null \
-            | base64 -d > ctx/terminal_state.py 2>/dev/null || true
-          if [ ! -s ctx/terminal_state.py ]; then
-            gh api "repos/$REPO/contents/scripts/terminal_state.py?ref=$DEFAULT_BRANCH" --jq '.content // empty' 2>/dev/null \
-              | base64 -d > ctx/terminal_state.py 2>/dev/null || true
-            if [ -s ctx/terminal_state.py ]; then
-              echo "::warning::준비·접수 판정부가 base 커밋(${BASE_SHA})에 없다 — ${DEFAULT_BRANCH} 판본을 쓴다"
+          # 둘 다 없으면 **번들에 안 싣고 넘어간다**(경고만). 없을 때 리뷰 잡이 어떻게 접히는지는
+          # 각 판정부의 호출부가 정한다 — terminal_state 부재는 준비 실패(확정, 후보 무관),
+          # review_chain 부재는 「남은 후보를 계속 시도」다 (그 자리 주석). 어느 쪽이든 PR 이
+          # 막히지는 않는다.
+          for JUDGE in terminal_state.py review_chain.py; do
+            gh api "repos/$REPO/contents/scripts/$JUDGE?ref=$BASE_SHA" --jq '.content // empty' 2>/dev/null \
+              | base64 -d > "ctx/$JUDGE" 2>/dev/null || true
+            [ -s "ctx/$JUDGE" ] && continue
+            gh api "repos/$REPO/contents/scripts/$JUDGE?ref=$DEFAULT_BRANCH" --jq '.content // empty' 2>/dev/null \
+              | base64 -d > "ctx/$JUDGE" 2>/dev/null || true
+            if [ -s "ctx/$JUDGE" ]; then
+              echo "::warning::판정부 scripts/${JUDGE} 가 base 커밋(${BASE_SHA})에 없다 — ${DEFAULT_BRANCH} 판본을 쓴다"
             else
-              rm -f ctx/terminal_state.py
-              echo "::warning::준비·접수 판정부가 base·${DEFAULT_BRANCH} 어디에도 없다 — Orca 리뷰 워커 경로는 준비 실패로 끝난다"
+              rm -f "ctx/$JUDGE"
+              echo "::warning::판정부 scripts/${JUDGE} 가 base·${DEFAULT_BRANCH} 어디에도 없다 — 리뷰 잡이 그 판정부 없이 접힌다(호출부 주석 참조)"
             fi
-          fi
+          done
 
       - name: 컨텍스트 업로드
         uses: actions/upload-artifact@v4   # ⚠ 배포 시 커밋 SHA 핀
@@ -639,8 +654,13 @@ jobs:
       reviewer_tier: ${{ steps.run.outputs.reviewer_tier }}
       exhausted: ${{ steps.run.outputs.exhausted }}
       degraded: ${{ steps.run.outputs.degraded }}
+      startup_failed: ${{ steps.run.outputs.startup_failed }}   # 기동 실패로 건너뛴 후보 (TUI·핸들·워크트리)
       failure_kind: ${{ steps.run.outputs.failure_kind }}
       stuck_at: ${{ steps.run.outputs.stuck_at }}            # 폴백 못 하고 끝났다면 어디서 막혔나
+      # 폴백해도 첫 후보가 왜 실패했는지는 남아야 한다 — 사라지면 「1순위가 매번 죽는 상태」가
+      # 조용히 상시화된다. 둘 다 순수 함수(review_chain.py)가 조립한 완성 문구다.
+      attempts_note: ${{ steps.run.outputs.attempts_note }}   # 후보별 결과 (성공했을 때도 남는다)
+      fallback_cause: ${{ steps.run.outputs.fallback_cause }} # 폴백 발동 근거 (사유 원문 포함)
     steps:
       - name: 컨텍스트 수령
         # ⚠ 라이브 검증 필요: hosted(route)→self-hosted 간 아티팩트 전달 동작 (D1 §6)
@@ -740,6 +760,7 @@ jobs:
           READY_TIMEOUT="${ORCA_TERM_READY_TIMEOUT_SECS:-60}"
           SEND_VERIFY_TIMEOUT="${ORCA_TERM_SEND_VERIFY_SECS:-20}"   # 리뷰 지시 도착·제출 확인 창 (각각)
           TERM_STATE="$PWD/ctx/terminal_state.py"                   # 준비·접수 판정부 (base 커밋 발, ctx 번들)
+          CHAIN_STATE="$PWD/ctx/review_chain.py"                    # 체인 처분·집계 판정부 (같은 번들)
           # 판정은 화면 **끝**의 입력 상자만 본다. 넉넉히 읽어도 앞쪽 줄은 판정에 안 쓰이고,
           # 1KB 프롬프트가 상자 안에서 접히면 화면이 30줄 가까이 된다.
           TERM_READ_LINES="${ORCA_TERM_READ_LINES:-200}"
@@ -748,6 +769,9 @@ jobs:
           # 준비 타임아웃으로 끝나는데 그 메시지는 원인을 안 가리키므로 미리 드러낸다.
           # 스텝을 죽이지는 않는다 — 실패 분류·확정 코멘트는 아래 정규화가 내야 한다.
           [ -s "$TERM_STATE" ] || echo "::warning::[orca] 준비·접수 판정부(ctx/terminal_state.py)가 번들에 없다 — 리뷰는 준비 실패로 끝난다"
+          # 체인 처분·집계 판정부. 없으면 후보 실패의 처분을 못 가리므로 **계속**으로 접고(조기
+          # 종결을 되살리지 않는다) 집계는 fail-closed 로 unable 을 낸다 — 각 호출부 주석 참조.
+          [ -s "$CHAIN_STATE" ] || echo "::error::[orca] 체인 처분·집계 판정부(ctx/review_chain.py)가 번들에 없다 — 후보 처분은 「계속」으로, 집계는 판정 없음으로 접힌다"
           WT_PATH_INTERVAL="${ORCA_WT_PATH_POLL_SECS:-3}"
           WT_PATH_TIMEOUT="${ORCA_WT_PATH_TIMEOUT_SECS:-30}"
           WT_DELETE_RETRY="${ORCA_WT_DELETE_RETRY_SECS:-2}"
@@ -798,8 +822,10 @@ jobs:
             grep -qiE "etimedout|econnreset|econnrefused|socket hang ?up|network error|timed? ?out|connection (reset|closed|refused|error)|50[234] " "$2"
           }
           # ⚠ `classify`(따라서 `is_transient` 도)는 **이 파일 어디에서도 호출되지 않는다.**
-          # 실제로 도는 판정부는 `is_rate_limited`(probe_limit 이 부른다)와 `terminal_hints_limit`
-          # 둘이다. 아래 두 함수는 한도·일시장애 판별 어휘의 보존용으로만 남아 있다.
+          # 이 셸에서 실제로 도는 판정부는 `is_rate_limited`(probe_limit 이 부른다)와
+          # `terminal_hints_limit` 둘이고, 후보 실패의 **처분**(다음 후보로 갈 것인가)은 셸이
+          # 아니라 `ctx/review_chain.py` 가 판정한다. 아래 두 함수는 한도·일시장애 판별 어휘의
+          # 보존용으로만 남아 있다.
           classify() {   # $1=rc $2=errfile → limit|transient|other
             if is_rate_limited "$1" "$2"; then echo limit; return; fi
             if is_transient   "$1" "$2"; then echo transient; return; fi
@@ -1147,7 +1173,7 @@ jobs:
             if [ -z "$CREATE_JSON" ] || ! printf '%s' "$CREATE_JSON" | jq -e '.ok == true' >/dev/null 2>&1; then
               echo "리뷰 워크트리 생성 실패($([ "$TWO_STEP" = yes ] && printf '2단계·티어 %s' "$FALLBACK_TIER" || printf -- '--agent %s' "$m"))" > err.txt
               keep_worker_for_inspection "$WT_SEL" "워크트리 생성 실패"
-              return 1
+              return 21   # 기동 실패 = 이 리뷰어를 못 쓴다 → 다음 후보로 (분류표는 review_chain.py)
             fi
             # ── 실제로 만들어진 워크트리를 가리킨다 (요청한 이름과 다를 수 있다 — 셀렉터 규약).
             WT_ID=$(printf '%s' "$CREATE_JSON" | jq -r '.result.worktree.id // empty' 2>/dev/null || true)
@@ -1183,7 +1209,7 @@ jobs:
               if [ -z "$AGENT_HANDLE" ]; then
                 echo "리뷰어 터미널 생성 실패(claude --model ${FALLBACK_TIER})" > err.txt
                 keep_worker_for_inspection "$WT_SEL" "리뷰어 터미널 생성 실패"
-                return 1
+                return 21   # 기동 실패 → 다음 후보로
               fi
             else
               AGENT_HANDLE=$(printf '%s' "$CREATE_JSON" | jq -r '.result.agentTerminalHandle // .result.startupTerminal.handle // empty' 2>/dev/null || true)
@@ -1200,7 +1226,7 @@ jobs:
             if [ -z "$AGENT_HANDLE" ]; then
               echo "에이전트 핸들 취득 실패 (create 응답·terminal list 모두 공백, ${READY_TIMEOUT}s)" > err.txt
               keep_worker_for_inspection "$WT_SEL" "에이전트 핸들 취득 실패"
-              return 1
+              return 21   # 기동 실패 → 다음 후보로
             fi
             # §6.1 워크트리 git 신원. 리뷰 워커는 무커밋이 정상이나 실수 커밋 provenance 백스톱.
             # 경로는 create 응답에 이미 있다 — 없을 때만 조회로 되돌아간다.
@@ -1240,12 +1266,15 @@ jobs:
             # ── TUI 준비 (프라이머 1회 + 버퍼 성장 확인) ──────────────────────────────────
             if ! wait_agent_ready "$AGENT_HANDLE"; then
               # 두 원인을 구분해 적는다 — 「무반응」 한 줄로 뭉치면 판정부 부재를 TUI 문제로 오진한다.
+              # **처분도 갈린다**: TUI 가 안 뜬 것은 그 리뷰어의 문제라 다음 후보로 가고(21),
+              # 판정부 번들 결손은 어느 후보로 갈아도 같으므로 확정 실패(1)다.
               if [ -s "$TERM_STATE" ]; then
                 echo "에이전트 TUI 준비 실패(${READY_TIMEOUT}s — 입력 상자가 화면에 나타나지 않았다)" > err.txt
-              else
-                echo "준비·접수 판정부(ctx/terminal_state.py)가 번들에 없어 준비를 판정할 수 없다" > err.txt
+                keep_worker_for_inspection "$WT_SEL" "TUI 준비 실패"
+                return 21
               fi
-              keep_worker_for_inspection "$WT_SEL" "TUI 준비 실패"
+              echo "준비·접수 판정부(ctx/terminal_state.py)가 번들에 없어 준비를 판정할 수 없다 — 후보를 갈아도 같다" > err.txt
+              keep_worker_for_inspection "$WT_SEL" "준비·접수 판정부 번들 부재"
               return 1
             fi
             # ── 리뷰어 티어 확인 (2단계 경로 전용) — 지시가 아니라 **관측**을 기록한다 ────
@@ -1280,7 +1309,7 @@ jobs:
             if [ "$SEND_RC" -eq 1 ]; then
               echo "리뷰 지시 전달 실패 (orca-ide terminal send 명령 실패)" > err.txt
               keep_worker_for_inspection "$WT_SEL" "리뷰 지시 전달 실패"
-              return 1
+              return 21   # 지시가 닿지도 않았다 = 그 리뷰어가 돈 적 없다 → 다음 후보로
             elif [ "$SEND_RC" -ne 0 ]; then
               SEND_UNVERIFIED=yes
               echo "::warning::[orca/${m}] 리뷰 지시 접수 미확인 — 치명으로 보지 않고 폴링을 계속한다 (실측: 접수 확인 오판 뒤 리뷰가 7~8분 뒤 정상 완료 — PR #104)"
@@ -1353,16 +1382,19 @@ jobs:
           }
 
           # ── 후보 1명 ──────────────────────────────────────────────────────────────────
-          # 반환 0=성공 / 10=한도 / 20=일시(소진) / 1=확정 실패 / 30=예산 소진
+          # 반환 0=성공 / 10=한도 / 20=일시(소진) / 21=기동 실패 / 1=확정 실패 / 30=예산 소진
+          # **처분표(어느 rc 가 다음 후보로 가는가)는 여기 없다** — scripts/review_chain.py 가 SoT 다.
           try_candidate() {
             local m="$1" rc
+            : > err.txt   # 사유는 후보마다 새로 쓴다 — 앞 후보의 사유가 이번 시도에 실리면 안 된다
             # ① Orca 불가용이면 이 후보도 다음 후보도 돌 수 없다 — 확정 실패로 끊는다 (fail-closed)
             if [ "$ORCA_OK" != "yes" ]; then
-              echo "Orca 경로 불가용(${ORCA_WHY}) — 리뷰 워커를 세울 수 없다" > err.txt
+              echo "Orca 경로 불가용(${ORCA_WHY}) — 리뷰 워커를 세울 수 없다 (후보를 갈아도 같다)" > err.txt
               return 1
             fi
             # ② 남은 예산이 한 홉을 담기에 모자라면 디스패치하지 않는다 — 워크트리만 만들고 죽는다
             if [ "$(remaining)" -lt "$MIN_SLICE" ]; then
+              echo "체인 예산(${CHAIN_BUDGET}s) 소진 — 남은 $(remaining)s < 한 홉 최소 ${MIN_SLICE}s" > err.txt
               echo "::warning::체인 예산(${CHAIN_BUDGET}s) 소진 — ${m} 시도 중단 (남은 $(remaining)s < 한 홉 최소 ${MIN_SLICE}s)"; return 30
             fi
             # ③ 사전 프로브 — 이미 소진됐으면 디스패치 없이 즉시 다음 홉 (폴링 창 낭비 0)
@@ -1382,38 +1414,71 @@ jobs:
           }
 
           # ── 체인 루프 (리뷰어가 바깥) ─────────────────────────────────────────────────
+          # 후보마다 결과를 **시도 이력**(모델·rc·사유)에 적고, 「다음 후보로 갈 것인가」와
+          # 최종 집계는 순수 함수(ctx/review_chain.py)가 판정한다. 여기 bash 에는 분기 조건이
+          # 없다 — 종전엔 이 자리의 `case` 가 rc 10·20 만 폴백으로 인정해, TUI 준비 실패 같은
+          # **기동 실패에서 체인이 첫 후보에 멈췄다** (실측: run 31815113895 — 체인 `kimi claude`
+          # 인데 `리뷰 후보 실행:` 이 kimi 한 줄뿐).
           echo "경로 가용성: ORCA_OK=${ORCA_OK} (${ORCA_WHY}) / 체인: ${CHAIN:-$ROUTED}"
-          EFFECTIVE=""; FALLBACK=no; EXHAUSTED=""; DEGRADED=""; FAILURE_KIND=""; STUCK_AT=""
-          FIRST_HOP=$(printf '%s' "${CHAIN:-$ROUTED}" | awk '{print $1}')
+          : > attempts.tsv
+          # 판정부가 번들에 없으면 **계속**으로 접는다. 체인은 유한하고 전부 실패하면 아래 집계가
+          # 종전대로 unable 을 낸다 — 조기 종결이 이 개정이 없애려는 것이라, 판정부 결손이
+          # 그것을 되살리게 두지 않는다. 대신 ::error:: 로 크게 남긴다.
+          chain_continue() {
+            local out
+            out=$(python3 "$CHAIN_STATE" step < attempts.tsv 2>/dev/null) || {
+              echo "::error::체인 처분 판정부(ctx/review_chain.py)를 실행하지 못했다 — 남은 후보를 계속 시도한다"
+              return 0
+            }
+            case "$out" in *continue=yes*) return 0 ;; esac
+            return 1
+          }
           for CAND in ${CHAIN:-$ROUTED}; do
             try_candidate "$CAND"; CRC=$?
-            case "$CRC" in
-              0)  EFFECTIVE="$CAND"; break ;;
-              10) EXHAUSTED="${EXHAUSTED:+$EXHAUSTED·}${CAND}" ;;
-              20) DEGRADED="${DEGRADED:+$DEGRADED·}${CAND}" ;;
-              30) FAILURE_KIND=budget; STUCK_AT="${CAND}"; break ;;
-              *)  FAILURE_KIND=confirmed; STUCK_AT="${CAND}: $(head -c 160 err.txt | tr '\n' ' ')"; break ;;
-            esac
+            printf '%s\t%s\t%s\n' "$CAND" "$CRC" "$(head -c 200 err.txt 2>/dev/null | tr '\n\t' '  ')" >> attempts.tsv
+            chain_continue || break
           done
 
-          [ -n "$EFFECTIVE" ] && [ "$EFFECTIVE" != "$FIRST_HOP" ] && FALLBACK=yes
-          if [ -z "$EFFECTIVE" ] && [ -z "$FAILURE_KIND" ]; then
-            FAILURE_KIND=chain-exhausted
-            STUCK_AT="체인 전체(${CHAIN:-$ROUTED})"
+          # ── 집계 — 실효 리뷰어·폴백 여부·실패 분류·사람이 읽는 문구까지 순수 함수가 낸다 ──
+          python3 "$CHAIN_STATE" summarize "${CHAIN:-$ROUTED}" < attempts.tsv > chain.env 2>/dev/null
+          if [ ! -s chain.env ]; then
+            echo "::error::체인 집계부(ctx/review_chain.py)를 실행하지 못했다 — 판정 없음(fail-closed)으로 종결한다"
+            { echo "effective="; echo "fallback=no"; echo "exhausted="; echo "degraded="
+              echo "startup_failed="; echo "failure_kind=confirmed"
+              echo "stuck_at=체인 집계부(ctx/review_chain.py) 실행 실패"
+              echo "attempts_note="; echo "fallback_cause="
+              echo "unable_reason=체인 집계부(ctx/review_chain.py) 실행 실패 — fail-closed(리뷰 불가)"
+            } > chain.env
           fi
+          cval() { sed -n "s/^$1=//p" chain.env; }
+          EFFECTIVE=$(cval effective)
+          # **시도 이력은 성공했을 때도 남긴다.** 폴백이 성공하면 체인은 초록으로 끝나는데, 그때
+          # 첫 후보의 실패 사유가 사라지면 「1순위가 매번 기동 실패」가 조용히 상시화된다.
+          [ -n "$(cval attempts_note)" ] && echo "리뷰어 시도 이력: $(cval attempts_note)"
           if [ -z "$EFFECTIVE" ]; then
             # **::error:: 다** (2026-08-06). 이 잡은 비게이트라 체크는 초록으로 남는데(#418),
             # 그 부작용으로 리뷰가 조용히 죽어도 PR 이 CLEAN 으로 보였다 — 네 PR 이 그 상태로
             # 방치됐다. 체크를 다시 빨갛게 만들지는 않되(그건 #418 을 되돌리는 것),
             # **Actions 주석은 빨갛게** 띄워 run 목록·요약에서 눈에 걸리게 한다.
-            echo "::error::CI 교차 리뷰 실패 — 판정 없음 (원인 ${FAILURE_KIND}${EXHAUSTED:+ / 한도: $EXHAUSTED}${DEGRADED:+ / 일시장애: $DEGRADED}${STUCK_AT:+ / 막힌 지점: $STUCK_AT}). publish 가 판정 없음 코멘트로 종결한다 — 이 PR 은 리뷰를 받지 못했다."
+            echo "::error::CI 교차 리뷰 실패 — 판정 없음 ($(cval unable_reason)). publish 가 판정 없음 코멘트로 종결한다 — 이 PR 은 리뷰를 받지 못했다."
             { echo "### CI 교차 리뷰 실패 — 판정 없음"
               echo
-              echo "- 원인 분류: \`${FAILURE_KIND}\`"
-              [ -n "$STUCK_AT" ]  && echo "- 막힌 지점: ${STUCK_AT}"
-              [ -n "$EXHAUSTED" ] && echo "- 한도 소진: ${EXHAUSTED}"
-              [ -n "$DEGRADED" ]  && echo "- 일시 장애: ${DEGRADED}"
+              echo "- 원인 분류: \`$(cval failure_kind)\`"
+              echo "- 시도 이력: $(cval attempts_note)"
+              [ -n "$(cval stuck_at)" ]       && echo "- 막힌 지점: $(cval stuck_at)"
+              [ -n "$(cval exhausted)" ]      && echo "- 한도 소진: $(cval exhausted)"
+              [ -n "$(cval degraded)" ]       && echo "- 일시 장애: $(cval degraded)"
+              [ -n "$(cval startup_failed)" ] && echo "- 기동 실패: $(cval startup_failed)"
               echo "- 실패한 리뷰 워크트리는 **남겨 둔다** — Orca 에서 \`review-${PR}-*\` 를 열어 확인하라. 확인이 끝나면 **사람이 지운다** (자동 회수기 없음)."
+            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          elif [ "$(cval fallback)" = yes ]; then
+            # 폴백은 성공해도 조용하면 안 된다 — 1순위가 계속 죽는 상태가 상시화되는 자리다.
+            echo "::warning::리뷰어 폴백 — 1순위 대신 ${EFFECTIVE} 가 판정했다. 발동 근거: $(cval fallback_cause)"
+            { echo "### 리뷰어 폴백 — 실효 리뷰어 \`${EFFECTIVE}\`"
+              echo
+              echo "- 발동 근거: $(cval fallback_cause)"
+              echo "- 시도 이력: $(cval attempts_note)"
+              echo "- 실패한 후보의 리뷰 워크트리는 **남겨 둔다** — Orca 에서 \`review-${PR}-*\` 를 열어 확인하라."
             } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
           fi
           # Orca 터미널 수집분을 잡 로그로 흘린다 (터미널은 잡 종료 후 사라진다)
@@ -1422,18 +1487,15 @@ jobs:
             echo "── ${f} (Orca 터미널 수집, 마지막 60줄) ──"; tail -60 "$f"
           done
           {
-            echo "effective=${EFFECTIVE}"
-            echo "fallback=${FALLBACK}"
-            echo "exhausted=${EXHAUSTED}"
-            echo "degraded=${DEGRADED}"
-            echo "failure_kind=${FAILURE_KIND}"
-            echo "stuck_at=${STUCK_AT}"
+            # 집계부 산출을 그대로 싣는다 — 값은 이미 한 줄로 펴져 있다 (개행이 섞이면 뒤 키를
+            # 위조할 수 있는데, 사유 원문에는 신뢰 경계 밖 문자열이 섞일 수 있다)
+            cat chain.env
             echo "tier=$([ "$EFFECTIVE" = claude ] && printf '%s' "$FALLBACK_TIER")"
             # 관측 티어는 **판정을 낸 후보가 실제로 그렇게 떴을 때만** 실린다. 체인이 실패로
             # 끝났으면 reviewer_tier.txt 에 남은 값은 죽은 후보의 것이라 실어서는 안 된다.
             echo "reviewer_tier=$([ -n "$EFFECTIVE" ] && cat reviewer_tier.txt 2>/dev/null)"
           } >> "$GITHUB_OUTPUT"
-          rm -f err.txt probe.err term-slice.txt poll_raw.txt poll_out.txt poll_err.txt reviewer_tier.txt
+          rm -f err.txt probe.err term-slice.txt poll_raw.txt poll_out.txt poll_err.txt reviewer_tier.txt attempts.tsv chain.env
           exit 0   # 실패 분류는 출력으로 전달한다 — 스텝은 성공 종료해 뒤 스텝을 반드시 태운다
       - name: 남은 리뷰 워크트리 안내 (always — 지우지 않는다, 어디를 보면 되는지만 알린다)
         # ⚠ **여기서 지우지 않는다** (2026-08-06 리드 결정으로 바뀐 자리). 종전엔 이 스텝이
@@ -1490,10 +1552,9 @@ jobs:
         if: ${{ always() }}
         env:
           EFFECTIVE: ${{ steps.run.outputs.effective }}
-          EXHAUSTED: ${{ steps.run.outputs.exhausted }}
-          DEGRADED: ${{ steps.run.outputs.degraded }}
-          FAILURE_KIND: ${{ steps.run.outputs.failure_kind }}
-          STUCK_AT: ${{ steps.run.outputs.stuck_at }}
+          # 체인 실패의 사유 문구는 순수 함수(review_chain.py)가 이미 조립해 왔다 — 여기서 다시
+          # 분기해 만들지 않는다. 빈 값 = 체인은 성공했는데 산출물이 결손·형식 위반인 경우다.
+          UNABLE_REASON: ${{ steps.run.outputs.unable_reason }}
           ROUTED: ${{ needs.route.outputs.reviewer }}
         run: |
           set -euo pipefail
@@ -1508,13 +1569,7 @@ jobs:
               out/verdict.json >/dev/null || ok=0
           fi
           if [ "$ok" = 0 ]; then
-            case "${FAILURE_KIND:-}" in
-              chain-exhausted) REASON="리뷰어 체인 소진 — 남은 후보 없음" ;;
-              confirmed)       REASON="리뷰어 실행이 확정 실패 (한도 신호 아님 — 폴백 금지 규칙)" ;;
-              budget)          REASON="체인 예산 소진 (리뷰가 상한 시간 내에 끝나지 않음)" ;;
-              *)               REASON="판정 산출물 결손·형식 위반" ;;
-            esac
-            REASON="${REASON}${EXHAUSTED:+. 한도 소진: ${EXHAUSTED}}${DEGRADED:+. 일시 장애: ${DEGRADED}}${STUCK_AT:+. 막힌 지점: ${STUCK_AT}} — fail-closed(리뷰 불가)"
+            REASON="${UNABLE_REASON:-판정 산출물 결손·형식 위반 — fail-closed(리뷰 불가)}"
             jq -n --arg sha "$HEAD_SHA" --arg m "$MODEL" --arg s "$REASON" \
               '{schema:"cross-review/v1",model:$m,verdict:"unable",sha:$sha,summary:$s}' > out/verdict.json
           fi
@@ -1565,6 +1620,9 @@ jobs:
       REVIEWER_TIER: ${{ needs.review.outputs.reviewer_tier }}     # **관측** 티어 (기동 배너) — 빈 값이면 미상
       EXHAUSTED: ${{ needs.review.outputs.exhausted }}
       DEGRADED: ${{ needs.review.outputs.degraded }}
+      STARTUP_FAILED: ${{ needs.review.outputs.startup_failed }}
+      ATTEMPTS_NOTE: ${{ needs.review.outputs.attempts_note }}
+      FALLBACK_CAUSE: ${{ needs.review.outputs.fallback_cause }}
       FAILURE_KIND: ${{ needs.review.outputs.failure_kind }}
       ORCA_OK: ${{ needs.review.outputs.orca_ok }}
       STUCK_AT: ${{ needs.review.outputs.stuck_at }}
@@ -1661,12 +1719,13 @@ jobs:
             TIER_FIELD=" tier=${REVIEWER_TIER}"
             TIER_KO="티어 ${REVIEWER_TIER}"
           fi
+          # 폴백 사유 문구는 순수 함수(review_chain.py)가 종류별로 조립해 온다 — 한도·일시 장애·
+          # 기동 실패가 각각 다른 대응을 요구하므로 그 셋이 문구에서 갈려야 하고, 사유 원문도
+          # 실린다. 어느 것도 기록되지 않았는데 폴백이 났다면 그 자체가 이상 신호이므로 그
+          # 사실을 적는다 (지어내지 않는다) — 그 기본값도 순수 함수 쪽에 있다.
           FALLBACK_NOTE=""; CAUSE=""
           if [ "${FALLBACK:-no}" = "yes" ]; then
-            [ -n "${EXHAUSTED:-}" ] && CAUSE="${EXHAUSTED} 한도 소진"
-            [ -n "${DEGRADED:-}" ]  && CAUSE="${CAUSE:+$CAUSE + }${DEGRADED} 일시 장애(타임아웃·연결 끊김)"
-            # 어느 쪽도 기록되지 않았는데 폴백이 났다면 그 자체가 이상 신호다 — 지어내지 말고 그렇게 적는다
-            CAUSE="${CAUSE:-1순위 리뷰어 실패(사유 미기록 — 잡 로그 확인 필요)}"
+            CAUSE="${FALLBACK_CAUSE:-1순위 리뷰어 실패(사유 미기록 — 잡 로그 확인 필요)}"
             if [ "$REVIEWER" = "claude" ] && [ "$SELF_VENDOR" = "yes" ]; then
               FALLBACK_NOTE="${CAUSE}으로 claude(${TIER_KO}) 대체 리뷰"
             else
@@ -1781,15 +1840,23 @@ jobs:
             printf '위험도 판독(라우팅 참고): risk: %s (출처: %s — 머지 경로 판정은 review-record 가 재판독)\n' "$RISK" "$RISK_SOURCE"
             printf '저자 판별: %s (근거: %s)\n' "${AUTHOR_MODELS:-사람(에이전트 신원 없음)}" "$IDENTITY_SOURCE"
             if [ -n "$FALLBACK_NOTE" ]; then
-              printf '리뷰어 폴백: 1순위 %s → 실효 %s(%s). 발동 근거: %s. (한도는 즉시 다음 리뷰어, 일시 장애는 재시도 후 다음 리뷰어, 그 밖의 실패는 폴백하지 않고 리뷰 불가로 간다.)\n' \
+              printf '리뷰어 폴백: 1순위 %s → 실효 %s(%s). 발동 근거: %s. (한도·일시 장애·기동 실패는 다음 후보로 간다. 어느 후보로도 리뷰를 실행할 수 없을 때만 리뷰 불가다.)\n' \
                 "$ROUTED_REVIEWER" "$REVIEWER" "$TIER_KO" "$CAUSE"
             fi
-            # 폴백 사유 분해 — 한도인가, 일시장애인가 (둘은 다른 대응을 요구한다)
+            # 후보별 결과 — **폴백이 성공했을 때도 남긴다.** 이 줄이 없으면 「1순위가 매번
+            # 기동 실패하는데 폴백이 늘 받아내는」 상태가 PR 화면에서 초록으로만 보인다.
+            if [ -n "${ATTEMPTS_NOTE:-}" ]; then
+              printf '리뷰어 시도 이력: %s\n' "$ATTEMPTS_NOTE"
+            fi
+            # 폴백 사유 분해 — 셋은 사람이 취할 행동이 다르다 (충전 / 재실행 / 런타임 점검)
             if [ -n "${EXHAUSTED:-}" ]; then
               printf '한도 소진(확증됨): %s — 깨끗한 채널(CLI stderr)의 프로브로 확인했다. Orca 터미널 텍스트는 PTY 라 stdout·stderr 가 병합돼 위조가 가능하므로 트리거로만 쓴다.\n' "$EXHAUSTED"
             fi
             if [ -n "${DEGRADED:-}" ]; then
               printf '일시 장애로 건너뜀: %s — 타임아웃·연결 끊김 계열. 한도와 달리 재시도 여지가 있으니 재실행 시 복구될 수 있다.\n' "$DEGRADED"
+            fi
+            if [ -n "${STARTUP_FAILED:-}" ]; then
+              printf '기동 실패로 건너뜀: %s — 리뷰어가 뜨지도 못했다(워크트리·터미널·핸들·TUI 준비·지시 전달). 그 리뷰어를 못 쓴 것이지 리뷰가 불가능한 것은 아니라 다음 후보로 넘어갔다. 반복되면 그 에이전트 런타임을 점검하라.\n' "$STARTUP_FAILED"
             fi
             if [ -n "${STUCK_AT:-}" ]; then
               printf '막힌 지점: %s (원인 분류: %s)\n' "$STUCK_AT" "${FAILURE_KIND:-미상}"
