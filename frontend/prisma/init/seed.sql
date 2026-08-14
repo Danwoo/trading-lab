@@ -84,6 +84,9 @@ VALUES
 ('019d9c31-be10-7b2e-9c05-7d1e4a8f6b32', '019d9c31-be10-7a1c-8f3d-4b6a2c9e5d10', 'credential', '019d9c31-be10-7a1c-8f3d-4b6a2c9e5d10', '96b3e92b13e00d02f4aaa317b8b381fb:79e41a2de1681fbdb8ae02c61316ace74f04b71abfdae97fbe81099a7943b481ff6338ab5de90778eddc72dc0858e6893a277b540cd4bb8e2f765f228476e3fa', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- 3. 메뉴
+--    url 은 `app/(main)/**/page.tsx` 로 실재하는 라우트여야 한다 — 사이드바가 이 값을 그대로 이동
+--    경로로 쓰므로(navigation/route.ts 의 path 합성 → Sidebar 의 router.replace) 없는 경로면 404 다.
+--    대조는 tests/regressions/seed-menu-url-routes.test.ts.
 INSERT INTO tn_menu (menu_id, menu_nm, upper_menu_id, menu_level, sort_ordr, use_at, url, icon, reg_dt, reg_id, mod_dt, mod_id)
 VALUES
 ('mbiz0000', '업무관리',   NULL,       1, 10,  'Y', NULL,                            'event',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
@@ -91,17 +94,14 @@ VALUES
 ('mbiz1008', '터미널',      'mbiz0000', 2, 5,   'Y', 'terminal',                      'chart',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('mbiz1001', '관심종목',    'mbiz0000', 2, 10,  'Y', 'admin/watchlist',               'check',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('mbiz1002', '포트폴리오',   'mbiz0000', 2, 20,  'Y', 'admin/portfolio',               'box',         CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
-('mbiz1003', 'NAV대시보드', 'mbiz0000', 2, 30,  'Y', 'admin/nav',                     'chart',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
-('mbiz1004', '개발활동 조회', 'mbiz0000', 2, 40,  'Y', 'admin/devactivity',                'search',   CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
-('mbiz1005', '스케줄러 관리', 'mbiz0000', 2, 50,  'Y', 'admin/devactivity/scheduler', 'event',    CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
+('mbiz1005', '스케줄러 관리', 'mbiz0000', 2, 50,  'Y', 'admin/scheduler',               'event',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('mbiz1006', '리서치 문서',   'mbiz0000', 2, 60,  'Y', 'admin/research-document',       'doc',         CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('mbiz1007', '리서치 챗',     'mbiz0000', 2, 70,  'Y', 'admin/research-chat',           'message',     CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('msys1001', '코드관리',     'msys0000', 2, 10, 'Y', 'admin/common/system/code',      'doc',         CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('msys1002', '워크스페이스관리', 'msys0000', 2, 20, 'Y', 'admin/common/system/workspace',   'home',        CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('msys1003', '권한관리',     'msys0000', 2, 30, 'Y', 'admin/common/system/author',    'key',         CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('msys1004', '메뉴관리',     'msys0000', 2, 40, 'Y', 'admin/common/system/menu',      'hierarchy',   CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
-('msys1005', '사용자관리',   'msys0000', 2, 50, 'Y', 'admin/common/system/adminuser', 'group',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
-('msys1006', '메일발송로그', 'msys0000', 2, 60, 'Y', 'admin/common/system/email-log', 'email',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR');
+('msys1005', '사용자관리',   'msys0000', 2, 50, 'Y', 'admin/common/system/adminuser', 'group',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR');
 
 -- 3-1. 워크스페이스별 메뉴 (워크스페이스가 부여받은 업무 기능)
 --      네비게이션은 일반 사용자에게 "권한 메뉴 ∩ 워크스페이스 메뉴" 만 노출한다
@@ -114,8 +114,6 @@ VALUES
 (1, 'mbiz1008', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 (1, 'mbiz1001', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 (1, 'mbiz1002', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
-(1, 'mbiz1003', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
-(1, 'mbiz1004', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 (1, 'mbiz1005', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 (1, 'mbiz1006', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 (1, 'mbiz1007', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR');
@@ -129,19 +127,17 @@ VALUES
 -- 5. 권한별 메뉴
 INSERT INTO tn_author_menu (author_id, menu_id, reg_dt, reg_id, mod_dt, mod_id)
 VALUES
--- operator: 전 업무 화면 접근 (mbiz1001~1008). isVisible = 권한메뉴 ∩ 워크스페이스메뉴 라,
--- tn_workspace_menu 만 부여하고 여기를 mbiz1001 로 두면 나머지 업무 화면(카테고리·대시보드·개발활동·스케줄러·리서치·터미널)이 안 보인다.
+-- operator: 전 업무 화면 접근. isVisible = 권한메뉴 ∩ 워크스페이스메뉴 라,
+-- tn_workspace_menu 만 부여하고 여기를 mbiz1001 로 두면 나머지 업무 화면(포트폴리오·스케줄러·리서치·터미널)이 안 보인다.
 ('operator', 'mbiz1008', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1001', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1002', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
-('operator', 'mbiz1003', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
-('operator', 'mbiz1004', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1005', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1006', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1007', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 -- user: 개인 워크스페이스 기본 메뉴(constants/protected.ts 의 PERSONAL_WORKSPACE_DEFAULT_MENU_IDS)를
 -- 전부 포함해야 한다. isVisible = 권한메뉴 ∩ 워크스페이스메뉴 라 한쪽만 부여하면 가입자의
--- 사이드바가 조용히 빈다(#251). 두 목록의 대조는 tests/regressions/251-personal-workspace-menu.test.ts.
+-- 사이드바가 조용히 빈다(#251). 두 목록의 대조는 tests/regressions/251-personal-workspace-menu.test.tsx.
 ('user', 'mbiz1008', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('user', 'mbiz1001', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR');
 

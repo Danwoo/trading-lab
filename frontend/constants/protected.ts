@@ -26,12 +26,15 @@ export const PROTECTED_MENU_PREFIXES = ["msys"];
 /**
  * 권한별 자동 시스템 메뉴 매핑 — TN_AuthorMenu 부여 없이도 권한 자체로 시스템 메뉴 접근.
  * - admin 시스템관리자: 모든 시스템 메뉴 (isSysAdmin 분기로 자동 — 이 매핑은 사실상 무관)
- * - operator 일반관리자: 사용자관리(msys1005), 메일발송로그(msys1006).
+ * - operator 일반관리자: 사용자관리(msys1005).
  *   권한관리(msys1003)는 전역(워크스페이스 무관) 권한을 변경 → 모든 워크스페이스에 영향이라 시스템관리자 전용. 운영자 제외.
  * - user 일반사용자: 시스템 메뉴 없음
+ *
+ * 여기 적힌 메뉴는 `tn_author_menu` 부여 없이 **강제로 더해지므로**, 화면이 사라진 메뉴를 남겨 두면
+ * 모든 operator 사이드바에 죽은 링크가 항상 뜬다 — 화면을 지울 때 이 목록도 같이 지운다.
  */
 export const AUTO_SYSTEM_MENUS_BY_AUTHOR: Record<string, string[]> = {
-  [GENERAL_ADMIN_AUTHOR_ID]: ["msys1005", "msys1006"],
+  [GENERAL_ADMIN_AUTHOR_ID]: ["msys1005"],
 };
 
 /**
