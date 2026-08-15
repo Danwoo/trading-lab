@@ -87,6 +87,25 @@ updates:
       #   이 항목도 함께 지운다.
       - dependency-name: "kysely"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # katex 는 0.18 로 가는 길만 막는다 — 0.17 안의 patch 는 계속 받는다.
+      #   실제 수식 마크업을 만드는 것은 최상위 katex 가 아니라, rehype-katex@7.0.1 과
+      #   micromark-extension-math@3.1.0 이 각각 `katex: ^0.16.0` 으로 물어 들이는 중첩
+      #   katex@0.16.47 이다. 최상위 katex 는 frontend/styles/globals.css 의
+      #   `@import "katex/dist/katex.min.css"` 한 줄을 위해 있는 직접 의존성이다 — 앱 코드는
+      #   katex 를 JS 로 import 하지 않는다.
+      #   katex 0.18.0 은 CSS 클래스를 접두어화하는 파괴적 변경이라, 0.18 스타일시트로
+      #   0.16 마크업을 칠하게 되어 MarkdownRenderer 의 수식 렌더가 깨진다. dependabot 은
+      #   0.17→0.18 을 「non-major」로 분류해 묶음 PR 에 실어 보낸다(PR #135) — 0.x 의 minor 는
+      #   semver 상 파괴가 허용되므로 그 분류가 이 레포 기준으로는 틀린다(kysely 와 같은 축).
+      #   minor·major 를 함께 막아 분류 차이를 덮는다.
+      #   CI 는 이 축을 못 본다 — 타입·린트·빌드가 전부 통과하고 수식은 브라우저에서만 깨진다.
+      # patch 를 살려 둔 이유: 매니페스트가 이미 `^0.17.0`(= >=0.17.0 <0.18.0)이라 0.17 patch
+      #   는 설치 시점에 어차피 허용된다 — 여기서 막으면 락파일만 얼어 매니페스트와 어긋나고,
+      #   0.17 계열로 나오는 보안 릴리스까지 PR 이 끊긴다(ignore 는 보안 업데이트도 막는다).
+      # 해제 조건: rehype-katex 와 micromark-extension-math 가 `katex: ^0.18.0` 을 무는 버전을
+      #   내면, frontend/package.json 의 katex 상승과 같은 PR 로 이 항목을 지운다.
+      - dependency-name: "katex"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
       # 아래 셋은 major 만 막는다 — 8.x·3.x·6.x 안의 minor·patch 는 계속 받는다
       #   (보안 패치가 거기서 온다). 셋 다 코드·설정 마이그레이션이 함께 가야 하는 변경이고,
       #   프론트 설계·디자인 축이 별도 브랜치에서 도는 중이라 2026-08-13 리드 결정으로 미뤘다.
