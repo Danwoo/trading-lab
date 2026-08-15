@@ -6,7 +6,7 @@ import Button from "@/components/shared/ui/Button";
 import { showToast } from "@/components/shared/Feedback";
 import { getApiErrorMessage } from "@/utils/common/errors";
 import { createBot, selectBot, selectStrategyCatalog, updateBot } from "@/services/bot/botService";
-import { BotConversation } from "./BotConversation";
+import { BotConversation, type BotProposal } from "./BotConversation";
 import { BotForm } from "./BotForm";
 import {
   NEW_BOT_DRAFT,
@@ -104,6 +104,35 @@ export function BotWorkbench({ botId }: Props) {
     );
   }, []);
 
+  /**
+   * 대화가 낸 제안을 폼에 채운다 (스펙 §8.6.1 「대화가 폼을 채우고, 폼이 대화를 검증한다」).
+   *
+   * **선언에 없는 이름은 버린다** — 전략이 모르는 값을 폼에 얹으면 저장에서 터지고, 사용자는
+   * 자기가 안 넣은 값 때문에 막힌다. 범위 검증은 저장 시점의 백엔드가 한다(전략 규약의 소유).
+   * 채운 칸에는 **`AI 제안 수락` 출처**가 붙는다(§8.6.3) — 무엇이 내 결정이고 무엇이 제안인지
+   * 나중에 구분되어야 한다.
+   */
+  const handleProposal = useCallback(
+    (proposal: BotProposal) => {
+      const form = strategyForms.find((candidate) => candidate.key === proposal.strategyKey);
+      if (!form) return;
+      setStrategy((prev) => {
+        const base = prev !== null && prev.strategyKey === proposal.strategyKey ? prev : newStrategyDraft(form);
+        const declared = new Set(form.fields.map((field) => field.name));
+        const accepted = Object.entries(proposal.params).filter(([name]) => declared.has(name));
+        return {
+          ...base,
+          params: { ...base.params, ...Object.fromEntries(accepted) },
+          paramSources: {
+            ...base.paramSources,
+            ...Object.fromEntries(accepted.map(([name]) => [name, "AI_SUGGESTED" as const])),
+          },
+        };
+      });
+    },
+    [strategyForms],
+  );
+
   const handleSave = async () => {
     if (draft.bot_nm.trim() === "") {
       showToast("봇 이름을 적어주세요.", "warning");
@@ -152,7 +181,7 @@ export function BotWorkbench({ botId }: Props) {
         <p className="text-sm text-ink-muted">불러오는 중입니다…</p>
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,5fr)]">
-          <BotConversation />
+          <BotConversation onProposal={handleProposal} />
           <BotForm
             draft={draft}
             onDraftChange={handleDraftChange}

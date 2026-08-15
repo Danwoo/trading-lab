@@ -6,11 +6,20 @@ import Button from "@/components/shared/ui/Button";
 import { getApiErrorMessage } from "@/utils/common/errors";
 import { selectBotAgentReadiness, streamBotAgent, type BotAgentEvent } from "@/services/bot/botAgentService";
 
+/** 대화가 낸 설정 제안 — 폼이 이것을 받아 채운다. */
+export interface BotProposal {
+  strategyKey: string;
+  params: Record<string, unknown>;
+  note: string | null;
+}
+
 interface Turn {
   role: "user" | "agent";
   text: string;
   /** 에이전트가 무엇을 읽었는지 — 판단의 근거가 숨지 않게 함께 보인다. */
   tools?: string[];
+  /** 이 턴이 폼에 채운 것 — 대화만 보고도 무엇이 바뀌었는지 알 수 있어야 한다. */
+  filled?: string[];
 }
 
 /**
@@ -23,7 +32,7 @@ interface Turn {
  *
  * 빈 대화창만 있으면 「고장」으로 읽히고, 그럴싸한 가짜 답을 채우면 「된다」로 읽힌다 — 둘 다 안 한다.
  */
-export function BotConversation() {
+export function BotConversation({ onProposal }: { onProposal?: (proposal: BotProposal) => void }) {
   const [reasons, setReasons] = useState<string[] | null>(null);
   const [ready, setReady] = useState<boolean | null>(null);
   const [draft, setDraft] = useState("");
@@ -60,8 +69,17 @@ export function BotConversation() {
     try {
       await streamBotAgent(message, (event: BotAgentEvent) => {
         if (event.type === "text") apply((turn) => ({ ...turn, text: turn.text + event.text }));
-        else if (event.type === "tool") apply((turn) => ({ ...turn, tools: [...(turn.tools ?? []), event.name] }));
-        else if (event.type === "unavailable") {
+        else if (event.type === "tool") {
+          // 폼을 채우는 도구는 「읽음」이 아니다 — 그 결과는 아래 「폼에 채움」 줄이 말한다.
+          // 내부 이름(`mcp__…`)이 화면에 새는 것도 여기서 막는다.
+          if (!event.name.startsWith("mcp__")) {
+            apply((turn) => ({ ...turn, tools: [...(turn.tools ?? []), event.name] }));
+          }
+        } else if (event.type === "proposal") {
+          onProposal?.({ strategyKey: event.strategy_key, params: event.params, note: event.note });
+          const filled = Object.entries(event.params).map(([name, value]) => `${name}=${String(value)}`);
+          apply((turn) => ({ ...turn, filled: [...(turn.filled ?? []), ...filled] }));
+        } else if (event.type === "unavailable") {
           // 정상 응답이다 — 대화가 왜 안 도는지 그대로 보여준다.
           setReady(false);
           setReasons(event.reasons);
@@ -110,11 +128,14 @@ export function BotConversation() {
             {turns.map((turn, index) => (
               <li key={index} className="text-sm leading-relaxed">
                 <span className="mr-2 font-mono text-2xs text-ink-faint">{turn.role === "user" ? "나" : "봇"}</span>
-                <span className={turn.role === "user" ? "text-ink-primary" : "text-ink-muted"}>
+                <span className={`whitespace-pre-wrap ${turn.role === "user" ? "text-ink-primary" : "text-ink-muted"}`}>
                   {turn.text || (isStreaming && index === turns.length - 1 ? "…" : "")}
                 </span>
                 {turn.tools && turn.tools.length > 0 && (
                   <p className="mt-1 font-mono text-2xs text-ink-faint">읽음: {turn.tools.join(" · ")}</p>
+                )}
+                {turn.filled && turn.filled.length > 0 && (
+                  <p className="mt-1 font-mono text-2xs text-ink-muted">폼에 채움: {turn.filled.join(" · ")}</p>
                 )}
               </li>
             ))}

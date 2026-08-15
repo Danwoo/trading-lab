@@ -17,6 +17,8 @@ export interface BotAgentReadiness {
  */
 export type BotAgentEvent =
   | { type: "text"; text: string }
+  /** 대화가 폼을 채운다 — 값은 도구 호출로만 온다(글에서 파싱하지 않는다). */
+  | { type: "proposal"; strategy_key: string; params: Record<string, unknown>; note: string | null }
   | { type: "tool"; name: string }
   | { type: "result"; subtype: string }
   | { type: "unavailable"; reasons: string[] }
