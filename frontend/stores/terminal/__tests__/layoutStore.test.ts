@@ -190,6 +190,33 @@ describe("layoutStore", () => {
     expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1", "ghost-1"]);
   });
 
+  it("resetPanels 는 열려 있는 기본 패널의 설정·접힘을 건드리지 않는다 — 되살리기지 초기화가 아니다", async () => {
+    const store = await freshStore();
+    store.getState().setWorkspace("ws-settings");
+
+    store.getState().updateSettings("chart-1", { interval: "1h" });
+    store.getState().toggleCollapsed("chart-1");
+    store.getState().closePanel("symbol-info-1");
+
+    store.getState().resetPanels();
+
+    const chart = store.getState().layout.panels.find((p) => p.instanceId === "chart-1");
+    expect(chart?.settings).toEqual({ interval: "1h" });
+    expect(chart?.collapsed).toBe(true);
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1"]);
+  });
+
+  it("되살릴 것이 없으면 resetPanels 는 아무것도 바꾸지 않는다", async () => {
+    const store = await freshStore();
+    store.getState().setWorkspace("ws-intact");
+    store.getState().updateSettings("chart-1", { interval: "1h" });
+    const before = store.getState().layout;
+
+    store.getState().resetPanels();
+
+    expect(store.getState().layout).toBe(before);
+  });
+
   it("좌표(grid)가 들어 있는 옛 v1 저장본으로도 복원이 깨지지 않는다", async () => {
     sharedStorage.setItem(
       "terminal-layout:ws-legacy",

@@ -112,16 +112,22 @@ export const useLayoutStore = create<LayoutStoreState>()(
         })),
 
       /**
-       * 기본 패널을 되살릴 뿐 **다른 것을 지우지 않는다.** 통째로 `DEFAULT_LAYOUT` 으로
-       * 갈아치우면 레지스트리에 아직 없는 타입(FE-AD-8 이 저장본에 남기기로 약속한
-       * `preserved`)까지 함께 날아간다 — 그 약속을 사람이 누르는 버튼 하나가 깨는 셈이다.
+       * **닫힌 기본 패널만 채워 넣는다.** 열려 있는 것은 그 인스턴스를 그대로 다시 쓰므로
+       * 사람이 만든 상태(`settings`·`collapsed`)가 살아남고, 기본 패널이 아닌 것 —
+       * 레지스트리에 아직 없는 타입(FE-AD-8 이 저장본에 남기기로 약속한 `preserved`)도
+       * 그대로 남는다. 통째로 `DEFAULT_LAYOUT` 으로 갈아치우면 둘 다 조용히 사라지는데,
+       * 버튼이 **열려 있는 패널 옆에** 뜬다는 사실 자체가 「저건 안 건드린다」로 읽힌다.
        */
       resetPanels: () =>
         set((state) => {
-          const defaults = cloneLayout(DEFAULT_LAYOUT);
-          const defaultIds = new Set(defaults.panels.map((panel) => panel.instanceId));
-          const kept = state.layout.panels.filter((panel) => !defaultIds.has(panel.instanceId));
-          return { layout: { ...defaults, panels: [...defaults.panels, ...kept] } };
+          const defaults = cloneLayout(DEFAULT_LAYOUT).panels;
+          const openById = new Map(state.layout.panels.map((panel) => [panel.instanceId, panel]));
+          if (defaults.every((panel) => openById.has(panel.instanceId))) return state;
+
+          const defaultIds = new Set(defaults.map((panel) => panel.instanceId));
+          const restored = defaults.map((panel) => openById.get(panel.instanceId) ?? panel);
+          const extras = state.layout.panels.filter((panel) => !defaultIds.has(panel.instanceId));
+          return { layout: { ...state.layout, panels: [...restored, ...extras] } };
         }),
 
       updateSettings: (instanceId, settings) =>
