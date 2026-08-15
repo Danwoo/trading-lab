@@ -50,11 +50,21 @@ class BotAgentService:
     async def _run(self, message: str, directory: Path) -> AsyncIterator[dict]:
         # import 를 여기서 하는 이유: 키가 없는 환경(CI·호스팅 모드)에서도 앱이 뜨고
         # readiness 가 답할 수 있어야 한다 — SDK 부재가 기동 실패가 되면 안 된다.
+        from agents.proposal_tool import build_proposal_server
         from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock, query
 
-        options = build_options(strategies_dir=directory, max_turns=self.config.AGENT_MAX_TURNS)
+        # 도구가 부른 제안을 담아 두고 메시지 사이사이에 흘린다 — 도구 호출은 SDK 안에서
+        # 일어나므로 이 큐가 그것을 스트림으로 옮기는 유일한 통로다.
+        proposals: list[dict] = []
+        options = build_options(
+            strategies_dir=directory,
+            max_turns=self.config.AGENT_MAX_TURNS,
+            proposal_server=build_proposal_server(proposals.append),
+        )
         try:
             async for reply in query(prompt=message, options=options):
+                while proposals:
+                    yield proposals.pop(0)
                 if isinstance(reply, AssistantMessage):
                     for block in reply.content:
                         if isinstance(block, TextBlock):
@@ -63,6 +73,8 @@ class BotAgentService:
                             # 무엇을 했는지 화면에 보인다 — 판단의 근거가 숨지 않게.
                             yield {"type": "tool", "name": block.name}
                 elif isinstance(reply, ResultMessage):
+                    while proposals:
+                        yield proposals.pop(0)
                     yield {"type": "result", "subtype": reply.subtype}
         except Exception:  # noqa: BLE001 — 남의 런타임이라 무엇이 터질지 모른다
             # 원본은 서버 로그에만 — 클라이언트엔 마스킹한다 (내부 경로·키가 새지 않게)

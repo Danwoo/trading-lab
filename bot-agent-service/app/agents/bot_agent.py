@@ -17,6 +17,7 @@
 from functools import partial
 from pathlib import Path
 
+from agents.proposal_tool import PROPOSAL_TOOL_NAME
 from agents.tool_scope import scope_hook
 from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
 
@@ -26,6 +27,10 @@ from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
 # 지금 범위(M2)에서 에이전트가 하는 일은 **대화가 폼을 채우는 것**이다. 값을 내놓는 일이라
 # 파일 쓰기도 셸도 필요 없다 — 전략 파일 생성(봇-전략-모델 §6)은 백테스트에 물려 있어 다음 베팅이다.
 ALLOWED_TOOLS = ["Read", "Glob", "Grep"]
+
+# 폼을 채우는 통로 하나 — in-process MCP 도구다(`proposal_tool.py`). 이름이 `mcp__<서버>__<도구>`
+# 로 붙으므로 허용 목록에도 그 이름으로 적는다. 경로 스코프 대상이 아니다(파일을 안 만진다).
+PROPOSAL_TOOL_FULL_NAME = f"mcp__bot_form__{PROPOSAL_TOOL_NAME}"
 
 # bare name 으로 적으면 도구 정의가 요청에서 **제거**돼 모델이 시도조차 못 한다.
 DISALLOWED_TOOLS = ["Bash", "Write", "Edit", "NotebookEdit", "WebSearch", "WebFetch", "Task"]
@@ -49,13 +54,15 @@ SYSTEM_PROMPT = """\
 3. 성과 숫자를 지어내지 않습니다. 백테스트 엔진이 아직 없어 과거 수익률·낙폭·승률을 말할 수
    없습니다. 모르면 "아직 검증 단계가 없어 그 숫자는 못 드립니다" 라고 말합니다.
 4. 값을 채울 때는 그 값이 어느 파라미터의 것인지 이름으로 밝힙니다.
+5. **값을 정했으면 `propose_settings` 도구를 부릅니다.** 사용자의 폼은 그 호출로만 채워지고,
+   말로만 적은 값은 화면에 반영되지 않습니다. 도구를 부른 뒤에는 무엇을 채웠는지 한 줄로 알립니다.
 
 전략은 파일로 선언돼 있고, 각 전략이 조절 가능한 파라미터와 그 범위를 스스로 선언합니다.
 범위 밖의 값을 제안하지 마십시오.\
 """
 
 
-def build_options(*, strategies_dir: Path | str, max_turns: int) -> ClaudeAgentOptions:
+def build_options(*, strategies_dir: Path | str, max_turns: int, proposal_server=None) -> ClaudeAgentOptions:
     """봇 만들기 대화 한 번에 쓸 옵션.
 
     경계는 **셋이 겹쳐** 만들어진다:
@@ -69,7 +76,8 @@ def build_options(*, strategies_dir: Path | str, max_turns: int) -> ClaudeAgentO
     """
     root = Path(strategies_dir).resolve()
     return ClaudeAgentOptions(
-        allowed_tools=list(ALLOWED_TOOLS),
+        allowed_tools=[*ALLOWED_TOOLS, PROPOSAL_TOOL_FULL_NAME],
+        mcp_servers={"bot_form": proposal_server} if proposal_server is not None else {},
         disallowed_tools=list(DISALLOWED_TOOLS),
         permission_mode=PERMISSION_MODE,
         setting_sources=list(SETTING_SOURCES),
