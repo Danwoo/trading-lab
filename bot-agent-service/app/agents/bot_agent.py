@@ -62,7 +62,9 @@ SYSTEM_PROMPT = """\
 """
 
 
-def build_options(*, strategies_dir: Path | str, max_turns: int, proposal_server=None) -> ClaudeAgentOptions:
+def build_options(
+    *, strategies_dir: Path | str, max_turns: int, proposal_server=None, resume: str | None = None
+) -> ClaudeAgentOptions:
     """봇 만들기 대화 한 번에 쓸 옵션.
 
     경계는 **셋이 겹쳐** 만들어진다:
@@ -85,4 +87,6 @@ def build_options(*, strategies_dir: Path | str, max_turns: int, proposal_server
         cwd=str(root),
         max_turns=max_turns,
         hooks={"PreToolUse": [HookMatcher(hooks=[partial(scope_hook, root=root)])]},
+        # 이어가기 — 없으면 새 대화다. 세션 id 의 소유는 서비스이고 클라이언트는 모른다.
+        resume=resume,
     )

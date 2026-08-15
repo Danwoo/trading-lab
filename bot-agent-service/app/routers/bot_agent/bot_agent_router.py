@@ -2,6 +2,7 @@
 
 import json
 
+from core.auth_context import get_email, get_user_id
 from core.container import Container
 from core.logger import logger
 from core.security import verify_access_token
@@ -34,9 +35,12 @@ async def chat(
 ):
     """봇 만들기 대화 한 턴을 SSE 로 스트리밍 (text·tool·result·unavailable·error + [DONE])."""
 
+    # 이어갈 대화를 신원으로 고른다 — 세션 id 를 요청 본문으로 받지 않는다(남의 대화를 이어받는 손잡이).
+    caller = get_user_id() or get_email()
+
     async def event_stream():
         try:
-            async for event in bot_agent_service.stream(body.message):
+            async for event in bot_agent_service.stream(body.message, caller=caller, reset=body.reset, form=body.form):
                 yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
         except Exception as e:
             # StreamingResponse 는 응답 시작 후 예외를 exception_handler 가 못 잡는다 —

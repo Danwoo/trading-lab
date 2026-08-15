@@ -16,6 +16,10 @@ from core.logger import logger
 class BotAgentService:
     def __init__(self, config):
         self.config = config
+        # 신원 → 최근 세션 id. **클라이언트가 세션 id 를 못 정하게** 서버가 들고 있는다 —
+        # id 를 받으면 남의 것을 넣어 남의 대화를 이어받을 수 있다. 로컬 배포 모드 전용
+        # 단일 프로세스라 메모리로 충분하고, 프로세스가 죽으면 대화가 새로 시작될 뿐이다.
+        self._sessions: dict[str, str] = {}
 
     def strategies_dir(self) -> Path:
         """설정이 비면 레포 루트의 `strategies/` — 전략 규약 §1 의 기본값과 같다."""
@@ -33,10 +37,38 @@ class BotAgentService:
             reasons.append(f"전략 디렉터리가 없습니다: {directory}")
         return {"ready": not reasons, "reasons": reasons, "strategies_dir": str(directory)}
 
-    async def stream(self, message: str) -> AsyncIterator[dict]:
-        """대화 한 턴의 이벤트를 낸다. SSE 프레이밍은 라우터 몫이다."""
+    @staticmethod
+    def _with_form_state(message: str, form) -> str:
+        """지금 폼 상태를 말머리에 붙인다.
+
+        붙이는 이유: 에이전트는 자기가 제안한 값만 기억하고 **사용자가 손으로 고친 값은 모른다.**
+        모르면 「나머지는 그대로 뒀습니다」 같은 문장이 사실과 어긋난다(실측으로 겪었다).
+        폼이 진실이고 대화는 그것을 읽는다.
+        """
+        if form is None:
+            return message
+        parts = []
+        if form.strategy_key:
+            parts.append(f"전략={form.strategy_key}")
+        parts.extend(f"{name}={value}" for name, value in form.params.items())
+        if not parts:
+            return message
+        return f"[지금 폼에 들어 있는 값 — 사용자가 직접 고친 것이 포함돼 있다: {', '.join(parts)}]\n\n{message}"
+
+    async def stream(
+        self, message: str, *, caller: str | None = None, reset: bool = False, form=None
+    ) -> AsyncIterator[dict]:
+        """대화 한 턴의 이벤트를 낸다. SSE 프레이밍은 라우터 몫이다.
+
+        `caller` 가 있으면 그 신원의 직전 세션을 이어간다 — 「그럼 손절은 5%로」가 통하려면
+        이전 턴을 알아야 한다. `reset` 이면 기억을 버리고 새로 시작한다.
+        """
         if not message.strip():
             raise BadRequestError("메시지가 비어 있습니다.")
+
+        key = caller or "anonymous"
+        if reset:
+            self._sessions.pop(key, None)
 
         state = self.readiness()
         if not state["ready"]:
@@ -44,10 +76,10 @@ class BotAgentService:
             yield {"type": "unavailable", "reasons": state["reasons"]}
             return
 
-        async for event in self._run(message, Path(state["strategies_dir"])):
+        async for event in self._run(self._with_form_state(message, form), Path(state["strategies_dir"]), key):
             yield event
 
-    async def _run(self, message: str, directory: Path) -> AsyncIterator[dict]:
+    async def _run(self, message: str, directory: Path, key: str) -> AsyncIterator[dict]:
         # import 를 여기서 하는 이유: 키가 없는 환경(CI·호스팅 모드)에서도 앱이 뜨고
         # readiness 가 답할 수 있어야 한다 — SDK 부재가 기동 실패가 되면 안 된다.
         from agents.proposal_tool import build_proposal_server
@@ -60,6 +92,7 @@ class BotAgentService:
             strategies_dir=directory,
             max_turns=self.config.AGENT_MAX_TURNS,
             proposal_server=build_proposal_server(proposals.append),
+            resume=self._sessions.get(key),
         )
         try:
             async for reply in query(prompt=message, options=options):
@@ -75,8 +108,14 @@ class BotAgentService:
                 elif isinstance(reply, ResultMessage):
                     while proposals:
                         yield proposals.pop(0)
+                    # 다음 턴이 이어붙을 자리 — 세션 id 는 **밖으로 내보내지 않는다**(남이 이어받는 손잡이가 된다).
+                    if getattr(reply, "session_id", None):
+                        self._sessions[key] = reply.session_id
                     yield {"type": "result", "subtype": reply.subtype}
         except Exception:  # noqa: BLE001 — 남의 런타임이라 무엇이 터질지 모른다
+            # 이어가기가 실패의 원인일 수 있다(세션 파일이 사라졌거나 손상). 기억을 버려
+            # 다음 턴이 새 대화로 되살아나게 한다 — 안 그러면 영영 같은 오류가 반복된다.
+            self._sessions.pop(key, None)
             # 원본은 서버 로그에만 — 클라이언트엔 마스킹한다 (내부 경로·키가 새지 않게)
             logger.exception("봇 만들기 대화가 실패했습니다")
             yield {"type": "error", "message": "대화 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."}

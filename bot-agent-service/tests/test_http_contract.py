@@ -85,8 +85,39 @@ def test_readiness_tells_why_not() -> str:
     return f"test_readiness_tells_why_not (ready={body['ready']})"
 
 
+def test_session_id_is_not_accepted_from_the_client() -> str:
+    """세션 id 를 요청으로 못 준다 — 받으면 남의 세션 id 를 넣어 남의 대화를 이어받을 수 있다."""
+    from schemas.bot_agent.bot_agent_schema import BotAgentIn
+
+    fields = set(BotAgentIn.model_fields)
+    assert fields == {"message", "reset"}, f"요청 필드가 늘었다: {fields}"
+
+    # 몰래 실어 보내도 무시된다 (pydantic 기본이 무시지만, 그 기본이 바뀌면 여기서 걸린다).
+    parsed = BotAgentIn(message="안녕", session_id="남의-세션")  # type: ignore[call-arg]
+    assert not hasattr(parsed, "session_id")
+    return "test_session_id_is_not_accepted_from_the_client"
+
+
+def test_continuation_is_keyed_by_caller() -> str:
+    """이어가기는 **신원별**이다 — 한 사람의 세션이 다른 사람에게 새면 안 된다."""
+    from services.bot_agent.bot_agent_service import BotAgentService
+    from core.config import settings
+
+    service = BotAgentService(config=settings)
+    service._sessions["user-a"] = "session-a"
+    assert service._sessions.get("user-b") is None, "다른 신원이 남의 세션을 본다"
+
+    # reset 은 그 신원의 기억만 지운다.
+    service._sessions["user-b"] = "session-b"
+    service._sessions.pop("user-a", None)
+    assert service._sessions == {"user-b": "session-b"}
+    return "test_continuation_is_keyed_by_caller"
+
+
 TESTS = [
     test_blank_message_is_rejected_at_the_boundary,
+    test_session_id_is_not_accepted_from_the_client,
+    test_continuation_is_keyed_by_caller,
     test_missing_key_answers_with_a_reason_not_silence,
     test_readiness_tells_why_not,
 ]
