@@ -1,4 +1,4 @@
-import { BENCH_PATH, MARKET_PATH } from "@/constants/routes";
+import { ADMIN_PATH, BENCH_PATH, MARKET_PATH } from "@/constants/routes";
 
 /** 아이콘 레일 폭 (화면 결정 §20 — 세로줄 하나로 유지, 넓은 사이드바는 쓰지 않는다). */
 export const RAIL_WIDTH_PX = 46;
@@ -73,12 +73,5 @@ export const RAIL_ITEMS: readonly RailItem[] = [
     kind: "panel",
     pending: "포트폴리오 패널 내용은 아직 없습니다.",
   },
-  {
-    id: "settings",
-    label: "설정",
-    icon: "preferences",
-    kind: "route",
-    pending: "설정 화면은 아직 없습니다.",
-    footer: true,
-  },
+  { id: "settings", label: "설정", icon: "preferences", kind: "route", path: ADMIN_PATH, footer: true },
 ] as const;

@@ -130,6 +130,11 @@ export function GlobalTabs() {
         </div>
       )}
       <div className="relative min-h-0 flex-1 bg-gray-50">
+        {tabs.length === 0 && (
+          <p className="flex h-full items-center justify-center text-sm text-gray-600">
+            왼쪽 메뉴에서 화면을 고르면 여기에 탭으로 열립니다.
+          </p>
+        )}
         {iframeTabs.map((tab) => {
           const isActive = tab.id === activeId;
           return (

@@ -7,12 +7,22 @@ import { useMenuAccessGate } from "@/hooks/shared/useMenuAccessGate";
 import { useCodeStore } from "@/stores/shared/codeStore";
 import { useNavStore } from "@/stores/shared/navStore";
 import { useTabStore } from "@/stores/shared/tabStore";
+import { ADMIN_PATH } from "@/constants/routes";
 
 // DB 메뉴에 없지만 항상 접근 가능한 경로 + 탭 제목. Object.keys() 가 곧 access 체크용 path 목록.
 const ALWAYS_ALLOWED_TABS: Record<string, string> = {
   "/admin/common/mypage": "마이페이지",
 };
 const ALWAYS_ALLOWED_PATHS = Object.keys(ALWAYS_ALLOWED_TABS);
+
+/**
+ * 섀시의 진입점 — 레일의 「설정」이 오는 자리. 메뉴 행이 아니므로 게이트가 따로 열어야 한다.
+ *
+ * `ALWAYS_ALLOWED_TABS` 에 넣지 않는 이유가 둘이다. 첫째, 그 목록은 **접두어**로 매칭돼
+ * `/admin/*` 전체가 게이트 밖으로 나간다. 둘째, 그 목록의 값은 탭 제목이라 여기에 넣으면
+ * 셸이 자기 자신을 iframe 탭으로 연다. 여기서 고를 화면은 사이드바가 개별로 게이팅한다.
+ */
+const CHASSIS_HOME_PATHS = [ADMIN_PATH];
 
 interface NavItem {
   id: string;
@@ -51,7 +61,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const { getGroupCodes } = useCodeStore();
   const navItems = useNavStore((s) => s.items);
   const openTab = useTabStore((s) => s.openTab);
-  const { loaded, authorized } = useMenuAccessGate(ALWAYS_ALLOWED_PATHS);
+  const { loaded, authorized } = useMenuAccessGate(ALWAYS_ALLOWED_PATHS, CHASSIS_HOME_PATHS);
 
   // iframe 내부인지 감지 (MDI 탭 콘텐츠로 로드된 경우 chrome 생략)
   useEffect(() => {
