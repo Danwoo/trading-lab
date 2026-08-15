@@ -12,7 +12,5 @@ export interface PanelDefinition {
   title: string;
   capability: PanelCapability;
   needsSymbol: boolean;
-  defaultSize: { w: number; h: number };
-  minSize: { w: number; h: number };
   load: () => Promise<{ default: React.ComponentType<PanelProps> }>;
 }

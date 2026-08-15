@@ -5,17 +5,17 @@ import { persist } from "zustand/middleware";
 import type { PersistStorage, StorageValue } from "zustand/middleware";
 import { cloneLayout, DEFAULT_LAYOUT } from "@/lib/terminal/layoutDefaults";
 import { migrateLayout } from "@/lib/terminal/layoutSchema";
-import type { GridCell, PanelInstance, TerminalLayout } from "@/types/terminal/layout";
+import type { TerminalLayout } from "@/types/terminal/layout";
 
 export interface LayoutStoreState {
   layout: TerminalLayout;
   workspaceId: string | null;
   recovered: boolean;
   setWorkspace: (workspaceId: string) => void;
-  applyGrid: (grid: GridCell[]) => void;
   toggleCollapsed: (instanceId: string) => void;
   closePanel: (instanceId: string) => void;
-  openPanel: (instance: PanelInstance, cell: GridCell) => void;
+  /** 닫은 패널을 되돌리는 유일한 경로 — 자유 배치와 함께 「패널 추가」 목록이 사라졌다 */
+  resetPanels: () => void;
   updateSettings: (instanceId: string, settings: Record<string, unknown>) => void;
   dismissRecovered: () => void;
 }
@@ -82,7 +82,7 @@ const layoutPersistStorage: PersistStorage<LayoutPersistedState> = {
  */
 export const useLayoutStore = create<LayoutStoreState>()(
   persist(
-    (set, get, api) => ({
+    (set, _get, api) => ({
       layout: cloneLayout(DEFAULT_LAYOUT),
       workspaceId: null,
       recovered: false,
@@ -92,8 +92,6 @@ export const useLayoutStore = create<LayoutStoreState>()(
         api.persist.setOptions({ name: layoutStorageKey(workspaceId) });
         void api.persist.rehydrate();
       },
-
-      applyGrid: (grid) => set((state) => ({ layout: { ...state.layout, grid } })),
 
       toggleCollapsed: (instanceId) =>
         set((state) => ({
@@ -110,22 +108,10 @@ export const useLayoutStore = create<LayoutStoreState>()(
           layout: {
             ...state.layout,
             panels: state.layout.panels.filter((panel) => panel.instanceId !== instanceId),
-            grid: state.layout.grid.filter((cell) => cell.i !== instanceId),
           },
         })),
 
-      openPanel: (instance, cell) => {
-        if (get().layout.panels.some((panel) => panel.instanceId === instance.instanceId)) {
-          return;
-        }
-        set((state) => ({
-          layout: {
-            ...state.layout,
-            panels: [...state.layout.panels, instance],
-            grid: [...state.layout.grid, cell],
-          },
-        }));
-      },
+      resetPanels: () => set({ layout: cloneLayout(DEFAULT_LAYOUT) }),
 
       updateSettings: (instanceId, settings) =>
         set((state) => ({

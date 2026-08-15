@@ -1,6 +1,3 @@
-/** 배치 그리드 컬럼 수 (react-grid-layout) */
-export const GRID_COLUMNS_COUNT = 12;
-
 /** 문맥 전환 1회당 동시 인플라이트 요청 상한 — 초과분은 큐에서 대기 (NFR-009) */
 export const MAX_INFLIGHT_REQUESTS = 6;
 

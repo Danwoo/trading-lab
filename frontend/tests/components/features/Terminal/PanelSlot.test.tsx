@@ -20,8 +20,6 @@ function definitionOf(overrides: Partial<PanelDefinition>): PanelDefinition {
     title: "차트",
     capability: "candles",
     needsSymbol: true,
-    defaultSize: { w: 8, h: 12 },
-    minSize: { w: 4, h: 8 },
     load: () =>
       Promise.resolve({
         default: (_props: PanelProps) => <div data-testid="panel-body">패널 본문</div>,
@@ -31,8 +29,6 @@ function definitionOf(overrides: Partial<PanelDefinition>): PanelDefinition {
 }
 
 const NOOP = {
-  onMove: () => {},
-  onResize: () => {},
   onToggleCollapse: () => {},
   onClose: () => {},
   onSettingsChange: () => {},
