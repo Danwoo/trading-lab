@@ -25,10 +25,10 @@ tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion
    **필드, 테이블명, PK 컬럼명은 절대 묻지 않는다.** Backend 프록시이고 backend 가 존재하면 design-patterns 의 "Backend 디스커버리 알고리즘" 으로 추출. 없으면 design-patterns 의 "네이밍 컨벤션" + "기본 비즈니스 필드" default 사용.
 
 3. **Backend 디스커버리** (Backend 프록시 + backend 존재 시) — design-patterns 의 "Backend 디스커버리 알고리즘" 그대로 따라 prefix / module / PK / Pydantic class·필드 추출.
-   - 추출한 **`prefix` 는 그대로(byte-identical) 사용**, `{service}` 그룹 폴더 + `{SERVICE}_SERVICE_URL` 도 디스커버리에서 확정 — `app/api/external/{service}/{prefix}/`, `app/(main)/admin/{service}/{prefix}/`, service `BASE_URL`(`/api/external/{service}/{prefix}`), proxy `{SERVICE}_SERVICE_URL + "/{prefix}"` 가 backend `APIRouter(prefix=...)` 와 정확히 같은 prefix. case 변환·복수형화·rename·재유도 금지 ([`anti-patterns-frontend.md`](../docs/anti-patterns-frontend.md) 룰 13). 1:N 자식 nested segment (`{child_route}`) 도 backend 와 동일. backend 미존재(Prisma 직접)면 entity 에서 kebab `{prefix}` 유도.
+   - 추출한 **`prefix` 는 그대로(byte-identical) 사용**, `{service}` 그룹 폴더 + `{SERVICE}_SERVICE_URL` 도 디스커버리에서 확정 — `app/api/external/{service}/{prefix}/`, `app/admin/{service}/{prefix}/`, service `BASE_URL`(`/api/external/{service}/{prefix}`), proxy `{SERVICE}_SERVICE_URL + "/{prefix}"` 가 backend `APIRouter(prefix=...)` 와 정확히 같은 prefix. case 변환·복수형화·rename·재유도 금지 ([`anti-patterns-frontend.md`](../docs/anti-patterns-frontend.md) 룰 13). 1:N 자식 nested segment (`{child_route}`) 도 backend 와 동일. backend 미존재(Prisma 직접)면 entity 에서 kebab `{prefix}` 유도.
 
 4. **충돌 확인** — 대상 파일 중 하나라도 존재하면 **즉시 중단 + 충돌 목록 보고** (덮어쓰기 금지):
-   - 공통: `services/{module}/`, `schemas/{module}/`, `components/features/{Module}/`, `app/(main)/admin/{prefix}/`
+   - 공통: `services/{module}/`, `schemas/{module}/`, `components/features/{Module}/`, `app/admin/{prefix}/`
    - Prisma 직접: `app/api/common/{prefix}/`
    - Backend 프록시: `app/api/external/{prefix}/`
    - Prisma 직접 + 모델 중복: `frontend/prisma/schema.prisma` 에 동일 모델명 존재 시 중단

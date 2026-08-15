@@ -15,15 +15,15 @@ dependencies = [
     "sqlalchemy~=2.0.51",
     "psycopg[binary]~=3.3.4",
     "langfuse>=4.14.3,<5",
-    "langchain>=1.3.4",
+    "langchain>=1.3.14",
 ]
 
 [dependency-groups]
 # multi-agent 특화 — Plan-Execute 멀티 에이전트 (LangGraph + 멀티 MCP)
 main = [
     "mcp>=1.29.0,<2",
-    "langchain==1.3.4",
-    "langgraph==1.2.4",
+    "langchain==1.3.14",
+    "langgraph==1.2.11",
     "langchain-core==1.5.3",
     "langchain-openai==1.4.3",
     "langchain-mcp-adapters==0.3.2",
