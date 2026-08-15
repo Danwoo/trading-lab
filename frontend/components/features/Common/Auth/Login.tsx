@@ -13,6 +13,7 @@ import { TextBox } from "@/components/shared/ui/TextBox";
 import { showMessage } from "@/stores/shared/messageStore";
 import { fetchNavigation } from "@/services/common/menuService";
 import { useNavStore } from "@/stores/shared/navStore";
+import { POST_LOGIN_PATH } from "@/constants/routes";
 
 const findFirstPath = (items: { path?: string; items?: any[] }[]): string | null => {
   for (const item of items) {
@@ -24,6 +25,21 @@ const findFirstPath = (items: { path?: string; items?: any[] }[]): string | null
   }
   return null;
 };
+
+const hasPath = (items: { path?: string; items?: any[] }[], target: string): boolean =>
+  items.some((item) => item.path === target || (item.items ? hasPath(item.items, target) : false));
+
+/**
+ * 로그인 후 착지점.
+ *
+ * 예전에는 「접근 가능한 첫 메뉴」였다 — 메뉴 정렬 순서가 곧 홈이라, 메뉴 하나를 위로
+ * 올리면 홈이 조용히 바뀌었다. 실험대가 홈이 되면서(화면 결정 §20.2) 착지점을 상수로
+ * 못박는다. 다만 **메뉴 게이트가 fail-closed** 라 그 경로 권한이 없는 사용자를 그리로 보내면
+ * 셸이 곧바로 로그인 화면으로 되돌려 왕복한다 — 그래서 네비게이션에 있을 때만 쓰고,
+ * 없으면 종전대로 첫 메뉴로 내려간다.
+ */
+const resolveLandingPath = (items: { path?: string; items?: any[] }[]): string | null =>
+  hasPath(items, POST_LOGIN_PATH) ? POST_LOGIN_PATH : findFirstPath(items);
 
 export const Login = () => {
   const router = useRouter();
@@ -59,8 +75,8 @@ export const Login = () => {
               return;
             }
             const nav = await fetchNavigation();
-            const firstPath = findFirstPath(nav.items);
-            if (!firstPath) {
+            const landingPath = resolveLandingPath(nav.items);
+            if (!landingPath) {
               // 접근 가능한 메뉴 없음 — 비정상 상태, 안내 후 admin 밖으로
               await showMessage(
                 "알림",
@@ -73,7 +89,7 @@ export const Login = () => {
               router.replace("/");
               return;
             }
-            router.replace(firstPath);
+            router.replace(landingPath);
             return;
           } else if (error?.message?.includes("RejectedUser")) {
             await showMessage(

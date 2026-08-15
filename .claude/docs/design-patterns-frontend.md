@@ -48,7 +48,7 @@ UI 컨벤션 / 재사용 훅/컴포넌트 / anti-pattern 룰은 [`frontend/CLAUD
 
 **Page**
 
-- `app/(main)/admin/{service}/{prefix}/page.tsx`
+- `app/admin/{service}/{prefix}/page.tsx`
 
 **API Route — 데이터 흐름별**
 
@@ -97,14 +97,14 @@ backend router/schema 가 이미 존재하면 거기서 실제 정의를 추출.
 
 | 요소                                      | 추출 위치                         | 적용 위치                                                                                                                  |
 | ----------------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **Route prefix** (`code-group`)           | `APIRouter(prefix="/code-group")` | `app/api/external/{service}/{prefix}/...`, `app/(main)/admin/{service}/{prefix}/page.tsx`, service `BASE_URL`, route `BACKEND_URL` (`{SERVICE}_SERVICE_URL + "/{prefix}"`) |
+| **Route prefix** (`code-group`)           | `APIRouter(prefix="/code-group")` | `app/api/external/{service}/{prefix}/...`, `app/admin/{service}/{prefix}/page.tsx`, service `BASE_URL`, route `BACKEND_URL` (`{SERVICE}_SERVICE_URL + "/{prefix}"`) |
 | **Service 그룹** (`factor`)                | router 가 속한 backend 폴더       | `{service}` 디렉토리 + `{SERVICE}_SERVICE_URL` env                                                                         |
 | **JS module 이름** (`code`)               | router 파일 basename              | `services/{module}/`, `schemas/{module}/`, `components/features/{Module}/`                                                 |
 | **PK segment** (`{group_code}`, `{code}`) | router path                       | `[{pk}]/route.ts`, `params.{pk}`, schema/service/component PK 필드                                                         |
 | **Pydantic class 이름**                   | `{module}_schema.py`              | Zod schema 변수 + TS type 이름 그대로 (`CodeGroupSchema`, `CodeGroup`, `CodeGroupOut`, `CodeSchema`, `Code`, `CodeOut` 등) |
 | **Pydantic 필드 + 제약**                  | `{module}_schema.py`              | Zod schema 필드 (아래 번역 규칙)                                                                                           |
 
-> **proxy 가 호출하는 backend prefix 는 그대로(byte-identical) 복제** — case 변환·복수형화·rename·재유도 금지. 보편 불변식: proxy route 의 `{SERVICE}_SERVICE_URL + "<P>"` 의 `<P>` 가 backend `APIRouter(prefix=...)` 와 정확히 같은 문자열. external 디렉토리는 `app/api/external/{service}/{prefix}/` (`{service}` = 대상 backend 그룹 → `{SERVICE}_SERVICE_URL`), admin page 는 `app/(main)/admin/{service}/{prefix}/`, client `BASE_URL` 은 `/api/external/{service}/{prefix}` 로 그 route 경로와 일치. 1:N 자식 nested segment (`{child_route}`) 도 backend 와 동일. backend prefix 가 바뀌면 proxy route + `BASE_URL` + admin page 를 lockstep 으로 수정 ([`anti-patterns-frontend.md`](anti-patterns-frontend.md) 룰 13).
+> **proxy 가 호출하는 backend prefix 는 그대로(byte-identical) 복제** — case 변환·복수형화·rename·재유도 금지. 보편 불변식: proxy route 의 `{SERVICE}_SERVICE_URL + "<P>"` 의 `<P>` 가 backend `APIRouter(prefix=...)` 와 정확히 같은 문자열. external 디렉토리는 `app/api/external/{service}/{prefix}/` (`{service}` = 대상 backend 그룹 → `{SERVICE}_SERVICE_URL`), admin page 는 `app/admin/{service}/{prefix}/`, client `BASE_URL` 은 `/api/external/{service}/{prefix}` 로 그 route 경로와 일치. 1:N 자식 nested segment (`{child_route}`) 도 backend 와 동일. backend prefix 가 바뀌면 proxy route + `BASE_URL` + admin page 를 lockstep 으로 수정 ([`anti-patterns-frontend.md`](anti-patterns-frontend.md) 룰 13).
 
 ### Pydantic → Zod 번역 규칙
 
@@ -695,7 +695,7 @@ export default function {Entity}DetailForm({ initialData, isNew, codeList, onSub
 ### Page (`page.tsx`)
 
 ```tsx
-// app/(main)/admin/{service}/{prefix}/page.tsx
+// app/admin/{service}/{prefix}/page.tsx
 import {Entity}Container from "@/components/features/{Entity}/{Entity}Container";
 
 export default function Page() {
