@@ -10,6 +10,7 @@ from modules import WIRING_MODULES
 
 # Repository
 from repositories.bar.bar_repository import BarRepository
+from repositories.bot.bot_repository import BotRepository
 from repositories.file.file_repository import FileRepository
 from repositories.file.sftp_file_repository import SftpFileRepository
 from repositories.ingest.ingest_repository import IngestRepository
@@ -22,6 +23,7 @@ from repositories.watchlist.watchlist_repository import WatchlistRepository
 
 # Service
 from services.bar.bar_service import BarService
+from services.bot.bot_service import BotService
 from services.capability.capability_service import CapabilityService
 from services.chat.portfolio_chat_service import PortfolioChatService
 from services.data_key.data_key_service import DataKeyService
@@ -64,11 +66,13 @@ class Container(containers.DeclarativeContainer):
     # 시세 — 캔들 조회(갈래 1)와 적재. 둘 다 workspace 스코프가 없다 (시세는 전역 공용, M2-AD-10).
     bar_repository = providers.Factory(BarRepository, sql_client=backend_sql_client)
     ingest_repository = providers.Factory(IngestRepository, sql_client=backend_sql_client)
+    bot_repository = providers.Factory(BotRepository, sql_client=backend_sql_client)
 
     # Service
     file_service = providers.Factory(FileService, file_repository=file_repository, file_store=sftp_file_repository)
     portfolio_service = providers.Factory(PortfolioService, portfolio_repository=portfolio_repository)
     watchlist_service = providers.Factory(WatchlistService, watchlist_repository=watchlist_repository)
+    bot_service = providers.Factory(BotService, bot_repository=bot_repository)
     nav_service = providers.Factory(NavService, nav_repository=nav_repository)
     message_queue_service = providers.Factory(
         MessageQueueService, message_queue_repository=message_queue_repository, nav_service=nav_service
