@@ -14,7 +14,7 @@ export interface LayoutStoreState {
   setWorkspace: (workspaceId: string) => void;
   toggleCollapsed: (instanceId: string) => void;
   closePanel: (instanceId: string) => void;
-  /** 닫은 패널을 되돌리는 유일한 경로 — 자유 배치와 함께 「패널 추가」 목록이 사라졌다 */
+  /** 닫힌 기본 패널을 되살리는 유일한 경로 — 자유 배치와 함께 「패널 추가」 목록이 사라졌다 */
   resetPanels: () => void;
   updateSettings: (instanceId: string, settings: Record<string, unknown>) => void;
   dismissRecovered: () => void;
@@ -111,7 +111,18 @@ export const useLayoutStore = create<LayoutStoreState>()(
           },
         })),
 
-      resetPanels: () => set({ layout: cloneLayout(DEFAULT_LAYOUT) }),
+      /**
+       * 기본 패널을 되살릴 뿐 **다른 것을 지우지 않는다.** 통째로 `DEFAULT_LAYOUT` 으로
+       * 갈아치우면 레지스트리에 아직 없는 타입(FE-AD-8 이 저장본에 남기기로 약속한
+       * `preserved`)까지 함께 날아간다 — 그 약속을 사람이 누르는 버튼 하나가 깨는 셈이다.
+       */
+      resetPanels: () =>
+        set((state) => {
+          const defaults = cloneLayout(DEFAULT_LAYOUT);
+          const defaultIds = new Set(defaults.panels.map((panel) => panel.instanceId));
+          const kept = state.layout.panels.filter((panel) => !defaultIds.has(panel.instanceId));
+          return { layout: { ...defaults, panels: [...defaults.panels, ...kept] } };
+        }),
 
       updateSettings: (instanceId, settings) =>
         set((state) => ({

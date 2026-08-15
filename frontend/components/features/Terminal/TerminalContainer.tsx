@@ -58,7 +58,7 @@ export function TerminalContainer() {
       onClick={resetPanels}
       className="border border-slate-line px-2 py-1 font-mono text-xs text-ink-primary hover:bg-slate-line focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
     >
-      기본 패널 구성으로 되돌리기
+      기본 패널 되살리기
     </button>
   );
 

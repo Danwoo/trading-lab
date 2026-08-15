@@ -30,6 +30,15 @@ function panelWidthPx(band: ViewportBand, expanded: boolean): number | null {
 }
 
 /**
+ * 620px 토글이 있는 구간 — §21.6 이 620 을 허용한 것은 **1280 이상뿐**이다.
+ * 그 아래에서는 `panelWidthPx` 가 `expanded` 를 무시하므로, 버튼을 보이면 누를 수는 있는데
+ * 아무 일도 안 일어나고 `aria-pressed` 만 눌림으로 바뀐다 — 스크린리더에게 거짓말이 된다.
+ */
+function canExpand(item: RailItem, band: ViewportBand): boolean {
+  return item.expandable === true && band === "wide";
+}
+
+/**
  * 레일이 여는 372px 패널 — **모달이 아니다. 보드를 덮지 않고 옆으로 민다**(화면 결정 §20.2).
  *
  * 덮지 않는 것이 이 패널의 존재 이유다. 패널에서 본 것을 보드에 바로 적용하는 것이 제품의
@@ -79,7 +88,7 @@ export function ProductPanel({ item, band, expanded, onToggleExpanded, onClose, 
           {item.label}
         </h2>
 
-        {item.expandable && band !== "overlay" && (
+        {canExpand(item, band) && (
           <button
             type="button"
             aria-pressed={expanded}

@@ -168,6 +168,28 @@ describe("layoutStore", () => {
     expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1"]);
   });
 
+  it("resetPanels 는 기본 패널만 되살리고 레지스트리 밖 패널(FE-AD-8 preserved)은 지우지 않는다", async () => {
+    sharedStorage.setItem(
+      "terminal-layout:ws-ghost",
+      JSON.stringify({
+        state: {
+          layout: {
+            schemaVersion: 2,
+            panels: [{ instanceId: "ghost-1", type: "retired-panel-type", collapsed: false, settings: {} }],
+          },
+        },
+        version: 0,
+      }),
+    );
+    const store = await freshStore();
+    store.getState().setWorkspace("ws-ghost");
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["ghost-1"]);
+
+    store.getState().resetPanels();
+
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1", "ghost-1"]);
+  });
+
   it("좌표(grid)가 들어 있는 옛 v1 저장본으로도 복원이 깨지지 않는다", async () => {
     sharedStorage.setItem(
       "terminal-layout:ws-legacy",

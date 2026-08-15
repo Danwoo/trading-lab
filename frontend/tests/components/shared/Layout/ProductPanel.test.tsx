@@ -96,6 +96,20 @@ describe("ProductPanel — 620 토글은 에이전트에만 있다 (§21.3)", ()
 
     expect(screen.queryByRole("button", { name: /넓히기/ })).toBeNull();
   });
+
+  // §21.6 이 620 을 허용한 것은 1280 이상뿐이다. 이 구간에서 버튼을 내면 눌러도 폭이 안 바뀌는데
+  // `aria-pressed` 만 눌림으로 바뀌어 스크린리더에게 거짓 상태를 알린다.
+  it("1024~1280 에서도 에이전트에게 넓히기를 내지 않는다 — 그 구간의 폭은 300 하나뿐이다", () => {
+    setup({ item: AGENT_ITEM, band: "compact" });
+
+    expect(screen.queryByRole("button", { name: /넓히기/ })).toBeNull();
+  });
+
+  it("expanded 가 켜진 채 1024~1280 으로 좁아져도 폭은 300 이다 — 상태가 폭을 앞지르지 않는다", () => {
+    const { panel } = setup({ item: AGENT_ITEM, band: "compact", expanded: true });
+
+    expect(panel.style.flex).toBe(`0 0 ${PANEL_COMPACT_WIDTH_PX}px`);
+  });
 });
 
 describe("ProductPanel — 키보드", () => {
