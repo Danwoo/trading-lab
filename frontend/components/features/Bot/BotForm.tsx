@@ -1,0 +1,246 @@
+"use client";
+
+import { NumberBox } from "@/components/shared/ui/NumberBox";
+import { SelectBox } from "@/components/shared/ui/SelectBox";
+import { TextArea } from "@/components/shared/ui/TextArea";
+import { TextBox } from "@/components/shared/ui/TextBox";
+import { StrategyFieldControl } from "./StrategyFieldControl";
+import {
+  BOT_ROLE_ITEMS,
+  COMBINE_RULE_ITEMS,
+  UNIVERSE_KIND_ITEMS,
+  type BotDraft,
+  type StrategyDraft,
+} from "./botFormModel";
+import type { StrategyForm } from "@/schemas/bot/bot";
+
+interface Props {
+  draft: BotDraft;
+  onDraftChange: (field: keyof BotDraft, value: unknown) => void;
+  strategy: StrategyDraft | null;
+  strategyForms: StrategyForm[];
+  catalogErrors: { source: string; message: string }[];
+  onStrategyChange: (key: string) => void;
+  onParamChange: (name: string, value: unknown) => void;
+}
+
+/** 설정 한 줄이 어디서 왔는지 — 사람이 손댄 것과 선언 기본값이 섞이면 무엇을 정했는지 모른다. */
+function SourceTag({ source }: { source?: "USER" | "AI_SUGGESTED" }) {
+  const label = source === "AI_SUGGESTED" ? "AI 제안 수락" : source === "USER" ? "내가 정함" : "선언 기본값";
+  return <span className="font-mono text-2xs text-ink-faint">{label}</span>;
+}
+
+/** `sourced` 는 **전략 파라미터 줄에만** 준다 — 봇 자체 설정에는 「선언」이 없어서 꼬리표가 거짓말이 된다. */
+function Row({
+  label,
+  help,
+  sourced,
+  source,
+  children,
+}: {
+  label: string;
+  help?: string;
+  sourced?: boolean;
+  source?: "USER" | "AI_SUGGESTED";
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid gap-1.5 sm:grid-cols-[minmax(9rem,14rem)_minmax(0,1fr)] sm:items-start sm:gap-3">
+      <div className="pt-1.5">
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm text-ink-primary">{label}</span>
+          {sourced && <SourceTag source={source} />}
+        </div>
+        {help && <p className="mt-0.5 text-2xs leading-relaxed text-ink-muted">{help}</p>}
+      </div>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+  return (
+    <section className="border border-slate-line bg-slate-panel">
+      <header className="border-b border-slate-line px-3 py-2">
+        <h2 className="font-mono text-xs text-ink-primary">{title}</h2>
+        {note && <p className="mt-0.5 text-2xs text-ink-muted">{note}</p>}
+      </header>
+      <div className="flex flex-col gap-4 p-3">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * 봇 폼 — 대화의 짝(실험대 스펙 §8.6.1 「문이 두 개다」). 대화가 채워도 **사용자가 언제든 직접
+ * 고칠 수 있어야** 하므로 이 폼이 언제나 지금 값을 보여주는 단일 표시면이다.
+ *
+ * 전략 파라미터 칸은 **전략 선언이 만든다** — 전략이 늘어도 이 파일은 안 바뀐다.
+ */
+export function BotForm({
+  draft,
+  onDraftChange,
+  strategy,
+  strategyForms,
+  catalogErrors,
+  onStrategyChange,
+  onParamChange,
+}: Props) {
+  const selectedForm = strategyForms.find((form) => form.key === strategy?.strategyKey) ?? null;
+
+  return (
+    <div className="flex min-h-0 flex-col gap-3 overflow-auto">
+      <Section title="봇">
+        <Row label="이름">
+          <TextBox
+            fieldName="bot_nm"
+            value={draft.bot_nm}
+            placeholder="예: 대형주 20일선 눌림목"
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+        <Row label="설명" help="나중에 「왜 이렇게 샀지」를 되짚을 때 읽는 줄입니다.">
+          <TextArea
+            fieldName="bot_desc"
+            value={draft.bot_desc}
+            height="4.5rem"
+            maxLength={500}
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+      </Section>
+
+      <Section
+        title="전략"
+        note={
+          selectedForm
+            ? `${selectedForm.timeframe} 기준 · ${selectedForm.fields.length}개 설정`
+            : "전략 파일이 폼을 만듭니다."
+        }
+      >
+        {catalogErrors.length > 0 && (
+          // 「전략이 없다」와 「전략을 못 읽었다」는 다르다 — 후자를 빈 목록으로 뭉개지 않는다.
+          <div className="border border-slate-line px-3 py-2">
+            <p className="text-2xs text-ink-primary">읽지 못한 전략 파일이 {catalogErrors.length}개 있습니다.</p>
+            <ul className="mt-1 flex flex-col gap-0.5">
+              {catalogErrors.map((error) => (
+                <li key={error.source} className="font-mono text-2xs text-ink-muted">
+                  {error.source} — {error.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <Row label="고른 전략">
+          <SelectBox
+            fieldName="strategy_key"
+            value={strategy?.strategyKey ?? null}
+            items={strategyForms.map((form) => ({ value: form.key, label: form.name }))}
+            displayExpr="label"
+            valueExpr="value"
+            noDataText="읽은 전략이 없습니다"
+            onValueChanged={(_field, value) => onStrategyChange(String(value))}
+          />
+        </Row>
+
+        {selectedForm?.summary && <p className="text-2xs leading-relaxed text-ink-muted">{selectedForm.summary}</p>}
+
+        {selectedForm?.fields.map((field) => (
+          <Row
+            key={field.name}
+            label={field.label}
+            help={field.help}
+            sourced
+            source={strategy?.paramSources[field.name]}
+          >
+            <StrategyFieldControl field={field} value={strategy?.params[field.name]} onChange={onParamChange} />
+          </Row>
+        ))}
+      </Section>
+
+      <Section title="굴리는 규칙" note="아직 봇을 돌리지는 않습니다 — 저장되는 조건입니다.">
+        <Row label="대상 종목">
+          <SelectBox
+            fieldName="universe_kind"
+            value={draft.universe_kind}
+            items={UNIVERSE_KIND_ITEMS}
+            displayExpr="label"
+            valueExpr="value"
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+        <Row label="조건 결합" help="전략을 여럿 실으면 어떻게 합칠지입니다.">
+          <SelectBox
+            fieldName="combine_rule"
+            value={draft.combine_rule}
+            items={COMBINE_RULE_ITEMS}
+            displayExpr="label"
+            valueExpr="value"
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+        <Row label="봇이 하는 일" help="실주문은 아직 없습니다. 지금 고를 수 있는 것은 보기와 제안뿐입니다.">
+          <SelectBox
+            fieldName="bot_role"
+            value={draft.bot_role}
+            items={BOT_ROLE_ITEMS}
+            displayExpr="label"
+            valueExpr="value"
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+        <Row label="손절">
+          <NumberBox
+            fieldName="stop_loss_pct"
+            value={draft.stop_loss_pct}
+            min={0}
+            max={100}
+            step={0.5}
+            format="#,##0.##%"
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+        <Row label="익절">
+          <NumberBox
+            fieldName="take_profit_pct"
+            value={draft.take_profit_pct}
+            min={0}
+            step={0.5}
+            format="#,##0.##%"
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+        <Row label="종목당 비중">
+          <NumberBox
+            fieldName="alloc_per_symbol"
+            value={draft.alloc_per_symbol}
+            min={0}
+            step={1}
+            format="#,##0.##%"
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+        <Row label="최대 보유 종목">
+          <NumberBox
+            fieldName="max_positions"
+            value={draft.max_positions}
+            min={1}
+            step={1}
+            format="#,##0종목"
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+        <Row label="하루 최대 매매">
+          <NumberBox
+            fieldName="max_trades_per_day"
+            value={draft.max_trades_per_day}
+            min={1}
+            step={1}
+            format="#,##0회"
+            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+          />
+        </Row>
+      </Section>
+    </div>
+  );
+}

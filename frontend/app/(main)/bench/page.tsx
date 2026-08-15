@@ -4,6 +4,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { useViewportBand } from "@/hooks/shared/useViewportBand";
 import { useBenchSelectionStore, type BenchSelectionKind } from "@/stores/shell/benchSelectionStore";
+import { BotList } from "@/components/features/Bot/BotList";
 
 /**
  * 보드에 상시로 있는 넷 (§20.2). 격자·곡선은 백테스트·봇 엔진 산출물이라 마일스톤 2 의
@@ -24,7 +25,7 @@ const BOARD_ZONES = [
     note: "자산 추이 + 구간 브러시. 구간을 끌면 그 구간만 다시 계산합니다.",
     marks: "curve-point" as BenchSelectionKind,
   },
-  { id: "bots", title: "내 봇", note: "만든 봇 목록과 지금 상태.", marks: "bot" as BenchSelectionKind },
+  { id: "bots", title: "내 봇", note: null, marks: "bot" as BenchSelectionKind },
   { id: "today", title: "오늘 할 일", note: "어젯밤에 한 일 · 정해야 할 것.", marks: null },
 ] as const;
 
@@ -45,7 +46,13 @@ function Zone({ zone }: { zone: (typeof BOARD_ZONES)[number] }) {
       )}
     >
       <h2 className="text-sm font-medium text-ink-primary">{zone.title}</h2>
-      <p className="mt-1 text-sm text-ink-muted">{zone.note}</p>
+      {zone.note !== null && <p className="mt-1 text-sm text-ink-muted">{zone.note}</p>}
+      {/* 「내 봇」은 유일하게 **실물이 있는** 자리다 — 만든 봇이 여기 놓이고, 여기서 새로 만든다. */}
+      {zone.id === "bots" && (
+        <div className="mt-2">
+          <BotList />
+        </div>
+      )}
       {marked && selection && (
         <p className="mt-2 text-sm text-ink-muted">
           <span className="text-ink-primary">{selection.label}</span>
