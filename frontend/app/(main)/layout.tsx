@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { ProductPanel, ProductRail } from "@/components/shared/Layout";
 import { useMenuAccessGate } from "@/hooks/shared/useMenuAccessGate";
 import { useViewportBand } from "@/hooks/shared/useViewportBand";
+import { useProductPanelStore } from "@/stores/shell/productPanelStore";
 import { RAIL_ITEMS } from "@/constants/shell";
 
 const PANEL_REGION_ID = "product-panel";
@@ -18,30 +19,20 @@ const PANEL_REGION_ID = "product-panel";
  * §20.2 「이동 규칙」 셋 중 **첫째가 여기**다: 레일 아이콘은 패널만 여닫고 **보드는 안 바뀐다**
  * (라우팅이 일어나지 않으므로 보드는 리마운트조차 되지 않는다). 나머지 둘(보드↔패널 양방향
  * 선택)은 `stores/shell/benchSelectionStore.ts` 가 소유한다.
+ *
+ * 무엇이 열려 있나는 `stores/shell/productPanelStore.ts` 가 갖는다 — 보드의 빈 상태가 주는
+ * 길(§21.4)도 패널을 열어야 해서, 셸의 지역 상태로 두면 보드에서 닿을 수 없다.
  */
 export default function ProductLayout({ children }: { children: ReactNode }) {
-  const [openPanelId, setOpenPanelId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  const [focusRailItemId, setFocusRailItemId] = useState<string | null>(null);
+  const openPanelId = useProductPanelStore((s) => s.openPanelId);
+  const expanded = useProductPanelStore((s) => s.expanded);
+  const focusRailItemId = useProductPanelStore((s) => s.focusRailItemId);
+  const togglePanel = useProductPanelStore((s) => s.toggle);
+  const closePanel = useProductPanelStore((s) => s.close);
+  const toggleExpanded = useProductPanelStore((s) => s.toggleExpanded);
+  const clearFocusRequest = useProductPanelStore((s) => s.clearFocusRequest);
   const { loaded, authorized } = useMenuAccessGate();
   const band = useViewportBand();
-
-  const togglePanel = useCallback((id: string) => {
-    setOpenPanelId((current) => (current === id ? null : id));
-    // 폭 토글은 패널마다 새로 정한다 — 에이전트를 620 으로 넓혀 두고 다른 패널을 열면
-    // 그 패널까지 620 이 되는데, §21.3 이 620 을 준 것은 에이전트뿐이다.
-    setExpanded(false);
-  }, []);
-
-  const closePanel = useCallback(() => {
-    setOpenPanelId((current) => {
-      // 닫고 나면 포커스를 연 자리(레일 버튼)로 돌려준다 — 안 돌려주면 사라진 요소에
-      // 포커스가 남아 브라우저가 `<body>` 로 떨어뜨리고 키보드 위치를 잃는다.
-      if (current) setFocusRailItemId(current);
-      return null;
-    });
-    setExpanded(false);
-  }, []);
 
   if (!loaded || authorized === null) return null;
 
@@ -55,7 +46,7 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
         onTogglePanel={togglePanel}
         panelRegionId={PANEL_REGION_ID}
         focusItemId={focusRailItemId}
-        onFocusHandled={() => setFocusRailItemId(null)}
+        onFocusHandled={clearFocusRequest}
       />
 
       {/* 패널은 이 상자 안에서만 논다 — 덮을 때(§21.6)도 레일까지 덮지는 않는다 */}
@@ -70,7 +61,7 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
             item={openPanel}
             band={band}
             expanded={expanded}
-            onToggleExpanded={() => setExpanded((v) => !v)}
+            onToggleExpanded={toggleExpanded}
             onClose={closePanel}
           />
         )}
