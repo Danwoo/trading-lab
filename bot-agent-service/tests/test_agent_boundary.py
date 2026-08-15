@@ -32,6 +32,7 @@ from agents.bot_agent import (  # noqa: E402
     ALLOWED_TOOLS,
     DISALLOWED_TOOLS,
     PERMISSION_MODE,
+    PROPOSAL_TOOL_FULL_NAME,
     SETTING_SOURCES,
     build_options,
 )
@@ -81,7 +82,16 @@ def test_settings_sources_are_not_loaded() -> None:
 
 def test_built_options_carry_the_boundary() -> None:
     options = build_options(strategies_dir="/tmp/strategies", max_turns=7)
-    check(list(options.allowed_tools) == list(ALLOWED_TOOLS), "옵션의 allowed_tools 가 선언과 같다")
+    # 자동승인은 **읽기 셋 + 폼 채우기 도구 하나**뿐이다. 목록을 그대로 적어 비교한다 —
+    # 「포함」으로 느슨하게 보면 도구가 하나 더 붙어도 통과한다.
+    check(
+        list(options.allowed_tools) == [*ALLOWED_TOOLS, PROPOSAL_TOOL_FULL_NAME],
+        f"옵션의 allowed_tools 가 선언과 같다 (지금 {list(options.allowed_tools)!r})",
+    )
+    check(
+        PROPOSAL_TOOL_FULL_NAME.startswith("mcp__"),
+        "폼 채우기 도구는 in-process MCP 도구다 — 이름이 mcp__ 로 시작해야 SDK 가 그렇게 다룬다",
+    )
     check(list(options.disallowed_tools) == list(DISALLOWED_TOOLS), "옵션의 disallowed_tools 가 선언과 같다")
     check(options.permission_mode == PERMISSION_MODE, "옵션의 permission_mode 가 선언과 같다")
     check(options.setting_sources == [], "옵션이 설정 소스를 안 읽는다")
