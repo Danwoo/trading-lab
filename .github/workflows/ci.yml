@@ -185,7 +185,8 @@ jobs:
           uv run python ../scripts/run_verify_scripts.py scripts \
             --skip verify_workspace_member_default_unique.py \
             --skip verify_no_orphan_personal_workspaces.py \
-            --skip verify_frontend_fk_referential_actions.py
+            --skip verify_frontend_fk_referential_actions.py \
+            --skip verify_bot_round_trip.py
 
       - name: Standalone tests (tests/test_*.py, fail-closed)
         if: ${{ !cancelled() }}
@@ -303,6 +304,15 @@ jobs:
             echo "::error::모델을 바꿨으면 리비전을 추가하세요: (cd backend-service/alembic && APP_ENV=development uv run python -m alembic revision --autogenerate -m \"설명\")"
             exit 1
           }
+
+      # 스키마가 선 김에 봇 저장·조회를 실제 DB 로 왕복시킨다 (#150 B0). 정적 대조가 못 잡는
+      # JSONB 바인딩·CHECK·CASCADE 를 여기서 본다. drift 판정과 독립이라 !cancelled() 를 붙인다.
+      - name: 봇 저장·조회 왕복 검증
+        if: ${{ !cancelled() }}
+        working-directory: backend-service
+        env:
+          BOT_ROUND_TRIP_DB_URL: postgresql://ci:ci@localhost:5432/ci
+        run: uv run python scripts/verify_bot_round_trip.py --i-know-this-drops-tables
 
   # ── MCP 서비스 5종 (uv — 서비스마다 venv 가 다르지만 한 잡에서 순차로 돈다) ──
   # portfolio(계산·redaction·테넌트 격리 계약 3종 + mock 신선도) · disclosure(사업연도 경계 +

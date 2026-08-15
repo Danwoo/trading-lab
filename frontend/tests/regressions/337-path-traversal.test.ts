@@ -191,10 +191,23 @@ const BACKEND = "http://backend.test/portfolio";
 const WATCHLIST = "http://backend.test/watchlist";
 const DOC = "http://backend.test/research-document";
 const SCHED = "http://devactivity.test/scheduler";
+const BOT = "http://backend.test/bot";
 
-// PR 본문·4차 리뷰가 전수 확인한 9파일 20지점 — app/api/external/** 안에서 params 를 백엔드 URL
-// 템플릿에 꽂는 자리 전부(services/common/* 는 브라우저→자체 API 호출이라 이 표 밖, N3 로 별도 처리).
+// app/api/external/** 안에서 params 를 백엔드 URL 템플릿에 꽂는 자리 전부(services/common/* 는
+// 브라우저→자체 API 호출이라 이 표 밖, N3 로 별도 처리). 건수는 손으로 적지 않는다 —
+// `EXPECTED_CALL_SITE_COUNT` 가 파일시스템을 실측해 이 표와 대조한다.
 const CALL_SITES: CallSite[] = [
+  // 봇 — #150 B1. `bot/route` 와 `bot/strategy-catalog/route` 는 params 를 URL 에 안 꽂아
+  // 콜사이트가 아니다(정적 카운트에도 안 잡힌다).
+  ...(["GET", "PUT", "DELETE"] as const).map((method) => ({
+    file: "@/app/api/external/backend/bot/[botId]/route",
+    label: `bot/[botId] ${method}`,
+    method,
+    opName: method,
+    needsBody: method === "PUT",
+    paramKeys: ["botId"],
+    buildUrl: (p: Record<string, string>) => `${BOT}/${p.botId}`,
+  })),
   ...(["GET", "PUT", "DELETE"] as const).map((method) => ({
     file: "@/app/api/external/backend/portfolio/[portfolio_id]/route",
     label: `portfolio/[portfolio_id] ${method}`,

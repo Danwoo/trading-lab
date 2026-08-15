@@ -43,6 +43,7 @@ ROUTER_MODULES: list[str] = [
     "routers.quote.quote_router",
     "routers.ingest.ingest_router",
     "routers.capability.capability_router",
+    "routers.bot.bot_router",
 ]
 
 # (모듈 경로, 매니저 인스턴스 이름) — 기동은 목록 순서, 종료는 역순

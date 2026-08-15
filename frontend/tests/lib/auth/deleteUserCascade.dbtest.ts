@@ -333,6 +333,10 @@ const PUBLIC_FIXTURES: Record<
   (typeof WORKSPACE_SCOPED_PUBLIC_TABLES)[number],
   (ws: number, key: string) => Prisma.Sql
 > = {
+  // 봇은 워크스페이스 자산이라 워크스페이스와 함께 지운다. 실린 전략(`tn_bot_strategy`)은
+  // `bot_id` FK 의 ON DELETE CASCADE 로 따라 지워지므로 여기서 따로 심지 않는다 (#150 B0).
+  tn_bot: (ws, key) =>
+    Prisma.sql`INSERT INTO public.tn_bot (workspace_id, bot_nm) VALUES (${ws}, ${`dbtest 봇 ${key}`})`,
   tn_holding: (ws, key) =>
     Prisma.sql`INSERT INTO public.tn_holding (workspace_id, portfolio_id, ticker, holding_nm)
                  VALUES (${ws}, ${`p-${key}`}, ${`T${key}`}, 'dbtest 보유종목')`,

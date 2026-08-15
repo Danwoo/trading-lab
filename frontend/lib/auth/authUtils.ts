@@ -58,6 +58,7 @@ export async function invalidateUserSessions(email: string): Promise<void> {
  * 보유 테이블은 아래 두 목록 중 하나에 있어야 한다"를 대조한다.
  */
 export const WORKSPACE_SCOPED_PUBLIC_TABLES = [
+  "tn_bot",
   "tn_holding",
   "tn_nav",
   "tn_portfolio",
@@ -150,6 +151,8 @@ export const AUDIT_ANONYMIZED_TABLES = [
   "frontend.tn_workspace_member",
   "frontend.tn_workspace_menu",
   "public.tn_board",
+  "public.tn_bot",
+  "public.tn_bot_strategy",
   "public.tn_file",
   "public.tn_file_detail",
   "public.tn_holding",
