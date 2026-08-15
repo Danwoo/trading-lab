@@ -6,10 +6,12 @@ import {
   SchedulerOut,
   SchedulerMembersOut,
 } from "@/schemas/scheduler/scheduler";
+import { HolderInfo } from "@/schemas/devActivity/devActivity";
 import { apiCall } from "@/utils/common/api/client";
 import { handleZodValidationError, validateWithZod } from "@/lib/zod/validation";
 
 const BASE_URL = "/api/external/devactivity/scheduler";
+const HOLDERS_URL = "/api/external/devactivity/chat";
 
 /**
  * 스케줄러 목록 조회
@@ -119,4 +121,16 @@ export const runScheduler = async (scheduler_id: string): Promise<MessageOut | n
   return apiCall<MessageOut>(`${BASE_URL}/${scheduler_id}/run`, {
     method: "POST",
   });
+};
+
+/**
+ * 스케줄러 알림 대상으로 고를 수 있는 계좌주 목록.
+ *
+ * 엔드포인트가 `chat/holders` 인 것은 backend-service 의 chat 모듈이 이 목록을 소유하기 때문이다
+ * (portfolio-mcp 에 계좌주 신원 필드가 없어 chat 모듈이 채운다 — `schemas/devActivity/devActivity.ts` 주석).
+ * 화면상 소비자는 스케줄러 하나뿐이라 여기서 호출한다.
+ */
+export const selectHolders = async (): Promise<HolderInfo[]> => {
+  const res = await apiCall<{ items: HolderInfo[]; total_count: number }>(`${HOLDERS_URL}/holders`, { method: "GET" });
+  return res?.items ?? [];
 };

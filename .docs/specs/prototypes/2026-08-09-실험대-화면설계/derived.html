@@ -1,0 +1,210 @@
+<style>
+  .dv { font-family:Pretendard,system-ui,sans-serif; }
+  .dv-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin:18px 0 8px; }
+  @media (max-width:1150px){ .dv-grid{grid-template-columns:1fr;} }
+  .dv-card { border-radius:11px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color .12s, transform .12s; background:#141416; }
+  .dv-card:hover { transform:translateY(-2px); }
+  .dv-card.selected { border-color:#4f8cff; }
+
+  .src { padding:14px 16px 13px; background:#1B1B1E; color:#D8D8DC; }
+  .src .lbl { font-size:10px; letter-spacing:.14em; opacity:.55; font-weight:700; }
+  .src h3 { font-size:15.5px; margin:5px 0 7px; letter-spacing:-.015em; }
+  .src p { font-size:12px; line-height:1.6; opacity:.85; margin:0; }
+  .src .orig { display:flex; gap:0; margin-top:11px; border-radius:5px; overflow:hidden; }
+  .src .orig i { flex:1; height:26px; position:relative; }
+  .src .orig i s { position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:7.5px; text-decoration:none; font-family:ui-monospace,monospace; }
+  .src .cap { font-size:10.5px; opacity:.5; margin-top:5px; font-style:normal; }
+
+  .shot { padding:16px; }
+  .p { border-radius:10px; border:1px solid; }
+  .ph { display:flex; align-items:center; gap:7px; padding:12px 14px 0; }
+  .pt { font-size:12.5px; font-weight:700; letter-spacing:-.01em; }
+  .pc { font-size:11px; }
+  .pb { padding:8px 14px 14px; }
+  .px { font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.08; font-variant-numeric:tabular-nums; }
+  .dl { font-size:12px; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .kv { display:flex; justify-content:space-between; font-size:11.5px; padding:5.5px 0; font-variant-numeric:tabular-nums; }
+  .bt { display:inline-block; font-size:11.5px; font-weight:600; padding:6px 13px; border-radius:7px; margin-top:11px; }
+  .bg2 { display:inline-block; font-size:10px; padding:2px 7px; border-radius:5px; margin-left:auto; }
+
+  .lite { margin-top:11px; border-radius:8px; padding:10px 12px; border:1px solid; }
+  .lite .lr { display:flex; justify-content:space-between; font-size:11px; padding:3px 0; font-variant-numeric:tabular-nums; }
+  .lite .lt2 { font-size:9.5px; letter-spacing:.12em; font-weight:700; opacity:.5; margin-bottom:5px; }
+
+  .tok { padding:0 16px 14px; font-family:ui-monospace,monospace; font-size:10px; line-height:1.7; color:#8A8A92; }
+  .risk { padding:12px 16px 15px; font-size:11.5px; line-height:1.55; background:#201A1A; color:#E0BDBD; border-top:1px solid #372828; }
+  .risk b { color:#F0A0A0; }
+</style>
+
+<div class="dv">
+<h2>세 갈래에서 각각 유도한 팔레트</h2>
+<p class="subtitle">
+  각 카드 위쪽은 <b>출처와 그 원본 색</b>, 아래는 <b>거기서 유도한 토큰을 실제 패널에 입힌 것</b>입니다.
+  맨 아래 붉은 칸은 <b>제가 보는 이 안의 약점</b>입니다 — 숨기면 또 같은 실수를 합니다.
+</p>
+
+<div class="dv-grid options">
+
+<!-- ══════ 갈래 1 : 도메인 유물 ══════ -->
+<div class="dv-card option" data-choice="g1" onclick="toggleSelect(this)">
+  <div class="src">
+    <div class="lbl">갈래 1 · 도메인 유물</div>
+    <h3>객장 전광판 &amp; 국내 HTS</h3>
+    <p>
+      증권사 객장 시세 전광판과 국내 HTS 다크 테마. 배경은 순검정이 아니라 <b>짙은 남청</b>이고,
+      적/청이 서구 SaaS 기준으로는 <b>과하게 쨍합니다</b>. 그 쨍함엔 이유가 있습니다 —
+      한 화면에 수백 행이 깔릴 때 <b>색으로 0.1초 안에 갈라야</b> 하기 때문입니다.
+      저채도=세련됨은 정보 밀도가 낮은 화면의 공식입니다.
+    </p>
+    <div class="orig">
+      <i style="background:#0B1017"><s style="color:#8899AA">객장 흑청</s></i>
+      <i style="background:#FF4B4B"><s style="color:#3A0000">LED 적</s></i>
+      <i style="background:#1E7FE8"><s style="color:#001A38">LED 청</s></i>
+      <i style="background:#F5C33B"><s style="color:#3A2A00">전광판 황</s></i>
+    </div>
+    <div class="cap">원본 근거: LED 전광판 3색(적·청·황) + 국내 HTS 남청 배경</div>
+  </div>
+  <div class="shot" style="background:#0B1017">
+    <div class="p" style="background:#131B26;border-color:#232F3E;box-shadow:0 1px 2px rgba(0,0,0,.55),0 6px 18px rgba(0,0,0,.3)">
+      <div class="ph"><span class="pt" style="color:#EAF0F7">삼성전자</span><span class="pc" style="color:#7C8CA0">005930</span>
+        <span class="bg2" style="color:#F5C33B;background:rgba(245,195,59,.15)">임시</span></div>
+      <div class="pb">
+        <div class="px" style="color:#FF4B4B">71,400</div>
+        <div class="dl" style="color:#FF4B4B">▲ 1,200 (+1.71%)</div>
+        <div style="margin-top:7px">
+          <div class="kv" style="border-bottom:1px solid rgba(35,47,62,.8)"><span style="color:#7C8CA0">거래량</span><span style="color:#C2CEDC">12,847,301</span></div>
+          <div class="kv" style="border-bottom:1px solid rgba(35,47,62,.8)"><span style="color:#7C8CA0">외국인</span><span style="color:#1E7FE8">-84,120</span></div>
+          <div class="kv"><span style="color:#7C8CA0">PER</span><span style="color:#C2CEDC">13.4</span></div>
+        </div>
+        <span class="bt" style="background:#F5C33B;color:#0B1017">관심종목 추가</span>
+      </div>
+    </div>
+    <div class="lite" style="background:#EDF0F4;border-color:#CDD5E0">
+      <div class="lt2" style="color:#5B6878">LIGHT</div>
+      <div class="lr"><span style="color:#131B26;font-weight:600">삼성전자</span><span style="color:#D92D2D;font-weight:600">71,400 ▲1.71%</span></div>
+      <div class="lr"><span style="color:#5B6878">외국인</span><span style="color:#1560C4">-84,120</span></div>
+    </div>
+  </div>
+  <div class="tok">--bg-base #0B1017 · --bg-panel #131B26 · --line #232F3E<br>--ink #C2CEDC · --ink-muted #7C8CA0 · --accent #F5C33B<br>--market-up #FF4B4B · --market-down #1E7FE8</div>
+  <div class="risk">
+    <b>약점:</b> 라이트 모드가 <b>평범한 회청색</b>으로 떨어집니다 — HTS 밝은 테마가 원래 Windows 회색이라
+    유도하면 개성이 사라집니다. 그리고 쨍한 적/청은 <b>장시간 응시에서 눈이 빨리 피로</b>합니다.
+    "국내 HTS 같다"가 칭찬인지 아닌지도 리드가 판단할 문제입니다.
+  </div>
+</div>
+
+<!-- ══════ 갈래 2 : 물리 계측기 ══════ -->
+<div class="dv-card option" data-choice="g2" onclick="toggleSelect(this)">
+  <div class="src">
+    <div class="lbl">갈래 2 · 물리 계측기</div>
+    <h3>항공 EFIS 계기판</h3>
+    <p>
+      여객기 주비행표시장치(PFD)의 <b>색 규약</b>에서 유도합니다. 이 규약은 취향이 아니라 규정입니다 —
+      <b>초록=현재 정상값 · 마젠타=조종사가 지정한 목표값 · 앰버=주의 · 적=경고 · 시안=참조 라벨</b>.
+      <b>마젠타가 "네가 지정한 것"</b>을 뜻한다는 게 핵심입니다. 이 제품에서 지정가·목표가·관심종목이
+      정확히 그 뜻이고, <b>마젠타는 웹 대시보드에서 거의 안 쓰입니다.</b>
+    </p>
+    <div class="orig">
+      <i style="background:#07090A"><s style="color:#7A8388">계기 흑</s></i>
+      <i style="background:#D65AB8"><s style="color:#2A0022">마젠타</s></i>
+      <i style="background:#35A7D9"><s style="color:#001C2A">시안</s></i>
+      <i style="background:#FFB000"><s style="color:#3A2600">앰버</s></i>
+      <i style="background:#3FCE7E"><s style="color:#002A14">그린</s></i>
+    </div>
+    <div class="cap">원본 근거: EFIS 색 규약 · 라이트는 Jeppesen 항공 차트(흰 종이+마젠타)</div>
+  </div>
+  <div class="shot" style="background:#07090A">
+    <div class="p" style="background:#101416;border-color:#1E2427;box-shadow:0 1px 2px rgba(0,0,0,.6),0 6px 18px rgba(0,0,0,.35)">
+      <div class="ph"><span class="pt" style="color:#EAEEF0">삼성전자</span><span class="pc" style="color:#77848A">005930</span>
+        <span class="bg2" style="color:#FFB000;background:rgba(255,176,0,.14)">임시</span></div>
+      <div class="pb">
+        <div class="px" style="color:#E5533F">71,400</div>
+        <div class="dl" style="color:#E5533F">▲ 1,200 (+1.71%)</div>
+        <div style="margin-top:7px">
+          <div class="kv" style="border-bottom:1px solid rgba(30,36,39,.9)"><span style="color:#77848A">거래량</span><span style="color:#D3DADD">12,847,301</span></div>
+          <div class="kv" style="border-bottom:1px solid rgba(30,36,39,.9)"><span style="color:#77848A">외국인</span><span style="color:#35A7D9">-84,120</span></div>
+          <div class="kv"><span style="color:#77848A">지정가</span><span style="color:#D65AB8">74,000</span></div>
+        </div>
+        <span class="bt" style="background:#D65AB8;color:#0A0509">관심종목 추가</span>
+      </div>
+    </div>
+    <div class="lite" style="background:#F4F4F2;border-color:#D5D5D0">
+      <div class="lt2" style="color:#6A6A64">LIGHT — 항공 차트 지면</div>
+      <div class="lr"><span style="color:#17191A;font-weight:600">삼성전자</span><span style="color:#B33325;font-weight:600">71,400 ▲1.71%</span></div>
+      <div class="lr"><span style="color:#6A6A64">지정가</span><span style="color:#A32F87;font-weight:600">74,000</span></div>
+    </div>
+  </div>
+  <div class="tok">--bg-base #07090A · --bg-panel #101416 · --line #1E2427<br>--ink #D3DADD · --ink-muted #77848A · --accent #D65AB8<br>--market-up #E5533F · --market-down #35A7D9 · --warn #FFB000</div>
+  <div class="risk">
+    <b>약점:</b> 마젠타는 <b>강한 선택</b>이라 질릴 위험이 실재합니다 — 앰버·회색과 달리 중립적이지 않습니다.
+    그리고 <b>액센트에 의미(=지정값)를 부여한 만큼, 그 의미를 지켜야 합니다</b> —
+    아무 버튼에나 마젠타를 쓰면 근거가 무너지고 그냥 보라색 앱이 됩니다. <b>규율이 필요한 안</b>입니다.
+  </div>
+</div>
+
+<!-- ══════ 갈래 3 : 인쇄 지면 ══════ -->
+<div class="dv-card option" data-choice="g3" onclick="toggleSelect(this)">
+  <div class="src">
+    <div class="lbl">갈래 3 · 인쇄 금융 지면</div>
+    <h3>시세면 — 액센트 색이 없다</h3>
+    <p>
+      신문 시세면·리서치 리포트를 뜯어보면 <b>색이 거의 없습니다.</b> 위계는 <b>괘선 굵기 · 활자 크기 · 여백</b>이
+      만들고, 색은 등락 표시에만 씁니다. 그래서 이 안은 <b>액센트 색을 아예 만들지 않습니다</b> —
+      강조는 인쇄물이 쓰는 방식대로 <b>흑백 반전 블록</b>입니다.
+      반전 인쇄의 특성을 따라 <b>배경은 차갑고(잉크) 글자는 따뜻합니다(종이)</b>.
+    </p>
+    <div class="orig">
+      <i style="background:#0D0F11"><s style="color:#8A8A86">인쇄 잉크</s></i>
+      <i style="background:#E6E4E0"><s style="color:#2A2A28">종이 흰</s></i>
+      <i style="background:#C33A2E"><s style="color:#2A0500">▲ 적</s></i>
+      <i style="background:#2B5C96"><s style="color:#00142A">▼ 청</s></i>
+    </div>
+    <div class="cap">원본 근거: 신문 증시면 괘선 위계 + 인쇄 잉크 적/청(저채도) · 액센트 0색</div>
+  </div>
+  <div class="shot" style="background:#0D0F11">
+    <div class="p" style="background:#16191C;border-color:#252A2E;box-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.26)">
+      <div class="ph"><span class="pt" style="color:#F0EDE8">삼성전자</span><span class="pc" style="color:#8B877F">005930</span>
+        <span class="bg2" style="color:#16191C;background:#8B877F;font-weight:700">임시</span></div>
+      <div class="pb">
+        <div class="px" style="color:#D9483A">71,400</div>
+        <div class="dl" style="color:#D9483A">▲ 1,200 (+1.71%)</div>
+        <div style="margin-top:7px">
+          <div class="kv" style="border-bottom:1px solid #252A2E"><span style="color:#8B877F">거래량</span><span style="color:#E6E4E0">12,847,301</span></div>
+          <div class="kv" style="border-bottom:1px solid #252A2E"><span style="color:#8B877F">외국인</span><span style="color:#5B87C4">-84,120</span></div>
+          <div class="kv" style="border-bottom:2px solid #4A4842"><span style="color:#8B877F">PER</span><span style="color:#E6E4E0">13.4</span></div>
+        </div>
+        <span class="bt" style="background:#E6E4E0;color:#0D0F11">관심종목 추가</span>
+      </div>
+    </div>
+    <div class="lite" style="background:#E6E4E0;border-color:#C6C2B9">
+      <div class="lt2" style="color:#6E6A62">LIGHT — 지면 그대로</div>
+      <div class="lr"><span style="color:#16191C;font-weight:700">삼성전자</span><span style="color:#C33A2E;font-weight:700">71,400 ▲1.71%</span></div>
+      <div class="lr" style="border-top:1px solid #C6C2B9;padding-top:4px"><span style="color:#6E6A62">외국인</span><span style="color:#2B5C96">-84,120</span></div>
+    </div>
+  </div>
+  <div class="tok">--bg-base #0D0F11 · --bg-panel #16191C · --line #252A2E<br>--ink #E6E4E0 · --ink-muted #8B877F · --accent <b style="color:#C33A2E">없음</b><br>--market-up #D9483A · --market-down #5B87C4 · 강조 = 반전</div>
+  <div class="risk">
+    <b>약점 두 개.</b> ① <b>라이트 모드가 방금 탈락한 그 자리로 되돌아갑니다</b> —
+    종이 미색 <code>#E6E4E0</code> 은 Claude 크림 <code>#F0EEE6</code> 과 이웃입니다. 라이트를 쓰려면
+    <b>더 차갑거나 더 흰 종이로 밀어야</b> 합니다. ② 액센트가 없으면 <b>"어디를 누르는가"가 약해집니다</b> —
+    반전 블록만으로 버티려면 타이포·여백 규율이 나머지 두 안보다 훨씬 엄격해야 합니다.
+  </div>
+</div>
+
+</div>
+
+<div class="section" style="margin-top:26px">
+  <p class="label">제가 보는 그림</p>
+  <p style="line-height:1.7">
+    <b>이번엔 추천을 앞세우지 않겠습니다.</b> 제 추천이 두 번 연속 남의 브랜드로 착지했고,
+    지금 필요한 건 제 취향이 아니라 리드의 눈입니다. 대신 <b>판단에 쓸 축</b>만 드립니다 —
+    <br><br>
+    <b>갈래 1</b>은 <b>계보</b>를 삽니다. "이건 한국 증권 화면이다"가 즉시 읽히고, 대신 개성보다 관습이 앞섭니다.<br>
+    <b>갈래 2</b>는 <b>의미</b>를 삽니다. 액센트가 뜻을 갖는 유일한 안이고(마젠타=내가 지정한 값), 대신 그 뜻을 지킬 규율이 필요합니다.<br>
+    <b>갈래 3</b>은 <b>절제</b>를 삽니다. 색으로 승부하지 않으니 유행을 탈 일이 없고, 대신 타이포·여백이 조금만 흐트러져도 바로 초라해집니다.
+    <br><br>
+    그리고 셋 다 <b>부분 채택이 가능</b>합니다 — 예를 들어 <b>갈래 3의 무채색 골격에 갈래 2의 마젠타를 지정값 전용으로</b> 얹으면,
+    유행 없는 바탕 + 뜻이 있는 액센트가 됩니다. 마음에 걸리는 것과 끌리는 것을 각각 말씀해 주시면 그 조합으로 다시 만들겠습니다.
+  </p>
+</div>
+</div>

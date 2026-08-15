@@ -1,0 +1,131 @@
+<style>
+  .au { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --keep:#5FA34C; --fix:#D9A441; --kill:#C94A3B; --ask:#4A8CC8;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .au .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+
+  .sum { display:flex; gap:10px; margin:16px 0 20px; }
+  .sum > div { flex:1; background:var(--pn); border:1px solid var(--ln); border-radius:10px; padding:12px 14px; }
+  .sum .k { font-size:9.5px; letter-spacing:.13em; font-weight:700; }
+  .sum .v { font-size:26px; font-weight:500; letter-spacing:-.03em; margin-top:3px; }
+  .sum .s { font-size:11px; color:var(--if); margin-top:2px; line-height:1.4; }
+
+  table.t { width:100%; border-collapse:collapse; font-size:12.5px; background:var(--pn);
+            border:1px solid var(--ln); border-radius:10px; overflow:hidden; }
+  table.t th { font-size:11px; font-weight:500; color:var(--if); text-align:left; padding:8px 11px;
+               border-bottom:1px solid var(--ln); background:var(--rs); white-space:nowrap; }
+  table.t td { padding:9px 11px; border-bottom:1px solid var(--hl); vertical-align:top; line-height:1.5; }
+  table.t tr:last-child td { border-bottom:none; }
+  table.t td.rt { color:var(--im); font-family:ui-monospace,monospace; font-size:11px; white-space:nowrap; }
+  table.t td.nm { color:var(--is); font-weight:500; white-space:nowrap; }
+  table.t td.wh { color:var(--im); font-size:11.5px; }
+
+  .tag { display:inline-block; font-size:10px; font-weight:700; padding:2px 8px; border-radius:5px; white-space:nowrap; }
+  .tag.keep { background:var(--keep); color:#07120A; }
+  .tag.fix  { background:var(--fix);  color:#141005; }
+  .tag.kill { background:var(--kill); color:#1A0605; }
+  .tag.ask  { background:transparent; color:var(--ask); border:1px solid var(--ask); }
+
+  .grp { font-size:10px; letter-spacing:.13em; font-weight:700; color:var(--if); padding:14px 11px 6px; }
+
+  .note { font-size:12px; color:var(--im); line-height:1.7; margin-top:14px; }
+  .note b { color:var(--ik); font-weight:500; }
+  .q { background:var(--pn); border:1px solid var(--ls); border-left:2px solid var(--ask); border-radius:9px;
+       padding:12px 14px; margin-top:11px; font-size:12.5px; line-height:1.65; }
+  .q b { display:block; color:var(--is); font-size:13px; margin-bottom:5px; }
+</style>
+
+<div class="au">
+<h2 style="color:#F5F3EF">화면 재고조사 — 23개를 쓸 것 / 고칠 것 / 버릴 것으로 가릅니다</h2>
+<p class="subtitle" style="color:#8B877F">
+  이 제품은 <b style="color:#E6E4E0">SaaS 멀티테넌트 스타터 템플릿</b>에서 출발해
+  <b style="color:#E6E4E0">퀀트 실험 플랫폼</b>으로 재정의됐습니다. 템플릿 잔재가 그대로 남아 있고,
+  <b style="color:#E6E4E0">버릴 화면에 디자인 시스템을 입히는 건 순수한 낭비</b>입니다.
+</p>
+
+<div class="sum">
+  <div><div class="k" style="color:var(--keep)">존치</div><div class="v n" style="color:var(--keep)">6</div><div class="s">제품에 필요. 디자인만 새로</div></div>
+  <div><div class="k" style="color:var(--fix)">개편</div><div class="v n" style="color:var(--fix)">5</div><div class="s">쓰되 형태가 바뀜(흡수·이동)</div></div>
+  <div><div class="k" style="color:var(--kill)">폐기</div><div class="v n" style="color:var(--kill)">7</div><div class="s">템플릿 잔재. 지운다</div></div>
+  <div><div class="k" style="color:var(--ask)">리드 판단</div><div class="v n" style="color:var(--ask)">5</div><div class="s">제품 방향에 달림</div></div>
+</div>
+
+<table class="t">
+  <tr><th style="width:200px">라우트</th><th style="width:104px">판정</th><th>근거</th></tr>
+
+  <tr><td colspan="3" class="grp">터미널 · 실험</td></tr>
+  <tr><td class="rt">(main)/terminal</td><td><span class="tag fix">개편</span></td>
+    <td class="wh">제품의 중심. 단 <b style="color:var(--ik)">iframe 밖으로 꺼내고</b> S2 셸로 재배치. 종목 선택이 전 패널로 퍼지려면 iframe 경계를 없애야 함</td></tr>
+  <tr><td class="rt" style="color:var(--if)">(신규) 실험대</td><td><span class="tag keep">신규</span></td>
+    <td class="wh">새 홈. 명세는 완료(<code>experiment-bench-spec</code>)</td></tr>
+
+  <tr><td colspan="3" class="grp">업무 화면</td></tr>
+  <tr><td class="rt">(main)/admin/watchlist</td><td><span class="tag fix">개편</span></td>
+    <td class="wh">관심종목. 퀀트에선 곁가지지만 <b style="color:var(--ik)">유니버스에 "항상 포함"</b>으로 쓰임 → <b style="color:var(--ik)">터미널 사이드바 탭으로 흡수</b>, 독립 화면 폐지</td></tr>
+  <tr><td class="rt">(main)/admin/portfolio</td><td><span class="tag keep">존치</span></td>
+    <td class="wh">실계좌 보유. <b style="color:var(--ik)">리더보드의 「내 실계좌」 행</b>이 여기서 옴 — 비교의 기준점이라 필수</td></tr>
+  <tr><td class="rt">(main)/admin/devactivity<br><span style="color:var(--if);font-size:10px">+ /scheduler</span></td><td><span class="tag ask">판단</span></td>
+    <td class="wh"><b style="color:var(--ik)">두 개가 붙어 있는데 성격이 다릅니다.</b> <code>devactivity</code>는 계좌목록+챗 데모(템플릿), <code>scheduler</code>는 <b style="color:var(--ik)">저녁 연구 배치의 실행 기반</b>. <b style="color:var(--ask)">scheduler 만 「설정」으로 옮기고 devactivity 는 버리는 게 맞아 보입니다</b></td></tr>
+  <tr><td class="rt">(main)/admin/nav</td><td><span class="tag kill">폐기</span></td>
+    <td class="wh"><b style="color:var(--kill)">랜덤워크 데모입니다.</b> <code>nav</code>와 <code>drawdown</code>이 서로 독립인 난수인데 화면은 "최대낙폭"이라 표기(F11). 실 자산곡선은 실험대가 담당 — <b style="color:var(--ik)">남겨두면 거짓 라벨을 물려받습니다</b></td></tr>
+
+  <tr><td colspan="3" class="grp">리서치 (RAG)</td></tr>
+  <tr><td class="rt">(main)/admin/research-document<br>(main)/admin/research-chat</td><td><span class="tag ask">판단</span></td>
+    <td class="wh">문서 업로드 + 근거 인용 챗. <b style="color:var(--ik)">잘 만들어져 있고 M1 의 산출물</b>인데, <b style="color:var(--ik)">퀀트 실험의 중심은 아닙니다.</b> 비전엔 "LLM 은 내가 원할 때 옆에서 돕는다"가 있어 명분은 있음 → <b style="color:var(--ask)">레일 한 칸을 줄지, 실험대 안 패널로 접을지</b></td></tr>
+
+  <tr><td colspan="3" class="grp">시스템 관리 — 템플릿 잔재가 몰려 있는 곳</td></tr>
+  <tr><td class="rt">…/system/menu</td><td><span class="tag kill">폐기</span></td>
+    <td class="wh"><b style="color:var(--kill)">레일 5칸이 코드로 고정되면 DB 메뉴 관리가 존재 이유를 잃습니다.</b> 지금은 메뉴가 DB 에 있어 권한 게이트까지 여기 물려 있음 — 이걸 걷어내야 셸 개편이 단순해집니다</td></tr>
+  <tr><td class="rt">…/system/author</td><td><span class="tag ask">판단</span></td>
+    <td class="wh">권한 3종(admin/operator/user). <b style="color:var(--ik)">로컬 1인 배포판에선 의미가 없습니다.</b> 다만 결정 로그가 <b style="color:var(--ik)">"읽기전용 게스트 초대"</b>를 멀티테넌시 유지 근거로 들었음 → <b style="color:var(--ask)">그 기능을 실제로 할 것인가</b></td></tr>
+  <tr><td class="rt">…/system/adminuser</td><td><span class="tag ask">판단</span></td>
+    <td class="wh">사용자 관리. author 와 운명이 같습니다 — 게스트 초대를 안 하면 함께 폐기</td></tr>
+  <tr><td class="rt">…/system/workspace</td><td><span class="tag fix">개편</span></td>
+    <td class="wh">결정 로그: <b style="color:var(--ik)">"회사=개인 워크스페이스로 재해석, 멀티테넌시 유지"</b>. 전략별 격리·레이아웃 저장에 쓰임 → <b style="color:var(--ik)">관리 화면이 아니라 「설정」의 한 절로 축소</b></td></tr>
+  <tr><td class="rt">…/system/code</td><td><span class="tag fix">개편</span></td>
+    <td class="wh">공통코드. <b style="color:var(--ik)">실제로 watchlist·portfolio·scheduler 가 씁니다</b> — 버리면 그 셋이 깨짐. 화면은 <b style="color:var(--ik)">「설정」으로 옮기되 유지</b></td></tr>
+  <tr><td class="rt">…/system/email-log</td><td><span class="tag kill">폐기</span></td>
+    <td class="wh">메일 발송 로그. 주간 리포트 메일을 <b style="color:var(--ik)">로컬 1인이 자기에게 보내는</b> 구조에서 발송 로그 화면은 과잉. 실패는 토스트로 충분</td></tr>
+  <tr><td class="rt">…/common/mypage</td><td><span class="tag fix">개편</span></td>
+    <td class="wh">비밀번호·프로필. <b style="color:var(--ik)">「설정」의 한 절로 흡수</b>, 독립 화면 폐지</td></tr>
+
+  <tr><td colspan="3" class="grp">인증 — 8개 화면이 로컬 1인 배포판에 필요한가</td></tr>
+  <tr><td class="rt">app/page (로그인)</td><td><span class="tag keep">존치</span></td>
+    <td class="wh">로그인은 남습니다. 이미 auth-backdrop 시그니처가 있음</td></tr>
+  <tr><td class="rt">(auth)/signup<br>(auth)/signup/agree<br>(auth)/signup/[email]<br>(auth)/signup/complete</td><td><span class="tag fix">개편</span></td>
+    <td class="wh"><b style="color:var(--kill)">4단계 가입이 로컬 1인에게 과합니다.</b> 약관동의·이메일인증·완료화면은 SaaS 흐름 → <b style="color:var(--ik)">「최초 1회 계정 생성」 한 화면으로 압축</b></td></tr>
+  <tr><td class="rt">(auth)/signup/idsearch<br>(auth)/signup/search<br>(auth)/signup/search/reset</td><td><span class="tag kill">폐기</span></td>
+    <td class="wh"><b style="color:var(--kill)">아이디 찾기·비밀번호 찾기·재설정 3화면.</b> 로컬 배포판은 <b style="color:var(--ik)">메일 서버가 없을 수 있고</b>, 자기 컴퓨터의 DB 를 직접 고칠 수 있습니다. 호스팅 전환 시 되살립니다</td></tr>
+</table>
+
+<div class="note">
+  <b>정리하면</b> — 23개 중 <b style="color:var(--kill)">7개를 지우고</b>, <b style="color:var(--fix)">5개를 다른 화면으로 흡수</b>합니다.
+  <b style="color:var(--ik)">독립 화면이 23 → 11개로 줄고</b>, 그중 신규가 1개(실험대)입니다.
+  <br><br>
+  <b style="color:var(--ik)">이게 디자인 작업량을 절반 이하로 줄입니다.</b> 그리고 더 중요한 건 —
+  <b style="color:var(--ik)">「메뉴 관리」를 지우면 셸 개편(S2)의 최대 위험이 사라집니다.</b>
+  지금 권한 게이트가 DB 메뉴에 물려 있어서 iframe 을 걷어내기 어려웠는데, 레일을 코드로 고정하면 그 매듭이 풀립니다.
+</div>
+
+<div class="q">
+  <b>리드 판단 ① — 게스트 초대를 실제로 할 것인가</b>
+  결정 로그가 멀티테넌시를 유지하는 근거로 <b>"읽기전용 게스트 초대"</b>를 들었습니다.
+  <b>할 것이면</b> 권한(author)·사용자(adminuser) 두 화면이 살고, <b>안 할 것이면</b> 둘 다 폐기하고 로그인을 단일 사용자로 단순화합니다.
+  워크스페이스는 어느 쪽이든 전략별 격리 때문에 남습니다.
+</div>
+
+<div class="q">
+  <b>리드 판단 ② — 리서치(문서·챗)에 레일 한 칸을 줄 것인가</b>
+  잘 만들어져 있고 M1 의 산출물이지만 퀀트 실험의 중심은 아닙니다.
+  <b>레일 한 칸</b>을 주면 독립 영역으로 남고, <b>실험대 안 패널</b>로 접으면 "이 종목 관련 내 메모"처럼 곁들여집니다.
+  <b>아예 후순위로 미루는 것</b>도 선택지입니다 — 지금 손대지 않고 그대로 두는 것.
+</div>
+
+<div class="q">
+  <b>리드 판단 ③ — devactivity 를 버려도 되는가</b>
+  계좌목록 + 챗 패널로 된 화면인데, 제가 보기엔 <b>템플릿 데모</b>입니다.
+  다만 리드가 이걸 실제로 쓰고 계셨다면 판단이 다릅니다.
+  붙어 있는 <code>scheduler</code>는 <b>저녁 연구 배치의 실행 기반이라 반드시 살립니다</b> — 「설정」으로 옮깁니다.
+</div>
+</div>

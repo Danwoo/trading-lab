@@ -1,0 +1,446 @@
+<style>
+  .gl { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --ok:#7FA05A; --wr:#D9A441; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .gl .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:12px; overflow:hidden; }
+  .hud { display:flex; align-items:center; height:46px; padding:0 15px; gap:13px; background:var(--pn);
+         border-bottom:1px solid var(--ln); font-size:12.5px; }
+  .hud .wm { font-size:11px; font-weight:700; letter-spacing:.16em; color:var(--is); }
+  .mode { display:flex; align-items:center; gap:7px; padding:4px 11px; border-radius:7px;
+          border:1px solid rgba(127,160,90,.45); background:rgba(127,160,90,.1); font-size:11.5px; color:#9BBE7A; }
+  .mode .dot { width:6px; height:6px; border-radius:50%; background:#9BBE7A; }
+  .mode s { text-decoration:none; color:var(--im); }
+  .mode.live { border-color:rgba(201,74,59,.5); background:rgba(201,74,59,.1); color:#E2837A; }
+  .mode.live .dot { background:#E2837A; }
+  .hud .sp { flex:1; }
+
+  .body { display:flex; min-height:610px; }
+  .main { flex:1; padding:17px 18px; min-width:0; }
+  .side { flex:0 0 296px; border-left:1px solid var(--ln); padding:17px 15px; }
+
+  .sec { font-size:13px; font-weight:700; color:var(--is); margin:0 0 3px; }
+  .secn { font-size:11.5px; color:var(--if); line-height:1.55; margin-bottom:11px; }
+  .sec.m { margin-top:21px; }
+
+  /* 체크리스트 */
+  .ck { display:flex; align-items:flex-start; gap:11px; padding:10px 0; border-bottom:1px solid var(--hl); }
+  .ck:last-child { border-bottom:none; }
+  .ck .m { flex:0 0 17px; height:17px; border-radius:5px; display:flex; align-items:center; justify-content:center;
+           font-size:10px; font-weight:800; margin-top:1px; }
+  .ck .m.y { background:rgba(127,160,90,.2); color:#9BBE7A; border:1px solid rgba(127,160,90,.5); }
+  .ck .m.n { background:var(--rs); color:var(--if); border:1px solid var(--ln); }
+  .ck .bd { flex:1; font-size:12.5px; color:var(--ik); line-height:1.5; }
+  .ck .bd s { display:block; text-decoration:none; font-size:11.5px; color:var(--if); margin-top:2px; line-height:1.5; }
+  .ck .v { flex:0 0 auto; font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .ck .v.y { color:#9BBE7A; } .ck .v.n { color:var(--if); }
+  .ck .go { flex:0 0 auto; font-size:11px; border:1px solid var(--ls); border-radius:7px; padding:4px 10px; color:var(--im); }
+
+  /* 금액 */
+  .amt { border:1px solid var(--ls); background:var(--rs); border-radius:11px; padding:15px 16px; }
+  .amt .t { font-size:13px; font-weight:700; color:var(--is); margin-bottom:3px; }
+  .amt .nt { font-size:11.5px; color:var(--im); line-height:1.6; margin-bottom:13px; }
+  .amt .nt b { color:var(--ik); font-weight:500; }
+  .big { display:flex; align-items:baseline; gap:11px; }
+  .big .v { font-size:33px; font-weight:600; color:var(--is); letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+  .big .of { font-size:13px; color:var(--if); }
+  .calc { margin-top:11px; border:1px solid var(--ln); border-radius:9px; background:var(--bg);
+          padding:11px 12px; font-size:11.5px; color:var(--im); line-height:1.85; font-family:ui-monospace,monospace; }
+  .calc b { color:var(--ik); font-weight:500; }
+  .calc em { font-style:normal; color:#9BBE7A; }
+  .amt .after { font-size:11.5px; color:var(--im); line-height:1.6; margin-top:11px;
+                border-top:1px solid var(--hl); padding-top:10px; }
+  .amt .after b { color:var(--ik); font-weight:500; }
+
+  /* 타이핑 확인 */
+  .typ { border:1px solid rgba(201,74,59,.4); background:rgba(201,74,59,.06); border-radius:11px;
+         padding:14px 15px; margin-top:14px; }
+  .typ .t { font-size:13px; font-weight:700; color:#E2837A; margin-bottom:4px; }
+  .typ .nt { font-size:11.5px; color:var(--im); line-height:1.6; margin-bottom:12px; }
+  .typ .nt b { color:var(--ik); font-weight:500; }
+  .typ .fld { margin-bottom:10px; }
+  .typ .fld label { display:block; font-size:12px; color:var(--ik); margin-bottom:5px; }
+  .typ .fld label s { text-decoration:none; color:var(--if); font-size:11px; }
+  .typ .fld .in { background:var(--bg); border:1px solid #6E3A33; border-radius:8px; padding:8px 11px;
+                  font-size:12.5px; color:var(--is); font-variant-numeric:tabular-nums; }
+  .typ .fld .in.ph { color:var(--if); }
+  .typ .btn { margin-top:12px; text-align:center; font-size:13px; font-weight:600; padding:11px;
+              border-radius:9px; background:var(--rs); border:1px solid var(--ln); color:var(--if); }
+  .typ .foot { font-size:11px; color:var(--if); line-height:1.55; margin-top:9px; }
+
+  /* 미리보기 */
+  .prev { border:1px solid var(--ln); border-radius:10px; padding:12px 13px; background:var(--pn); margin-bottom:11px; }
+  .prev .t { font-size:12px; font-weight:600; color:var(--is); margin-bottom:8px; }
+  .prev .row { display:flex; align-items:center; gap:8px; padding:7px 0; font-size:11.5px; color:var(--im); }
+  .prev .row + .row { border-top:1px solid var(--hl); }
+  .prev .row .k { flex:0 0 76px; color:var(--if); }
+  .prev .row .v { flex:1; color:var(--ik); }
+  .prev .arw { text-align:center; color:var(--if); font-size:11px; padding:3px 0; }
+
+  .card { border:1px solid var(--ln); border-radius:10px; padding:12px 13px; background:var(--pn); margin-bottom:11px; }
+  .card .t { font-size:12px; font-weight:600; color:var(--is); margin-bottom:6px; }
+  .card .x { font-size:11.5px; color:var(--im); line-height:1.6; }
+  .card .x b { color:var(--ik); font-weight:500; }
+
+  .db { max-width:1320px; margin-top:16px; background:var(--pn); border:1px solid var(--ln); border-radius:11px; padding:15px 17px; }
+  .db h4 { margin:0 0 4px; font-size:13px; color:var(--is); font-weight:700; }
+  .db .nt { font-size:12px; color:var(--im); line-height:1.6; margin-bottom:11px; }
+  .db pre { margin:0; font-family:ui-monospace,monospace; font-size:11.5px; line-height:1.75; color:var(--im);
+            background:var(--bg); border:1px solid var(--ln); border-radius:9px; padding:12px 13px; overflow:auto; }
+  .db pre b { color:var(--ik); font-weight:500; }
+  .db pre em { font-style:normal; color:#9BBE7A; }
+  .db pre s { text-decoration:none; color:var(--if); }
+  .db .q { margin-top:11px; padding:10px 12px; border-left:2px solid #D9A441; background:rgba(217,164,65,.07);
+           border-radius:0 8px 8px 0; font-size:12px; color:var(--im); line-height:1.6; }
+  .db .q b { color:#D9B45C; display:block; margin-bottom:3px; }
+
+  .gb { font-size:10.5px;padding:3px 7px;border-radius:5px;border:1px solid var(--ln);
+        color:var(--if);background:var(--bg2);transition:all .15s }
+  .gb.ok { color:#9BBE7A;border-color:rgba(127,160,90,.45);background:rgba(127,160,90,.1) }
+  .gb.no { color:#E2837A;border-color:rgba(201,74,59,.45);background:rgba(201,74,59,.1) }
+  @keyframes gpulse { 0%,100%{opacity:.55} 50%{opacity:1} }
+</style>
+
+<div class="gl">
+<h2 style="color:#F5F3EF">실전 전환 — 계좌 한계선이 금액을 정합니다</h2>
+<p class="subtitle" style="color:#8B877F">
+  <b style="color:#E6E4E0">금액은 사용자가 정합니다. 이 화면은 막지 않습니다.</b>
+  대신 <b style="color:#E6E4E0">적은 금액이 무엇을 뜻하는지</b>를 그 자리에서 전부 보여주고, 적은 그대로 기록합니다.
+  시스템이 미리 거는 상한은 없습니다 — 유일하게 남는 선은 <b style="color:#E6E4E0">평온할 때 본인이 적어 둔 손실 한계선</b>뿐입니다.
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span>
+    <span class="mode"><span class="dot"></span><b>모의</b><s>실제 주문 나가지 않음 · 연결된 계좌 없음 · 오늘 나간 주문 <b style="color:var(--ik)">0</b>건</s></span>
+    <div class="sp"></div>
+    <span style="font-size:12px;color:var(--is);font-weight:600">대형주봇</span>
+    <span style="font-size:11.5px;color:var(--im)">모의 47일째</span>
+  </div>
+
+  <div class="body">
+    <div class="main">
+      <div class="sec">지금 준비된 것</div>
+      <div class="secn">아래 항목 중 <b style="color:var(--im)">주문 키만 없으면 물리적으로 못 넘어갑니다</b> (키가 없으면 주문이 안 나갑니다).
+        <b style="color:var(--im)">나머지는 전부 판단 재료</b>입니다 — 몇 개를 채웠든 넘어갈 수 있습니다.<br>
+        <span style="color:#D9B45C">「내 기준」 6개는 <b>당신이 스스로 만든 잣대</b>이지 통과 조건이 아닙니다.
+        덜 채운 채로 가시겠다면 <b>덜 채웠다는 사실이 기록에 남습니다.</b></span></div>
+
+      <div class="ck">
+        <span class="m n">·</span>
+        <div class="bd">주문 권한이 있는 증권사 키
+          <s>지금 등록된 건 <b style="color:var(--ik)">조회 전용</b>입니다. 주문 키는 따로 발급받아야 합니다 —
+            <b style="color:#E2837A">이것만은 없으면 아예 못 넘어갑니다.</b><br>
+            등록 화면은 <b style="color:var(--ik)">여기서만 열립니다</b> — 미리 등록해 두고 나중에 그냥 통과하는 걸 막기 위해서입니다</s></div>
+        <span class="go" style="border-color:#6E3A33;color:#E2837A">지금 등록 →</span>
+      </div>
+      <div class="ck">
+        <span class="m n">·</span>
+        <div class="bd">모의로 쌓은 거래
+          <s>날짜가 아니라 거래 수로 셉니다 — 봇이 놀아도 날짜는 갑니다</s></div>
+        <span class="v n">131건</span>
+      </div>
+      <div class="ck">
+        <span class="m n">·</span>
+        <div class="bd">내 합격 기준 6개 중 통과
+          <s>「모의 표본」과 「수익 몰린 정도」 둘이 내 기준에 못 미칩니다 — 막는 건 아닙니다</s></div>
+        <span class="v n" style="color:#E2837A">4 / 6</span>
+      </div>
+      <div class="ck" style="background:rgba(201,74,59,.05);margin:0 -18px;padding-left:18px;padding-right:18px">
+        <span class="m" style="background:rgba(201,74,59,.18);color:#E2837A;border:1px solid rgba(201,74,59,.5)">!</span>
+        <div class="bd">컴퓨터가 꺼져 있을 때의 대비
+          <s><b style="color:#E2837A">이 봇은 컴퓨터가 켜져 있을 때만 지킵니다.</b>
+            노트북을 닫으면 손절도, 한계선 자동 정지도 돌지 않습니다 —
+            지난 47일 중 <b style="color:var(--ik)">14번</b> 그런 일이 있었습니다.<br>
+            24시간 지키려면 <b style="color:var(--ik)">증권사에 예약 손절을 따로 걸어야</b> 합니다.
+            봇이 사는 순간 같은 종목에 −7% 예약 매도를 함께 내는 방식입니다</s></div>
+        <span class="go" style="border-color:#6E3A33;color:#E2837A">예약 손절 켜기 →</span>
+      </div>
+
+      <div class="ck">
+        <span class="m y">✓</span>
+        <div class="bd">손실 한계선을 적어 두었나
+          <s>−160만원 · <b style="color:var(--ik)">"전부 정리하고 3개월 쉰다"</b> · 08-09에 평온할 때 적음</s></div>
+        <span class="v y">적음</span>
+      </div>
+
+      <!-- 계좌 한계선에서 역산 -->
+      <div class="sec m">내 계좌 한계선을 넘지 않으려면</div>
+      <div class="secn">한계선은 <b style="color:var(--im)">봇마다가 아니라 계좌 하나</b>에 겁니다 —
+        봇별로 두면 「금액을 줄이면 한계선도 줄어」 식이 순환해 답이 안 나옵니다.</div>
+
+      <div class="amt">
+        <div class="t">얼마를 넣을지 정하기 전에 — 이 봇에 대해 아는 것 전부</div>
+        <div class="nt">
+          <b style="color:var(--ik)">여기에 상한은 없습니다.</b> 아래는 판단 재료이고, 금액은 다음 칸에서 직접 적으십시오.
+        </div>
+
+        <div class="calc" style="font-size:12px;font-family:Pretendard,sans-serif">
+          <div style="display:flex;align-items:baseline;gap:9px;padding:6px 0;border-bottom:1px solid var(--hl)">
+            <span style="flex:1;color:var(--ik)">이 봇이 과거에 까였던 최대 폭</span>
+            <span style="color:var(--is);font-weight:600">14.2%</span></div>
+          <div style="display:flex;align-items:baseline;gap:9px;padding:6px 0;border-bottom:1px solid var(--hl)">
+            <span style="flex:1;color:var(--ik)">그 숫자를 뒷받침하는 증거
+              <s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">131번 거래했지만 번 돈의 88%가 3종목에서 나왔습니다</s></span>
+            <span style="color:#E2837A;font-weight:600">9건어치</span></div>
+          <div style="display:flex;align-items:baseline;gap:9px;padding:6px 0;border-bottom:1px solid var(--hl)">
+            <span style="flex:1;color:var(--ik)">내가 적어 둔 손실 한계선</span>
+            <span style="color:var(--is);font-weight:600">−160만원</span></div>
+          <div style="display:flex;align-items:baseline;gap:9px;padding:6px 0">
+            <span style="flex:1;color:var(--ik)">그 선까지 남은 거리
+              <s style="display:block;text-decoration:none;font-size:10.5px;color:#D9B45C">고점 1,730만에서 이미 58만원 내려와 있습니다 — 한계선의 36%를 썼습니다</s></span>
+            <span style="color:#D9B45C;font-weight:600">102만원</span></div>
+
+          <div style="margin-top:11px;padding-top:10px;border-top:1px solid var(--ln);color:var(--im);
+                      font-size:11.5px;line-height:1.6">
+            <b style="color:var(--ik)">「9건어치」가 무슨 뜻인가</b> —
+            시험을 131번 봤는데 점수의 88%가 3문제에서 나온 것과 같습니다.
+            <span style="color:var(--if)">번 돈의 비중으로 세면 실제로 결과를 만든 건
+            <b style="color:var(--im)">2.83종목</b>어치입니다(41종목 중).
+            <b style="color:var(--ik)">131 × (2.83 ÷ 41) = 9건</b> —
+            그 3종목이 반대로 갔으면 결과가 통째로 뒤집혔을 테니 그만큼 덜 믿습니다.</span>
+          </div>
+
+          <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--ln);color:var(--im);
+                      font-size:11.5px;line-height:1.6">
+            <b style="color:var(--ik)">한계선(남은 102만원)이 정확히 닿는 금액</b>
+            <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap">
+              <span>과거만큼 까이면 <b style="color:var(--ik)">718만원</b></span>
+              <span style="color:var(--ln)">·</span>
+              <span>2배 깊어지면 <b style="color:var(--ik)">359만원</b></span>
+              <span style="color:var(--ln)">·</span>
+              <span>4배 깊어지면 <b style="color:var(--ik)">180만원</b></span>
+            </div>
+            <span style="color:var(--if);display:block;margin-top:6px">
+              <b style="color:var(--im)">몇 배까지 각오할지에 정해진 답은 없습니다.</b>
+              증거가 9건뿐이라 「과거만큼만 까인다」에 걸기는 얇습니다 — 그 판단은 사용자 것입니다.</span>
+          </div>
+        </div>
+
+        <div style="margin-top:11px;padding-top:10px;border-top:1px solid var(--hl);font-size:11.5px;
+                    color:var(--im);line-height:1.6">
+          <b style="color:var(--ik)">봇을 여러 개 돌리신다면</b> —
+          지금 이 계좌에 실전으로 나가 있는 건 <b style="color:var(--ik)">0원</b>입니다(대형주봇·눌림목봇 둘 다 모의).
+          <span style="color:var(--if)">한계선 <b style="color:var(--im)">−160만원은 계좌 하나에 걸린 선</b>이라,
+          봇마다 따로 주어지지 않습니다. 둘이 같이 까이면 같이 그 선을 향합니다 —
+          위 「남은 거리 102만원」은 <b style="color:var(--im)">모든 봇이 나눠 쓰는 하나의 여유</b>입니다.</span>
+        </div>
+
+        <div class="after">
+          <b>이 계산을 좋게 만드는 길</b>
+          — 종목을 늘리거나 · 상관 낮은 종목을 섞거나 · 포지션을 줄이거나 · 손절을 조이거나 · 거래를 더 쌓거나.<br>
+          <span style="color:var(--if)"><b style="color:#E2837A">파라미터를 다시 돌려 낙폭 작은 조합을 고르는 것은 이 목록에 없습니다.</b>
+          그건 봇을 고친 게 아니라 운 좋은 조합을 찾은 것이고, 다시 돌린 만큼
+          <b style="color:var(--im)">「설정 바꿔본 횟수」</b>가 올라가 증거는 오히려 얇아집니다.</span>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;border:1px solid rgba(201,74,59,.4);background:rgba(201,74,59,.07);
+           border-radius:10px;padding:12px 13px;font-size:12px;color:var(--im);line-height:1.65">
+        <b style="color:#E2837A;display:block;margin-bottom:4px">먼저 알아두실 것 — 적게 넣어도 봇이 나아지지는 않습니다</b>
+        적게 넣으면 <b style="color:var(--ik)">계좌가 받는 충격</b>이 줄 뿐, 이 봇이 까이는 <b style="color:var(--ik)">비율 14.2%</b> 는 그대로입니다.
+        <span style="color:var(--if)">— 봇을 실제로 낫게 만드는 건 종목을 늘리거나 손절을 조이는 쪽이고,
+        금액은 <b style="color:var(--im)">「이번에 얼마까지 잃어도 되나」</b>를 정하는 것뿐입니다.
+        둘을 섞지 마십시오 — 작게 넣었다고 검증이 끝난 봇이 되지는 않습니다.</span>
+      </div>
+
+      <!-- 손으로 -->
+      <div class="typ">
+        <div class="t">넘어가기 전에 두 가지를 손으로 적으십시오</div>
+        <div class="nt">
+          고르는 게 아니라 적습니다. <b>클릭한 동의는 기억에 안 남습니다.</b>
+          여기 적은 것은 전환 시점의 성적과 함께 통째로 기록되고, 나중에 되짚을 수 있습니다.
+        </div>
+        <div class="fld">
+          <label>① 이 봇에 넣을 실제 금액 <s>상한 없습니다 — 적으시면 그게 무엇을 뜻하는지 아래에 나옵니다</s></label>
+          <div class="in ph">얼마를 넣으시겠습니까</div>
+          <div style="margin-top:9px;border:1px solid var(--ln);border-radius:8px;background:var(--bg);padding:11px 12px">
+            <div style="font-size:11px;color:var(--if)">적으시면 여기에 이렇게 나옵니다 — <b style="color:var(--im)">300만원을 적었을 때</b></div>
+            <div style="margin-top:7px;font-size:12px;font-family:Pretendard,sans-serif">
+              <div style="display:flex;gap:9px;padding:4px 0;border-bottom:1px solid var(--hl)">
+                <span style="flex:1;color:var(--im)">과거만큼(14.2%) 까이면</span>
+                <span style="color:var(--ik);font-weight:600">−43만원</span>
+                <span style="flex:0 0 96px;text-align:right;color:var(--im)">남은 거리의 42%</span></div>
+              <div style="display:flex;gap:9px;padding:4px 0;border-bottom:1px solid var(--hl)">
+                <span style="flex:1;color:var(--im)">2배 깊어지면</span>
+                <span style="color:var(--ik);font-weight:600">−85만원</span>
+                <span style="flex:0 0 96px;text-align:right;color:#D9B45C">84%</span></div>
+              <div style="display:flex;gap:9px;padding:4px 0">
+                <span style="flex:1;color:#E2837A">4배 깊어지면</span>
+                <span style="color:#E2837A;font-weight:600">−170만원</span>
+                <span style="flex:0 0 96px;text-align:right;color:#E2837A">167% — 넘습니다</span></div>
+            </div>
+            <div style="font-size:11.5px;color:var(--im);line-height:1.55;margin-top:8px;
+                        border-top:1px solid var(--hl);padding-top:8px">
+              <b style="color:var(--ik)">4배 쪽이 오면 「전부 정리하고 3개월 쉰다」고 08-09에 적으셨습니다.</b><br>
+              <span style="color:var(--if)">— 남이 쓴 경고는 배경이 되지만, 리드가 쓰신 문장은 아직 아닙니다.
+              그래서 이 자리에 그걸 꺼냅니다. <b style="color:var(--im)">막지는 않습니다.</b></span></div>
+          </div>
+        </div>
+        <div class="fld">
+          <label>② 내가 지금 무엇을 믿고 넘어가는지 <s>미래의 내가 읽을 문장입니다 — 예시를 두지 않습니다</s></label>
+          <div class="in ph" style="min-height:44px">직접 쓰십시오. <span style="color:#6E3A33">잘 쓰인 예시가 있으면 그걸 베끼게 되고,
+            그 순간 이 칸은 손으로 적는 자리가 아니라 동의 버튼이 됩니다.</span></div>
+        </div>
+        <div class="btn" style="border-color:rgba(201,74,59,.35);color:#8B6862">
+          실제 돈으로 전환 — <b style="color:#E2837A">주문 권한 키가 없어 잠겨 있습니다</b></div>
+        <div style="font-size:11px;color:var(--if);text-align:center;margin-top:6px">
+          키를 등록하면 위 두 칸을 채우는 것으로 열립니다</div>
+        <div class="foot">
+          누르는 순간 <b style="color:var(--ik)">지금 화면의 모든 숫자</b>가 스냅샷으로 저장됩니다 —
+          성적·기준 판정·통과 여부·적어 넣은 문장까지. 나중에 이 봇이 안 됐을 때
+          <b style="color:var(--ik)">무엇을 알고도 넘어갔는지</b>가 남습니다.
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="prev" style="border-color:rgba(217,164,65,.35)">
+        <div class="t" style="color:#D9B45C">한계선 막대는 0에서 다시 시작합니다</div>
+        <div style="font-size:11.5px;color:var(--im);line-height:1.6">
+          모의에서 쓰던 막대는 <b style="color:var(--ik)">여기서 끝납니다.</b> 실전 막대는 새로 그립니다 —
+          모양도 색도 다릅니다.<br><br>
+          <div style="border:1px solid var(--ln);border-radius:8px;background:var(--bg);padding:10px 11px">
+            <div style="font-size:11px;color:var(--if)">다만 이건 넘어갑니다</div>
+            <div style="font-size:13px;color:#E2837A;font-weight:600;margin-top:3px">
+              모의에서 최대 <b>71%</b>까지 갔었습니다</div>
+            <div style="font-size:11px;color:var(--im);line-height:1.5;margin-top:3px">
+              7월 17일. 실전에서 같은 일이 생기면 <b style="color:var(--ik)">−114만원</b>입니다.</div>
+          </div>
+          <span style="color:var(--if);display:block;margin-top:8px">
+            — 가짜 돈으로 태운 막대를 매일 보면 <b style="color:var(--im)">실전에서 그게 익숙한 가구가 됩니다.</b>
+            그래서 막대는 리셋하되, <b style="color:var(--im)">얼마나 갔었는지는 숫자로 남깁니다.</b></span>
+        </div>
+      </div>
+
+      <div class="prev">
+        <div class="t">넘어가면 이렇게 바뀝니다</div>
+        <div style="margin:5px 0 3px">
+          <span class="mode" style="font-size:10.5px"><span class="dot"></span><b>모의</b><s>주문 0건</s></span>
+        </div>
+        <div class="arw">↓</div>
+        <div style="margin:3px 0 9px">
+          <span class="mode live" style="font-size:10.5px"><span class="dot"></span><b>실전</b><s>KIS 5012**** · 오늘 3건</s></span>
+        </div>
+        <div class="row"><span class="k">주문</span><span class="v">실제로 나갑니다</span></div>
+        <div class="row"><span class="k">계좌</span><span class="v">화면에 번호가 뜹니다</span></div>
+        <div class="row"><span class="k">주문 수</span><span class="v">0 고정이 아니게 됩니다</span></div>
+        <div style="font-size:11px;color:var(--if);line-height:1.55;margin-top:9px;padding-top:9px;border-top:1px solid var(--hl)">
+          <b style="color:var(--im)">주문 카운터가 0에서 움직이는 것</b>이 실전이 됐다는 가장 확실한 증거입니다.
+          매일 그 숫자를 보게 됩니다.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="t">모의는 멈추지 않습니다</div>
+        <div class="x">
+          넘어간 뒤에도 <b>같은 봇의 모의가 나란히 계속</b> 돕니다.<br><br>
+          <span style="color:var(--if)">모의 47일: +4.5%<br>실전 &nbsp;0일: —</span><br><br>
+          이 두 줄의 차이가 벌어지는 것이 <b>대부분의 봇이 죽는 자리</b>입니다.
+          같은 규칙인데 결과가 다르면 전략이 아니라 <b>체결·환경 문제</b>입니다.
+        </div>
+      </div>
+
+      <div class="card" style="border-color:rgba(217,164,65,.35)">
+        <div class="t" style="color:#D9B45C">한계선에 닿으면 무엇을 할지</div>
+        <div class="x">
+          <b>닿는 순간 물어보지 않습니다</b> — 그때 물으면 그건 정지가 아니라 대화상자입니다. 지금 골라 두십시오.
+          <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px">
+            <span style="border:1px solid var(--is);background:var(--is);color:var(--bg);border-radius:7px;
+                         padding:6px 10px;font-size:11.5px;font-weight:600">전부 팔고 멈춤</span>
+            <span style="border:1px solid var(--ln);border-radius:7px;padding:6px 10px;font-size:11.5px;color:var(--im)">
+              3일에 나눠 팔고 멈춤</span>
+            <span style="border:1px solid var(--ln);border-radius:7px;padding:6px 10px;font-size:11.5px;color:var(--im)">
+              그대로 두고 새로 사는 것만 멈춤 <span style="color:var(--if)">(손절은 계속 나감)</span></span>
+          </div>
+          <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--hl);color:var(--if);font-size:11px">
+            <b style="color:var(--im)">모의에서는 안 걸립니다</b> — 걸리면 90일을 못 채웁니다.
+            모의는 막대만 보여주고, 실전에서만 스위치가 됩니다.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="t">되돌아올 수 있습니다</div>
+        <div class="x">
+          실전에서 모의로 되돌리는 건 언제든 됩니다 — <b>들고 있는 것을 정리할지 그대로 둘지</b>만 고르면 됩니다.<br><br>
+          <b style="color:#D9B45C">다만 되돌리기 쉽다는 게 넘어가기 쉽다는 뜻은 아닙니다.</b>
+          가장 되돌리고 싶은 순간은 <b>물려 있을 때</b>이고, 그때 되돌리면 손실이 확정됩니다 — 그게 어려운 부분입니다.
+          <br><br><span style="color:var(--if)">되돌린 것도 이력에 남습니다. 부끄러운 기록이 아니라, 나중에 「왜 그때 뺐더라」를 알 수 있게 하는 것입니다.</span>
+        </div>
+      </div>
+
+      <div class="card" style="border-color:rgba(201,74,59,.35)">
+        <div class="t" style="color:#E2837A">이건 못 막습니다</div>
+        <div class="x">
+          실전에서 <b>사람이 손절을 취소하는 것</b>은 도구가 막을 수 없습니다.
+          손실 경험자가 "그 두 번이 손실의 절반이었다"고 한 것이 이것입니다.<br><br>
+          <span style="color:var(--if)">할 수 있는 건 하나 — 손댄 것을 전부 기록해 거래 로그에
+          <b style="color:var(--im)">「봇이 한 것」과 「내가 손댄 것」을 나눠서</b> 보여주는 것입니다.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="db">
+  <h4>이 화면이 요구하는 표</h4>
+  <p class="nt">
+    이 화면의 본질은 버튼이 아니라 <b style="color:var(--ik)">스냅샷</b>입니다.
+    「무엇을 알고도 넘어갔는가」를 나중에 복원할 수 없으면 이 화면은 그냥 확인 대화상자일 뿐입니다.
+  </p>
+  <pre><b>tn_bot_mode_log</b>  <s>— 모드 전환 이력. 전환 시점을 통째로 얼려 둔다</s>
+  log_id · bot_id · <em>from_mode</em> · <em>to_mode</em> <s>(paper→live, live→paper)</s> · changed_at
+  <em>capital_amount</em> <s>(넣기로 한 실제 금액 — 손으로 적은 값)</s>
+  <s>상한 컬럼은 없다 — 시스템이 상한을 걸지 않기로 했다(리드 결정 2026-08-09).</s>
+  <em>reference_snapshot</em> <s>(JSON. 그때 화면이 보여준 판단 재료를 통째로 얼린다:</s>
+  <s>{realized_mdd, mdd_source, trade_n, effective_symbol_n, symbol_n, effective_sample_n,</s>
+  <s> account_limit, account_peak, headroom, breakeven_amounts:{x1,x2,x4}})</s>
+  <s>사용자가 적은 금액이 그때 무엇을 뜻했는지 복원하려면 이게 있어야 한다 —</s>
+  <s>tn_bot_risk_measure 는 「지금 값」이라 그 사이 바뀌어 있다.</s>
+  <em>headroom_multiple_at_entry</em> <s>(적은 금액 ÷ 한계선이 닿는 금액. 300만/718만 = 0.42배)</s>
+  <s>「근거를 몇 배 넘겨 적었나」가 한 숫자로 남아야 나중에 패턴이 보인다.</s>
+  <em>belief_text</em> <s>(무엇을 믿고 넘어가는지 — 손으로 적은 문장)</s>
+  <em>gate_snapshot</em> <s>(JSON: 6개 기준의 임계값·관측값·통과여부를 그대로)</s>
+  <em>perf_snapshot</em> <s>(JSON: 그때 성적 — 수익·낙폭·회복기간·거래수·승률)</s>
+  <em>paper_days</em> · <em>trials_count</em>
+  <s>스냅샷을 JSON 으로 박는 이유 — 기준 항목이 나중에 늘어도 과거 전환 기록이 깨지지 않는다.</s>
+  <s>조인해서 다시 계산하면 그때 기준이 아니라 지금 기준으로 재평가돼 기록의 의미가 사라진다.</s>
+
+<b>tn_broker_credential</b>  <s>— 증권사 키. 조회 전용과 주문 권한을 반드시 나눈다</s>
+  cred_id · user_id · broker <s>(kis|toss)</s> · <em>scope</em> <s>(read|trade)</s> · account_masked
+  <em>scope_verified_at</em> · <em>verification_method</em> · <em>last_verified_result</em>
+  <s>← scope 가 자기신고 값이면 무의미하다. 등록 직후 실제로 확인해야 하고,</s>
+  <s>한 번 확인하고 끝내면 나중에 권한이 회수돼도 그대로 실전에 남는다</s>
+  <s>(브로커 권한 조회, 없으면 즉시취소 주문 프로브). 안 하면 "주문 키 등록됨 ✓"인데</s>
+  <s>실제로는 조회 키인 상태로 실전에 넘어간다.</s>
+  <em>is_mock_account</em> <s>← KIS 는 모의투자와 실전이 도메인·계좌체계가 다르다.</s>
+  <s>이걸 헷갈리면 「실전으로 전환했는데 실은 모의」가 되고, 이 제품에서 가장 조용하고 나쁜 실패다 —</s>
+  <s>이 화면이 "주문 카운터가 0에서 움직이는 것이 실전의 증거"라고 하는데 모의 계좌도 카운터는 움직인다.</s>
+  <s>실제 키는 .env — 이 표는 「무엇이 연결돼 있나」만 안다 (FR-012 대로 DB에 키를 담지 않는다)</s>
+
+<b>tn_trade</b> <s>확장 — 거래 로그와 같은 표에 한 컬럼</s>
+  <em>actor</em> <s>(bot|human) — 봇이 한 것과 사람이 손댄 것을 나눈다</s>
+  <em>overridden_from</em> <s>(사람이 봇 결정을 뒤집었을 때 원래 무엇이었나)</s>
+  <s>손절 취소는 막을 수 없지만, 나눠서 보여줄 수는 있다. 손실 경험자가 지목한 실패의 자리.</s></pre>
+
+  <div class="q" style="border-left-color:#7FA05A;background:rgba(127,160,90,.06)">
+    <b style="color:#9BBE7A">결정 — 시스템이 거는 금액 상한을 없앱니다 (리드, 2026-08-09)</b>
+    <b style="color:var(--ik);display:inline">"이런 건 사람이 직접 결정하게 둬야 하는 것 아닙니까?"</b>
+    맞습니다. 금액은 사용자 돈이고, 계산된 상한으로 막던 구조를 걷어냈습니다.
+    <br><br>남기는 선은 <b style="color:var(--ik);display:inline">평온할 때 본인이 적어 둔 손실 한계선</b> 하나뿐입니다 —
+    그건 시스템의 제약이 아니라 <b style="color:var(--ik);display:inline">자기 자신에게 한 약속</b>이고,
+    직접 바꿀 수 있으며 바꾼 이력이 남습니다.
+    <br><br><b style="color:var(--ik);display:inline">계산은 없애지 않고 역할만 바꿨습니다</b> — 한도가 아니라 판단 재료입니다.
+    「한계선이 닿는 금액」 3종과 「증거가 몇 건어치인가」를 보여주고, 적은 금액이 그것을 몇 배 넘는지
+    (<b style="color:var(--ik);display:inline">headroom_multiple_at_entry</b>) 기록에 남깁니다.
+    <br><br><span style="color:#D9B45C">이 결정으로 함께 걷어낸 것 — 게이트가 실전 전환을 막던 구조(주문 키만 물리적 필수),
+    기준 슬라이더(「통과시키는 방법」을 인쇄해 두는 물건이라 「내 기준」 화면이 이미 거부한 것),
+    가동률 캡(병목이 될 수 없어 예약 손절의 유인이 0원이던 것).</span>
+  </div>
+</div>
+</div>
+</div>
+

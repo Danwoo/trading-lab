@@ -1,0 +1,179 @@
+<style>
+  .wa { font-family:Pretendard,system-ui,sans-serif; }
+  .wa-duo { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:18px 0 8px; }
+  @media (max-width:1000px){ .wa-duo{grid-template-columns:1fr;} }
+  .wa-cap { font-size:13px; font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .wa-cap s { text-decoration:none; font-weight:400; font-size:11.5px; opacity:.6; }
+
+  .t { background:#0D0F11; border:1px solid #262B30; border-radius:11px; overflow:hidden; position:relative; }
+  .t .top { display:flex; align-items:center; gap:10px; padding:0 12px; height:38px; background:#16191C; border-bottom:1px solid #262B30; }
+  .t .wm { font-size:10.5px; font-weight:700; letter-spacing:.15em; }
+  .t .srch { flex:0 0 130px; height:24px; border:1px solid #262B30; border-radius:6px; background:#0D0F11; display:flex; align-items:center; padding:0 8px; font-size:10px; color:#8B877F; }
+  .t .who { margin-left:auto; font-size:10px; color:#8B877F; }
+
+  .t .body { display:flex; height:250px; }
+  .t .side { flex:0 0 150px; border-right:1px solid #262B30; background:#16191C; }
+  .t .tabs { display:flex; border-bottom:1px solid #262B30; }
+  .t .tabs div { flex:1; text-align:center; font-size:9.5px; padding:7px 0; color:#8B877F; }
+  .t .row { display:flex; align-items:center; padding:6px 9px; font-size:10px; border-left:2px solid transparent; font-variant-numeric:tabular-nums; }
+  .t .row b { flex:1; font-weight:400; color:#E6E4E0; }
+  .t .row u { text-decoration:none; width:44px; text-align:right; }
+  .t .sep { height:1px; background:rgba(38,43,48,.8); }
+
+  .t .main { flex:1; padding:10px; display:flex; flex-direction:column; gap:9px; min-width:0; }
+  .t .p { background:#16191C; border:1px solid #262B30; border-radius:9px; box-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.24); }
+  .t .ph { display:flex; align-items:center; gap:7px; padding:9px 11px 0; }
+  .t .pt { font-size:11px; font-weight:700; color:#F2F0EC; }
+  .t .pb { padding:6px 11px 11px; }
+  .t .px { font-size:23px; font-weight:700; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1.1; }
+  .t .kv { display:flex; justify-content:space-between; font-size:10px; padding:4px 0; font-variant-numeric:tabular-nums; color:#E6E4E0; }
+  .t .kv span:first-child { color:#8B877F; }
+  .t .bdg { font-size:9px; padding:2px 6px; border-radius:4px; border:1px solid; margin-left:auto; }
+  .t .btn { display:inline-block; font-size:10.5px; font-weight:500; padding:5px 11px; border-radius:7px; border:1px solid; margin-top:8px; }
+
+  /* 번호 표식 */
+  .mk { position:absolute; width:17px; height:17px; border-radius:50%; background:#E6E4E0; color:#0D0F11;
+        font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; z-index:5;
+        box-shadow:0 0 0 2px #0D0F11, 0 2px 6px rgba(0,0,0,.6); }
+
+  .lst { margin-top:14px; font-size:12.5px; line-height:1.7; }
+  .lst .li { display:flex; gap:10px; padding:7px 0; border-bottom:1px solid rgba(128,128,128,.18); }
+  .lst .li i { flex:0 0 19px; height:19px; border-radius:50%; background:#C79A3C; color:#0D0F11; font-size:10.5px; font-weight:800; display:flex; align-items:center; justify-content:center; font-style:normal; }
+  .lst .li div { flex:1; }
+  .lst .li b { display:block; }
+  .lst .li s { text-decoration:none; opacity:.65; font-size:11.5px; }
+</style>
+
+<div class="wa">
+<h2>액센트 = 이만큼입니다</h2>
+<p class="subtitle">
+  같은 화면 두 벌입니다. 왼쪽엔 액센트가 있고, 오른쪽엔 없습니다.
+  <b>번호가 붙은 다섯 곳이 액센트의 전부</b>입니다 — 나머지는 전부 무채이거나 등락색입니다.
+</p>
+
+<div class="wa-duo">
+
+<!-- ══ 액센트 있음 ══ -->
+<div>
+  <div class="wa-cap" style="color:#C79A3C">액센트 있음 <s>(예시: 황동)</s></div>
+  <div class="t">
+    <div class="mk" style="left:52px; top:57px">1</div>
+    <div class="mk" style="left:10px; top:82px">2</div>
+    <div class="mk" style="left:196px; top:236px">3</div>
+    <div class="mk" style="left:305px; top:104px">4</div>
+    <div class="mk" style="left:62px; top:10px">5</div>
+
+    <div class="top">
+      <span class="wm" style="color:#C79A3C">TRADING LAB</span>
+      <div class="srch" style="outline:1.5px solid #C79A3C; outline-offset:2px">종목 검색</div>
+      <span class="who">장중 14:32</span>
+    </div>
+    <div class="body">
+      <div class="side">
+        <div class="tabs">
+          <div style="color:#F2F0EC;font-weight:700;box-shadow:inset 0 -1.5px 0 #C79A3C">관심종목</div><div>보유</div><div>스크리너</div>
+        </div>
+        <div class="row" style="background:#1C2126;border-left-color:#C79A3C"><b style="color:#F2F0EC;font-weight:500">삼성전자</b><u style="color:#DB4F3E">+1.71%</u></div>
+        <div class="sep"></div>
+        <div class="row"><b>SK하이닉스</b><u style="color:#DB4F3E">+3.04%</u></div><div class="sep"></div>
+        <div class="row"><b>NAVER</b><u style="color:#4A8CC8">-0.85%</u></div><div class="sep"></div>
+        <div class="row"><b>카카오</b><u style="color:#4A8CC8">-2.11%</u></div><div class="sep"></div>
+        <div class="row"><b>현대차</b><u style="color:#4A8CC8">-1.20%</u></div>
+      </div>
+      <div class="main">
+        <div class="p" style="flex:1">
+          <div class="ph"><span class="pt">종목 정보</span>
+            <span class="bdg" style="color:#C79A3C;border-color:rgba(199,154,60,.45);background:rgba(199,154,60,.1)">임시 데이터</span></div>
+          <div class="pb">
+            <div class="px" style="color:#DB4F3E">71,400</div>
+            <div style="font-size:10.5px;color:#DB4F3E;margin-top:1px" class="kv"><span style="color:#DB4F3E">▲ 1,200 (+1.71%)</span></div>
+            <div style="margin-top:5px">
+              <div class="kv" style="border-bottom:1px solid rgba(38,43,48,.8)"><span>거래량</span><span>12,847,301</span></div>
+              <div class="kv" style="border-bottom:1px solid rgba(38,43,48,.8)"><span>시가총액</span><span>426.1조</span></div>
+              <div class="kv"><span>PER</span><span>13.4</span></div>
+            </div>
+            <span class="btn" style="background:linear-gradient(180deg,#2E353B,#242A30);border-color:#7A6026;color:#E3BC6A;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)">관심종목 추가</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 액센트 없음 ══ -->
+<div>
+  <div class="wa-cap" style="color:#8B877F">액센트 없음 <s>(C1 강철 — 전부 무채)</s></div>
+  <div class="t">
+    <div class="top">
+      <span class="wm" style="color:#F2F0EC">TRADING LAB</span>
+      <div class="srch" style="outline:1.5px solid #E6E4E0; outline-offset:2px">종목 검색</div>
+      <span class="who">장중 14:32</span>
+    </div>
+    <div class="body">
+      <div class="side">
+        <div class="tabs">
+          <div style="color:#F5F3EF;font-weight:700;box-shadow:inset 0 -1.5px 0 #F5F3EF">관심종목</div><div>보유</div><div>스크리너</div>
+        </div>
+        <div class="row" style="background:#1C2126;border-left-color:#F5F3EF"><b style="color:#F2F0EC;font-weight:500">삼성전자</b><u style="color:#DB4F3E">+1.71%</u></div>
+        <div class="sep"></div>
+        <div class="row"><b>SK하이닉스</b><u style="color:#DB4F3E">+3.04%</u></div><div class="sep"></div>
+        <div class="row"><b>NAVER</b><u style="color:#4A8CC8">-0.85%</u></div><div class="sep"></div>
+        <div class="row"><b>카카오</b><u style="color:#4A8CC8">-2.11%</u></div><div class="sep"></div>
+        <div class="row"><b>현대차</b><u style="color:#4A8CC8">-1.20%</u></div>
+      </div>
+      <div class="main">
+        <div class="p" style="flex:1">
+          <div class="ph"><span class="pt">종목 정보</span>
+            <span class="bdg" style="color:#A9A59D;border-color:#3A4249;background:#1C2126">임시 데이터</span></div>
+          <div class="pb">
+            <div class="px" style="color:#DB4F3E">71,400</div>
+            <div style="font-size:10.5px;margin-top:1px" class="kv"><span style="color:#DB4F3E">▲ 1,200 (+1.71%)</span></div>
+            <div style="margin-top:5px">
+              <div class="kv" style="border-bottom:1px solid rgba(38,43,48,.8)"><span>거래량</span><span>12,847,301</span></div>
+              <div class="kv" style="border-bottom:1px solid rgba(38,43,48,.8)"><span>시가총액</span><span>426.1조</span></div>
+              <div class="kv"><span>PER</span><span>13.4</span></div>
+            </div>
+            <span class="btn" style="background:linear-gradient(180deg,#2E353B,#242A30);border-color:#434C54;color:#F5F3EF;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)">관심종목 추가</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="lst">
+  <div class="li"><i>1</i><div><b>활성 탭 밑줄</b><s>지금 보고 있는 탭이 무엇인지</s></div></div>
+  <div class="li"><i>2</i><div><b>선택된 종목 행의 왼쪽 세로선</b><s>지금 고른 종목이 무엇인지</s></div></div>
+  <div class="li"><i>3</i><div><b>기본 동작 버튼의 테두리·글자</b><s>이 화면에서 가장 하고 싶은 행동 하나</s></div></div>
+  <div class="li"><i>4</i><div><b>임시 데이터 배지</b><s>이 숫자는 아직 실데이터가 아니라는 경고</s></div></div>
+  <div class="li"><i>5</i><div><b>포커스 링 · 워드마크</b><s>키보드로 지금 어디에 있는지</s></div></div>
+</div>
+
+<div class="section" style="margin-top:22px">
+  <p class="label">헷갈리기 쉬운 것 — 이건 액센트가 아닙니다</p>
+  <p style="line-height:1.7">
+    <b>빨강 <code>71,400</code> · 파랑 <code>-2.11%</code> 은 액센트가 아닙니다.</b> 그건 <b>등락색</b>이고,
+    한국식/미국식 관습에 따라 <b>바뀌는 값</b>입니다. 데이터가 스스로 말하는 색이라 디자인이 정할 몫이 아닙니다.
+    <br>액센트는 <b>데이터가 아니라 조작 장치</b>(탭·선택·버튼·포커스)에 붙는 색입니다.
+  </p>
+</div>
+
+<div class="section" style="margin-top:20px">
+  <p class="label">그래서 제 정직한 의견</p>
+  <p style="line-height:1.7">
+    두 화면을 나란히 보시면 아시겠지만, <b>차이가 이만큼입니다.</b>
+    저는 이 2%를 두고 라운드를 세 번 썼고, 리드는 세 번 다 "별로"라고 하셨습니다.
+    <b>그건 제 안이 나빴다기보다, 이 자리가 원래 화면의 인상을 결정하는 자리가 아니기 때문</b>일 수 있습니다.
+    <br><br>
+    <b>제안: 액센트 없이(오른쪽) 확정하고 넘어갑시다.</b> 색은 무채 + 등락색으로 끝내고,
+    <b>타이포·괘선·여백·밀도</b>로 넘어가는 겁니다. "사람이 디자인한 것 같다"의 대부분은 원래 거기서 나옵니다 —
+    글자 크기의 위계, 선의 굵기 차이, 숨 쉬는 여백 같은 것들요.
+    <br>나중에 화면이 다 정리된 뒤에 <b>"여기 한 곳만 색이 있으면 좋겠다"</b> 싶은 자리가 생기면,
+    그때 그 자리 하나를 보고 고르는 게 훨씬 쉽습니다. 지금은 판단할 근거가 없는 상태에서 고르고 있습니다.
+    <br><br>
+    <b>이대로 갈까요, 아니면 액센트를 더 볼까요?</b>
+  </p>
+</div>
+</div>

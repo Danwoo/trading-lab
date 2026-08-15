@@ -1,0 +1,426 @@
+<style>
+  .bd { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --ok:#7FA05A; --wr:#D9A441; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .bd .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+  .bd h2 { font-size:17px; font-weight:700; color:var(--is); margin:0 0 5px; }
+  .bd h3 { font-size:14.5px; font-weight:700; color:var(--is); margin:28px 0 4px; }
+  .bd p.lead { font-size:12.5px; color:var(--im); line-height:1.7; margin:0 0 14px; max-width:80ch; }
+  .bd p.lead b { color:var(--ik); font-weight:500; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:12px; overflow:hidden; max-width:1320px; }
+  .hud { display:flex; align-items:center; gap:10px; padding:9px 13px; background:var(--pn);
+         border-bottom:1px solid var(--ln); font-size:11.5px; color:var(--im); }
+  .hud .wm { font-size:10px; letter-spacing:.16em; color:var(--if); font-weight:700; }
+  .hud .mode { display:flex; align-items:center; gap:6px; padding:2px 8px; border-radius:5px;
+               border:1px solid var(--ls); color:var(--ik); }
+  .hud .mode .dot { width:5px; height:5px; border-radius:50%; background:var(--wr); }
+  .hud .sp { flex:1; } .hud s { text-decoration:none; color:var(--if); }
+
+  .body { display:flex; min-height:540px; }
+  .rail { flex:0 0 46px; background:var(--pn); border-right:1px solid var(--ln); display:flex;
+          flex-direction:column; align-items:center; padding:9px 0; gap:5px; }
+  .rail i { width:30px; height:30px; border-radius:8px; display:flex; align-items:center;
+            justify-content:center; font-style:normal; font-size:15px; color:var(--if);
+            border:1px solid transparent; cursor:pointer; transition:all .12s; }
+  .rail i:hover { color:var(--im); background:var(--rs); }
+  .rail i.act { background:var(--is); color:var(--bg); font-weight:700; }
+  .rail i.on { background:var(--rs); border-color:var(--ls); color:var(--is); }
+  .rail .gap { flex:1; }
+  .rail hr { width:22px; border:0; border-top:1px solid var(--ln); margin:4px 0; }
+
+  .stage { flex:1; display:flex; min-width:0; }
+  .board { flex:1; padding:13px 15px; min-width:0; display:flex; flex-direction:column; }
+  .btop { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; }
+  .btop b { font-size:14px; color:var(--is); }
+  .btop s { text-decoration:none; font-size:11.5px; color:var(--im); }
+  .btop .rt { margin-left:auto; font-size:11.5px; color:var(--im); }
+  .btop .rt em { font-style:normal; color:var(--ik); font-weight:600; }
+
+  .lay { display:grid; grid-template-columns:300px 1fr; gap:12px; }
+  .card { border:1px solid var(--ln); border-radius:10px; background:var(--pn); padding:10px 11px; }
+  .card > .t { font-size:11px; color:var(--im); margin-bottom:7px; display:flex; align-items:baseline; gap:6px; }
+  .card > .t em { font-style:normal; margin-left:auto; color:var(--if); font-size:10.5px; }
+
+  .g { display:grid; grid-template-columns:repeat(10,1fr); gap:2px; }
+  .g i { aspect-ratio:1; border-radius:2px; cursor:pointer; font-style:normal; transition:transform .08s; }
+  .g i:hover { transform:scale(1.22); }
+  .g i.sel { box-shadow:0 0 0 2px var(--pn), 0 0 0 3px var(--is); }
+  .g i.mark { box-shadow:0 0 0 2px var(--pn), 0 0 0 3px #D9B45C; }
+
+  svg.c { width:100%; display:block; cursor:crosshair; }
+  .met { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin-top:9px;
+         padding-top:9px; border-top:1px solid var(--hl); }
+  .met > div > .k { font-size:10.5px; color:var(--if); }
+  .met > div > .v { font-size:15px; font-weight:600; color:var(--is); margin-top:1px; }
+  .met > div > .s { font-size:10px; color:var(--if); }
+
+  .vd { margin-top:9px; padding:8px 10px; border-radius:8px; background:var(--rs);
+        font-size:11.5px; color:var(--im); line-height:1.6; }
+  .vd b.ok { color:#9BBE7A; } .vd b.bad { color:#E2837A; } .vd b.wr { color:#D9B45C; }
+
+  .strip { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:12px; }
+  .strip .card { cursor:pointer; transition:border-color .12s; }
+  .strip .card:hover { border-color:var(--ls); }
+  .strip .row { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:11.5px; }
+  .strip .row + .row { border-top:1px solid var(--hl); }
+  .strip .row .nm { flex:1; min-width:0; color:var(--ik); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .strip .row .v { flex:0 0 auto; }
+  .dotm { width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
+
+  .panel { flex:0 0 372px; border-left:1px solid var(--ln); background:var(--pn);
+           display:flex; flex-direction:column; min-width:0; }
+  .ptop { display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--ln); }
+  .ptop b { font-size:12.5px; color:var(--is); }
+  .ptop .sub { font-size:11px; color:var(--im); }
+  .ptop .x { margin-left:auto; color:var(--if); cursor:pointer; }
+  .pbd { padding:11px 12px; font-size:11.5px; color:var(--im); line-height:1.6; overflow:auto; }
+  .pin { font-size:10.5px; color:var(--if); padding:4px 8px; border:1px solid var(--ln);
+         border-radius:6px; background:var(--rs); margin-bottom:9px; }
+  .prow { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--hl); cursor:pointer; }
+  .prow:last-child { border-bottom:0; }
+  .prow:hover { background:var(--rs); margin:0 -6px; padding-left:6px; padding-right:6px; border-radius:6px; }
+  .prow.on { background:var(--rs); margin:0 -6px; padding-left:6px; padding-right:6px; border-radius:6px; }
+  .prow .nm { flex:1; min-width:0; color:var(--ik); font-size:12px; }
+  .prow .nm s { display:block; text-decoration:none; font-size:10.5px; color:var(--if); }
+  .prow .v { flex:0 0 auto; text-align:right; font-size:12px; }
+  .prow .v s { display:block; text-decoration:none; font-size:10.5px; color:var(--if); }
+
+  .note { border-left:2px solid var(--ls); padding:2px 0 2px 11px; margin:12px 0 0;
+          font-size:11.5px; color:var(--im); line-height:1.65; max-width:80ch; }
+  .note b { color:var(--ik); }
+  .note.good { border-left-color:var(--ok); } .note.warn { border-left-color:var(--wr); }
+  .cap { font-size:11px; color:var(--if); margin-top:6px; line-height:1.6; }
+  table.t2 { width:100%; border-collapse:collapse; font-size:11.5px; margin:8px 0 2px; max-width:940px; }
+  table.t2 th { text-align:left; font-weight:600; color:var(--im); padding:5px 7px;
+                border-bottom:1px solid var(--ln); font-size:11px; }
+  table.t2 td { padding:6px 7px; border-bottom:1px solid var(--hl); color:var(--im); vertical-align:top; }
+  table.t2 td b { color:var(--ik); font-weight:600; }
+  table.t2 tr:last-child td { border-bottom:0; }
+</style>
+
+<div class="bd">
+
+<h2>보드 본체 — 실험대</h2>
+<p class="lead">
+  <code>home</code> 과 <code>board-live</code> 를 합친 <b>메인 화면</b>입니다. 실제로 눌러집니다 —
+  <b>격자 칸을 누르면</b> 곡선과 지표가 바뀌고, <b>곡선을 가로로 끌면</b> 그 구간만 다시 계산합니다.
+  하단 띠의 카드나 레일을 누르면 <b>패널이 옆에 붙고</b>, 패널에서 거래를 고르면 격자·곡선이 그 지점을 표시합니다.
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span>
+    <span class="mode"><span class="dot"></span><b>모의</b></span>
+    <s>실제 주문 나가지 않음 · 오늘 나간 주문 <b style="color:var(--ik)">0</b>건</s>
+    <div class="sp"></div>
+    <s>계좌 <b style="color:var(--ik)">1,672만</b> · 고점 대비 <b style="color:#D9B45C">−58만</b> (한계선의 36%)</s>
+  </div>
+  <div class="body">
+    <div class="rail" id="rail">
+      <i class="act" data-p="" title="실험대">▦</i>
+      <i data-p="research" title="리서치">◵</i>
+      <hr>
+      <i data-p="bots" title="봇">◫</i>
+      <i data-p="trades" title="거래 로그">≡</i>
+      <i data-p="rules" title="내 기준">◈</i>
+      <hr>
+      <i data-p="quote" title="시세">◷</i>
+      <i data-p="pf" title="포트폴리오">⌸</i>
+      <span class="gap"></span>
+      <i data-p="agent" title="에이전트">✦</i>
+      <i data-p="settings" title="설정">⚙</i>
+    </div>
+    <div class="stage">
+      <div class="board">
+        <div class="btop">
+          <b>대형주 20일선 눌림목</b><s>모의 47거래일 · 131건</s>
+          <span class="rt">설정 바꿔본 횟수 <em id="tries">32</em> / 45</span>
+        </div>
+
+        <div class="lay">
+          <div class="card">
+            <div class="t">격자 — 설정 100가지<em id="gsel">4행 5열</em></div>
+            <div class="g" id="grid"></div>
+            <div class="cap" id="ghint">칸을 누르면 오른쪽이 그 설정으로 바뀝니다. <b style="color:var(--im)">누를 때마다 시도 횟수가 오릅니다.</b></div>
+          </div>
+
+          <div class="card">
+            <div class="t">자산 추이<em id="crange">전체 880거래일</em></div>
+            <svg class="c" id="chart" viewBox="0 0 600 190" preserveAspectRatio="none">
+              <rect id="brushRect" x="0" y="0" width="0" height="150" fill="rgba(126,156,196,.13)"></rect>
+              <polyline id="cBm" fill="none" stroke="#3A4249" stroke-width="1.2"></polyline>
+              <polyline id="cSt" fill="none" stroke="#DB4F3E" stroke-width="1.7"></polyline>
+              <line x1="0" y1="152" x2="600" y2="152" stroke="#262B30" stroke-width="1"></line>
+              <polyline id="cDd" fill="none" stroke="#4A8CC8" stroke-width="1.1"></polyline>
+            </svg>
+            <div class="cap" style="margin-top:2px">
+              <span style="color:#DB4F3E">━</span> 이 설정 &nbsp;
+              <span style="color:#3A4249">━</span> 코스피 &nbsp;
+              <span style="color:#4A8CC8">━</span> 고점 아래 낙폭 &nbsp;·&nbsp;
+              가로로 끌면 그 구간만 다시 셉니다
+            </div>
+            <div class="met">
+              <div><div class="k">1년에</div><div class="v" id="mCagr">—</div><div class="s" id="mCagrS">&nbsp;</div></div>
+              <div><div class="k">최악일 때</div><div class="v" id="mMdd">—</div><div class="s">고점 대비</div></div>
+              <div><div class="k">고점 아래 최장</div><div class="v" id="mUw">—</div><div class="s">거래일</div></div>
+              <div><div class="k">거래</div><div class="v" id="mN">—</div><div class="s" id="mNS">&nbsp;</div></div>
+            </div>
+            <div class="vd" id="verdict">—</div>
+          </div>
+        </div>
+
+        <div class="strip">
+          <div class="card" data-open="bots">
+            <div class="t">내 봇 3개<em>보기 →</em></div>
+            <div class="row"><span class="dotm" style="background:var(--ok)"></span><span class="nm">대형주 20일선 눌림목</span><span class="v" style="color:var(--up)">+72.0만</span></div>
+            <div class="row"><span class="dotm" style="background:var(--ls)"></span><span class="nm">눌림목봇</span><span class="v" style="color:var(--dn)">−3.1만</span></div>
+            <div class="row"><span class="dotm" style="background:#D9B45C"></span><span class="nm">반도체 실험</span><span class="v" style="color:var(--im)">시도 147</span></div>
+          </div>
+          <div class="card" data-open="trades">
+            <div class="t">어젯밤에 한 일<em>거래 로그 →</em></div>
+            <div class="row"><span class="nm">삼성전자·현대차를 샀습니다</span><span class="v" style="color:var(--im)">2건</span></div>
+            <div class="row"><span class="nm">눌림목봇은 조건에 맞는 게 없었습니다</span><span class="v" style="color:var(--if)">0건</span></div>
+            <div class="row"><span class="nm" style="color:#D9B45C">컴퓨터가 3시간 15분 꺼져 있었습니다</span><span class="v" style="color:var(--if)">01:20~</span></div>
+          </div>
+          <div class="card" data-open="todo" style="border-color:rgba(217,164,65,.35)">
+            <div class="t" style="color:#D9B45C">정해야 할 것 2<em>보기 →</em></div>
+            <div class="row"><span class="nm">현대차 12일 실적 발표 — 봇은 일정을 안 봅니다</span></div>
+            <div class="row"><span class="nm">반도체 실험 시도 147회 — 한계 45를 넘겼습니다</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel" style="display:none">
+        <div class="ptop"><b id="pTitle">—</b><span class="sub" id="pSub"></span><span class="x" id="pClose">✕</span></div>
+        <div class="pbd" id="pBody"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note good">
+  <b>보드에 상시로 있는 것은 넷뿐입니다</b> — 격자 · 곡선 · 내 봇 · 오늘 할 일.
+  <code>home</code> 에 있던 벤치마크 비교는 <b>곡선 안의 회색 선</b>으로 들어갔고,
+  나머지(데이터 적재·상세 성적)는 각 패널로 흩어졌습니다.
+  첫 화면에서 읽을 것이 많으면 보드가 아니라 대시보드가 됩니다.
+</div>
+
+<div class="note warn">
+  <b>격자를 누를 때마다 시도 횟수가 오릅니다.</b> 이게 이 화면에서 가장 중요한 마찰입니다 —
+  「좋은 칸을 찾을 때까지 눌러보는 것」이 <b>공짜가 아니라는 걸 그 자리에서 보여줍니다.</b>
+  45를 넘기면 격자가 잠기는 게 아니라 <b>경고가 뜨고 계속 셉니다</b>(막지 않는다는 원칙).
+</div>
+
+<h3>이 화면이 답하는 것</h3>
+<table class="t2">
+  <tr><th style="width:26%">동작</th><th>보이는 것</th></tr>
+  <tr><td><b>격자 칸 누르기</b></td><td>그 설정의 곡선·지표. 그리고 <b>이웃 칸과의 낙차</b> — 고원인지 봉우리인지</td></tr>
+  <tr><td><b>곡선 가로로 끌기</b></td><td>그 구간만 다시 계산. <b>표본이 짧으면 연환산을 안 합니다</b> — 26거래일을 1년으로 늘리면 57.8% 같은 숫자가 나옵니다</td></tr>
+  <tr><td><b>하단 카드 누르기</b></td><td>해당 패널이 옆에 붙음. 보드는 그대로 살아 있음</td></tr>
+  <tr><td><b>패널에서 거래 고르기</b></td><td>격자에 <b>그 거래가 나온 칸</b>이 노란 테두리로, 곡선에 그 시점이 표시</td></tr>
+</table>
+
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  if(!$('grid')) return;
+  const N = 880, ROWS = 10, COLS = 10;
+  const rnd = s => () => (s = (s*1664525+1013904223) & 0x7fffffff, s/0x7fffffff);
+
+  // 격자 품질 — 넓은 고원 하나 + 고립된 봉우리 하나
+  const g2 = (r,c,r0,c0,sig) => Math.exp(-(((r-r0)**2+(c-c0)**2)/(2*sig*sig)));
+  const Q = [], flat = [];
+  for(let r=0;r<ROWS;r++){ Q.push([]);
+    for(let c=0;c<COLS;c++){
+      const q = 1.00*g2(r,c,3.4,3.6,1.75) + 1.22*g2(r,c,6.0,8.0,0.42) + 0.30*g2(r,c,5.2,2.0,1.10);
+      Q[r].push(q); flat.push(q);
+    } }
+  const qMax = Math.max.apply(null, flat);
+
+  function build(drift, seed){
+    const R = rnd(seed), out = [1]; let v = 1;
+    for(let i=1;i<N;i++){
+      const shock = (i>300 && i<360) ? -0.0022 : 0;
+      v *= 1 + drift/N + shock + (R()-0.5)*0.019;
+      out.push(v);
+    }
+    return out;
+  }
+  const bench = build(0.28, 12345), cache = {};
+  const curveFor = (r,c) => cache[r+'_'+c] || (cache[r+'_'+c] = build(0.12 + (Q[r][c]/qMax)*0.72, 1000 + r*97 + c*31));
+
+  function metrics(eq){
+    const n = eq.length, total = eq[n-1]/eq[0];
+    let peak = eq[0], mdd = 0, run = 0, longest = 0; const dd = [];
+    for(let i=0;i<n;i++){
+      peak = Math.max(peak, eq[i]);
+      const d = eq[i]/peak - 1; dd.push(d); mdd = Math.min(mdd, d);
+      if(d < -1e-9){ run++; longest = Math.max(longest, run); } else run = 0;
+    }
+    return { total, cagr: Math.pow(total, 252/n) - 1, mdd, dd, longest, n };
+  }
+
+  let sel = {r:3, c:4}, brush = null, tries = 32, mark = null, open = null;
+  const LIMIT = 45;
+
+  // 격자 그리기
+  const grid = $('grid');
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const i = document.createElement('i');
+    const q = Q[r][c]/qMax;
+    i.style.background = `rgb(${34+Math.round(q*44)},${48+Math.round(q*63)},${58+Math.round(q*72)})`;
+    i.dataset.r = r; i.dataset.c = c;
+    grid.appendChild(i);
+  }
+  const cells = () => grid.querySelectorAll('i');
+
+  const px = (a,i,lo,hi,h,top) => [(i/(a.length-1))*600, top + h - ((a[i]-lo)/(hi-lo))*(h-6) - 3];
+  const poly = (el,arr,lo,hi,h,top) =>
+    el.setAttribute('points', arr.map((_,i)=>px(arr,i,lo,hi,h,top).join(',')).join(' '));
+
+  function render(){
+    cells().forEach(el => {
+      el.classList.toggle('sel', +el.dataset.r===sel.r && +el.dataset.c===sel.c);
+      el.classList.toggle('mark', !!mark && +el.dataset.r===mark.r && +el.dataset.c===mark.c);
+    });
+    $('gsel').textContent = (sel.r+1)+'행 '+(sel.c+1)+'열';
+    $('tries').textContent = tries;
+    $('tries').style.color = tries > LIMIT ? '#E2837A' : 'var(--ik)';
+
+    const full = curveFor(sel.r, sel.c);
+    const s = brush ? brush[0] : 0, e = brush ? brush[1] : N-1;
+    const st = full.slice(s,e+1), bm = bench.slice(s,e+1);
+    const all = st.concat(bm), lo = Math.min.apply(null,all)*0.985, hi = Math.max.apply(null,all)*1.015;
+    poly($('cSt'), st, lo, hi, 148, 0);
+    poly($('cBm'), bm, lo, hi, 148, 0);
+
+    const m = metrics(st);
+    const ddLo = Math.min(Math.min.apply(null,m.dd), -0.01);
+    poly($('cDd'), m.dd, ddLo, 0.002, 34, 154);
+
+    $('crange').textContent = brush ? (m.n+'거래일 구간') : ('전체 '+N+'거래일');
+    const short = m.n < 120;
+    $('mCagr').innerHTML = short
+      ? `<span style="color:${m.total>=1?'var(--up)':'var(--dn)'}">${m.total>=1?'+':''}${((m.total-1)*100).toFixed(1)}%</span>`
+      : `<span style="color:${m.cagr>=0?'var(--up)':'var(--dn)'}">${m.cagr>=0?'+':''}${(m.cagr*100).toFixed(1)}%</span>`;
+    $('mCagrS').innerHTML = short
+      ? '<span style="color:#D9B45C">구간 전체 — 연환산 안 함</span>'
+      : '연환산';
+    $('mMdd').innerHTML = `<span style="color:var(--dn)">${(m.mdd*100).toFixed(1)}%</span>`;
+    $('mUw').textContent = m.longest;
+    $('mN').textContent = Math.round(m.n * 131/880);
+    $('mNS').textContent = brush ? '이 구간' : '모의 131건 기준';
+
+    // 고원 vs 봉우리
+    const q = Q[sel.r][sel.c]; let worst = 0, cnt = 0;
+    for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+      if(!dr && !dc) continue;
+      const r = sel.r+dr, c = sel.c+dc;
+      if(r<0||c<0||r>=ROWS||c>=COLS) continue;
+      cnt++; worst = Math.max(worst, (q - Q[r][c])/qMax);
+    }
+    let v = worst > 0.42
+      ? `<b class="bad">절벽입니다.</b> 이웃 한 칸만 옮겨도 성과가 <b class="bad">${(worst*100).toFixed(0)}%</b> 떨어집니다 — 봉우리에 걸터앉은 상태라, 실제로는 이 설정이 아닐 수 있습니다.`
+      : `<b class="ok">고원 안입니다.</b> 이웃 ${cnt}칸 중 최대 낙차 <b class="ok">${(worst*100).toFixed(0)}%</b> — 두께가 있어 조금 빗나가도 견딥니다.`;
+    if(short) v += ` <b class="wr">다만 표본이 ${m.n}거래일뿐이라</b> 이 판정도 얇습니다.`;
+    if(tries > LIMIT) v += ` <b class="bad">시도 ${tries}회 — 한계 ${LIMIT}를 넘겼습니다.</b> 여기서 고르는 건 좋은 설정을 찾은 게 아니라 운 좋은 걸 고르는 쪽에 가깝습니다.`;
+    $('verdict').innerHTML = v;
+  }
+
+  grid.addEventListener('click', ev => {
+    const t = ev.target.closest('i'); if(!t) return;
+    const r = +t.dataset.r, c = +t.dataset.c;
+    if(r===sel.r && c===sel.c) return;
+    sel = {r,c}; tries++; mark = null; render();
+  });
+
+  // 브러시
+  const chart = $('chart');
+  let dragging = false, x0 = 0;
+  const toIdx = ev => {
+    const b = chart.getBoundingClientRect();
+    return Math.max(0, Math.min(N-1, Math.round(((ev.clientX-b.left)/b.width)*(N-1))));
+  };
+  chart.addEventListener('mousedown', ev => { dragging = true; x0 = toIdx(ev); ev.preventDefault(); });
+  window.addEventListener('mousemove', ev => {
+    if(!dragging) return;
+    const x1 = toIdx(ev), a = Math.min(x0,x1), b = Math.max(x0,x1);
+    const R = $('brushRect');
+    R.setAttribute('x', (a/(N-1))*600); R.setAttribute('width', ((b-a)/(N-1))*600);
+  });
+  window.addEventListener('mouseup', ev => {
+    if(!dragging) return; dragging = false;
+    const x1 = toIdx(ev), a = Math.min(x0,x1), b = Math.max(x0,x1);
+    $('brushRect').setAttribute('width', 0);
+    brush = (b - a < 12) ? null : [a,b];
+    render();
+  });
+
+  // 패널
+  const PANELS = {
+    bots: { t:'봇', s:'3개', html:
+      `<div class="pin">고르면 <b>격자·곡선</b>이 그 봇 것으로 바뀝니다</div>
+       <div class="prow on"><span class="nm">대형주 20일선 눌림목<s>모의 47거래일 · 131건</s></span><span class="v" style="color:var(--up)">+72.0만<s>4/6 기준</s></span></div>
+       <div class="prow"><span class="nm">눌림목봇<s>모의 12거래일 · 18건</s></span><span class="v" style="color:var(--dn)">−3.1만<s>2/6 기준</s></span></div>
+       <div class="prow"><span class="nm">반도체 실험<s>격자만 · 시도 147회</s></span><span class="v" style="color:#D9B45C">한계 초과</span></div>` },
+    trades: { t:'거래 로그', s:'131건', html:
+      `<div class="pin">고르면 격자에 <b>그 거래가 나온 칸</b>이, 곡선에 그 시점이 표시됩니다</div>
+       <div class="prow" data-mark="6,8"><span class="nm">카카오<s>07-27 → 08-07 · 손절</s></span><span class="v" style="color:var(--dn)">−14.2만<s>−7.02%</s></span></div>
+       <div class="prow" data-mark="3,4"><span class="nm">삼성전자<s>08-07 → 보유중</s></span><span class="v" style="color:var(--up)">+3.4만<s>+1.7%</s></span></div>
+       <div class="prow" data-mark="5,2"><span class="nm">현대차<s>08-07 → 보유중</s></span><span class="v" style="color:var(--up)">+8.1만<s>+3.3%</s></span></div>
+       <div class="cap" style="margin-top:8px;border-top:1px solid var(--hl);padding-top:8px">한 건을 누르면 왼쪽 격자에 노란 테두리가 생깁니다.</div>` },
+    rules: { t:'내 기준', s:'4/6 통과', html:
+      `<div class="pin" style="border-color:rgba(126,156,196,.3);background:rgba(126,156,196,.06)"><b style="color:var(--ik)">마음대로 정하십시오 — 무엇도 막지 않습니다</b></div>
+       <div class="prow"><span class="nm">최악일 때 이 안으로</span><span class="v">20%<s style="color:#E2837A">지금 22.1</s></span></div>
+       <div class="prow"><span class="nm">모의 표본</span><span class="v">250건<s style="color:#E2837A">지금 131</s></span></div>
+       <div class="prow"><span class="nm">수익 몰린 정도</span><span class="v">60%<s style="color:#E2837A">지금 88</s></span></div>` },
+    todo: { t:'정해야 할 것', s:'2건', html:
+      `<div class="prow"><span class="nm">현대차 12일 실적 발표<s>봇은 실적 일정을 보지 않습니다. 그대로 둘지, 그 종목만 뺄지</s></span></div>
+       <div class="prow"><span class="nm">반도체 실험 시도 147회<s>한계 45를 넘겼습니다 — 100조합을 돌린 것이 100번으로 세어졌습니다</s></span></div>
+       <div class="cap" style="margin-top:8px">둘 다 <b style="color:var(--im)">리서치가 저녁 배치에서 올린 것</b>입니다 — 봇이 모르는 것이라서입니다.</div>` },
+    agent: { t:'에이전트', s:'', html:
+      `<div style="color:var(--ik)">이 격자에서 뭘 골라야 해?</div>
+       <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--hl)">
+       <b style="color:var(--is)">지금 고르신 칸은 고원 안입니다.</b> 이웃 낙차가 작아 조금 빗나가도 견딥니다.<br><br>
+       <span style="color:var(--im)">다만 6행 8열이 더 높아 보이실 텐데, 거긴 <b style="color:#E2837A">이웃 한 칸에 60% 떨어지는 절벽</b>입니다.
+       높은 칸이 아니라 <b style="color:var(--ik)">두꺼운 칸</b>을 고르셔야 합니다.</span></div>` }
+  };
+  function openPanel(k){
+    const p = PANELS[k];
+    if(!p){ closePanel(); return; }
+    open = k;
+    $('pTitle').textContent = p.t; $('pSub').textContent = p.s;
+    $('pBody').innerHTML = p.html; $('panel').style.display = 'flex';
+    $('rail').querySelectorAll('i').forEach(i => i.classList.toggle('on', i.dataset.p===k));
+  }
+  function closePanel(){
+    open = null; $('panel').style.display = 'none';
+    $('rail').querySelectorAll('i').forEach(i => i.classList.remove('on'));
+  }
+  $('rail').addEventListener('click', ev => {
+    const t = ev.target.closest('i'); if(!t) return;
+    const k = t.dataset.p;
+    if(!k){ closePanel(); return; }
+    if(!PANELS[k]) return;
+    open === k ? closePanel() : openPanel(k);
+  });
+  $('pClose').addEventListener('click', closePanel);
+  document.querySelectorAll('.strip .card').forEach(c =>
+    c.addEventListener('click', () => openPanel(c.dataset.open)));
+  $('pBody').addEventListener('click', ev => {
+    const row = ev.target.closest('.prow'); if(!row) return;
+    $('pBody').querySelectorAll('.prow').forEach(r => r.classList.remove('on'));
+    row.classList.add('on');
+    if(row.dataset.mark){
+      const [r,c] = row.dataset.mark.split(',').map(Number);
+      mark = {r,c}; render();
+    }
+  });
+
+  render();
+})();
+</script>

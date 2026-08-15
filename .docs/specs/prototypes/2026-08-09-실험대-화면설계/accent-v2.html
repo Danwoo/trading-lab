@@ -1,0 +1,204 @@
+<style>
+  .a2 { font-family:Pretendard,system-ui,sans-serif; }
+  .a2-why { background:#16191C; border:1px solid #262B30; border-left:2px solid #8B877F; border-radius:9px; padding:13px 16px; margin:14px 0 18px; color:#E6E4E0; font-size:12.5px; line-height:1.65; }
+  .a2-why code { font-family:ui-monospace,monospace; font-size:11px; }
+
+  .a2-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:16px 0 8px; }
+  @media (max-width:1100px){ .a2-grid{grid-template-columns:1fr;} }
+  .c { border-radius:11px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color .12s, transform .12s; background:#16191C; }
+  .c:hover { transform:translateY(-2px); }
+  .c.selected { border-color:#4f8cff; }
+  .c .shot { padding:14px; background:#0D0F11; }
+
+  .c .mini { border:1px solid #262B30; border-radius:9px; overflow:hidden; background:#16191C; }
+  .c .tabs { display:flex; background:#1A1E22; border-bottom:1px solid #262B30; }
+  .c .tabs div { font-size:10.5px; padding:8px 11px; color:#8B877F; }
+  .c .row { display:flex; align-items:center; padding:7px 10px; font-size:11px; border-left:2px solid transparent; font-variant-numeric:tabular-nums; }
+  .c .row b { flex:1; font-weight:400; color:#E6E4E0; }
+  .c .row u { text-decoration:none; width:52px; text-align:right; }
+  .c .sep { height:1px; background:#262B30; }
+
+  .c .pb { padding:12px; }
+  .c .lbl { font-size:9px; letter-spacing:.13em; font-weight:700; color:#5C5852; margin:0 0 7px; }
+  .c .lbl.m { margin-top:13px; }
+  .c .st { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+  /* 버튼 — 계조·인셋 하이라이트가 들어간 서피스 */
+  .c .btn { font-size:12px; font-weight:500; padding:7px 14px; border-radius:8px; border:1px solid; letter-spacing:-.005em; }
+  .c .bdg { font-size:9.5px; padding:2px 7px; border-radius:5px; border:1px solid; letter-spacing:.02em; }
+  .c .fld { font-size:11px; padding:6px 10px; border-radius:7px; background:#1A1E22; border:1px solid #262B30; color:#E6E4E0; }
+
+  .c .lite { margin-top:11px; border-radius:8px; padding:11px; background:#F4F5F6; border:1px solid #D6D9DC; }
+  .c .lite .lb { font-size:9px; letter-spacing:.13em; font-weight:700; color:#7C7871; margin-bottom:8px; }
+
+  .c .meta { padding:12px 15px 15px; font-size:11.5px; line-height:1.55; color:#E6E4E0; }
+  .c .meta b.t { display:block; font-size:14px; margin-bottom:4px; letter-spacing:-.01em; }
+  .c .hex { font-family:ui-monospace,monospace; font-size:9.5px; color:#8B877F; margin-top:8px; line-height:1.6; }
+</style>
+
+<div class="a2">
+<h2>액센트 다시 — 색상이 아니라 <b>채도·명도·사용법</b>을 바꿨습니다</h2>
+
+<div class="a2-why">
+  <b>왜 싸 보였는가.</b> ① 겨자 <code>#E8B33E</code>·민트 <code>#3FAFA8</code> 은 <b>중간 채도·중간 명도</b> — 가장 싸 보이는 대역입니다.
+  ② <b>알약 버튼을 액센트로 통째로 채운 것</b>이 2015년 플랫디자인의 얼굴입니다.
+  <br><br>
+  <b>그래서 이번엔:</b> 액센트를 <b>깊게 내리거나 옅게 빼서</b> 중간 대역을 벗어났고,
+  버튼은 <b>계조 + 1px 안쪽 하이라이트</b>가 있는 서피스로 바꿨습니다(평평한 단색 채움을 버렸습니다).
+  <br><b>구조적 사실:</b> 적·청·녹은 임자가 있고 분홍·보라는 배제라 <b>남은 색상은 황 계열·청록 계열·무채뿐</b>입니다.
+  차이는 색상이 아니라 <b>어떻게 쓰느냐</b>에서 나옵니다.
+</div>
+
+<div class="a2-grid options">
+
+<!-- ═══ C1 무채 강철 ═══ -->
+<div class="c option" data-choice="c1" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="mini">
+      <div class="tabs">
+        <div style="color:#F5F3EF;font-weight:600;box-shadow:inset 0 -1.5px 0 #F5F3EF">관심종목</div>
+        <div>보유</div><div>스크리너</div>
+      </div>
+      <div class="row" style="background:#1C2126;border-left-color:#F5F3EF"><b style="font-weight:500;color:#F5F3EF">삼성전자</b><u style="color:#DB4F3E">+1.71%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>NAVER</b><u style="color:#4A8CC8">-0.85%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>카카오</b><u style="color:#4A8CC8">-2.11%</u></div>
+      <div class="pb">
+        <div class="lbl">기본 동작 · 보조</div>
+        <div class="st">
+          <span class="btn" style="background:linear-gradient(180deg,#2E353B,#242A30);border-color:#434C54;color:#F5F3EF;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)">관심종목 추가</span>
+          <span class="btn" style="background:transparent;border-color:#333B42;color:#A9A59D">취소</span>
+        </div>
+        <div class="lbl m">배지 · 포커스</div>
+        <div class="st">
+          <span class="bdg" style="color:#A9A59D;border-color:#3A4249;background:#1C2126">임시 데이터</span>
+          <span class="fld" style="outline:1.5px solid #E6E4E0;outline-offset:2px">종목 검색</span>
+        </div>
+      </div>
+    </div>
+    <div class="lite">
+      <div class="lb">라이트</div>
+      <div class="st">
+        <span class="btn" style="background:linear-gradient(180deg,#FFFFFF,#F0F1F3);border-color:#C6CBD1;color:#201E1A;box-shadow:0 1px 1px rgba(30,35,40,.06)">관심종목 추가</span>
+        <span class="bdg" style="color:#6E6A63;border-color:#CFD3D7;background:#EAECEE">임시 데이터</span>
+      </div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">C1. 강철 — 액센트 색 없음</b>
+    액센트를 <b>색이 아니라 재질</b>로 냅니다. 기본 버튼은 미세한 계조와 안쪽 하이라이트가 들어간
+    <b>금속 서피스</b>고, 강조는 순백 얇은 선입니다. 흰색을 넓게 채우지 않아 A1 의 밋밋함이 없습니다.
+    <br><b>유행 탈 색이 아예 없어 가장 안 낡습니다.</b> 대신 화면이 <b style="color:#C9C5BD">조용한 만큼 심심할 수</b> 있고,
+    "여기를 누르세요"가 가장 약합니다.
+    <div class="hex">btn &nbsp;#2E353B→#242A30 · border #434C54<br>강조선 #F5F3EF · light btn #FFF→#F0F1F3</div>
+  </div>
+</div>
+
+<!-- ═══ C2 심연 청록 ═══ -->
+<div class="c option" data-choice="c2" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="mini">
+      <div class="tabs">
+        <div style="color:#F2F0EC;font-weight:600;box-shadow:inset 0 -1.5px 0 #2E8F86">관심종목</div>
+        <div>보유</div><div>스크리너</div>
+      </div>
+      <div class="row" style="background:#1C2126;border-left-color:#2E8F86"><b style="font-weight:500;color:#F2F0EC">삼성전자</b><u style="color:#DB4F3E">+1.71%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>NAVER</b><u style="color:#4A8CC8">-0.85%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>카카오</b><u style="color:#4A8CC8">-2.11%</u></div>
+      <div class="pb">
+        <div class="lbl">기본 동작 · 보조</div>
+        <div class="st">
+          <span class="btn" style="background:linear-gradient(180deg,#12695F,#0D544C);border-color:#1A8074;color:#DFF2EF;box-shadow:inset 0 1px 0 rgba(255,255,255,.09)">관심종목 추가</span>
+          <span class="btn" style="background:transparent;border-color:#333B42;color:#A9A59D">취소</span>
+        </div>
+        <div class="lbl m">배지 · 포커스</div>
+        <div class="st">
+          <span class="bdg" style="color:#4FA79D;border-color:rgba(46,143,134,.5);background:rgba(46,143,134,.12)">임시 데이터</span>
+          <span class="fld" style="outline:1.5px solid #2E8F86;outline-offset:2px">종목 검색</span>
+        </div>
+      </div>
+    </div>
+    <div class="lite">
+      <div class="lb">라이트</div>
+      <div class="st">
+        <span class="btn" style="background:linear-gradient(180deg,#12695F,#0E5850);border-color:#0B4A43;color:#F1F8F7;box-shadow:0 1px 1px rgba(20,45,42,.14)">관심종목 추가</span>
+        <span class="bdg" style="color:#0E5850;border-color:rgba(14,88,80,.35);background:rgba(14,88,80,.09)">임시 데이터</span>
+      </div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">C2. 심연 청록 — 깊게 내림</b>
+    민트(<code>#3FAFA8</code>)를 <b>명도 절반 아래로 끌어내렸습니다</b>(<code>#0D544C</code>).
+    같은 색상인데 인상이 완전히 다릅니다 — 밝은 민트의 가벼움이 사라지고 <b>무게가 생깁니다.</b>
+    다크·라이트 인상이 갈리지 않는 것도 그대로입니다.
+    <br>확인해 주실 것: <b style="color:#C9C5BD">선택 행의 세로선</b>과 옆의 <b style="color:#4A8CC8">하락 파랑</b>이 헷갈리는지.
+    <div class="hex">accent-deep #0D544C · accent #2E8F86<br>btn #12695F→#0D544C · border #1A8074</div>
+  </div>
+</div>
+
+<!-- ═══ C3 황동 텍스트 전용 ═══ -->
+<div class="c option" data-choice="c3" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="mini">
+      <div class="tabs">
+        <div style="color:#F2F0EC;font-weight:600;box-shadow:inset 0 -1.5px 0 #C79A3C">관심종목</div>
+        <div>보유</div><div>스크리너</div>
+      </div>
+      <div class="row" style="background:#1C2126;border-left-color:#C79A3C"><b style="font-weight:500;color:#F2F0EC">삼성전자</b><u style="color:#DB4F3E">+1.71%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>NAVER</b><u style="color:#4A8CC8">-0.85%</u></div>
+      <div class="sep"></div>
+      <div class="row"><b>카카오</b><u style="color:#4A8CC8">-2.11%</u></div>
+      <div class="pb">
+        <div class="lbl">기본 동작 · 보조</div>
+        <div class="st">
+          <span class="btn" style="background:linear-gradient(180deg,#2E353B,#242A30);border-color:#7A6026;color:#E3BC6A;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)">관심종목 추가</span>
+          <span class="btn" style="background:transparent;border-color:#333B42;color:#A9A59D">취소</span>
+        </div>
+        <div class="lbl m">배지 · 포커스</div>
+        <div class="st">
+          <span class="bdg" style="color:#C79A3C;border-color:rgba(199,154,60,.45);background:rgba(199,154,60,.1)">임시 데이터</span>
+          <span class="fld" style="outline:1.5px solid #C79A3C;outline-offset:2px">종목 검색</span>
+        </div>
+      </div>
+    </div>
+    <div class="lite">
+      <div class="lb">라이트</div>
+      <div class="st">
+        <span class="btn" style="background:linear-gradient(180deg,#FFFFFF,#F0F1F3);border-color:#9E7A21;color:#6F5312;box-shadow:0 1px 1px rgba(30,35,40,.06)">관심종목 추가</span>
+        <span class="bdg" style="color:#6F5312;border-color:rgba(111,83,18,.35);background:rgba(111,83,18,.08)">임시 데이터</span>
+      </div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">C3. 황동 — 채우지 않는다</b>
+    <b>액센트로 면을 채우는 것을 금지</b>합니다. 버튼 바탕은 C1 과 같은 무채 금속 서피스이고,
+    황동은 <b>테두리와 글자에만</b> 나타납니다. 블룸버그의 앰버가 채움이 아니라 글자색인 것과 같은 원리입니다.
+    <br>겨자 노랑의 싸구려 느낌은 <b>넓게 채웠기 때문</b>이었고, 얇게 쓰면 같은 색상이 <b>정밀 계기의 각인</b>처럼 읽힙니다.
+    라이트에서도 갈색까지 안 내려가도 됩니다 — 글자·테두리는 대비 요구가 낮습니다.
+    <div class="hex">accent #C79A3C · text #E3BC6A · light #6F5312<br>btn = 무채 서피스 + 액센트 테두리/글자 (채움 금지)</div>
+  </div>
+</div>
+
+</div>
+
+<div class="section" style="margin-top:24px">
+  <p class="label">셋 다 아니면</p>
+  <p style="line-height:1.7">
+    <b>남은 색상이 정말 이 셋뿐</b>이라, 다음 라운드는 색을 더 찾는 게 아니라 <b>제약을 푸는</b> 쪽이 됩니다. 두 갈래입니다 —
+    <br><br>
+    <b>㉠ 임자를 다시 정한다.</b> 하락 파랑을 <b>회청(거의 무채)</b>으로 낮추면 파랑 대역이 통째로 비고,
+    그러면 <b>깊은 감청(navy)</b>을 액센트로 쓸 수 있습니다. 등락은 빨강 하나로만 구분하는 방식이 되는데,
+    이건 <b>제가 결정할 수 없는 도메인 판단</b>입니다(적/청 관습을 흔드는 것이라).
+    <br><br>
+    <b>㉡ 액센트를 아예 두지 않는다(C1).</b> 그리고 성격을 <b>타이포·괘선·여백</b>에서 냅니다.
+    이 경우 다음 라운드는 색이 아니라 <b>활자와 선</b>을 보게 됩니다 — 사실 "사람이 디자인한 것 같다"의
+    상당 부분이 원래 거기서 나옵니다.
+    <br><br>
+    <b>지금 셋 중 하나를 고르셔도 되고, ㉠·㉡ 중 하나로 방향을 트셔도 됩니다.</b>
+  </p>
+</div>
+</div>

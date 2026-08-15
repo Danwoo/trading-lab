@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>실험대 — 눌러지는 프로토타입</title>
+<style>
+  :root{
+    --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+    --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+    --up:#DB4F3E; --dn:#4A8CC8; --dg:#C94A3B;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0A0C0E;color:var(--ik);font-family:Pretendard,system-ui,-apple-system,sans-serif;
+       letter-spacing:-.01em;padding:22px}
+  .n{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  h2{font-size:19px;color:var(--is);margin:0 0 5px;font-weight:700}
+  .sub{font-size:12.5px;color:var(--im);margin:0 0 16px;line-height:1.6}
+  .sub b{color:var(--ik);font-weight:500}
+
+  .win{background:var(--bg);border:1px solid var(--ln);border-radius:12px;overflow:hidden;position:relative;
+       max-width:1280px}
+
+  /* HUD */
+  .hud{display:flex;align-items:center;height:42px;padding:0 14px;background:var(--pn);
+       border-bottom:1px solid var(--ln);font-size:12px}
+  .hud .wm{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--is);margin-right:16px}
+  .hud .cell{display:flex;align-items:baseline;gap:6px;padding:0 14px;border-left:1px solid var(--ln);height:100%;
+             align-items:center}
+  .hud .cell:first-of-type{border-left:none}
+  .hud .cell>span:first-child{color:var(--if);font-size:11px}
+  .hud .cell b{color:var(--ik);font-weight:500}
+  .hud .warn{color:var(--dg);font-weight:500}
+  .hud .sp{flex:1}
+  .btn{font-size:12px;font-weight:500;padding:6px 13px;border-radius:8px;cursor:pointer;user-select:none;
+       background:linear-gradient(180deg,#2E353B,#242A30);border:1px solid #434C54;color:var(--is);
+       box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+  .btn:hover{background:linear-gradient(180deg,#39424A,#2C333A)}
+  .btn2{font-size:11.5px;padding:5px 11px;border-radius:7px;cursor:pointer;user-select:none;
+        background:transparent;border:1px solid var(--ls);color:var(--im)}
+  .btn2:hover{color:var(--ik);border-color:#4C5760}
+
+  .body{display:flex;height:620px}
+
+  /* 레일 */
+  .rail{flex:0 0 46px;background:var(--pn);border-right:1px solid var(--ln);display:flex;flex-direction:column;
+        align-items:center;gap:5px;padding:9px 0}
+  .rail i{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+          font-size:14px;color:var(--if);border:1px solid transparent;font-style:normal;cursor:pointer;user-select:none}
+  .rail i:hover{color:var(--im);background:var(--rs)}
+  .rail i.on{background:var(--rs);border-color:var(--ls);color:var(--is)}
+  .rail i.act{background:var(--is);color:var(--bg);font-weight:700}
+  .rail .gap{flex:1}
+
+  .board{flex:1;display:flex;flex-direction:column;min-width:0}
+  .btop{flex:1;display:flex;min-height:0}
+  .curve{flex:1;display:flex;flex-direction:column;padding:13px 14px 0;min-width:0}
+  .chd{display:flex;align-items:baseline;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+  .chd b{font-size:13px;font-weight:700;color:var(--is)}
+  .chd .meta{font-size:11.5px;color:var(--im)}
+  .chd .lg{display:flex;gap:12px;margin-left:auto;font-size:11px}
+  .chd .lg span{display:flex;align-items:center;gap:5px;color:var(--im)}
+  .chd .lg i{width:14px;height:0;display:block}
+
+  .plot{flex:1;position:relative;min-height:0;cursor:crosshair;
+        background-image:repeating-linear-gradient(0deg,var(--hl) 0 1px,transparent 1px 46px)}
+  .plot svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .brush{position:absolute;top:0;bottom:0;background:rgba(245,243,239,.06);
+         border-left:1px solid var(--ls);border-right:1px solid var(--ls);pointer-events:none;display:none}
+  .brush em{position:absolute;top:5px;left:50%;transform:translateX(-50%);font-style:normal;font-size:10px;
+            color:var(--ik);white-space:nowrap;background:var(--rs);padding:2px 7px;border-radius:4px;
+            border:1px solid var(--ls)}
+  .under{height:76px;padding:0 14px 11px}
+  .under .lb{font-size:9.5px;letter-spacing:.13em;font-weight:700;color:var(--if);margin:7px 0 4px;
+             display:flex;align-items:center;gap:9px}
+  .under .up2{position:relative;height:46px;
+              background-image:repeating-linear-gradient(0deg,var(--hl) 0 1px,transparent 1px 23px)}
+  .under svg{position:absolute;inset:0;width:100%;height:100%}
+
+  .side{flex:0 0 282px;border-left:1px solid var(--ln);padding:13px 14px;display:flex;flex-direction:column;
+        min-height:0;overflow:auto}
+  .lb{font-size:9.5px;letter-spacing:.13em;font-weight:700;color:var(--if);margin-bottom:8px}
+  .lb.m{margin-top:15px}
+
+  .grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2px}
+  .grid i{aspect-ratio:1;border-radius:2px;display:block;cursor:pointer}
+  .grid i:hover{outline:1px solid var(--im);outline-offset:-1px}
+  .grid i.sel{box-shadow:0 0 0 1.5px var(--is);z-index:2;position:relative}
+  .gaxis{display:flex;justify-content:space-between;font-size:9.5px;color:var(--if);margin-top:5px}
+  .verdict{font-size:11px;line-height:1.5;margin-top:7px;color:var(--im)}
+  .verdict b{font-weight:500}
+  .verdict .ok{color:var(--ik)}
+  .verdict .bad{color:var(--dg)}
+
+  .tile{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0}
+  .tile+.tile{border-top:1px solid var(--hl)}
+  .tile .k{font-size:11.5px;color:var(--im)}
+  .tile .v{font-size:14px;font-weight:500;color:var(--ik)}
+  .tile.hero .k{color:var(--ik)}
+  .tile.hero .v{font-size:21px;letter-spacing:-.02em;color:var(--is)}
+
+  .dock{flex:0 0 92px;border-top:1px solid var(--ln);background:var(--pn);padding:9px 14px}
+  .dock .hdr{display:flex;align-items:baseline;gap:9px;margin-bottom:7px;font-size:11px}
+  .dock .hdr b{font-weight:700;letter-spacing:.13em;color:var(--if)}
+  .dock .hdr span{color:var(--im)}
+  .strip{display:flex;gap:4px;align-items:flex-end;height:42px}
+  .strip u{flex:1;border-radius:2px 2px 0 0;text-decoration:none;display:block;cursor:pointer;min-height:2px}
+  .strip u:hover{outline:1px solid var(--im)}
+  .strip u.on{box-shadow:0 0 0 1.5px var(--is)}
+  .strip u.dead{opacity:.3}
+
+  .panel{position:absolute;right:14px;top:56px;width:300px;background:var(--pn);border:1px solid var(--ls);
+         border-radius:11px;box-shadow:0 8px 28px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.5);z-index:9;display:none}
+  .panel.open{display:block}
+  .panel .ph{display:flex;align-items:center;gap:8px;padding:12px 14px 0}
+  .panel .ph b{font-size:12.5px;font-weight:700;color:var(--is)}
+  .panel .ph .x{margin-left:auto;color:var(--if);font-size:15px;cursor:pointer;line-height:1}
+  .panel .ph .x:hover{color:var(--ik)}
+  .panel .pb{padding:9px 14px 14px;font-size:12px;line-height:1.55;color:var(--im)}
+  .panel .row{display:flex;justify-content:space-between;padding:7px 0}
+  .panel .row+.row{border-top:1px solid var(--hl)}
+  .panel .row b{color:var(--ik);font-weight:500}
+
+  .tips{max-width:1280px;margin-top:14px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .tip{background:var(--pn);border:1px solid var(--ln);border-radius:9px;padding:11px 13px;font-size:12px;
+       line-height:1.6;color:var(--im)}
+  .tip b{color:var(--ik);font-weight:500;display:block;margin-bottom:3px}
+  kbd{background:var(--rs);border:1px solid var(--ls);border-radius:4px;padding:1px 6px;font-size:11px;
+      color:var(--ik);font-family:inherit}
+</style>
+</head>
+<body>
+
+<h2>실험대 — 눌러지는 프로토타입</h2>
+<p class="sub">
+  목데이터지만 <b>모든 지표를 하나의 자산곡선에서 파생</b>시켰습니다 — 곡선을 자르면 지표도 같이 바뀝니다.
+  <b>격자를 누르고, 곡선을 드래그하고, 레일을 눌러 보십시오.</b>
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span>
+    <div class="cell"><span>가설</span><b>대형주 20일선 눌림목</b></div>
+    <div class="cell"><span>시도</span><b class="n" id="hTry">32</b><span class="n" id="hLimit">/ 45 상한</span></div>
+    <div class="cell"><span>모의</span><b class="n">3</b><span>봇 · <b class="n">47</b>일</span></div>
+    <div class="sp"></div>
+    <div class="cell"><span class="warn" id="hWarn">⚠ MinBTL 잔여 13회</span></div>
+    <div class="cell" style="border:none"><span class="btn" id="runBtn">새 실행</span></div>
+  </div>
+
+  <div class="panel" id="panel">
+    <div class="ph"><b id="pTitle">리서치</b><span style="font-size:11px;color:var(--im)" id="pSub"></span><span class="x" id="pClose">×</span></div>
+    <div class="pb" id="pBody"></div>
+  </div>
+
+  <div class="body">
+    <div class="rail" id="rail">
+      <i class="on" data-p="board" title="실험대">▦</i>
+      <i data-p="terminal" title="터미널">◵</i>
+      <i data-p="research" title="리서치">◷</i>
+      <i data-p="portfolio" title="포트폴리오">⌸</i>
+      <div class="gap"></div>
+      <i data-p="settings" title="설정">⚙</i>
+    </div>
+
+    <div class="board">
+      <div class="btop">
+        <div class="curve">
+          <div class="chd">
+            <b>자산곡선</b>
+            <span class="meta n" id="rangeLbl">2023-01 → 2026-08 · 880 세션</span>
+            <span class="btn2" id="clearBrush" style="display:none">구간 해제</span>
+            <div class="lg">
+              <span><i style="border-top:2px solid #F5F3EF"></i>전략</span>
+              <span><i style="border-top:1px solid #8B877F"></i>코스피200</span>
+              <span><i style="border-top:1px dashed #625E58"></i>유니버스 동일가중</span>
+            </div>
+          </div>
+          <div class="plot" id="plot">
+            <svg viewBox="0 0 600 250" preserveAspectRatio="none">
+              <polyline id="cEq" fill="none" stroke="#625E58" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+              <polyline id="cBm" fill="none" stroke="#8B877F" stroke-width="1" vector-effect="non-scaling-stroke"/>
+              <polyline id="cSt" fill="none" stroke="#F5F3EF" stroke-width="2" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <div class="brush" id="brush"><em id="brushLbl"></em></div>
+          </div>
+          <div class="under">
+            <div class="lb">낙폭 (underwater) — 시간축 연동 <span style="color:var(--im);letter-spacing:0;font-weight:400;text-transform:none" id="ddLbl"></span></div>
+            <div class="up2">
+              <svg viewBox="0 0 600 46" preserveAspectRatio="none">
+                <polyline id="cDd" fill="none" stroke="#4A8CC8" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="side">
+          <div class="lb">파라미터 격자 · 이평 × RSI <span style="color:var(--im);letter-spacing:0;font-weight:400" id="gridN"></span></div>
+          <div class="grid" id="grid"></div>
+          <div class="gaxis"><span class="n">이평 5</span><span class="n" id="selLbl"></span><span class="n">60</span></div>
+          <div class="verdict" id="verdict"></div>
+
+          <div class="lb m">이 지점의 성과 <span style="color:var(--im);letter-spacing:0;font-weight:400" id="scopeLbl"></span></div>
+          <div class="tile hero"><span class="k">최장 미회복</span><span class="v n" id="mUw">—</span></div>
+          <div class="tile"><span class="k">MDD · Calmar</span><span class="v n" id="mMdd">—</span></div>
+          <div class="tile"><span class="k">거래당 수익 vs 비용</span><span class="v n" id="mCush">—</span></div>
+          <div class="tile"><span class="k">연환산</span><span class="v n" id="mCagr">—</span></div>
+          <div class="tile"><span class="k" style="color:var(--if)">샤프</span><span class="v n" id="mSr" style="color:var(--im);font-size:12.5px">—</span></div>
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="hdr"><b>실험 이력</b><span class="n" id="dockN"></span>
+          <span style="margin-left:auto;color:var(--if)">막대 = 검증구간 성과 · 흐린 것은 버린 시도 · 눌러서 전환</span></div>
+        <div class="strip" id="strip"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tips">
+  <div class="tip"><b>① 격자를 누르십시오</b>
+    곡선·낙폭·지표가 <b style="color:var(--ik);display:inline">그 조합의 것으로 통째로</b> 갈아끼워집니다.
+    <kbd>고원</kbd> 안인지 <kbd>봉우리</kbd>인지 판정이 아래에 뜹니다 — <b style="color:var(--ik);display:inline">우하단 밝은 칸</b>이 봉우리입니다.</div>
+  <div class="tip"><b>② 곡선을 드래그하십시오</b>
+    구간을 잡으면 <b style="color:var(--ik);display:inline">지표 전체가 그 구간만으로 재계산</b>됩니다.
+    낙폭 구간을 잡아 보면 같은 전략의 숫자가 얼마나 달라지는지 보입니다.</div>
+  <div class="tip"><b>③ 레일을 누르십시오</b>
+    화면을 <b style="color:var(--ik);display:inline">떠나지 않고</b> 패널이 뜹니다. 브러시와 격자 선택이 그대로 유지되는지 확인해 보십시오.</div>
+  <div class="tip"><b>④ 「새 실행」을 눌러 보십시오</b>
+    시도 횟수가 오르고 <b style="color:var(--ik);display:inline">MinBTL 경고가 붉어집니다</b>. 45회를 넘기면 무슨 일이 생기는지 보십시오.</div>
+</div>
+
+<script>
+(function(){
+  const N = 880, ROWS = 10, COLS = 10;
+  const $ = id => document.getElementById(id);
+  const rnd = s => () => (s = s*1664525+1013904223 & 0x7fffffff, s/0x7fffffff);
+
+  // ── 격자 품질: 넓은 고원 하나 + 고립된 봉우리 하나 ──
+  const g2 = (r,c,r0,c0,sig) => Math.exp(-(((r-r0)**2+(c-c0)**2)/(2*sig*sig)));
+  function quality(r,c){
+    return 1.00*g2(r,c,3.4,3.6,1.75)      // 고원
+         + 1.22*g2(r,c,6.0,8.0,0.42)      // 봉우리 (고립)
+         + 0.30*g2(r,c,5.2,2.0,1.10);
+  }
+  const Q = [], flat = [];
+  for(let r=0;r<ROWS;r++){ Q.push([]); for(let c=0;c<COLS;c++){ const q=quality(r,c); Q[r].push(q); flat.push(q); } }
+  const qMax = Math.max(...flat);
+
+  // ── 곡선 생성: 한 시리즈에서 모든 지표를 파생 ──
+  const bench = build(0.28, 12345), equal = build(0.42, 777);
+  function build(drift, seed){
+    const R = rnd(seed), out = [1]; let v = 1;
+    for(let i=1;i<N;i++){
+      const shock = (i>300&&i<360) ? -0.0022 : 0;
+      v *= 1 + drift/N + shock + (R()-0.5)*0.019;
+      out.push(v);
+    }
+    return out;
+  }
+  const cache = {};
+  function curveFor(r,c){
+    const k = r+'_'+c; if(cache[k]) return cache[k];
+    const q = Q[r][c]/qMax;
+    return cache[k] = build(0.12 + q*0.72, 1000 + r*97 + c*31);
+  }
+
+  // ── 지표: 전부 equity 슬라이스에서 계산 ──
+  function metrics(eq){
+    const n = eq.length; if(n<3) return null;
+    const total = eq[n-1]/eq[0], cagr = Math.pow(total, 252/n) - 1;
+    let peak = eq[0], mdd = 0, run = 0, longest = 0;
+    const dd = [];
+    for(let i=0;i<n;i++){
+      peak = Math.max(peak, eq[i]);
+      const d = eq[i]/peak - 1; dd.push(d);
+      mdd = Math.min(mdd, d);
+      if(d < -1e-9){ run++; longest = Math.max(longest, run); } else run = 0;
+    }
+    const rs = []; for(let i=1;i<n;i++) rs.push(eq[i]/eq[i-1]-1);
+    const mu = rs.reduce((a,b)=>a+b,0)/rs.length;
+    const sd = Math.sqrt(rs.reduce((a,b)=>a+(b-mu)**2,0)/rs.length);
+    return { cagr, mdd, dd, longest, calmar: mdd<0 ? cagr/Math.abs(mdd) : 0,
+             sharpe: sd>0 ? mu/sd*Math.sqrt(252) : 0, n };
+  }
+
+  // ── 상태 ──
+  let sel = {r:3,c:4}, brush = null, tries = 32, open = null;
+  const LIMIT = 45;
+  const hist = (()=>{ const R = rnd(4242), a = [];
+    for(let i=0;i<32;i++){ const r = Math.floor(R()*ROWS), c = Math.floor(R()*COLS);
+      a.push({r,c,q:Q[r][c]/qMax, kept: R()<0.09}); }
+    a[31] = {r:3,c:4,q:Q[3][4]/qMax,kept:true}; return a; })();
+
+  const px = (a,i,lo,hi,h) => [(i/(a.length-1))*600, h - ((a[i]-lo)/(hi-lo))*(h-8) - 4];
+  function poly(el, arr, lo, hi, h){
+    el.setAttribute('points', arr.map((_,i)=>px(arr,i,lo,hi,h).join(',')).join(' '));
+  }
+
+  function render(){
+    const full = curveFor(sel.r, sel.c);
+    const s = brush ? brush[0] : 0, e = brush ? brush[1] : N-1;
+    const cut = a => a.slice(s, e+1);
+    const st = cut(full), bm = cut(bench), eq = cut(equal);
+    const all = [...st,...bm,...eq], lo = Math.min(...all)*0.985, hi = Math.max(...all)*1.015;
+    poly($('cSt'), st, lo, hi, 250); poly($('cBm'), bm, lo, hi, 250); poly($('cEq'), eq, lo, hi, 250);
+
+    const m = metrics(st);
+    const ddLo = Math.min(...m.dd, -0.01);
+    poly($('cDd'), m.dd.map(d=>d), ddLo, 0.002, 46);
+
+    $('mUw').textContent = (m.longest/21).toFixed(1) + '개월';
+    $('mMdd').innerHTML = `<span style="color:var(--dn)">${(m.mdd*100).toFixed(1)}%</span><span style="color:var(--if)"> · </span>${m.calmar.toFixed(2)}`;
+    const cush = 1.4 + (Q[sel.r][sel.c]/qMax)*2.6;
+    $('mCush').innerHTML = cush.toFixed(1) + '<span style="font-size:11px;color:var(--if)">배 쿠션</span>';
+    $('mCagr').innerHTML = `<span style="color:${m.cagr>=0?'var(--up)':'var(--dn)'}">${m.cagr>=0?'+':''}${(m.cagr*100).toFixed(1)}%</span>`;
+    $('mSr').textContent = m.sharpe.toFixed(2) + ' ±0.54';
+
+    // 고원 vs 봉우리 판정 — 이웃 ±1칸 최대 낙차
+    const q = Q[sel.r][sel.c]; let worst = 0, cnt = 0;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      if(!dr&&!dc) continue;
+      const r=sel.r+dr, c=sel.c+dc; if(r<0||c<0||r>=ROWS||c>=COLS) continue;
+      cnt++; worst = Math.max(worst, (q - Q[r][c])/qMax);
+    }
+    const cliff = worst > 0.42;
+    $('verdict').innerHTML = cliff
+      ? `<b class="bad">절벽 — 기각 권고.</b> 이웃 한 칸만 옮겨도 성과가 <b class="bad">${(worst*100).toFixed(0)}%</b> 떨어집니다. 봉우리에 걸터앉은 상태입니다.`
+      : `<b class="ok">고원 안.</b> 이웃 ${cnt}칸 중 최대 낙차 <b class="ok">${(worst*100).toFixed(0)}%</b> — 두께가 있습니다.`;
+    $('selLbl').textContent = `이평 ${5+sel.c*6} · RSI ${10+sel.r*4}`;
+
+    $('rangeLbl').textContent = brush
+      ? `선택 구간 · ${m.n} 세션 (전체 ${N})`
+      : `2023-01 → 2026-08 · ${N} 세션`;
+    $('scopeLbl').textContent = brush ? '· 선택 구간' : '';
+    $('ddLbl').textContent = `최저 ${(m.mdd*100).toFixed(1)}% · 최장 ${m.longest}일`;
+    $('clearBrush').style.display = brush ? '' : 'none';
+
+    document.querySelectorAll('#grid i').forEach(el=>{
+      el.classList.toggle('sel', +el.dataset.r===sel.r && +el.dataset.c===sel.c);
+    });
+    document.querySelectorAll('#strip u').forEach((el,i)=>{
+      el.classList.toggle('on', i===31 && sel.r===hist[31].r && sel.c===hist[31].c);
+    });
+    $('hTry').textContent = tries;
+    const over = tries > LIMIT;
+    $('hWarn').innerHTML = over
+      ? `⚠ MinBTL 초과 — <b class="n">${tries-LIMIT}</b>회 넘김`
+      : `⚠ MinBTL 잔여 <span class="n">${LIMIT-tries}</span>회`;
+    $('hWarn').style.color = over ? 'var(--dg)' : (tries > LIMIT*0.8 ? 'var(--dg)' : 'var(--im)');
+    $('hLimit').textContent = `/ ${LIMIT} 상한`;
+  }
+
+  // ── 격자 ──
+  const grid = $('grid');
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const el = document.createElement('i');
+    const t = Q[r][c]/qMax;
+    const v = Math.round(28 + t*196);
+    el.style.background = `rgb(${Math.round(v*0.92)},${Math.round(v*0.98)},${Math.round(v*1.02)})`;
+    el.dataset.r = r; el.dataset.c = c;
+    el.title = `이평 ${5+c*6} · RSI ${10+r*4}`;
+    el.onclick = () => { sel = {r,c}; render(); };
+    grid.appendChild(el);
+  }
+  $('gridN').textContent = `· ${ROWS*COLS}조합`;
+
+  // ── 이력 스트립 ──
+  const strip = $('strip');
+  hist.forEach((h,i)=>{
+    const u = document.createElement('u');
+    u.style.height = Math.max(4, h.q*100) + '%';
+    u.style.background = h.q > 0.42 ? 'var(--up)' : 'var(--dn)';
+    if(!h.kept && i!==31) u.classList.add('dead');
+    u.title = `${i+1}번째 시도 · 이평 ${5+h.c*6} · RSI ${10+h.r*4}`;
+    u.onclick = () => { sel = {r:h.r,c:h.c}; render(); };
+    strip.appendChild(u);
+  });
+  $('dockN').textContent = `${hist.length}회 · 커밋 ${hist.filter(h=>h.kept).length} · 버림 ${hist.filter(h=>!h.kept).length}`;
+
+  // ── 브러시 ──
+  const plot = $('plot'), bEl = $('brush');
+  let dragging = false, x0 = 0;
+  const toIdx = ev => {
+    const rect = plot.getBoundingClientRect();
+    return Math.max(0, Math.min(N-1, Math.round((ev.clientX-rect.left)/rect.width*(N-1))));
+  };
+  plot.addEventListener('mousedown', e => { dragging = true; x0 = toIdx(e); bEl.style.display='none'; });
+  window.addEventListener('mousemove', e => {
+    if(!dragging) return;
+    const x1 = toIdx(e), a = Math.min(x0,x1), b = Math.max(x0,x1);
+    bEl.style.display = ''; bEl.style.left = (a/(N-1)*100)+'%'; bEl.style.right = (100-b/(N-1)*100)+'%';
+    $('brushLbl').textContent = `${b-a+1} 세션 선택`;
+  });
+  window.addEventListener('mouseup', e => {
+    if(!dragging) return; dragging = false;
+    const x1 = toIdx(e), a = Math.min(x0,x1), b = Math.max(x0,x1);
+    if(b-a < 25){ bEl.style.display='none'; brush = null; } else brush = [a,b];
+    render();
+  });
+  $('clearBrush').onclick = () => { brush = null; bEl.style.display='none'; render(); };
+
+  // ── 레일 · 패널 ──
+  const CONTENT = {
+    terminal: ['터미널','삼성전자 005930', `<div class="row"><span>현재가</span><b class="n" style="color:var(--up)">71,400</b></div>
+      <div class="row"><span>이 종목 편입 실험</span><b class="n">14 / 32</b></div>
+      <div class="row"><span>모의 보유</span><b class="n">28주 · +2.4%</b></div>
+      <div style="margin-top:9px;font-size:11px;color:var(--if);line-height:1.5">보드의 구간 선택이 유지된 채 열립니다 — 닫으면 그대로 돌아갑니다.</div>`],
+    research: ['리서치','이 가설 관련', `<div class="row"><b>2026 반도체 사이클 메모</b><span class="n">08-02</span></div>
+      <div class="row"><b>HBM 공급과잉 리포트</b><span class="n">07-28</span></div>
+      <div style="margin-top:9px;font-size:11px;color:var(--if);line-height:1.5">실험대 안 패널로 접었습니다 — 레일 한 칸을 쓰지만 화면을 떠나지 않습니다.</div>`],
+    portfolio: ['포트폴리오','실계좌 vs 봇', `<div class="row"><span>내 실계좌</span><b class="n" style="color:var(--up)">+8.6%</b></div>
+      <div class="row"><span>이 전략(모의)</span><b class="n" style="color:var(--up)">+14.2%</b></div>
+      <div class="row"><span>동일가중 유니버스</span><b class="n" style="color:var(--up)">+11.9%</b></div>
+      <div style="margin-top:9px;font-size:11px;color:var(--if);line-height:1.5">기준선으로 고정하면 모든 곡선에 상시 겹칩니다.</div>`],
+    settings: ['설정','판정 기준 · 계정 단위', `<div class="row"><span>최장 미회복 &lt; 9개월</span><b style="color:var(--ik)">✓</b></div>
+      <div class="row"><span>MDD &lt; 20%</span><b style="color:var(--ik)">✓</b></div>
+      <div class="row"><span>시도 ≤ 45회</span><b style="color:var(--dg)">✕</b></div>
+      <div style="margin-top:9px;font-size:11px;color:var(--if);line-height:1.5">가설이 아니라 계정에 붙습니다 — 모든 실험을 같은 자로 잽니다.</div>`],
+  };
+  $('rail').addEventListener('click', e => {
+    const i = e.target.closest('i'); if(!i) return;
+    const p = i.dataset.p;
+    document.querySelectorAll('#rail i').forEach(x=>x.classList.remove('act'));
+    if(p==='board' || open===p){ open=null; $('panel').classList.remove('open'); return; }
+    open = p; i.classList.add('act');
+    const [t,s,b] = CONTENT[p];
+    $('pTitle').textContent = t; $('pSub').textContent = s; $('pBody').innerHTML = b;
+    $('panel').classList.add('open');
+  });
+  $('pClose').onclick = () => { open=null; $('panel').classList.remove('open');
+    document.querySelectorAll('#rail i').forEach(x=>x.classList.remove('act')); };
+
+  // ── 새 실행 ──
+  $('runBtn').onclick = () => {
+    tries++;
+    const R = rnd(tries*991);
+    const r = Math.floor(R()*ROWS), c = Math.floor(R()*COLS);
+    sel = {r,c};
+    const u = document.createElement('u');
+    u.style.height = Math.max(4, (Q[r][c]/qMax)*100) + '%';
+    u.style.background = (Q[r][c]/qMax) > 0.42 ? 'var(--up)' : 'var(--dn)';
+    u.title = `${tries}번째 시도`;
+    u.onclick = () => { sel={r,c}; render(); };
+    strip.appendChild(u);
+    hist.push({r,c,q:Q[r][c]/qMax,kept:false});
+    $('dockN').textContent = `${hist.length}회 · 커밋 ${hist.filter(h=>h.kept).length} · 버림 ${hist.filter(h=>!h.kept).length}`;
+    render();
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>

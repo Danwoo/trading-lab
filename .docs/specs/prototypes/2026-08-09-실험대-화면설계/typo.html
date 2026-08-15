@@ -1,0 +1,175 @@
+<style>
+  .ty { font-family:Pretendard,system-ui,sans-serif; }
+  .ty-fix { background:#16191C; border:1px solid #262B30; border-left:2px solid #8B877F; border-radius:9px; padding:13px 16px; margin:14px 0 18px; color:#E6E4E0; font-size:12.5px; line-height:1.65; }
+  .ty-fix code { font-family:ui-monospace,monospace; font-size:11px; }
+
+  .ty-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:16px 0 8px; }
+  @media (max-width:1100px){ .ty-grid{grid-template-columns:1fr;} }
+  .k { border-radius:11px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color .12s, transform .12s; background:#16191C; }
+  .k:hover { transform:translateY(-2px); }
+  .k.selected { border-color:#4f8cff; }
+  .k .shot { padding:15px; background:#0D0F11; }
+
+  .k .p { background:#16191C; border:1px solid #262B30; border-radius:9px; box-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.24); }
+  .k .pb { padding:0 13px 13px; }
+  .k .tb { border-top:1px solid #262B30; margin-top:10px; }
+  .k .tr { display:flex; align-items:center; border-bottom:1px solid rgba(38,43,48,.75); font-variant-numeric:tabular-nums; }
+  .k .tr b { flex:1; font-weight:400; }
+  .k .tr s { width:64px; text-align:right; text-decoration:none; }
+  .k .tr u { width:54px; text-align:right; text-decoration:none; }
+  .k .kv { display:flex; justify-content:space-between; font-variant-numeric:tabular-nums; }
+  .k .btn { display:inline-block; background:linear-gradient(180deg,#2E353B,#242A30); border:1px solid #434C54; color:#F5F3EF; border-radius:8px; box-shadow:inset 0 1px 0 rgba(255,255,255,.07); }
+
+  .k .meta { padding:12px 15px 15px; font-size:11.5px; line-height:1.55; color:#E6E4E0; }
+  .k .meta b.t { display:block; font-size:14px; margin-bottom:4px; letter-spacing:-.01em; }
+  .k .spec { font-family:ui-monospace,monospace; font-size:9.5px; color:#8B877F; margin-top:8px; line-height:1.65; }
+</style>
+
+<div class="ty">
+<h2>타이포 — 먼저 정할 것은 크기값이 아니라 <b>위계를 무엇으로 만드는가</b> 입니다</h2>
+
+<div class="ty-fix">
+  <b>고정됨.</b> 세 후보 모두 <b>색·간격·라운드·버튼 재질이 완전히 동일</b>합니다. 바뀌는 건 글자의 크기·굵기·자간·명도뿐입니다.
+  내용도 동일합니다.
+  <br><br>
+  <b>왜 이게 지금 가장 중요한가:</b> 액센트를 뺐으니 <b>"무엇이 더 중요한가"를 알려줄 수단이 글자밖에 없습니다.</b>
+  색이 있을 때는 색이 절반을 해주지만, 지금은 크기·굵기·명도 셋이 전부입니다.
+</div>
+
+<div class="ty-grid options">
+
+<!-- ═══ T1 크기 대비 ═══ -->
+<div class="k option" data-choice="t1" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="p">
+      <div style="padding:13px 13px 0; display:flex; align-items:baseline; gap:7px">
+        <span style="font-size:15px;font-weight:700;color:#F2F0EC;letter-spacing:-.015em">종목 정보</span>
+        <span style="font-size:11px;color:#8B877F">005930</span>
+      </div>
+      <div class="pb">
+        <div style="font-size:32px;font-weight:700;letter-spacing:-.035em;color:#DB4F3E;line-height:1.1;margin-top:8px" class="kv"><span>71,400</span></div>
+        <div style="font-size:13px;color:#DB4F3E;margin-top:2px">▲ 1,200 (+1.71%)</div>
+        <div style="margin-top:9px">
+          <div class="kv" style="padding:5px 0;border-bottom:1px solid rgba(38,43,48,.75)"><span style="font-size:11px;color:#8B877F">거래량</span><span style="font-size:13px;font-weight:500;color:#E6E4E0">12,847,301</span></div>
+          <div class="kv" style="padding:5px 0;border-bottom:1px solid rgba(38,43,48,.75)"><span style="font-size:11px;color:#8B877F">시가총액</span><span style="font-size:13px;font-weight:500;color:#E6E4E0">426.1조</span></div>
+          <div class="kv" style="padding:5px 0"><span style="font-size:11px;color:#8B877F">PER</span><span style="font-size:13px;font-weight:500;color:#E6E4E0">13.4</span></div>
+        </div>
+        <div class="tb">
+          <div class="tr" style="height:24px;font-size:11px;font-weight:500;color:#8B877F"><b style="font-weight:500">종목명</b><s>현재가</s><u>등락</u></div>
+          <div class="tr" style="height:28px;font-size:12.5px;color:#E6E4E0"><b>SK하이닉스</b><s>184,200</s><u style="color:#DB4F3E">+3.04%</u></div>
+          <div class="tr" style="height:28px;font-size:12.5px;color:#E6E4E0"><b>NAVER</b><s>198,500</s><u style="color:#4A8CC8">-0.85%</u></div>
+          <div class="tr" style="height:28px;font-size:12.5px;color:#E6E4E0;border-bottom:none"><b>카카오</b><s>41,750</s><u style="color:#4A8CC8">-2.11%</u></div>
+        </div>
+        <span class="btn" style="font-size:12.5px;font-weight:500;padding:7px 14px;margin-top:11px">관심종목 추가</span>
+      </div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">T1. 크기로 가른다</b>
+    제목은 크고 라벨은 작습니다. 스텝 폭이 넓어(11 → 32) <b>위계가 한눈에 잡히고 활기가 있습니다.</b>
+    <br>대신 <b style="color:#C9C5BD">큰 글자가 자리를 먹어 한 화면 정보량이 줄고</b>, 패널이 많은 터미널에서는
+    화면마다 제목이 크게 반복돼 <b>소란스러워질 수</b> 있습니다.
+    <div class="spec">라벨 11 · 값 13/500 · 제목 15/700 · 대표숫자 32/700<br>표 헤더 11/500 · 셀 12.5/400 · 행 28</div>
+  </div>
+</div>
+
+<!-- ═══ T2 굵기·명도 ═══ -->
+<div class="k option" data-choice="t2" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="p">
+      <div style="padding:13px 13px 0; display:flex; align-items:baseline; gap:7px">
+        <span style="font-size:12.5px;font-weight:700;color:#F2F0EC;letter-spacing:-.01em">종목 정보</span>
+        <span style="font-size:12px;color:#625E58">005930</span>
+      </div>
+      <div class="pb">
+        <div style="font-size:26px;font-weight:500;letter-spacing:-.03em;color:#DB4F3E;line-height:1.15;margin-top:9px" class="kv"><span>71,400</span></div>
+        <div style="font-size:12px;color:#DB4F3E;margin-top:3px">▲ 1,200 (+1.71%)</div>
+        <div style="margin-top:10px">
+          <div class="kv" style="padding:5px 0;border-bottom:1px solid rgba(38,43,48,.75)"><span style="font-size:12px;color:#625E58">거래량</span><span style="font-size:12.5px;font-weight:500;color:#E6E4E0">12,847,301</span></div>
+          <div class="kv" style="padding:5px 0;border-bottom:1px solid rgba(38,43,48,.75)"><span style="font-size:12px;color:#625E58">시가총액</span><span style="font-size:12.5px;font-weight:500;color:#E6E4E0">426.1조</span></div>
+          <div class="kv" style="padding:5px 0"><span style="font-size:12px;color:#625E58">PER</span><span style="font-size:12.5px;font-weight:500;color:#E6E4E0">13.4</span></div>
+        </div>
+        <div class="tb">
+          <div class="tr" style="height:24px;font-size:12px;color:#625E58"><b>종목명</b><s>현재가</s><u>등락</u></div>
+          <div class="tr" style="height:26px;font-size:12px;color:#E6E4E0"><b>SK하이닉스</b><s>184,200</s><u style="color:#DB4F3E">+3.04%</u></div>
+          <div class="tr" style="height:26px;font-size:12px;color:#E6E4E0"><b>NAVER</b><s>198,500</s><u style="color:#4A8CC8">-0.85%</u></div>
+          <div class="tr" style="height:26px;font-size:12px;color:#E6E4E0;border-bottom:none"><b>카카오</b><s>41,750</s><u style="color:#4A8CC8">-2.11%</u></div>
+        </div>
+        <span class="btn" style="font-size:12px;font-weight:500;padding:7px 14px;margin-top:12px">관심종목 추가</span>
+      </div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">T2. 굵기와 명도로 가른다</b>
+    글자 크기를 <b>12~13px 좁은 대역에 묶고</b>, 위계는 <b>굵기(400·500·700)</b>와
+    <b>잉크 명도 4단</b>(<code>#F2F0EC</code>→<code>#E6E4E0</code>→<code>#8B877F</code>→<code>#625E58</code>)으로 만듭니다.
+    <br><b>가장 조용하고 밀도가 가장 높습니다.</b> 계기·표 중심 도구가 쓰는 방식이고,
+    N4 바탕의 절제와 성격이 맞습니다. 대신 <b style="color:#C9C5BD">위계가 은근해서 처음 보는 사람은 훑기 어려울 수</b> 있습니다.
+    <div class="spec">라벨 12/faint · 값 12.5/500 · 제목 12.5/700 · 대표숫자 26/500<br>표 헤더 12/faint · 셀 12/400 · 행 26</div>
+  </div>
+</div>
+
+<!-- ═══ T3 라벨 조판 ═══ -->
+<div class="k option" data-choice="t3" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="p">
+      <div style="padding:13px 13px 0; display:flex; align-items:baseline; gap:8px">
+        <span style="font-size:11px;font-weight:700;color:#F2F0EC;letter-spacing:.13em">종목 정보</span>
+        <span style="font-size:10px;color:#8B877F;letter-spacing:.08em">005930</span>
+      </div>
+      <div class="pb">
+        <div style="font-size:30px;font-weight:700;letter-spacing:-.03em;color:#DB4F3E;line-height:1.1;margin-top:9px" class="kv"><span>71,400</span></div>
+        <div style="font-size:12px;color:#DB4F3E;margin-top:2px;letter-spacing:.02em">▲ 1,200 (+1.71%)</div>
+        <div style="margin-top:10px">
+          <div class="kv" style="padding:5px 0;border-bottom:1px solid rgba(38,43,48,.75)"><span style="font-size:9.5px;font-weight:700;color:#8B877F;letter-spacing:.14em">거래량</span><span style="font-size:13px;color:#E6E4E0">12,847,301</span></div>
+          <div class="kv" style="padding:5px 0;border-bottom:1px solid rgba(38,43,48,.75)"><span style="font-size:9.5px;font-weight:700;color:#8B877F;letter-spacing:.14em">시가총액</span><span style="font-size:13px;color:#E6E4E0">426.1조</span></div>
+          <div class="kv" style="padding:5px 0"><span style="font-size:9.5px;font-weight:700;color:#8B877F;letter-spacing:.14em">PER</span><span style="font-size:13px;color:#E6E4E0">13.4</span></div>
+        </div>
+        <div class="tb">
+          <div class="tr" style="height:23px;font-size:9.5px;font-weight:700;color:#8B877F;letter-spacing:.14em"><b style="font-weight:700">종목명</b><s>현재가</s><u>등락</u></div>
+          <div class="tr" style="height:27px;font-size:12.5px;color:#E6E4E0"><b>SK하이닉스</b><s>184,200</s><u style="color:#DB4F3E">+3.04%</u></div>
+          <div class="tr" style="height:27px;font-size:12.5px;color:#E6E4E0"><b>NAVER</b><s>198,500</s><u style="color:#4A8CC8">-0.85%</u></div>
+          <div class="tr" style="height:27px;font-size:12.5px;color:#E6E4E0;border-bottom:none"><b>카카오</b><s>41,750</s><u style="color:#4A8CC8">-2.11%</u></div>
+        </div>
+        <span class="btn" style="font-size:10.5px;font-weight:700;padding:8px 15px;margin-top:12px;letter-spacing:.11em">관심종목 추가</span>
+      </div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">T3. 라벨을 조판한다</b>
+    라벨·표 헤더를 <b>아주 작게(9.5px) + 굵게 + 자간을 크게 벌려</b> 값과 완전히 다른 종류의 글자로 만듭니다.
+    인쇄 표·계기판 각인의 방식이고, <b>성격이 가장 뚜렷합니다.</b>
+    <br><b style="color:#C9C5BD">정직한 한계:</b> 이 기법의 원래 힘은 <b>대문자 변환</b>에서 나오는데
+    <b>한글엔 대문자가 없습니다.</b> 그래서 한글에서는 자간·굵기·크기로만 흉내 내야 하고 효과가 절반입니다.
+    영문 라벨(<code>VOL</code>·<code>PER</code>)에서는 제대로 살지만, 이 앱은 한국어가 기본입니다.
+    <div class="spec">라벨 9.5/700/+.14em · 값 13/400 · 제목 11/700/+.13em<br>대표숫자 30/700 · 표 헤더 9.5/700/+.14em · 행 27</div>
+  </div>
+</div>
+
+</div>
+
+<div class="section" style="margin-top:24px">
+  <p class="label">함께 정해질 것 — 한글 조판 기본값 (어느 안을 고르든 적용)</p>
+  <p style="line-height:1.7">
+    <b>① 자간</b> — 한글은 라틴보다 글자 폭이 균일해서 기본 자간이 헐거워 보입니다.
+    본문·UI 텍스트에 <code>letter-spacing: -0.01em</code>, 큰 숫자에 <code>-0.03em</code> 을 기본으로 겁니다.
+    <br><b>② 행간</b> — 한글은 라틴보다 행간이 더 필요합니다. 본문 <b>1.6</b>, UI 한 줄 텍스트 <b>1.45</b>.
+    지금 코드엔 이 기준이 없어 화면마다 다릅니다.
+    <br><b>③ 숫자</b> — <code>font-feature-settings:"tnum"</code> 로 자릿수를 고정합니다.
+    앞서 말씀드린 대로 <b>Pretendard 가 tnum 을 실제로 담고 있는지는 구현 첫 단계에서 확인</b>하고,
+    없으면 숫자만 시스템 mono 로 폴백합니다.
+    <br><b>④ 굵기</b> — <b>400 / 500 / 700 세 벌</b>만 씁니다(현재 9벌 로드 중 4벌은 사용 0). woff2만 남겨 17MB → 3파일.
+  </p>
+</div>
+
+<div class="section" style="margin-top:20px">
+  <p class="label">고르실 때 쓸 축</p>
+  <p style="line-height:1.7">
+    <b>"이 화면을 매일 몇 시간 볼 것인가"</b>가 기준입니다.
+    오래 보는 도구일수록 T2 쪽이 편하고(위계가 조용해 눈이 덜 피로), 가끔 열어보는 화면일수록 T1 이 친절합니다.
+    이 제품은 <b>터미널을 매일 오래 보고, 관리 화면은 가끔</b> 여는 구조라 — 한 벌로 통일할지,
+    <b>터미널은 T2 / 관리 화면은 T1</b> 로 나눌지도 선택지입니다.
+    <br><b>혼합을 고르시면 규칙이 하나 늘지만</b>, 두 곳의 사용 방식이 실제로 다르니 정당한 분리입니다.
+  </p>
+</div>
+</div>

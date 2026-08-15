@@ -1,0 +1,185 @@
+<style>
+  .mk { font-family:Pretendard,system-ui,sans-serif; }
+  .mk-fix { background:#16191C; border:1px solid #262B30; border-radius:10px; padding:13px 16px; margin:14px 0 20px; color:#E6E4E0; font-size:12.5px; line-height:1.6; }
+  .mk-fix code { font-family:ui-monospace,monospace; font-size:11px; }
+  .mk-fix .sw { display:flex; gap:0; border-radius:5px; overflow:hidden; margin-top:9px; }
+  .mk-fix .sw i { flex:1; height:22px; }
+
+  .mk-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:16px 0 8px; }
+  @media (max-width:1100px){ .mk-grid{grid-template-columns:1fr;} }
+  .m { border-radius:11px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color .12s, transform .12s; background:#16191C; }
+  .m:hover { transform:translateY(-2px); }
+  .m.selected { border-color:#4f8cff; }
+  .m .shot { padding:15px; background:#0D0F11; }
+
+  .m .p { background:#16191C; border:1px solid #262B30; border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.26); }
+  .m .ph { display:flex; align-items:center; gap:7px; padding:12px 14px 0; }
+  .m .pt { font-size:12.5px; font-weight:700; color:#F2F0EC; letter-spacing:-.01em; }
+  .m .pc { font-size:11px; color:#8B877F; }
+  .m .pb { padding:8px 14px 13px; }
+  .m .px { font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.08; font-variant-numeric:tabular-nums; }
+  .m .dl { font-size:11.5px; margin-top:2px; font-variant-numeric:tabular-nums; }
+
+  /* 밀집 표 — 실제 판별력 시험대 */
+  .m .tb { margin-top:11px; border-top:1px solid #262B30; }
+  .m .tr { display:flex; align-items:center; height:24px; font-size:11px; font-variant-numeric:tabular-nums; border-bottom:1px solid rgba(38,43,48,.75); }
+  .m .tr b { flex:1; font-weight:400; color:#E6E4E0; }
+  .m .tr s { width:62px; text-align:right; text-decoration:none; color:#E6E4E0; }
+  .m .tr u { width:56px; text-align:right; text-decoration:none; }
+
+  .m .strip { margin-top:12px; border-radius:8px; padding:9px 11px; }
+  .m .strip .lb { font-size:9.5px; letter-spacing:.12em; font-weight:700; opacity:.55; margin-bottom:6px; }
+  .m .strip .sr { display:flex; gap:10px; font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .m .strip .sr span { flex:1; }
+
+  .m .meta { padding:12px 15px 15px; font-size:11.5px; line-height:1.55; color:#E6E4E0; }
+  .m .meta b.t { display:block; font-size:14px; margin-bottom:4px; letter-spacing:-.01em; }
+  .m .hex { font-family:ui-monospace,monospace; font-size:9.5px; color:#8B877F; margin-top:8px; line-height:1.6; }
+</style>
+
+<div class="mk">
+<h2>2단계 — 상승 / 하락 색. 축은 <b>채도</b> 하나입니다.</h2>
+
+<div class="mk-fix">
+  <b>고정됨 — N4 바탕.</b> 이 화면에서 배경·패널·선·글자는 <b>세 후보 모두 완전히 동일</b>합니다. 바뀌는 건 등락 두 색뿐입니다.
+  <div class="sw"><i style="background:#0D0F11"></i><i style="background:#16191C"></i><i style="background:#262B30"></i><i style="background:#8B877F"></i><i style="background:#E6E4E0"></i></div>
+  <div style="margin-top:9px;font-size:11.5px;opacity:.85">
+    <code>--bg-base #0D0F11</code> · <code>--bg-panel #16191C</code> · <code>--line #262B30</code> ·
+    <code>--ink-muted #8B877F</code> · <code>--ink #E6E4E0</code>
+    <br><b>라이트는 같은 원리를 뒤집습니다</b> — 바탕은 차갑게(<code>#E8EAEC</code>/<code>#F4F5F6</code>),
+    글자만 따뜻하게(<code>#2E2B26</code>). 따뜻함이 글자에만 있으니 크림 배경 문제가 구조적으로 안 생깁니다.
+  </div>
+</div>
+
+<p class="subtitle">
+  각 후보는 <b>대형 숫자 · 밀집 표 6행 · 미국식 프리셋 · 라이트</b> 넷에서 함께 보여야 판단이 됩니다.
+  특히 <b>밀집 표</b>가 진짜 시험대입니다 — 11px 글자에서 적/청이 즉시 갈리지 않으면 그 팔레트는 실패입니다.
+</p>
+
+<div class="mk-grid options">
+
+<!-- ═══ M1 저채도 ═══ -->
+<div class="m option" data-choice="m1" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="p">
+      <div class="ph"><span class="pt">삼성전자</span><span class="pc">005930</span></div>
+      <div class="pb">
+        <div class="px" style="color:#C24A3C">71,400</div>
+        <div class="dl" style="color:#C24A3C">▲ 1,200 (+1.71%)</div>
+        <div class="tb">
+          <div class="tr"><b>SK하이닉스</b><s>184,200</s><u style="color:#C24A3C">+3.04%</u></div>
+          <div class="tr"><b>NAVER</b><s>198,500</s><u style="color:#4B7BAE">-0.85%</u></div>
+          <div class="tr"><b>카카오</b><s>41,750</s><u style="color:#4B7BAE">-2.11%</u></div>
+          <div class="tr"><b>LG에너지솔루션</b><s>402,000</s><u style="color:#C24A3C">+0.62%</u></div>
+          <div class="tr"><b>현대차</b><s>247,500</s><u style="color:#4B7BAE">-1.20%</u></div>
+          <div class="tr" style="border-bottom:none"><b>셀트리온</b><s>176,300</s><u style="color:#C24A3C">+0.34%</u></div>
+        </div>
+      </div>
+    </div>
+    <div class="strip" style="background:#16191C;border:1px solid #262B30">
+      <div class="lb" style="color:#8B877F">미국식 프리셋 (녹=상승)</div>
+      <div class="sr"><span style="color:#5E8F4A">▲ +1.71%</span><span style="color:#C24A3C">▼ -0.85%</span></div>
+    </div>
+    <div class="strip" style="background:#F4F5F6;border:1px solid #D6D9DC">
+      <div class="lb" style="color:#6E6A63">라이트</div>
+      <div class="sr"><span style="color:#A83A2C;font-weight:600">▲ 71,400</span><span style="color:#2F5D8F;font-weight:600">▼ 41,750</span></div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">M1. 인쇄 잉크 — 저채도</b>
+    신문 시세면의 잉크 농도. <b>N4의 지면 정체성과 가장 잘 맞습니다.</b>
+    오래 봐도 눈이 편하고 화면이 차분합니다.
+    <br>다만 <b style="color:#E8A090">밀집 표에서 판별이 가장 느립니다</b> — 위 6행을 실제로 훑어보시고
+    적/청이 즉시 갈리는지 확인해 주십시오. 이 안의 유일한 탈락 조건입니다.
+    <div class="hex">KR &nbsp;up #C24A3C &nbsp;down #4B7BAE<br>US &nbsp;up #5E8F4A &nbsp;down #C24A3C<br>LT &nbsp;up #A83A2C &nbsp;down #2F5D8F</div>
+  </div>
+</div>
+
+<!-- ═══ M2 중채도 ═══ -->
+<div class="m option" data-choice="m2" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="p">
+      <div class="ph"><span class="pt">삼성전자</span><span class="pc">005930</span></div>
+      <div class="pb">
+        <div class="px" style="color:#DB4F3E">71,400</div>
+        <div class="dl" style="color:#DB4F3E">▲ 1,200 (+1.71%)</div>
+        <div class="tb">
+          <div class="tr"><b>SK하이닉스</b><s>184,200</s><u style="color:#DB4F3E">+3.04%</u></div>
+          <div class="tr"><b>NAVER</b><s>198,500</s><u style="color:#4A8CC8">-0.85%</u></div>
+          <div class="tr"><b>카카오</b><s>41,750</s><u style="color:#4A8CC8">-2.11%</u></div>
+          <div class="tr"><b>LG에너지솔루션</b><s>402,000</s><u style="color:#DB4F3E">+0.62%</u></div>
+          <div class="tr"><b>현대차</b><s>247,500</s><u style="color:#4A8CC8">-1.20%</u></div>
+          <div class="tr" style="border-bottom:none"><b>셀트리온</b><s>176,300</s><u style="color:#DB4F3E">+0.34%</u></div>
+        </div>
+      </div>
+    </div>
+    <div class="strip" style="background:#16191C;border:1px solid #262B30">
+      <div class="lb" style="color:#8B877F">미국식 프리셋 (녹=상승)</div>
+      <div class="sr"><span style="color:#5FA34C">▲ +1.71%</span><span style="color:#DB4F3E">▼ -0.85%</span></div>
+    </div>
+    <div class="strip" style="background:#F4F5F6;border:1px solid #D6D9DC">
+      <div class="lb" style="color:#6E6A63">라이트</div>
+      <div class="sr"><span style="color:#B83C2B;font-weight:600">▲ 71,400</span><span style="color:#2E6BA8;font-weight:600">▼ 41,750</span></div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">M2. 중채도</b>
+    <b>지면의 차분함과 단말의 판별력이 만나는 지점.</b> 밀집 표에서 확실히 갈리면서도
+    화면 전체가 쨍해지지 않습니다.
+    <br>Tailwind 기본값(<code>#EF4444</code>/<code>#3B82F6</code>)과는 <b>둘 다 명확히 다른 자리</b>에 있습니다 —
+    빨강은 주홍 쪽으로, 파랑은 탁한 쪽으로 각각 밀려 있습니다.
+    <div class="hex">KR &nbsp;up #DB4F3E &nbsp;down #4A8CC8<br>US &nbsp;up #5FA34C &nbsp;down #DB4F3E<br>LT &nbsp;up #B83C2B &nbsp;down #2E6BA8</div>
+  </div>
+</div>
+
+<!-- ═══ M3 고채도 ═══ -->
+<div class="m option" data-choice="m3" onclick="toggleSelect(this)">
+  <div class="shot">
+    <div class="p">
+      <div class="ph"><span class="pt">삼성전자</span><span class="pc">005930</span></div>
+      <div class="pb">
+        <div class="px" style="color:#F5483F">71,400</div>
+        <div class="dl" style="color:#F5483F">▲ 1,200 (+1.71%)</div>
+        <div class="tb">
+          <div class="tr"><b>SK하이닉스</b><s>184,200</s><u style="color:#F5483F">+3.04%</u></div>
+          <div class="tr"><b>NAVER</b><s>198,500</s><u style="color:#2F9BEE">-0.85%</u></div>
+          <div class="tr"><b>카카오</b><s>41,750</s><u style="color:#2F9BEE">-2.11%</u></div>
+          <div class="tr"><b>LG에너지솔루션</b><s>402,000</s><u style="color:#F5483F">+0.62%</u></div>
+          <div class="tr"><b>현대차</b><s>247,500</s><u style="color:#2F9BEE">-1.20%</u></div>
+          <div class="tr" style="border-bottom:none"><b>셀트리온</b><s>176,300</s><u style="color:#F5483F">+0.34%</u></div>
+        </div>
+      </div>
+    </div>
+    <div class="strip" style="background:#16191C;border:1px solid #262B30">
+      <div class="lb" style="color:#8B877F">미국식 프리셋 (녹=상승)</div>
+      <div class="sr"><span style="color:#3FBF5F">▲ +1.71%</span><span style="color:#F5483F">▼ -0.85%</span></div>
+    </div>
+    <div class="strip" style="background:#F4F5F6;border:1px solid #D6D9DC">
+      <div class="lb" style="color:#6E6A63">라이트</div>
+      <div class="sr"><span style="color:#D6291E;font-weight:600">▲ 71,400</span><span style="color:#1478D6;font-weight:600">▼ 41,750</span></div>
+    </div>
+  </div>
+  <div class="meta">
+    <b class="t">M3. 단말 — 고채도</b>
+    국내 HTS·전광판의 쨍함. <b>판별력은 압도적</b>이고, 수백 행이 깔려도 0.1초에 갈립니다.
+    <br>대신 <b style="color:#E8A090">차분한 N4 바탕과 성격이 부딪힙니다</b> — 지면 같은 배경 위에 LED 숫자가 얹힌 인상이 됩니다.
+    그리고 장시간 응시에서 눈이 가장 빨리 피로합니다.
+    <div class="hex">KR &nbsp;up #F5483F &nbsp;down #2F9BEE<br>US &nbsp;up #3FBF5F &nbsp;down #F5483F<br>LT &nbsp;up #D6291E &nbsp;down #1478D6</div>
+  </div>
+</div>
+
+</div>
+
+<div class="section" style="margin-top:24px">
+  <p class="label">craft 하나 — 적과 청은 같은 채도로 두면 안 됩니다</p>
+  <p style="line-height:1.7">
+    세 후보 모두 <b>파랑의 명도를 빨강보다 조금 올려</b> 뒀습니다. 사람 눈은 어두운 배경에서 파랑을 빨강보다
+    약하게 지각하기 때문에, 숫자상 같은 채도로 맞추면 <b>화면에서는 하락이 상승보다 흐리게</b> 보입니다.
+    등락이 대등하게 읽혀야 하는 화면에서 이건 편향입니다. 흔히 놓치는 자리라 명시해 둡니다.
+    <br><br>
+    <b>고르실 때는 대형 숫자가 아니라 밀집 표 6행을 보십시오.</b> 큰 숫자는 어떤 색이든 잘 보입니다 —
+    실제 사용은 표에서 일어납니다. <b>"M2 인데 빨강만 좀 더 진하게" 같은 미세 조정도 좋습니다.</b>
+    확정되면 마지막 3단계(액센트 한 색)로 넘어갑니다.
+  </p>
+</div>
+</div>

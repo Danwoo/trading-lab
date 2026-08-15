@@ -1,0 +1,282 @@
+<style>
+  .ds { font-family:Pretendard,system-ui,sans-serif; }
+  .ds h3 { font-size:16px; margin:30px 0 4px; letter-spacing:-.01em; }
+  .ds .hint { font-size:12.5px; opacity:.7; line-height:1.6; margin-bottom:12px; }
+  .ds code { font-family:ui-monospace,monospace; font-size:11.5px; }
+
+  .duo { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:900px){ .duo{grid-template-columns:1fr;} }
+  .box { border-radius:10px; padding:14px; border:1px solid; }
+  .box.dk { background:#0C0B09; border-color:#302B24; color:#D6CFC4; }
+  .box.lt { background:#EFEAE0; border-color:#DFD7C7; color:#2A2622; }
+  .box h4 { font-size:12px; letter-spacing:.1em; opacity:.65; margin:0 0 10px; font-weight:600; }
+
+  .tk { display:flex; align-items:center; gap:9px; padding:4px 0; font-size:11.5px; }
+  .tk i { width:26px; height:20px; border-radius:5px; flex:0 0 auto; border:1px solid rgba(128,128,128,.28); }
+  .tk b { font-family:ui-monospace,monospace; font-weight:400; flex:1; }
+  .tk s { font-family:ui-monospace,monospace; text-decoration:none; opacity:.6; }
+
+  /* 타이포 */
+  .ty { border:1px solid #302B24; border-radius:10px; background:#1A1815; color:#D6CFC4; padding:6px 14px; }
+  .ty .r { display:flex; align-items:baseline; gap:14px; padding:9px 0; }
+  .ty .r + .r { border-top:1px solid rgba(48,43,36,.8); }
+  .ty .r em { font-style:normal; font-family:ui-monospace,monospace; font-size:10.5px; opacity:.55; flex:0 0 168px; }
+  .ty .r span { flex:1; }
+  .tnum { font-feature-settings:"tnum"; font-variant-numeric:tabular-nums; }
+
+  .wt { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  .wt div { border:1px solid #302B24; border-radius:8px; padding:9px 13px; background:#1A1815; color:#D6CFC4; font-size:14px; }
+  .wt div s { display:block; text-decoration:none; font-size:10px; opacity:.5; font-family:ui-monospace,monospace; font-weight:400; margin-top:3px; }
+  .wt div.gone { opacity:.4; border-style:dashed; }
+
+  /* 스케일 바 */
+  .sc { display:flex; align-items:flex-end; gap:7px; flex-wrap:wrap; }
+  .sc div { text-align:center; font-size:9.5px; font-family:ui-monospace,monospace; opacity:.7; }
+  .sc div i { display:block; background:#C9973F; border-radius:2px; margin-bottom:4px; }
+
+  .rd { display:flex; gap:12px; flex-wrap:wrap; }
+  .rd div { width:74px; height:52px; background:#221F1A; border:1px solid #443D33; display:flex; align-items:flex-end; justify-content:center; font-size:10px; font-family:ui-monospace,monospace; color:#8A8175; padding-bottom:5px; }
+
+  .el { display:flex; gap:14px; flex-wrap:wrap; }
+  .el div { width:120px; height:64px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:10.5px; font-family:ui-monospace,monospace; }
+
+  /* 상태 */
+  .st { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .btn { font-size:12.5px; font-weight:500; padding:7px 15px; border-radius:8px; border:1px solid transparent; }
+  .fld { font-size:12.5px; padding:7px 11px; border-radius:8px; }
+
+  /* 밀도 */
+  .tb { border:1px solid; border-radius:10px; overflow:hidden; font-size:12px; }
+  .tb .h { display:flex; font-weight:600; font-size:11px; letter-spacing:.02em; }
+  .tb .rw { display:flex; }
+  .tb .c1 { flex:1; } .tb .c2 { width:78px; text-align:right; } .tb .c3 { width:66px; text-align:right; }
+  .dense .h, .dense .rw { height:28px; align-items:center; padding:0 11px; font-size:11px; }
+  .cozy .h, .cozy .rw { height:34px; align-items:center; padding:0 13px; font-size:12.5px; }
+
+  .inv { border-left:2px solid #C9973F; padding:2px 0 2px 14px; margin:10px 0; font-size:12.5px; line-height:1.65; }
+</style>
+
+<div class="ds">
+
+<h2>토큰 시스템 확정안 — P2 한지 &amp; 먹</h2>
+<p class="subtitle">
+  이 시트가 그대로 <code>styles/globals.css</code> + <code>tailwind.config.mjs</code> 가 됩니다.
+  <b>미결은 맨 아래 「테이블 밀도」 하나</b>이고, 나머지는 제가 정한 확정안입니다 — 이상하면 짚어 주십시오.
+</p>
+
+<!-- ═══ 1. 색 ═══ -->
+<h3>1. 색 — 두 벌, 이름은 동일</h3>
+<p class="hint">
+  모드 중립 이름이라 마크업은 한 벌입니다. <b>순수 무채색은 하나도 없습니다</b> — 모든 회색이 따뜻한 잉크 계열에서 파생됩니다.
+  <b>Tailwind 기본 팔레트 값은 0개</b>입니다.
+</p>
+<div class="duo">
+  <div class="box dk">
+    <h4>DARK (기본)</h4>
+    <div class="tk"><i style="background:#0C0B09"></i><b>--bg-base</b><s>#0C0B09</s></div>
+    <div class="tk"><i style="background:#1A1815"></i><b>--bg-panel</b><s>#1A1815</s></div>
+    <div class="tk"><i style="background:#221F1A"></i><b>--bg-raised</b><s>#221F1A</s></div>
+    <div class="tk"><i style="background:#302B24"></i><b>--line</b><s>#302B24</s></div>
+    <div class="tk"><i style="background:#443D33"></i><b>--line-strong</b><s>#443D33</s></div>
+    <div class="tk"><i style="background:#EFE9DE"></i><b>--ink-strong</b><s>#EFE9DE</s></div>
+    <div class="tk"><i style="background:#D6CFC4"></i><b>--ink</b><s>#D6CFC4</s></div>
+    <div class="tk"><i style="background:#8A8175"></i><b>--ink-muted</b><s>#8A8175</s></div>
+    <div class="tk"><i style="background:#635C52"></i><b>--ink-faint</b><s>#635C52</s></div>
+    <div class="tk"><i style="background:#C9973F"></i><b>--accent</b><s>#C9973F</s></div>
+    <div class="tk"><i style="background:#D9A852"></i><b>--accent-hover</b><s>#D9A852</s></div>
+    <div class="tk"><i style="background:#C6453A"></i><b>--market-up</b><s>#C6453A</s></div>
+    <div class="tk"><i style="background:#4C6FA8"></i><b>--market-down</b><s>#4C6FA8</s></div>
+    <div class="tk"><i style="background:#D65A4A"></i><b>--danger</b><s>#D65A4A</s></div>
+    <div class="tk"><i style="background:#7FA05A"></i><b>--success</b><s>#7FA05A</s></div>
+  </div>
+  <div class="box lt">
+    <h4>LIGHT</h4>
+    <div class="tk"><i style="background:#EFEAE0"></i><b>--bg-base</b><s>#EFEAE0</s></div>
+    <div class="tk"><i style="background:#FAF7F0"></i><b>--bg-panel</b><s>#FAF7F0</s></div>
+    <div class="tk"><i style="background:#F1ECE1"></i><b>--bg-raised</b><s>#F1ECE1</s></div>
+    <div class="tk"><i style="background:#DFD7C7"></i><b>--line</b><s>#DFD7C7</s></div>
+    <div class="tk"><i style="background:#C9BFA9"></i><b>--line-strong</b><s>#C9BFA9</s></div>
+    <div class="tk"><i style="background:#17140F"></i><b>--ink-strong</b><s>#17140F</s></div>
+    <div class="tk"><i style="background:#2A2622"></i><b>--ink</b><s>#2A2622</s></div>
+    <div class="tk"><i style="background:#7A7166"></i><b>--ink-muted</b><s>#7A7166</s></div>
+    <div class="tk"><i style="background:#A79C8D"></i><b>--ink-faint</b><s>#A79C8D</s></div>
+    <div class="tk"><i style="background:#9C7526"></i><b>--accent</b><s>#9C7526</s></div>
+    <div class="tk"><i style="background:#85631F"></i><b>--accent-hover</b><s>#85631F</s></div>
+    <div class="tk"><i style="background:#B33A2F"></i><b>--market-up</b><s>#B33A2F</s></div>
+    <div class="tk"><i style="background:#3D5C91"></i><b>--market-down</b><s>#3D5C91</s></div>
+    <div class="tk"><i style="background:#A8382A"></i><b>--danger</b><s>#A8382A</s></div>
+    <div class="tk"><i style="background:#5A7A38"></i><b>--success</b><s>#5A7A38</s></div>
+  </div>
+</div>
+
+<div class="inv">
+  <b>불변식 — 색이 유일한 정보 전달자가 되지 않는다.</b><br>
+  한국식 프리셋에서 <code>--market-up</code>(상승 빨강)과 <code>--danger</code>(오류 빨강)는 필연적으로 가깝습니다.
+  그래서 규칙으로 막습니다 — <b>숫자에는 절대 <code>--danger</code> 를 쓰지 않고</b>, 상태 메시지는 <b>항상 아이콘+텍스트를 동반</b>합니다.
+  상승·하락도 마찬가지로 <b>부호(▲▼ / +−)를 항상 함께</b> 그립니다(기존 <code>marketColorPreset.ts</code> 주석의 규약을 그대로 승계).
+  <br><b><code>--info</code> 는 만들지 않습니다</b> — 파랑 자리는 <code>--market-down</code> 이 이미 점유했고, 정보성 표시는 중립 잉크로 충분합니다.
+</div>
+
+<!-- ═══ 2. 타이포 ═══ -->
+<h3>2. 타이포 — 굵기 9벌 → 3벌</h3>
+<p class="hint">
+  현재 <code>@font-face</code> 9벌(17MB, woff2+woff 18파일) 중 <b>Thin·ExtraLight·Light·Black 4벌은 한 번도 쓰이지 않습니다.</b>
+  그리고 500/600/700/800 네 단계를 강조용으로 섞어 쓰는 것이 위계를 흐립니다. <b>400 / 500 / 700 세 벌로 줄이고 woff2 만 남깁니다.</b>
+</p>
+<div class="wt">
+  <div style="font-weight:400">본문 텍스트 400<s>--w-normal · 유지</s></div>
+  <div style="font-weight:500">라벨·UI 500<s>--w-medium · 유지 (최다 사용 72곳)</s></div>
+  <div style="font-weight:700">제목·강조 700<s>--w-bold · 유지</s></div>
+  <div class="gone" style="font-weight:600">600<s>→ 500 또는 700 으로 흡수 (36곳)</s></div>
+  <div class="gone" style="font-weight:800">800<s>→ 700 으로 흡수 (32곳)</s></div>
+  <div class="gone" style="font-weight:300">100·200·300·900<s>사용 0곳 · @font-face 삭제</s></div>
+</div>
+
+<div class="ty" style="margin-top:14px">
+  <div class="r"><em>--text-2xs · 10/14 · 500</em><span style="font-size:10px;line-height:14px;font-weight:500;letter-spacing:.06em">임시 데이터 · 배지 · 마이크로 라벨</span></div>
+  <div class="r"><em>--text-xs · 11/16</em><span style="font-size:11px;line-height:16px">표 셀 밀집 · 보조 설명</span></div>
+  <div class="r"><em>--text-sm · 12.5/18</em><span style="font-size:12.5px;line-height:18px">기본 UI 텍스트 — 버튼·필드·표 (가장 많이 쓰입니다)</span></div>
+  <div class="r"><em>--text-base · 14/21</em><span style="font-size:14px;line-height:21px">본문 · 폼 입력값 · 설명 문단</span></div>
+  <div class="r"><em>--text-lg · 16/24 · 700</em><span style="font-size:16px;line-height:24px;font-weight:700">패널 제목 · 섹션 헤딩</span></div>
+  <div class="r"><em>--text-xl · 20/28 · 700</em><span style="font-size:20px;line-height:28px;font-weight:700">화면 제목</span></div>
+  <div class="r"><em>--text-num · 30/33 · tnum</em><span class="tnum" style="font-size:30px;line-height:33px;font-weight:700;letter-spacing:-.03em;color:#C6453A">71,400</span></div>
+</div>
+
+<div class="inv">
+  <b>숫자용 별도 웹폰트를 추가하지 않습니다.</b> Pretendard 에 <code>font-feature-settings:"tnum"</code> 을 걸어
+  자릿수 정렬을 얻습니다 — 시스템 mono 스택은 OS마다 글자가 달라져 화면이 기기별로 갈라지고,
+  폰트를 하나 더 얹기엔 지금 예산(17MB)이 이미 과합니다.
+  <br><b>검증 필요:</b> Pretendard 가 <code>tnum</code> 을 실제로 담고 있는지는 <b>제가 아직 확인 못 했습니다.</b>
+  구현 첫 단계에서 <code>1111</code>/<code>8888</code> 폭을 tnum on/off 로 비교해 확인하고,
+  없으면 <code>--text-num</code> 만 시스템 mono 로 폴백합니다. (위 <code>71,400</code> 이 그 시험 대상입니다)
+</div>
+
+<!-- ═══ 3. 간격·라운드·깊이 ═══ -->
+<h3>3. 간격 · 라운드 · 깊이</h3>
+<p class="hint">간격은 4px 기반(Tailwind 기본과 동일)을 쓰되, <b>패널 내부 규칙</b>을 고정합니다 — 여기가 안 정해져서 화면마다 달랐습니다.</p>
+<div class="sc" style="margin-bottom:14px">
+  <div><i style="width:2px;height:16px"></i>2</div><div><i style="width:4px;height:16px"></i>4</div>
+  <div><i style="width:6px;height:16px"></i>6</div><div><i style="width:8px;height:16px"></i>8</div>
+  <div><i style="width:12px;height:16px"></i>12</div><div><i style="width:16px;height:16px"></i>16</div>
+  <div><i style="width:20px;height:16px"></i>20</div><div><i style="width:24px;height:16px"></i>24</div>
+  <div><i style="width:32px;height:16px"></i>32</div><div><i style="width:40px;height:16px"></i>40</div>
+</div>
+<p class="hint" style="margin-bottom:14px">
+  <b>패널 헤더</b> <code>14px 16px 0</code> · <b>패널 바디</b> <code>8px 16px 16px</code> ·
+  <b>아이콘↔텍스트</b> <code>6</code> · <b>그룹 간</b> <code>12</code> · <b>섹션 간</b> <code>20</code>
+</p>
+
+<div class="rd" style="margin-bottom:8px">
+  <div style="border-radius:5px">--r-sm 5</div>
+  <div style="border-radius:8px">--r-md 8</div>
+  <div style="border-radius:10px">--r-lg 10</div>
+  <div style="border-radius:999px">--r-full</div>
+</div>
+<p class="hint">배지·인풋 5 · 버튼·필드 8 · 패널·카드 10 · 아바타·pill 999. <b>0px 은 쓰지 않습니다</b>(H2 결정).</p>
+
+<div class="duo" style="margin-top:12px">
+  <div class="box dk">
+    <h4>DARK — 그림자로 띄운다</h4>
+    <div class="el">
+      <div style="background:#1A1815;border:1px solid #302B24">--e-0 평면</div>
+      <div style="background:#1A1815;border:1px solid #302B24;box-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.28)">--e-1 패널</div>
+      <div style="background:#221F1A;border:1px solid #443D33;box-shadow:0 4px 12px rgba(0,0,0,.55),0 12px 32px rgba(0,0,0,.4)">--e-2 팝오버</div>
+    </div>
+  </div>
+  <div class="box lt">
+    <h4>LIGHT — 보더로 가른다</h4>
+    <div class="el">
+      <div style="background:#FAF7F0;border:1px solid #DFD7C7;color:#2A2622">--e-0 평면</div>
+      <div style="background:#FAF7F0;border:1px solid #DFD7C7;color:#2A2622;box-shadow:0 1px 2px rgba(60,50,35,.09),0 6px 18px rgba(60,50,35,.07)">--e-1 패널</div>
+      <div style="background:#FAF7F0;border:1px solid #C9BFA9;color:#2A2622;box-shadow:0 4px 12px rgba(60,50,35,.13),0 12px 28px rgba(60,50,35,.1)">--e-2 팝오버</div>
+    </div>
+  </div>
+</div>
+<p class="hint" style="margin-top:8px">
+  <b>라이트의 그림자는 다크 값의 재사용이 아닙니다.</b> 검정 알파를 밝은 배경에 그대로 쓰면 회색 때가 낍니다 —
+  라이트는 그림자를 옅게 깔고 <code>--line</code> 대비를 올려 <b>보더로</b> 층을 가릅니다. 흔한 실수라 명시해 둡니다.
+</p>
+
+<!-- ═══ 4. 상태 ═══ -->
+<h3>4. 상태 — 지금 화면마다 다른 부분</h3>
+<div class="duo">
+  <div class="box dk">
+    <h4>DARK</h4>
+    <div class="st" style="margin-bottom:12px">
+      <span class="btn" style="background:#C9973F;color:#0C0B09">기본</span>
+      <span class="btn" style="background:#D9A852;color:#0C0B09">hover</span>
+      <span class="btn" style="background:#C9973F;color:#0C0B09;outline:2px solid #C9973F;outline-offset:2px">focus</span>
+      <span class="btn" style="background:#C9973F;color:#0C0B09;opacity:.45">disabled</span>
+      <span class="btn" style="background:transparent;color:#D6CFC4;border-color:#443D33">보조</span>
+      <span class="btn" style="background:transparent;color:#D65A4A;border-color:#D65A4A">위험</span>
+    </div>
+    <div class="st">
+      <span class="fld" style="background:#221F1A;border:1px solid #302B24;color:#8A8175">입력 대기</span>
+      <span class="fld" style="background:#221F1A;border:1px solid #C9973F;color:#D6CFC4;outline:2px solid #C9973F;outline-offset:2px">포커스</span>
+      <span class="fld" style="background:#221F1A;border:1px solid #D65A4A;color:#D6CFC4">⚠ 오류</span>
+    </div>
+  </div>
+  <div class="box lt">
+    <h4>LIGHT</h4>
+    <div class="st" style="margin-bottom:12px">
+      <span class="btn" style="background:#9C7526;color:#FAF7F0">기본</span>
+      <span class="btn" style="background:#85631F;color:#FAF7F0">hover</span>
+      <span class="btn" style="background:#9C7526;color:#FAF7F0;outline:2px solid #9C7526;outline-offset:2px">focus</span>
+      <span class="btn" style="background:#9C7526;color:#FAF7F0;opacity:.45">disabled</span>
+      <span class="btn" style="background:transparent;color:#2A2622;border-color:#C9BFA9">보조</span>
+      <span class="btn" style="background:transparent;color:#A8382A;border-color:#A8382A">위험</span>
+    </div>
+    <div class="st">
+      <span class="fld" style="background:#F1ECE1;border:1px solid #DFD7C7;color:#7A7166">입력 대기</span>
+      <span class="fld" style="background:#FAF7F0;border:1px solid #9C7526;color:#2A2622;outline:2px solid #9C7526;outline-offset:2px">포커스</span>
+      <span class="fld" style="background:#FAF7F0;border:1px solid #A8382A;color:#2A2622">⚠ 오류</span>
+    </div>
+  </div>
+</div>
+<div class="inv">
+  <b>포커스는 <code>ring</code> 이 아니라 <code>outline</code> 으로 통일합니다.</b>
+  현재 <code>focus:</code>/<code>focus-visible:</code> 혼용에 <code>ring-blue-500/40</code> 하드코딩이 12곳 남아 있습니다.
+  <code>outline</code> 을 쓰는 이유는 <b><code>overflow:hidden</code> 안에서 잘리지 않기</b> 때문입니다 —
+  표 셀·패널 내부처럼 잘리는 자리가 이 앱엔 많습니다. 규칙: <b><code>focus-visible</code> 에만</b>
+  <code>outline: 2px solid var(--accent); outline-offset: 2px</code>. 마우스 클릭엔 안 뜹니다.
+  <br><b>비활성은 색을 바꾸지 않고 <code>opacity:.45</code></b> 하나로 — 색을 바꾸면 모드마다 다시 정해야 합니다.
+</div>
+
+<!-- ═══ 5. 미결 ═══ -->
+<h3>5. ❓ 유일한 미결 — 데이터 테이블 밀도</h3>
+<p class="hint">
+  관리 화면 8개가 전부 표입니다(메뉴·권한·코드·사용자·워크스페이스·메일로그·관심종목·포트폴리오).
+  여기서 정한 행 높이가 그 8개 화면의 성격을 결정합니다. <b>하나 골라 주십시오.</b>
+</p>
+<div class="duo options">
+  <div class="option" data-choice="dense" onclick="toggleSelect(this)" style="padding:0;border:none;background:none">
+    <div class="tb dense" style="border-color:#302B24;background:#1A1815;color:#D6CFC4">
+      <div class="h" style="background:#221F1A;border-bottom:1px solid #302B24;color:#8A8175"><span class="c1">종목명</span><span class="c2">현재가</span><span class="c3">등락률</span></div>
+      <div class="rw" style="border-bottom:1px solid rgba(48,43,36,.7)"><span class="c1">삼성전자</span><span class="c2 tnum">71,400</span><span class="c3 tnum" style="color:#C6453A">+1.71%</span></div>
+      <div class="rw" style="border-bottom:1px solid rgba(48,43,36,.7)"><span class="c1">SK하이닉스</span><span class="c2 tnum">184,200</span><span class="c3 tnum" style="color:#C6453A">+3.04%</span></div>
+      <div class="rw" style="border-bottom:1px solid rgba(48,43,36,.7)"><span class="c1">NAVER</span><span class="c2 tnum">198,500</span><span class="c3 tnum" style="color:#4C6FA8">-0.85%</span></div>
+      <div class="rw" style="border-bottom:1px solid rgba(48,43,36,.7)"><span class="c1">카카오</span><span class="c2 tnum">41,750</span><span class="c3 tnum" style="color:#4C6FA8">-2.11%</span></div>
+      <div class="rw" style="border-bottom:1px solid rgba(48,43,36,.7)"><span class="c1">LG에너지솔루션</span><span class="c2 tnum">402,000</span><span class="c3 tnum" style="color:#C6453A">+0.62%</span></div>
+      <div class="rw" style="background:#221F1A"><span class="c1">현대차</span><span class="c2 tnum">247,500</span><span class="c3 tnum" style="color:#4C6FA8">-1.20%</span></div>
+    </div>
+    <p class="hint" style="margin-top:9px"><b>조밀 — 행 28px · 11px</b><br>한 화면 <b>약 22행</b>. 표를 하루 종일 보는 사람에게 유리. 대신 클릭 표적이 작고 손가락 입력엔 부적합.</p>
+  </div>
+  <div class="option" data-choice="cozy" onclick="toggleSelect(this)" style="padding:0;border:none;background:none">
+    <div class="tb cozy" style="border-color:#302B24;background:#1A1815;color:#D6CFC4">
+      <div class="h" style="background:#221F1A;border-bottom:1px solid #302B24;color:#8A8175"><span class="c1">종목명</span><span class="c2">현재가</span><span class="c3">등락률</span></div>
+      <div class="rw" style="border-bottom:1px solid rgba(48,43,36,.7)"><span class="c1">삼성전자</span><span class="c2 tnum">71,400</span><span class="c3 tnum" style="color:#C6453A">+1.71%</span></div>
+      <div class="rw" style="border-bottom:1px solid rgba(48,43,36,.7)"><span class="c1">SK하이닉스</span><span class="c2 tnum">184,200</span><span class="c3 tnum" style="color:#C6453A">+3.04%</span></div>
+      <div class="rw" style="border-bottom:1px solid rgba(48,43,36,.7)"><span class="c1">NAVER</span><span class="c2 tnum">198,500</span><span class="c3 tnum" style="color:#4C6FA8">-0.85%</span></div>
+      <div class="rw" style="border-bottom:1px solid rgba(48,43,36,.7)"><span class="c1">카카오</span><span class="c2 tnum">41,750</span><span class="c3 tnum" style="color:#4C6FA8">-2.11%</span></div>
+      <div class="rw" style="background:#221F1A"><span class="c1">LG에너지솔루션</span><span class="c2 tnum">402,000</span><span class="c3 tnum" style="color:#C6453A">+0.62%</span></div>
+    </div>
+    <p class="hint" style="margin-top:9px"><b>보통 — 행 34px · 12.5px</b><br>한 화면 <b>약 17행</b>. 읽기 편하고 클릭 표적이 넉넉. 대신 표가 길어져 스크롤이 늘고 밀도감이 떨어짐.</p>
+  </div>
+</div>
+<p class="hint" style="margin-top:12px">
+  <b>제 추천은 「조밀」입니다</b> — 이 제품은 데스크톱 전용 지휘소이고, 결정 로그가
+  <code>화면=트레이딩 터미널 중심</code> 이라고 못박고 있습니다. 다만 <b>관리 화면(코드·메뉴·사용자)까지 28px 로 가면
+  폼 편집이 답답</b>해질 수 있어, <b>표는 조밀 / 폼은 보통</b>으로 나누는 절충도 가능합니다. 셋 중 골라 주십시오.
+</p>
+
+</div>

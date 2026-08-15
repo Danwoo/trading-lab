@@ -155,11 +155,6 @@ const ROUTES: FilterRoute[] = [
     scope: { key: "group_code", value: "G1", attacker: "OTHER_GROUP" },
   },
   {
-    module: "@/app/api/common/system/email-log/route",
-    file: "app/api/common/system/email-log/route.ts",
-    controlField: "email",
-  },
-  {
     module: "@/app/api/common/system/menu/route",
     file: "app/api/common/system/menu/route.ts",
     controlField: "menu_nm",

@@ -21,5 +21,5 @@ const getHandler = async (_req: NextRequest, session: any) => {
   }
 };
 
-// 개발활동 조회(mbiz1004)·스케줄러 관리(mbiz1005) 화면의 계좌주 필터 — 가드를 화면 권한과 정렬 (#203).
+// 스케줄러 관리(mbiz1005) 화면의 계좌주 필터 — 가드를 화면 권한과 정렬 (#203).
 export const GET = withAuth(getHandler, { requireOperatorOrAdmin: true });
