@@ -148,7 +148,45 @@ def test_empty_response_carries_reason_not_bare_zero() -> str:
     assert "키" in out["unavailable_reason"], (
         f"국내 일봉이 비어 있는 사유가 키 얘기가 아니다: {out['unavailable_reason']}"
     )
+    # 사유가 「키가 아직 없다」뿐이면 코드도 함께 온다 — 화면은 이 코드로만 임시 데이터를 그린다
+    # (문구로 가르면 문구만 바뀌어도 조용히 갈린다). 코드를 흘리면 화면은 영영 빈 채로 남는다.
+    assert out["unavailable_code"] == "credential_missing", (
+        f"사유는 키 얘기인데 코드가 {out['unavailable_code']!r} 다"
+    )
+
+    minute = _bar_service().select_minute_bar_list(
+        {
+            "market": "KOSPI",
+            "symbol": "005930",
+            "ts_from": dt.datetime(2026, 1, 2, 9, 0),
+            "ts_to": dt.datetime(2026, 1, 2, 15, 30),
+            "interval_min": 1,
+            "limit": None,
+            "workspace_id": 1,
+        }
+    )
+    assert minute["unavailable_code"] == "credential_missing", (
+        f"분봉 쪽만 코드를 흘린다: {minute['unavailable_code']!r}"
+    )
     return "test_empty_response_carries_reason_not_bare_zero"
+
+
+def test_every_bar_exit_carries_both_fields() -> str:
+    """사유를 싣는 자리마다 코드가 같이 실린다 — 한쪽만 실은 출구가 하나라도 있으면 실패다.
+
+    실측으로 잡힌 구멍이다: 종목 마스터가 비어 있는 갈래가 사유만 싣고 코드를 흘려, 화면이
+    「키가 아직 없다」를 알 방법이 없어 빈 채로 남았다.
+    """
+    source = inspect.getsource(BarService)
+    reasons = source.count('"unavailable_reason"')
+    codes = source.count('"unavailable_code"')
+    assert reasons > 0, "사유를 싣는 자리를 하나도 못 찾았다 (그물이 죽어 있다)"
+    assert reasons == codes, f"사유 {reasons}자리 · 코드 {codes}자리 — 짝이 안 맞는다"
+
+    # 코드를 안 주면 조용히 None 이 되는 기본값이 없어야 새 호출자가 같은 실수를 못 한다.
+    code_param = inspect.signature(BarService._empty).parameters["code"]
+    assert code_param.default is inspect.Parameter.empty, "_empty(code=) 에 기본값이 생겼다"
+    return f"test_every_bar_exit_carries_both_fields (사유·코드 각 {reasons}자리)"
 
 
 def test_limit_over_cap_is_rejected_not_truncated() -> str:
@@ -243,6 +281,7 @@ TESTS = [
     test_capability_reason_carries_next_action,
     test_bar_service_is_not_wired_to_any_provider,
     test_empty_response_carries_reason_not_bare_zero,
+    test_every_bar_exit_carries_both_fields,
     test_limit_over_cap_is_rejected_not_truncated,
     test_five_minute_synthesis_matches_manual_fold,
     test_duplicate_bars_in_one_response_merge_by_rule,
@@ -250,7 +289,21 @@ TESTS = [
 ]
 
 
+def _unregistered_tests() -> list[str]:
+    """`TESTS` 는 손으로 적는 목록이라, 새 테스트를 안 적으면 **조용히 안 돈다** (실측으로 겪었다).
+
+    등록을 잊은 것 자체를 실패로 만든다 — 목록이 모듈의 `test_*` 를 전부 덮어야 한다.
+    """
+    registered = {test.__name__ for test in TESTS}
+    defined = {name for name, value in globals().items() if name.startswith("test_") and callable(value)}
+    return sorted(defined - registered)
+
+
 if __name__ == "__main__":
+    missing = _unregistered_tests()
+    if missing:
+        print(f"  FAIL TESTS 목록에 없는 테스트: {', '.join(missing)}")
+        sys.exit(1)
     failures = 0
     for test in TESTS:
         try:

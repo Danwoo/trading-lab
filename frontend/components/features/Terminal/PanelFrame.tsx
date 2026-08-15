@@ -36,6 +36,14 @@ export function PanelFrame({ instance, definition, provenance, onToggleCollapse,
         </div>
       </div>
 
+      {/* 왜 임시인지와 무엇을 하면 진짜 값이 오는지 — 헤더 배지에 넣으면 제목을 밀어내므로
+          (실측) 폭 전체를 쓰는 안내줄로 낸다. 접힌 패널에서는 본문과 함께 감춘다. */}
+      {isPlaceholder && provenance.hint && !instance.collapsed && (
+        <p className="flex-shrink-0 border-b border-slate-line px-2 py-1 font-mono text-2xs leading-relaxed text-ink-muted">
+          {provenance.hint}
+        </p>
+      )}
+
       {instance.collapsed ? (
         <div className="flex flex-1 items-center justify-center text-xs text-ink-muted">패널이 접혀 있습니다</div>
       ) : isUnavailable ? (

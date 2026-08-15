@@ -25,6 +25,11 @@ export interface CandleSeries {
   source: string;
   asOf: string | null;
   unavailableReason: string | null;
+  /**
+   * 사유의 기계가 읽는 갈래. `credential_missing` 만 화면이 임시 데이터로 덮는다 —
+   * 다른 값·`null` 이면 이유를 그대로 보여준다(진짜 결손을 덮지 않는다).
+   */
+  unavailableCode: string | null;
 }
 
 interface BarsOut {
@@ -37,6 +42,7 @@ interface BarsOut {
   adj_policy: string | null;
   asof: string | null;
   unavailable_reason: string | null;
+  unavailable_code?: string | null;
 }
 
 /** 분 단위 주기 문자열 → 백엔드 `interval_min`. 월봉(`1M`)은 아직 계약이 없다. */
@@ -52,7 +58,7 @@ const MONTHLY_NOT_READY = "월봉은 아직 제공되지 않습니다 — 일봉
 
 function toSeries(result: BarsOut | null, fallbackReason: string): CandleSeries {
   if (result === null) {
-    return { items: [], source: "적재본", asOf: null, unavailableReason: fallbackReason };
+    return { items: [], source: "적재본", asOf: null, unavailableReason: fallbackReason, unavailableCode: null };
   }
   return {
     items: result.items.map(({ time, open, high, low, close, volume }) => ({
@@ -68,6 +74,7 @@ function toSeries(result: BarsOut | null, fallbackReason: string): CandleSeries 
     source: result.source ? `${result.source}${result.adj_policy ? ` · ${result.adj_policy}` : ""}` : "적재본",
     asOf: result.asof,
     unavailableReason: result.unavailable_reason,
+    unavailableCode: result.unavailable_code ?? null,
   };
 }
 
@@ -86,7 +93,7 @@ export async function selectCandles(params: {
   to: string;
 }): Promise<CandleSeries> {
   if (params.interval === "1M") {
-    return { items: [], source: "적재본", asOf: null, unavailableReason: MONTHLY_NOT_READY };
+    return { items: [], source: "적재본", asOf: null, unavailableReason: MONTHLY_NOT_READY, unavailableCode: null };
   }
 
   const intervalMin = MINUTES_BY_INTERVAL[params.interval];
