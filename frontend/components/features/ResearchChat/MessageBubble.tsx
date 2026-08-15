@@ -12,7 +12,7 @@ interface Props {
 }
 
 /**
- * user/assistant 말풍선. DevActivity/MessageBubble 렌더 로직 차용 + 근거·후속질문 슬롯 추가.
+ * user/assistant 말풍선. 근거·후속질문 슬롯 포함.
  * 근거(media)는 답변 토큰 전에 도착하므로 spinner 단계에서도 함께 보인다(§3.2).
  */
 export function MessageBubble({ message, streaming, statusText, onFollowUpClick }: Props) {

@@ -1,0 +1,315 @@
+<style>
+  .st { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --ok:#7FA05A; --wr:#D9A441; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .st .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+  .st h2 { font-size:17px; font-weight:700; color:var(--is); margin:0 0 5px; }
+  .st h3 { font-size:14.5px; font-weight:700; color:var(--is); margin:30px 0 4px; }
+  .st h3 em { font-style:normal; color:var(--if); font-weight:400; font-size:12.5px; margin-left:7px; }
+  .st p.lead { font-size:12.5px; color:var(--im); line-height:1.7; margin:0 0 13px; max-width:80ch; }
+  .st p.lead b { color:var(--ik); font-weight:500; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:12px; overflow:hidden; max-width:1320px; }
+  .win.sm { max-width:820px; } .win.xs { max-width:420px; }
+  .hud { display:flex; align-items:center; gap:9px; padding:8px 12px; background:var(--pn);
+         border-bottom:1px solid var(--ln); font-size:11px; color:var(--im); }
+  .hud .wm { font-size:9.5px; letter-spacing:.16em; color:var(--if); font-weight:700; }
+  .hud .sp { flex:1; } .hud s { text-decoration:none; color:var(--if); }
+
+  .body { display:flex; min-height:270px; }
+  .rail { flex:0 0 46px; background:var(--pn); border-right:1px solid var(--ln); display:flex;
+          flex-direction:column; align-items:center; padding:9px 0; gap:5px; }
+  .rail i { width:30px; height:30px; border-radius:8px; display:flex; align-items:center;
+            justify-content:center; font-style:normal; font-size:15px; color:var(--if); }
+  .rail i.act { background:var(--is); color:var(--bg); font-weight:700; }
+  .rail i.on { background:var(--rs); border:1px solid var(--ls); color:var(--is); }
+  .rail i.dim { opacity:.32; } .rail .gap { flex:1; }
+  .rail hr { width:22px; border:0; border-top:1px solid var(--ln); margin:4px 0; }
+
+  .stage { flex:1; display:flex; min-width:0; }
+  .board { flex:1; padding:13px 15px; min-width:0; }
+  .zone { border:1px dashed var(--ls); border-radius:10px; background:var(--pn); padding:12px;
+          display:flex; flex-direction:column; align-items:center; justify-content:center;
+          gap:4px; color:var(--if); font-size:11.5px; text-align:center; min-height:150px; line-height:1.6; }
+  .zone b { color:var(--im); font-size:12.5px; font-weight:600; }
+  .zone .cta { margin-top:7px; font-size:11.5px; padding:5px 12px; border-radius:7px;
+               background:var(--is); color:var(--bg); font-weight:600; }
+  .zone .cta2 { margin-top:5px; font-size:11px; color:var(--if); border-bottom:1px solid var(--ln); }
+  .lay { display:grid; grid-template-columns:1.05fr 1.35fr; gap:11px; }
+
+  .panel { border-left:1px solid var(--ln); background:var(--pn); display:flex; flex-direction:column; min-width:0; }
+  .p372 { flex:0 0 372px; } .p620 { flex:0 0 620px; }
+  .ptop { display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--ln); }
+  .ptop b { font-size:12.5px; color:var(--is); }
+  .ptop .r { margin-left:auto; display:flex; gap:6px; color:var(--if); font-size:12px; }
+  .pbd { padding:11px 12px; font-size:11.5px; color:var(--im); line-height:1.65; }
+
+  .full { padding:15px 17px; }
+  .fh { display:flex; align-items:baseline; gap:9px; margin-bottom:10px; }
+  .fh b { font-size:14px; color:var(--is); }
+  .fh s { text-decoration:none; font-size:11.5px; color:var(--im); }
+  .fh .back { margin-left:auto; font-size:11.5px; color:var(--if); border:1px solid var(--ln);
+              border-radius:6px; padding:3px 9px; }
+
+  .note { border-left:2px solid var(--ls); padding:2px 0 2px 11px; margin:11px 0 0;
+          font-size:11.5px; color:var(--im); line-height:1.65; max-width:80ch; }
+  .note b { color:var(--ik); }
+  .note.good { border-left-color:var(--ok); } .note.warn { border-left-color:var(--wr); }
+  .note.bad { border-left-color:var(--dg); }
+  .cap { font-size:11px; color:var(--if); margin-top:6px; line-height:1.6; }
+
+  table.t { width:100%; border-collapse:collapse; font-size:11.5px; margin:8px 0 2px; max-width:940px; }
+  table.t th { text-align:left; font-weight:600; color:var(--im); padding:5px 7px;
+               border-bottom:1px solid var(--ln); font-size:11px; }
+  table.t td { padding:6px 7px; border-bottom:1px solid var(--hl); color:var(--im); vertical-align:top; }
+  table.t td b { color:var(--ik); font-weight:600; }
+  table.t tr:last-child td { border-bottom:0; }
+
+  .err { border:1px solid rgba(201,74,59,.4); background:rgba(201,74,59,.07); border-radius:9px;
+         padding:11px 12px; font-size:11.5px; color:var(--im); line-height:1.65; margin-bottom:9px; }
+  .err b { color:#E2837A; }
+  .err .fix { margin-top:7px; display:flex; gap:7px; }
+  .err .fix span { font-size:11px; padding:4px 10px; border-radius:6px; border:1px solid var(--ls); color:var(--ik); }
+  .stale { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; color:#D9B45C;
+           border:1px solid rgba(217,164,65,.4); border-radius:5px; padding:2px 7px; }
+</style>
+
+<div class="st">
+
+<h2>안 풀린 것과 빈 자리 — 결정과 시안</h2>
+<p class="lead">
+  <code>bench-shell.html</code> 에서 미뤄 둔 폭 문제 둘과, 한 번도 안 그린 상태 넷입니다.
+  <b>전부 숫자와 무관해서 지금 정할 수 있습니다.</b>
+</p>
+
+<!-- ① 실전 전환의 폭 -->
+<h3>① 실전 전환의 폭 <em>— 결정: 전체 폭 예외</em></h3>
+<p class="lead">
+  372px 로는 시나리오 3종 표와 손으로 적는 칸이 답답하고,
+  520px 로 넓히면 <b>어중간해집니다</b> — 보드도 제대로 안 보이고 표도 여전히 좁습니다.<br>
+  <b>이 순간만 성격이 다릅니다.</b> 실제 돈이 나가는 유일한 지점이고, 이미
+  「고르지 말고 손으로 적으십시오」라는 의식이 설계돼 있습니다.
+  <b>보드를 곁눈질하며 할 일이 아닙니다.</b>
+</p>
+
+<div class="win">
+  <div class="hud"><span class="wm">TRADING LAB</span><s>모의 · 실제 주문 나가지 않음</s>
+    <div class="sp"></div><s>계좌 1,672만 · 고점 대비 −58만</s></div>
+  <div class="body" style="min-height:210px">
+    <div class="rail">
+      <i class="dim">▦</i><i class="dim">◫</i><i class="dim">≡</i><i class="dim">◈</i>
+      <hr><i class="dim">◷</i><i class="dim">◵</i><i class="dim">⌸</i>
+      <span class="gap"></span><i class="dim">⚙</i>
+    </div>
+    <div class="stage"><div class="full" style="flex:1">
+      <div class="fh"><b>실제 돈으로 전환 — 대형주 20일선 눌림목</b>
+        <s>이 화면에서만 주문 키를 등록할 수 있습니다</s>
+        <span class="back">← 보드로</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="border:1px solid var(--ln);border-radius:9px;padding:11px 12px;font-size:11.5px;color:var(--im);line-height:1.7">
+          <b style="color:var(--ik)">얼마를 넣을지 정하기 전에 아는 것</b><br>
+          과거에 까였던 최대 폭 <b style="color:var(--is)">14.2%</b> ·
+          뒷받침하는 증거 <b style="color:#E2837A">9건어치</b><br>
+          한계선까지 남은 거리 <b style="color:#D9B45C">102만원</b><br>
+          <span style="color:var(--if)">한계선이 닿는 금액 — 과거만큼 718만 · 2배 359만 · 4배 180만</span>
+        </div>
+        <div style="border:1px solid var(--ln);border-radius:9px;padding:11px 12px;font-size:11.5px;color:var(--im);line-height:1.7">
+          <b style="color:var(--ik)">300만원을 적었을 때</b><br>
+          과거만큼 −43만 <span style="color:var(--if)">(남은 거리의 42%)</span><br>
+          2배 −85만 <span style="color:#D9B45C">(84%)</span><br>
+          4배 <b style="color:#E2837A">−170만 (167% — 넘습니다)</b>
+        </div>
+      </div>
+      <div class="cap">— 상한은 없습니다. 넘겨 적어도 막지 않고, <b style="color:var(--im)">넘겼다는 사실이 기록에 남습니다.</b></div>
+    </div></div>
+  </div>
+</div>
+
+<div class="note good">
+  <b>레일이 흐려지는 것이 신호입니다.</b> 다른 곳으로 갈 수 없다는 뜻이 아니라
+  (「← 보드로」는 항상 열려 있습니다), <b>지금은 이것만 보는 자리</b>라는 표시입니다.
+  전체 폭을 쓰는 화면은 이것과 「시세」·<code>/admin</code> 셋뿐입니다.
+</div>
+
+<!-- ② 에이전트의 자리 -->
+<h3>② 에이전트 대화의 자리 <em>— 결정: 패널 372 ↔ 620 토글, 전체 폭은 쓰지 않음</em></h3>
+<p class="lead">
+  <b>전체 폭을 안 쓰는 이유가 분명합니다.</b> 에이전트가 격자를 돌리면
+  그 결과가 <b>보드에서 채워지는 것이 보여야</b> 합니다.
+  보드가 안 보이면 에이전트가 무엇을 했는지 확인할 방법이 없고,
+  그러면 이 제품이 내세우는 <b>「증명하라, 주장하지 마라」가 무너집니다.</b><br>
+  다만 372px 로는 긴 대화가 답답하므로 <b>620px 로 넓히는 토글</b>을 둡니다. 보드는 좁아져도 살아 있습니다.
+</p>
+
+<div class="win">
+  <div class="hud"><span class="wm">TRADING LAB</span><s>모의</s><div class="sp"></div><s>에이전트 작업 중 — 격자 68/100</s></div>
+  <div class="body" style="min-height:250px">
+    <div class="rail">
+      <i class="act">▦</i><i>◫</i><i>≡</i><i>◈</i><hr>
+      <i class="dim">◷</i><i class="dim">◵</i><i class="dim">⌸</i>
+      <span class="gap"></span><i class="on">✦</i><i class="dim">⚙</i>
+    </div>
+    <div class="stage">
+      <div class="board">
+        <div class="zone" style="min-height:0;padding:10px"><b>격자 68 / 100</b>에이전트가 지금 돌리는 중 — 여기서 차오릅니다</div>
+        <div class="zone" style="min-height:0;margin-top:9px;padding:10px"><b>곡선</b>가장 좋은 칸이 바뀔 때마다 다시 그려집니다</div>
+      </div>
+      <div class="panel p620">
+        <div class="ptop"><b>에이전트</b>
+          <div class="r"><span title="좁히기">⇥</span><span title="닫기">✕</span></div></div>
+        <div class="pbd">
+          <div style="color:var(--ik)">반도체 쪽으로 하나 만들어봐 줘</div>
+          <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--hl)">
+            <b style="color:var(--is)">조건 두 개로 세워 보겠습니다.</b>
+            20일 평균선까지 눌렸다가 반등 · 최근 3개월 급등 상위 20% 제외.
+            <span style="color:var(--if)">반도체 41종목이 대상입니다.</span><br><br>
+            <span style="color:var(--im)">격자 100조합을 돌리고 있습니다 — <b style="color:var(--ik)">68/100</b>.
+            끝나면 가장 좋은 칸부터 같이 뜯어보겠습니다.</span>
+          </div>
+          <div class="cap" style="margin-top:10px;border-top:1px solid var(--hl);padding-top:8px">
+            ⇥ 를 누르면 372px 로 좁아집니다. <b style="color:var(--im)">전체 폭은 없습니다</b> — 보드가 안 보이면 확인이 안 됩니다.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ③ 빈 상태 -->
+<h3>③ 빈 상태 <em>— 튜토리얼을 지운 뒤</em></h3>
+<p class="lead">
+  튜토리얼을 끝내고 예제 봇을 지우면 이 화면이 됩니다.
+  <b>「봇을 만드세요」 하나만 두지 않습니다</b> — 무엇을 만드는 건지 모르는 채로 버튼만 보게 됩니다.
+</p>
+
+<div class="win">
+  <div class="hud"><span class="wm">TRADING LAB</span><s>모의</s><div class="sp"></div><s>봇 0개</s></div>
+  <div class="body" style="min-height:230px">
+    <div class="rail"><i class="act">▦</i><i class="dim">◫</i><i class="dim">≡</i><i class="dim">◈</i><hr>
+      <i>◷</i><i>◵</i><i class="dim">⌸</i><span class="gap"></span><i class="on">✦</i><i>⚙</i></div>
+    <div class="stage"><div class="board">
+      <div class="lay">
+        <div class="zone"><b>격자</b>봇을 만들면 설정 조합이<br>여기 100칸으로 펼쳐집니다
+          <span class="cta">봇 만들기</span><span class="cta2">에이전트에게 맡기기</span></div>
+        <div class="zone"><b>곡선</b>칸을 고르면 그 설정으로<br>1년을 돌린 결과가 그려집니다</div>
+      </div>
+      <div class="cap" style="text-align:center;margin-top:10px">
+        튜토리얼을 다시 보시려면 <b style="color:var(--im)">설정 → 튜토리얼 다시 하기</b>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<div class="note">
+  <b>빈 자리에 「무엇이 여기 올 것인지」를 적습니다.</b> 실루엣만 남기고 비우면 고장 난 화면처럼 보입니다.
+  그리고 <b>길이 둘</b>입니다 — 직접 만들기, 에이전트에게 맡기기.
+  이 제품의 두 갈래를 첫 화면에서 보여줍니다.
+</div>
+
+<!-- ④ 실패 -->
+<h3>④ 실패 <em>— 무엇이 멈췄고, 무엇은 아직 도는가</em></h3>
+<p class="lead">
+  실패했을 때 가장 중요한 것은 <b>「지금 보는 숫자를 믿어도 되나」</b>입니다.
+  그래서 오류 문구보다 <b>영향 범위</b>를 먼저 적습니다.
+</p>
+
+<div class="win">
+  <div class="hud"><span class="wm">TRADING LAB</span><s>모의</s>
+    <div class="sp"></div><span class="stale">시세 08-06 · 하루 낡음</span></div>
+  <div class="body" style="min-height:180px">
+    <div class="rail"><i class="act">▦</i><i>◫</i><i>≡</i><i>◈</i><hr>
+      <i>◷</i><i>◵</i><i>⌸</i><span class="gap"></span><i>⚙</i></div>
+    <div class="stage"><div class="board">
+      <div class="err">
+        <b>어젯밤 시세를 못 받았습니다</b> — 데이터 제공처가 응답하지 않았습니다 (05:10, 3회 시도).
+        <div style="margin-top:6px">
+          <b style="color:var(--ik)">지금 화면은 08-06 시세로 그려져 있습니다.</b>
+          <span style="color:var(--if)">봇은 계속 돌지만 <b style="color:#D9B45C">오늘 신호는 안 냅니다</b> —
+          낡은 값으로 사고파는 것보다 안 하는 게 낫습니다.
+          과거 성적·격자는 영향 없습니다.</span>
+        </div>
+        <div class="fix"><span>지금 다시 받기</span><span>왜 실패했는지 보기</span></div>
+      </div>
+      <div class="lay" style="opacity:.5">
+        <div class="zone" style="min-height:96px"><b>격자</b>영향 없음</div>
+        <div class="zone" style="min-height:96px"><b>곡선</b>영향 없음</div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<table class="t">
+  <tr><th style="width:22%">실패</th><th style="width:30%">멈추는 것</th><th>계속 도는 것 · 화면 표시</th></tr>
+  <tr><td><b>시세 적재 실패</b></td><td>오늘 신호 판정</td><td>격자·과거 성적. 상단에 <b>「시세 08-06 · 하루 낡음」</b> 배지 상시</td></tr>
+  <tr><td><b>주문 키 만료</b></td><td><b>실전 주문 전부</b></td><td>모의는 그대로. 보유 종목은 <b>증권사 예약 손절이 지킵니다</b>(걸어 뒀다면) — 안 걸었으면 그 사실을 크게</td></tr>
+  <tr><td><b>증권사 무응답</b></td><td>이번 주문 1건</td><td>재시도 3회 후 <b>「안 나간 신호」로 기록</b>. 임의로 나중에 체결하지 않습니다</td></tr>
+  <tr><td><b>격자 중단</b></td><td>남은 칸</td><td>끝난 칸은 <b>남습니다.</b> 「68/100에서 멈춤 — 이어서 돌리기」</td></tr>
+</table>
+<div class="note bad">
+  <b>절대 안 하는 것 — 조용히 낡은 값으로 계속 굴리는 것.</b>
+  낡은 시세로 낸 신호는 나중에 「봇이 이상하다」로 돌아오는데, 그때는 원인을 못 찾습니다.
+  <b>못 믿을 때는 안 하고, 안 했다는 걸 남깁니다.</b>
+</div>
+
+<!-- ⑤ 좁은 화면 -->
+<h3>⑤ 좁은 화면 <em>— 결정: 1280 미만이면 보드가 하나씩, 1024 미만이면 패널이 덮음</em></h3>
+<p class="lead">
+  지금 시안은 1320px 전제입니다. 13인치 노트북(1280)에서 <b>격자+곡선+패널이 동시에 안 들어갑니다.</b>
+  줄이면 셋 다 못 쓰게 되므로, <b>보드가 먼저 양보합니다</b> — 격자와 곡선을 탭으로 바꿉니다.
+</p>
+
+<div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+  <div style="flex:1 1 420px;min-width:0">
+    <div class="cap" style="margin-bottom:6px"><b style="color:var(--im)">1024 ~ 1280</b> — 보드는 한 번에 하나</div>
+    <div class="win sm">
+      <div class="hud"><span class="wm">TRADING LAB</span><div class="sp"></div><s>1180px</s></div>
+      <div class="body" style="min-height:170px">
+        <div class="rail"><i class="act">▦</i><i class="dim">◫</i><i class="on">≡</i><i class="dim">◈</i>
+          <span class="gap"></span><i class="dim">⚙</i></div>
+        <div class="stage">
+          <div class="board">
+            <div style="display:flex;gap:5px;margin-bottom:8px;font-size:11px">
+              <span style="padding:3px 9px;border-radius:6px;background:var(--rs);border:1px solid var(--ls);color:var(--is)">격자</span>
+              <span style="padding:3px 9px;border-radius:6px;color:var(--if)">곡선</span></div>
+            <div class="zone" style="min-height:100px"><b>격자</b>탭으로 전환</div>
+          </div>
+          <div class="panel p372" style="flex:0 0 300px">
+            <div class="ptop"><b>거래 로그</b></div>
+            <div class="pbd" style="color:var(--if)">패널은 300px 로 줄어듭니다</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="flex:0 0 auto">
+    <div class="cap" style="margin-bottom:6px"><b style="color:var(--im)">1024 미만</b> — 패널이 덮음</div>
+    <div class="win xs">
+      <div class="hud"><span class="wm">TRADING LAB</span><div class="sp"></div><s>860px</s></div>
+      <div class="body" style="min-height:170px">
+        <div class="rail"><i class="dim">▦</i><i class="on">≡</i><span class="gap"></span><i class="dim">⚙</i></div>
+        <div class="stage"><div class="panel p372" style="flex:1;border-left:0">
+          <div class="ptop"><b>거래 로그</b><div class="r"><span>✕</span></div></div>
+          <div class="pbd" style="color:var(--if)">보드를 덮습니다.<br>닫으면 보드로 돌아갑니다.</div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<table class="t">
+  <tr><th style="width:20%">폭</th><th style="width:38%">보드</th><th>패널</th></tr>
+  <tr><td><b>1280 이상</b></td><td>격자 + 곡선 나란히</td><td>372px 옆에 붙음 (에이전트는 620까지)</td></tr>
+  <tr><td><b>1024 ~ 1280</b></td><td><b>격자 / 곡선 탭</b>으로 하나씩</td><td>300px 로 줄어 붙음</td></tr>
+  <tr><td><b>1024 미만</b></td><td>격자 / 곡선 탭</td><td><b>보드를 덮음.</b> 닫으면 보드로</td></tr>
+  <tr><td><b>모바일</b></td><td colspan="2"><b>다루지 않습니다</b> — 격자를 손가락으로 고르는 것도, 손으로 적는 칸도 성립하지 않습니다.
+    모바일은 <b>보기 전용</b>(오늘 뭘 했나 · 한계선까지 얼마)으로 별도 설계가 필요하고, 지금 범위가 아닙니다</td></tr>
+</table>
+
+<div class="note warn">
+  <b>실전 전환은 1280 미만에서 열지 않습니다.</b> 시나리오 표와 손으로 적는 칸이 좁은 화면에서 잘리면
+  <b>「무엇을 알고도 넘어갔는가」가 성립하지 않습니다.</b>
+  「넓은 화면에서 진행해 주십시오」로 막는 <b>유일한 자리</b>입니다 — 여기서만은 막는 게 맞습니다.
+</div>
+
+</div>

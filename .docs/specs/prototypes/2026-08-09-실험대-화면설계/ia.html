@@ -1,0 +1,162 @@
+<style>
+  .ia { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58; --dg:#C94A3B; --ok:#5FA34C;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .ia .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+  .ia h3 { font-size:15px; font-weight:700; color:var(--is); margin:28px 0 4px; }
+  .ia p.lead { font-size:12.5px; color:var(--im); line-height:1.65; margin:0 0 13px; }
+  .ia p.lead b { color:var(--ik); font-weight:500; }
+
+  .map { display:flex; gap:14px; background:var(--bg); border:1px solid var(--ln); border-radius:11px; padding:14px; }
+  .rail { flex:0 0 172px; }
+  .rail .r { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:8px; border:1px solid transparent; font-size:12.5px; }
+  .rail .r.on { background:var(--rs); border-color:var(--ls); color:var(--is); font-weight:500; }
+  .rail .r i { font-style:normal; width:20px; text-align:center; color:var(--im); }
+  .rail .r.on i { color:var(--is); }
+  .rail .sep { height:1px; background:var(--ln); margin:9px 4px; }
+  .rail .r em { font-style:normal; margin-left:auto; font-size:10.5px; color:var(--if); }
+
+  .panes { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .pane { border:1px solid var(--ln); border-radius:10px; background:var(--pn); padding:12px 13px; }
+  .pane > b { display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--is); font-weight:700; margin-bottom:8px; }
+  .pane > b span.tag { margin-left:auto; font-size:9.5px; letter-spacing:.1em; font-weight:700; padding:2px 6px; border-radius:4px; }
+  .tag.built { color:var(--bg); background:var(--ok); }
+  .tag.part { color:var(--bg); background:var(--is); }
+  .tag.none { color:var(--im); border:1px solid var(--ls); }
+  .pane ul { margin:0; padding:0; list-style:none; }
+  .pane li { font-size:11.5px; color:var(--im); padding:3.5px 0; display:flex; gap:7px; line-height:1.45; }
+  .pane li s { text-decoration:none; flex:0 0 13px; }
+  .pane li b { color:var(--ik); font-weight:400; }
+
+  .lgd { display:flex; gap:18px; font-size:11.5px; color:var(--im); margin-top:12px; align-items:center; flex-wrap:wrap; }
+  .lgd i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+
+  table.d { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+  table.d th { font-size:11px; font-weight:500; color:var(--if); text-align:left; padding:6px 9px; border-bottom:1px solid var(--ln); }
+  table.d td { padding:8px 9px; border-bottom:1px solid var(--hl); vertical-align:top; line-height:1.5; }
+  table.d td:first-child { white-space:nowrap; color:var(--is); font-weight:500; }
+  table.d .why { color:var(--im); font-size:11.5px; }
+</style>
+
+<div class="ia">
+<h2 style="color:#F5F3EF">화면 지도 — 레일에 무엇이 들어가나</h2>
+<p class="lead">
+  지금까지 그린 화면 전부를 <b>S2 아이콘 레일 5칸</b>에 배치했습니다. 각 칸 옆의 숫자는 그 안의 화면 수,
+  태그는 <b>지금 구현 상태</b>입니다. <b>레일이 5칸인 이유는 「매일 여는 것」과 「가끔 여는 것」을 가르면 딱 그만큼이기 때문</b>입니다.
+</p>
+
+<div class="map">
+  <div class="rail">
+    <div class="r on"><i>▤</i> 터미널 <em>1</em></div>
+    <div class="r"><i>◫</i> 봇 <em>4</em></div>
+    <div class="r"><i>◵</i> 리서치 <em>3</em></div>
+    <div class="r"><i>⌸</i> 포트폴리오 <em>2</em></div>
+    <div class="sep"></div>
+    <div class="r"><i>⚙</i> 설정 <em>3</em></div>
+    <div class="r" style="color:var(--if)"><i>⋯</i> 관리자 <em>7</em></div>
+    <div style="font-size:11px;color:var(--if);line-height:1.55;margin-top:12px;padding:0 4px">
+      관리자는 <b style="color:var(--im);font-weight:400">제품 메뉴에서 빼고</b> 별도 경로로 둡니다
+      (결정 로그 2026-07-28). 기존 MDI 탭은 여기서만 삽니다.
+    </div>
+  </div>
+
+  <div class="panes">
+    <div class="pane">
+      <b>▤ 터미널 <span class="tag part">일부</span></b>
+      <ul>
+        <li><s>·</s><b>브리핑</b> — 종목 미선택 시 첫 상태 <span style="color:var(--if)">· 미구현</span></li>
+        <li><s>·</s><b>패널 그리드</b> — 종목 선택 시 <span style="color:var(--ok)">· 골조 있음</span></li>
+        <li><s>·</s>패널 <b class="n">2</b>/10 구현 — 차트 · 종목정보</li>
+        <li><s>·</s>사이드바 3탭 — 관심종목 · 보유 · 스크리너</li>
+      </ul>
+    </div>
+    <div class="pane">
+      <b>◫ 봇 <span class="tag none">없음</span></b>
+      <ul>
+        <li><s>·</s><b>봇 만들기</b> — 전략 조합 + 파라미터 폼</li>
+        <li><s>·</s><b>백테스트 리포트</b> — 가정 상설 표시</li>
+        <li><s>·</s><b>리더보드</b> — 실계좌 포함 비교</li>
+        <li><s>·</s><b>전략 만들기</b> — 자연어 → 파일 → 즉시 백테스트</li>
+      </ul>
+    </div>
+    <div class="pane">
+      <b>◵ 리서치 <span class="tag part">일부</span></b>
+      <ul>
+        <li><s>·</s><b>문서</b> — 업로드·검색 <span style="color:var(--ok)">· 구현됨</span></li>
+        <li><s>·</s><b>챗</b> — 근거 인용 답변 <span style="color:var(--ok)">· 구현됨</span></li>
+        <li><s>·</s><b>저녁 리포트</b> — 배치 산출물 <span style="color:var(--if)">· 미구현</span></li>
+      </ul>
+    </div>
+    <div class="pane">
+      <b>⌸ 포트폴리오 <span class="tag part">일부</span></b>
+      <ul>
+        <li><s>·</s><b>전체 보기</b> — 비중·손익 <span style="color:var(--ok)">· 구현됨</span></li>
+        <li><s>·</s><b>실계좌 vs 봇</b> — 나란히 비교 <span style="color:var(--if)">· 미구현</span></li>
+      </ul>
+    </div>
+    <div class="pane">
+      <b>⚙ 설정 <span class="tag none">없음</span></b>
+      <ul>
+        <li><s>·</s><b>데이터 소스 키</b> — 워크스페이스별 암호화</li>
+        <li><s>·</s><b>적재 상태</b> — 종목·기간·갭</li>
+        <li><s>·</s><b>스케줄</b> — 저녁 배치 시각 <span style="color:var(--ok)">· 백엔드 있음</span></li>
+      </ul>
+    </div>
+    <div class="pane">
+      <b>⋯ 관리자 <span class="tag built">구현됨</span></b>
+      <ul>
+        <li><s>·</s>워크스페이스 · 사용자 · 권한 · 메뉴</li>
+        <li><s>·</s>코드 · 메일로그 · 개발활동</li>
+        <li><s>·</s><span style="color:var(--if)">기존 MDI 탭 구조 유지</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+<div class="lgd">
+  <span><i style="background:#5FA34C"></i>구현됨</span>
+  <span><i style="background:#F5F3EF"></i>일부</span>
+  <span><i style="border:1px solid #3A4249"></i>없음</span>
+  <span style="margin-left:auto;color:var(--if)">화면 <b style="color:var(--im);font-weight:400" class="n">20</b>개 중 구현 <b style="color:var(--im);font-weight:400" class="n">9</b> · 일부 <b style="color:var(--im);font-weight:400" class="n">2</b> · 미구현 <b style="color:var(--im);font-weight:400" class="n">9</b></span>
+</div>
+
+<h3>레일을 이렇게 가른 근거</h3>
+<table class="d">
+  <tr><th style="width:120px">칸</th><th>왜 독립 칸인가</th></tr>
+  <tr><td>터미널</td><td>매일 가장 오래 여는 곳이고 <b>문맥(종목)을 소유</b>합니다. 다른 칸은 문맥이 없습니다.<div class="why">브리핑을 별도 칸으로 빼지 않은 이유 — 브리핑은 화면이 아니라 <b>터미널의 상태</b>입니다. 종목을 고르면 사라지는 것을 칸으로 만들면 빈 화면이 하나 생깁니다.</div></td></tr>
+  <tr><td>봇</td><td>여러 봇을 <b>나란히 놓고 비교</b>해야 해서 넓은 화면이 필요합니다. 터미널 패널에 우겨넣으면 리더보드가 안 읽힙니다.</td></tr>
+  <tr><td>리서치</td><td><b>읽고 쓰는 작업</b>이라 시간 리듬이 다릅니다. 장중에 안 봅니다.</td></tr>
+  <tr><td>포트폴리오</td><td>종목별이 아니라 <b>전체 관점</b>입니다 — 터미널의 문맥(한 종목)과 정반대 축입니다.</td></tr>
+  <tr><td>설정</td><td>가끔 열지만 <b>없으면 제품이 안 돕니다</b>(키·적재). 관리자 안에 숨기면 첫 사용자가 못 찾습니다.</td></tr>
+  <tr><td style="color:var(--im)">관리자</td><td class="why">제품 메뉴에서 뺐습니다. 개인 투자 지휘소를 쓰는 사람에게 「메뉴 관리」는 제품이 아닙니다. 레일 아래쪽에 분리해 두고 기존 MDI 탭 구조를 그대로 삽니다.</td></tr>
+</table>
+
+<h3>화면 사이 이동 — 문맥이 따라가는가</h3>
+<p class="lead">
+  칸을 옮길 때 <b>지금 보던 종목이 따라가는지</b>가 실제 사용감을 가릅니다. 규칙을 하나로 고정합니다.
+</p>
+<table class="d">
+  <tr><th style="width:190px">이동</th><th>문맥</th></tr>
+  <tr><td>터미널 → 봇</td><td><b>따라간다</b> — 리더보드가 "이 종목을 보는 봇"으로 필터된 상태로 열립니다. 필터는 상단에 칩으로 뜨고 <b>한 번에 해제</b>됩니다.</td></tr>
+  <tr><td>터미널 → 리서치</td><td><b>따라간다</b> — 그 종목을 다룬 문서만 먼저 보여주고, 전체 보기로 넓힐 수 있습니다.</td></tr>
+  <tr><td>터미널 → 포트폴리오</td><td><b>안 따라간다</b> — 전체 관점이 목적인 화면이라 한 종목으로 좁히면 존재 이유가 사라집니다. 대신 그 종목 행이 <b>하이라이트</b>됩니다.</td></tr>
+  <tr><td>봇 → 터미널</td><td><b>봇이 따라간다</b> — 리더보드에서 봇을 고르고 터미널로 가면 「봇 판단」 패널이 그 봇을 편 상태로 열립니다.</td></tr>
+  <tr><td>설정 · 관리자</td><td><b>문맥 없음</b> — 돌아오면 이전 상태가 그대로 복원됩니다.</td></tr>
+</table>
+
+<h3>기존 MDI 탭은 어떻게 되는가</h3>
+<p class="lead">
+  현재 모든 화면이 <b>iframe 탭</b>으로 뜨고, 그래서 터미널이 문맥을 공유하지 못합니다.
+  <b>버리지 않고 관리자 칸으로 좁힙니다.</b>
+</p>
+<table class="d">
+  <tr><th style="width:190px">영역</th><th>탭 구조</th></tr>
+  <tr><td>터미널 · 봇 · 리서치 · 포트폴리오 · 설정</td><td><b>탭 없음</b> — 레일이 곧 이동입니다. iframe 을 벗어나야 종목 선택이 전 패널로 퍼집니다.</td></tr>
+  <tr><td style="color:var(--im)">관리자</td><td class="why">MDI 탭 유지. 코드·메뉴·권한을 여러 개 열어 놓고 오가는 작업이라 탭이 실제로 맞습니다. <b style="color:var(--ik);font-weight:400">이미 동작하는 것을 굳이 바꾸지 않습니다.</b></td></tr>
+</table>
+<p class="lead" style="margin-top:11px">
+  <b style="color:var(--dg)">이것이 이번 작업에서 가장 위험한 변경입니다.</b>
+  <code style="font-family:ui-monospace,monospace;font-size:11px">tabStore</code> · 권한 게이트 ·
+  <code style="font-family:ui-monospace,monospace;font-size:11px">isEmbed</code> 분기가 전부 이 구조에 물려 있습니다.
+  그래서 <b>토큰·컴포넌트를 먼저 끝내고 셸은 나중에</b> 가기로 이미 정하셨습니다 — 그 판단이 맞습니다.
+</p>
+</div>

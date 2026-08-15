@@ -1,10 +1,16 @@
-# trading-lab — 멀티에이전트가 금융 MCP 도구를 오케스트레이션해 근거 기반 투자 리서치를 만드는 풀스택 SaaS
+# trading-lab — 로그인해서 쓰는 개인 투자 지휘소
 
-> 투자자의 질문 한 줄을 **Plan-Execute 멀티에이전트**가 분해하고, 시세·공시·뉴스·웹·사내 리서치 RAG 를 **자체 MCP 서버 스위트**로 오케스트레이션해 **공시 근거가 붙은 투자 리서치**를 생성하는 모습을 보여주는 핀테크 포트폴리오. 가드레일이 환각·미근거 수치·컴플라이언스를 방어한다. 경량 MSA(12 서비스 + 1 템플릿) + 6 MCP 서버 + 멀티에이전트 1식 + Next.js 프론트, 멀티테넌트 SaaS 구조.
+> 트레이딩 봇을 만들고, 과거 데이터로 검증하고, 실제로 굴리면서 성과를 비교한다 — 이 제품이 가는 곳이다. 호스팅해서 파는 서비스가 아니라 **각자 자기 컴퓨터에서 자기 계좌로** 굴리는 오픈소스다.
+>
+> **지금 받아서 할 수 있는 것** — API 키 없이 전 서비스를 한 번에 띄우고, 로그인해 **AI 투자 리서치 챗**에 질문을 던진다. Plan-Execute 멀티에이전트가 시세·공시·뉴스·웹검색·리서치 문서 MCP 도구를 오케스트레이션해 **출처 라벨이 붙은 리서치 답변**을 만들고, 가드레일이 미근거 수치를 막는다. 관심종목·포트폴리오(보유종목) 관리 화면과 시스템 관리 화면이 함께 있다. 봇·백테스트·실거래 연동은 아직 없다 — 어떤 순서로 오는지는 [ROADMAP.md](ROADMAP.md).
+>
+> 구성은 Next.js 프론트 + 통합 FastAPI 백엔드 + 금융 MCP 서버 6종 + 멀티에이전트 서비스다. 워크스페이스 단위 멀티테넌시가 코드에 들어 있는데, 여럿에게 호스팅해 파는 구조여서가 아니라 **개인 워크스페이스** — 전략별 격리·읽기전용 게스트 초대·봇 신원·레이아웃 저장 — 를 위해 쓴다.
 >
 > 모든 MCP 서버는 기본 **MOCK 금융 데이터**를 반환해 **API 키 없이 즉시 기동**(실데이터는 `USE_REAL_API` env 토글). 등장 발행사/티커는 공개 상장사 샘플·합성값이며 식별자는 샌드박스 값(`acme`/`example.com`)이다. ⓘ 정보 제공 목적이며 투자 조언이 아닙니다.
 
 ## 한눈에
+
+지휘소의 골조인 트레이딩 터미널(시세·봇·백테스트 화면)은 지금 짓는 중이다 — 순서는 [ROADMAP.md](ROADMAP.md). 아래는 이미 끝까지 동작하는 경로다: 질문 한 줄이 근거 라벨 붙은 리서치 답변이 되기까지.
 
 ```mermaid
 flowchart TD
@@ -33,7 +39,7 @@ flowchart TD
 
 | 서비스 | 포트 | 역할 | 보여주는 패턴 |
 | --- | --- | --- | --- |
-| `frontend` | 3010 | 투자 리서치 UI · API proxy · 멀티테넌트 인증 | Next 16 · React 19 · Better Auth(JWT) · DevExtreme · ECharts · Prisma |
+| `frontend` | 3010 | 투자 리서치 UI · API proxy · 워크스페이스 인증 | Next 16 · React 19 · Better Auth(JWT) · DevExtreme · ECharts · Prisma |
 | `backend-service` | 8000 | **통합 앱** — 관심종목 CRUD · 포트폴리오→보유종목 마스터-디테일 · NAV 시계열 · 시세/체결 틱 MQ · 리서치 문서 · 파일 업로드/SFTP · 활동요약 메일 스케줄러 · 활동 조회 챗 | FastAPI 레이어드(Router→Service→Repo) · DI · raw SQL · producer/consumer 큐 · APScheduler · 모듈 레지스트리(`app/modules.py`) |
 | `multi-agent-service` | 8003 | 투자 리서치 Plan-Execute 멀티에이전트(종목·시세/재무·공시/리스크·밸류/시장·뉴스) | StateGraph 4 도메인 · 총 12 sub-agent · 멀티 MCP 오케스트레이션 · grounding 라벨 · 가드레일 |
 | `single-agent-service` | 8010 | 단일 MCP 소비 에이전트 교본 | 프리빌트 ReAct → multi-agent 졸업 경로 |
@@ -52,7 +58,7 @@ flowchart TD
 - **Backend** — FastAPI · SQLAlchemy(raw SQL, push 스키마/무 마이그레이션) · dependency-injector · Pydantic Settings · uv / Python 3.12
 - **AI / Agent** — LangChain 1.x · LangGraph(StateGraph Plan-Execute + 프리빌트 ReAct) · langchain-mcp-adapters · FastMCP 3.x · MCP · LiteLLM 게이트웨이(+ custom guardrail)
 - **RAG / 검색** — Milvus(`pymilvus`) + Redis · BM25 · Kiwi 형태소 분석 하이브리드 검색
-- **Frontend** — Next.js 16 · React 19 · TypeScript · Better Auth(멀티테넌트 JWT) · Prisma(PostgreSQL) · DevExtreme · ECharts · Zustand · Zod · react-markdown/KaTeX
+- **Frontend** — Next.js 16 · React 19 · TypeScript · Better Auth(워크스페이스 JWT) · Prisma(PostgreSQL) · DevExtreme · ECharts · Zustand · Zod · react-markdown/KaTeX
 - **Infra** — PostgreSQL · Nginx · atmoz SFTP · VictoriaLogs · process-compose(dev) / Docker Compose(staging·prod)
 
 ## 빠른 실행

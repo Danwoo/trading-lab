@@ -1,0 +1,239 @@
+<style>
+  .st { --bg-base:#0D0F11; --bg-panel:#16191C; --bg-raised:#1C2126;
+        --hairline:rgba(38,43,48,.75); --line:#262B30; --line-strong:#3A4249;
+        --ink-strong:#F5F3EF; --ink:#E6E4E0; --ink-muted:#8B877F; --ink-faint:#625E58;
+        --up:#DB4F3E; --down:#4A8CC8; --danger:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; }
+  .st .num { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+
+  .st-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:15px; margin:16px 0 8px; }
+  @media (max-width:1150px){ .st-grid{grid-template-columns:1fr 1fr;} }
+  @media (max-width:780px){ .st-grid{grid-template-columns:1fr;} }
+
+  .cell { background:var(--bg-base); border:1px solid var(--line); border-radius:11px; padding:14px; }
+  .cell > .cap { font-size:9.5px; letter-spacing:.12em; font-weight:700; color:var(--ink-faint); margin-bottom:9px; }
+  .cell > .cap em { font-style:normal; color:var(--ink-muted); font-family:ui-monospace,monospace; letter-spacing:0; font-weight:400; }
+
+  .p { background:var(--bg-panel); border:1px solid var(--line); border-radius:10px;
+       box-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.24); min-height:150px; display:flex; flex-direction:column; }
+  .ph { display:flex; align-items:center; gap:8px; padding:13px 14px 0; }
+  .pt { font-size:12.5px; font-weight:700; color:var(--ink-strong); }
+  .pb { padding:8px 14px 14px; flex:1; display:flex; flex-direction:column; }
+
+  /* 출처 배지 5종 */
+  .prov { margin-left:auto; display:inline-flex; align-items:center; gap:5px; font-size:11px; }
+  .prov.live { color:var(--ink); }
+  .prov.loaded { color:var(--ink-muted); }
+  .prov.ph { color:var(--bg-panel); background:var(--ink-strong); font-weight:700; padding:2px 7px; border-radius:5px; }
+  .prov.un { color:var(--ink-muted); }
+  .prov.unk { color:var(--danger); font-weight:500; }
+  .prov i { display:inline-block; font-style:normal; }
+
+  .px { font-size:26px; font-weight:500; letter-spacing:-.03em; line-height:1.15; color:var(--up); }
+  .dl { font-size:12px; margin-top:3px; color:var(--up); }
+  .kv { display:flex; justify-content:space-between; padding:5px 0; }
+  .kv + .kv { border-top:1px solid var(--hairline); }
+  .kv span:first-child { font-size:12px; color:var(--ink-faint); }
+  .kv span:last-child { font-size:12.5px; font-weight:500; color:var(--ink); }
+
+  .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:6px; padding:12px; }
+  .empty b { font-size:12.5px; font-weight:500; color:var(--ink); }
+  .empty span { font-size:12px; color:var(--ink-faint); line-height:1.5; }
+  .empty .act { margin-top:4px; font-size:12px; font-weight:500; padding:5px 12px; border-radius:8px;
+                background:linear-gradient(180deg,#2E353B,#242A30); border:1px solid #434C54; color:var(--ink-strong);
+                box-shadow:inset 0 1px 0 rgba(255,255,255,.07); }
+
+  .hatch { flex:1; border-radius:7px; border:1px solid var(--line-strong); display:flex; flex-direction:column;
+           align-items:center; justify-content:center; gap:5px; text-align:center; padding:12px;
+           background-image:repeating-linear-gradient(45deg, var(--hairline) 0 1px, transparent 1px 9px); }
+
+  .sk { background:var(--bg-raised); border-radius:4px; }
+  @media (prefers-reduced-motion: no-preference) { .sk { animation:pulse 1.4s ease-in-out infinite; } }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.55} }
+
+  .rw { display:flex; align-items:center; height:26px; font-size:12px; }
+  .rw + .rw { border-top:1px solid var(--hairline); }
+  .rw b { flex:1; font-weight:400; color:var(--ink); }
+  .rw u { text-decoration:none; width:64px; text-align:right; }
+  .rw .na { color:var(--ink-faint); font-size:11px; }
+
+  .note { font-size:11.5px; line-height:1.55; color:var(--ink-muted); margin-top:9px; }
+  .note b { color:var(--ink); font-weight:500; }
+  .note code { font-family:ui-monospace,monospace; font-size:10.5px; color:var(--ink); }
+</style>
+
+<div class="st">
+<h2>패널 상태 — 데이터 계약에서 유도했습니다</h2>
+<p class="subtitle" style="color:#8B877F">
+  각 상태는 <b style="color:#E6E4E0">제가 지어낸 게 아니라 스키마 필드가 강제하는 것</b>입니다.
+  캡션의 <code style="font-family:ui-monospace,monospace">회색 글씨</code>가 그 근거 필드입니다.
+  <code style="font-family:ui-monospace,monospace">ProvenanceBadge.tsx</code> 의 5종 분류를 그대로 따르되, 액센트 색이 없어진 새 시스템에 맞춰 표현만 바꿨습니다.
+</p>
+
+<div class="st-grid">
+
+  <!-- 1. live -->
+  <div class="cell">
+    <div class="cap">① 실시간 <em>provenance.kind = "live"</em></div>
+    <div class="p">
+      <div class="ph"><span class="pt">종목 정보</span>
+        <span class="prov live"><i>●</i> KIS · 실시간 · <span class="num">14:32</span></span></div>
+      <div class="pb">
+        <div class="px num">71,400</div><div class="dl num">▲ 1,200 (+1.71%)</div>
+        <div style="margin-top:8px">
+          <div class="kv"><span>거래량</span><span class="num">12,847,301</span></div>
+          <div class="kv"><span>시가총액</span><span class="num">426.1조</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="note"><b>소스명 + 실시간 + 시각.</b> 점(●)은 정적입니다 — 깜빡이지 않고, 신선도는 <code>asof</code> 시각이 갱신되는 것으로 보여줍니다.</div>
+  </div>
+
+  <!-- 2. loaded -->
+  <div class="cell">
+    <div class="cap">② 적재본 <em>source · asof · adj_policy</em></div>
+    <div class="p">
+      <div class="ph"><span class="pt">차트</span>
+        <span class="prov loaded"><i>▤</i> data.go.kr · <span class="num">08-07 16:00</span></span></div>
+      <div class="pb">
+        <div style="flex:1;display:flex;align-items:flex-end;gap:2px">
+          <div class="sk" style="flex:1;height:30%"></div><div class="sk" style="flex:1;height:45%"></div>
+          <div class="sk" style="flex:1;height:38%"></div><div class="sk" style="flex:1;height:58%"></div>
+          <div class="sk" style="flex:1;height:52%"></div><div class="sk" style="flex:1;height:70%"></div>
+          <div class="sk" style="flex:1;height:64%"></div><div class="sk" style="flex:1;height:80%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink-faint);margin-top:8px;border-top:1px solid var(--hairline);padding-top:6px">
+          <span>수정주가 적용</span><span class="num">일봉 · 120건</span></div>
+      </div>
+    </div>
+    <div class="note"><b><code>adj_policy</code> 를 하단에 상설 표시합니다.</b> 수정주가 적용 여부는 차트의 숫자 자체를 바꾸는 값이라, 툴팁에 숨기면 안 됩니다. <b>제 이전 시안엔 이 줄이 없었습니다.</b></div>
+  </div>
+
+  <!-- 3. placeholder -->
+  <div class="cell">
+    <div class="cap">③ 임시 데이터 <em>kind = "placeholder" · FR-020</em></div>
+    <div class="p">
+      <div class="ph"><span class="pt">호가</span>
+        <span class="prov ph">임시 데이터</span></div>
+      <div class="pb"><div class="hatch">
+        <b style="font-size:12.5px;color:var(--ink);font-weight:500">실데이터 소스 미확보</b>
+        <span style="font-size:12px;color:var(--ink-faint);line-height:1.5">이 숫자는 믿지 마십시오.<br>소스 연결이 이 패널의 완료 조건입니다.</span>
+      </div></div>
+    </div>
+    <div class="note"><b>액센트 색이 없어져 배지를 반전 블록으로 바꿨습니다.</b> 색 없이도 화면에서 가장 튀는 요소입니다 — 편안해 보이면 사람이 그 숫자를 믿습니다.</div>
+  </div>
+
+  <!-- 4. unavailable -->
+  <div class="cell">
+    <div class="cap">④ 제공 안 됨 <em>unavailable_reason · FR-021</em></div>
+    <div class="p">
+      <div class="ph"><span class="pt">수급</span>
+        <span class="prov un"><i>⊖</i> 제공 안 됨</span></div>
+      <div class="pb"><div class="empty">
+        <b>미국 시장은 투자자별 수급이 없습니다</b>
+        <span>원 개념 자체가 부재합니다.<br>기관 보유·공매도 잔고로 대체 가능합니다.</span>
+        <span class="act">대체 지표 보기</span>
+      </div></div>
+    </div>
+    <div class="note"><b>본문을 렌더하지 않고 이유를 적습니다.</b> 0 으로 채우거나 빈 표를 그리지 않습니다 — 빈 표는 "데이터가 0"으로 읽힙니다.</div>
+  </div>
+
+  <!-- 5. 출처 미상 -->
+  <div class="cell">
+    <div class="cap">⑤ 출처 미상 <em>provenance === null</em></div>
+    <div class="p">
+      <div class="ph"><span class="pt">뉴스</span>
+        <span class="prov unk"><i>⚠</i> 출처 미상</span></div>
+      <div class="pb">
+        <div style="font-size:12.5px;color:var(--ink);line-height:1.5">삼성전자, 3분기 영업이익 컨센서스 상회</div>
+        <div style="font-size:12px;color:var(--ink-faint);margin-top:5px">2시간 전</div>
+        <div style="margin-top:auto;font-size:11.5px;color:var(--danger);border-top:1px solid var(--hairline);padding-top:8px">
+          이 패널이 출처를 보고하지 않았습니다 — 개발 결함입니다.</div>
+      </div>
+    </div>
+    <div class="note"><b>조용히 통과시키지 않습니다.</b> 출처를 안 붙인 패널은 화면에서 경고로 드러납니다. 5종 중 <b>유일하게 <code>--danger</code> 를 쓰는 상태</b>입니다 — 사용자가 아니라 개발자에게 하는 말이기 때문입니다.</div>
+  </div>
+
+  <!-- 6. 부분 실패 -->
+  <div class="cell">
+    <div class="cap">⑥ 일부만 실패 <em>QuotesOut.unavailable: dict</em></div>
+    <div class="p">
+      <div class="ph"><span class="pt">관심종목</span>
+        <span class="prov loaded"><i>▤</i> 7건 중 <span class="num">5</span>건</span></div>
+      <div class="pb" style="padding-top:2px">
+        <div class="rw"><b>삼성전자</b><u class="num" style="color:var(--up)">+1.71%</u></div>
+        <div class="rw"><b>SK하이닉스</b><u class="num" style="color:var(--up)">+3.04%</u></div>
+        <div class="rw"><b>NAVER</b><u class="num" style="color:var(--down)">-0.85%</u></div>
+        <div class="rw"><b style="color:var(--ink-muted)">TSLA</b><u class="na">시장 미개장</u></div>
+        <div class="rw"><b style="color:var(--ink-muted)">NVDA</b><u class="na">키 미등록</u></div>
+      </div>
+    </div>
+    <div class="note"><b>행마다 사유가 다릅니다.</b> <code>unavailable</code> 이 종목별 사유를 담은 dict 이라 가능합니다. <b>전체를 오류로 처리하거나 그 행을 숨기지 않습니다</b> — 숨기면 사용자는 자기가 지운 줄 압니다.</div>
+  </div>
+
+  <!-- 7. 0건 두 종류 -->
+  <div class="cell">
+    <div class="cap">⑦ 0건 — 이유가 다릅니다 <em>unavailable_reason 유무</em></div>
+    <div class="p" style="min-height:auto">
+      <div class="ph"><span class="pt">공시</span><span class="prov loaded"><i>▤</i> DART</span></div>
+      <div class="pb"><div class="empty" style="padding:18px 12px">
+        <b>최근 90일 공시가 없습니다</b>
+        <span>기간을 넓혀 보시겠습니까?</span>
+        <span class="act">1년으로 보기</span>
+      </div></div>
+    </div>
+    <div class="p" style="min-height:auto;margin-top:11px">
+      <div class="ph"><span class="pt">공시</span><span class="prov un"><i>⊖</i> 제공 안 됨</span></div>
+      <div class="pb"><div class="empty" style="padding:18px 12px">
+        <b>이 시장은 아직 적재되지 않았습니다</b>
+        <span>미국 공시는 SEC EDGAR 연결 후 제공됩니다.</span>
+      </div></div>
+    </div>
+    <div class="note"><b>같은 "0건"이 두 화면입니다.</b> 위는 <b>진짜로 없음</b>(다음 행동 제안), 아래는 <b>아직 안 채움</b>(제안 없음 — 사용자가 할 수 있는 게 없습니다). 스키마가 이 둘을 가르라고 요구합니다.</div>
+  </div>
+
+  <!-- 8. 로딩 -->
+  <div class="cell">
+    <div class="cap">⑧ 로딩 <em>골격을 먼저 그린다</em></div>
+    <div class="p">
+      <div class="ph"><span class="pt">종목 정보</span>
+        <span class="prov loaded"><i>▤</i> <span class="sk" style="display:inline-block;width:64px;height:9px"></span></span></div>
+      <div class="pb">
+        <div class="sk" style="width:128px;height:28px;margin-top:2px"></div>
+        <div class="sk" style="width:88px;height:12px;margin-top:7px"></div>
+        <div style="margin-top:12px">
+          <div class="kv"><span>거래량</span><span class="sk" style="width:76px;height:11px"></span></div>
+          <div class="kv"><span>시가총액</span><span class="sk" style="width:56px;height:11px"></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="note"><b>스피너가 아니라 골격입니다.</b> 라벨(거래량·시가총액)은 이미 아는 값이라 그대로 그리고 값만 비웁니다 — 화면이 흔들리지 않습니다. <code>prefers-reduced-motion</code> 에서는 펄스 없이 정적입니다.</div>
+  </div>
+
+  <!-- 9. 오류 -->
+  <div class="cell">
+    <div class="cap">⑨ 오류 <em>--danger + 아이콘 + 재시도</em></div>
+    <div class="p">
+      <div class="ph"><span class="pt">차트</span><span class="prov un"><i>⊖</i> —</span></div>
+      <div class="pb"><div class="empty">
+        <b style="color:var(--danger)">⚠ 시세를 불러오지 못했습니다</b>
+        <span>data.go.kr 응답 시간 초과 (10초)</span>
+        <span class="act">다시 시도</span>
+      </div></div>
+    </div>
+    <div class="note"><b>실패한 대상·이유·다음 행동 셋을 다 적습니다.</b> "오류가 발생했습니다"만 있으면 사용자가 할 수 있는 게 없습니다. 현재 22개 파일이 그 문구를 다섯 가지로 쓰고 있습니다.</div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:26px">
+  <p class="label">제가 이번에 새로 정한 것 (액센트가 없어져 생긴 결정)</p>
+  <p style="line-height:1.7;color:#8B877F">
+    기존 <code style="font-family:ui-monospace,monospace">ProvenanceBadge.tsx</code> 는 <code style="font-family:ui-monospace,monospace">text-signal-warn</code>(앰버)로
+    <b style="color:#E6E4E0">임시 데이터</b>와 <b style="color:#E6E4E0">출처 미상</b>을 함께 표시합니다. 새 시스템엔 앰버가 없으므로 둘을 갈랐습니다 —
+    <b style="color:#E6E4E0">임시 데이터는 반전 블록</b>(사용자에게 하는 말, 색 없이 가장 튐),
+    <b style="color:#E6E4E0">출처 미상은 <code style="font-family:ui-monospace,monospace">--danger</code></b>(개발자에게 하는 말, 화면에 남아선 안 되는 상태).
+    <br>같은 앰버로 묶여 있던 두 상태가 실은 <b style="color:#E6E4E0">청중이 다릅니다.</b> 액센트를 뺀 덕에 드러난 구분입니다.
+  </p>
+</div>
+</div>

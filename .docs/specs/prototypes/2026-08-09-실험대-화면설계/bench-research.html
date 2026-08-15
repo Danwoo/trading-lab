@@ -1,0 +1,399 @@
+<style>
+  .rs { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --ok:#7FA05A; --wr:#D9A441; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .rs .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+  .rs h2 { font-size:17px; font-weight:700; color:var(--is); margin:0 0 5px; }
+  .rs h3 { font-size:14.5px; font-weight:700; color:var(--is); margin:30px 0 4px; }
+  .rs h3 em { font-style:normal; color:var(--if); font-weight:400; font-size:12.5px; margin-left:7px; }
+  .rs p.lead { font-size:12.5px; color:var(--im); line-height:1.7; margin:0 0 13px; max-width:80ch; }
+  .rs p.lead b { color:var(--ik); font-weight:500; }
+  .rs code { font-size:11px; color:var(--im); background:var(--rs); padding:1px 4px; border-radius:3px; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:12px; overflow:hidden; max-width:1320px; }
+  .hud { display:flex; align-items:center; gap:10px; padding:9px 13px; background:var(--pn);
+         border-bottom:1px solid var(--ln); font-size:11.5px; color:var(--im); }
+  .hud .wm { font-size:10px; letter-spacing:.16em; color:var(--if); font-weight:700; }
+  .hud .sp { flex:1; } .hud s { text-decoration:none; color:var(--if); }
+
+  .body { display:flex; min-height:430px; }
+  .rail { flex:0 0 46px; background:var(--pn); border-right:1px solid var(--ln); display:flex;
+          flex-direction:column; align-items:center; padding:9px 0; gap:5px; }
+  .rail i { width:30px; height:30px; border-radius:8px; display:flex; align-items:center;
+            justify-content:center; font-style:normal; font-size:15px; color:var(--if); }
+  .rail i.act { background:var(--is); color:var(--bg); font-weight:700; }
+  .rail i.dim { opacity:.32; } .rail .gap { flex:1; }
+  .rail hr { width:22px; border:0; border-top:1px solid var(--ln); margin:4px 0; }
+
+  .main { flex:1; display:flex; min-width:0; }
+  .doc { flex:1; padding:14px 17px; min-width:0; overflow:auto; }
+  .side { flex:0 0 268px; border-left:1px solid var(--ln); background:var(--pn); padding:12px 13px; }
+
+  .q { font-size:15px; color:var(--is); font-weight:600; line-height:1.5; margin-bottom:3px; }
+  .qm { font-size:11px; color:var(--if); margin-bottom:13px; }
+
+  /* 진행 */
+  .prog { border:1px solid var(--ln); border-radius:10px; background:var(--pn); padding:11px 12px; margin-bottom:13px; }
+  .prog .h { font-size:11.5px; color:var(--im); margin-bottom:9px; display:flex; align-items:center; gap:7px; }
+  .prog .h b { color:var(--ik); }
+  .prog .h em { font-style:normal; margin-left:auto; color:var(--if); font-size:10.5px; }
+  .dom { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .dom > div { border:1px solid var(--ln); border-radius:8px; padding:7px 8px; }
+  .dom .dn { font-size:11.5px; color:var(--ik); margin-bottom:5px; }
+  .dom .subs { display:flex; flex-direction:column; gap:3px; }
+  .dom .sb { font-size:10.5px; color:var(--if); display:flex; align-items:center; gap:5px; }
+  .dom .sb u { text-decoration:none; width:5px; height:5px; border-radius:50%; background:var(--ln); flex:0 0 auto; }
+  .dom .sb.done u { background:var(--ok); } .dom .sb.done { color:var(--im); }
+  .dom .sb.run u { background:var(--wr); } .dom .sb.run { color:var(--ik); }
+  .dom .sb.off { opacity:.34; }
+
+  /* 답 */
+  .ans { font-size:13px; color:var(--ik); line-height:1.85; }
+  .ans p { margin:0 0 11px; }
+  .ans b { color:var(--is); }
+  .cite { font-size:10px; color:var(--bg); background:var(--im); border-radius:3px; padding:1px 4px;
+          vertical-align:2px; margin:0 1px; font-weight:700; }
+  .cite.no { background:#C94A3B; }
+
+  .gl { display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:3px 9px;
+        border-radius:6px; margin-bottom:11px; }
+  .gl.src { color:#9BBE7A; border:1px solid rgba(127,160,90,.45); background:rgba(127,160,90,.09); }
+  .gl.non { color:#E2837A; border:1px solid rgba(201,74,59,.5); background:rgba(201,74,59,.09); }
+
+  .foot { margin-top:13px; padding-top:10px; border-top:1px solid var(--hl);
+          font-size:11px; color:var(--if); line-height:1.6; }
+
+  /* 출처 */
+  .src { border-bottom:1px solid var(--hl); padding:8px 0; font-size:11.5px; }
+  .src:last-child { border-bottom:0; }
+  .src .n1 { color:var(--ik); display:flex; align-items:baseline; gap:6px; }
+  .src .n1 u { text-decoration:none; font-size:10px; color:var(--bg); background:var(--im);
+               border-radius:3px; padding:0 4px; font-weight:700; flex:0 0 auto; }
+  .src .m1 { font-size:10.5px; color:var(--if); margin-top:2px; }
+
+  .sw { display:flex; align-items:center; gap:7px; padding:6px 0; font-size:11.5px; color:var(--im);
+        border-bottom:1px solid var(--hl); }
+  .sw:last-child { border-bottom:0; }
+  .sw .t { flex:1; } .sw .t s { display:block; text-decoration:none; font-size:10px; color:var(--if); }
+  .sw .k { width:26px; height:15px; border-radius:8px; background:var(--ln); position:relative; flex:0 0 auto; }
+  .sw .k::after { content:''; position:absolute; top:2px; left:2px; width:11px; height:11px;
+                  border-radius:50%; background:var(--if); transition:all .12s; }
+  .sw.on .k { background:rgba(127,160,90,.4); } .sw.on .k::after { left:13px; background:#9BBE7A; }
+
+  .act { display:flex; gap:7px; flex-wrap:wrap; margin-top:11px; }
+  .act span { font-size:11.5px; padding:5px 11px; border-radius:7px; border:1px solid var(--ls); color:var(--ik); }
+  .act span.pri { background:var(--is); color:var(--bg); border-color:var(--is); font-weight:600; }
+
+  .note { border-left:2px solid var(--ls); padding:2px 0 2px 11px; margin:12px 0 0;
+          font-size:11.5px; color:var(--im); line-height:1.65; max-width:80ch; }
+  .note b { color:var(--ik); }
+  .note.good { border-left-color:var(--ok); } .note.warn { border-left-color:var(--wr); }
+  .note.bad { border-left-color:var(--dg); }
+  .cap { font-size:11px; color:var(--if); margin-top:6px; line-height:1.6; }
+  table.t2 { width:100%; border-collapse:collapse; font-size:11.5px; margin:8px 0 2px; max-width:960px; }
+  table.t2 th { text-align:left; font-weight:600; color:var(--im); padding:5px 7px;
+                border-bottom:1px solid var(--ln); font-size:11px; }
+  table.t2 td { padding:6px 7px; border-bottom:1px solid var(--hl); color:var(--im); vertical-align:top; }
+  table.t2 td b { color:var(--ik); font-weight:600; }
+  table.t2 tr:last-child td { border-bottom:0; }
+</style>
+
+<div class="rs">
+
+<h2>리서치 — 두 번째 기둥</h2>
+<p class="lead">
+  <b>이 화면만 백엔드가 이미 있습니다.</b> <code>multi-agent-service</code> 의 실제 계약에 맞춰 그렸습니다 —
+  SSE 이벤트(<code>routing</code>·<code>step</code>·<code>tool_call</code>·<code>response_chunk</code>·<code>trace</code>),
+  근거 라벨 <code>sourced</code>/<code>no_evidence</code>, 도메인 4개와 sub-agent 12개
+  (시세 2 · 재무공시 3 · 리스크 3 · 시장뉴스 4), MCP 게이팅 <code>enabled_mcps</code>.<br>
+  <b>내부 용어는 화면에 안 씁니다.</b> 「sub-agent」·「MCP」·「Plan-Execute」는 사람 말로 바꿉니다 —
+  이 제품의 사용자는 투자는 하지만 퀀트는 처음인 사람입니다.
+</p>
+
+<!-- ① 돌아가는 중 -->
+<h3>① 돌아가는 중 <em>— 12갈래가 차오릅니다</em></h3>
+<p class="lead">
+  격자가 끝난 칸부터 차오르듯(§21.5), 여기서는 <b>무엇을 보고 있는지</b>가 차오릅니다.
+  스피너 하나를 돌리면 몇 분이 빈 시간이 됩니다.
+</p>
+
+<div class="win">
+  <div class="hud"><span class="wm">TRADING LAB</span><s>리서치</s>
+    <div class="sp"></div><s>저녁 배치 · 오늘 12번째 질문</s></div>
+  <div class="body" style="min-height:330px">
+    <div class="rail">
+      <i class="dim">▦</i><i class="act">◵</i><hr>
+      <i class="dim">◫</i><i class="dim">≡</i><i class="dim">◈</i><hr>
+      <i class="dim">◷</i><i class="dim">⌸</i>
+      <span class="gap"></span><i class="dim">✦</i><i class="dim">⚙</i>
+    </div>
+    <div class="main">
+      <div class="doc">
+        <div class="q">현대차 최근 실적이랑 지금 위험한 게 뭔지 알려줘</div>
+        <div class="qm">방금 · 이어지는 질문 3번째</div>
+
+        <div class="prog">
+          <div class="h"><b>보고 있습니다</b> — 질문을 네 갈래로 나눠서 동시에<em>34초째</em></div>
+          <div class="dom">
+            <div><div class="dn">시세·보유</div><div class="subs">
+              <div class="sb done"><u></u>주가 흐름</div>
+              <div class="sb done"><u></u>내 보유 현황</div></div></div>
+            <div><div class="dn">재무·공시</div><div class="subs">
+              <div class="sb done"><u></u>재무제표</div>
+              <div class="sb run"><u></u>공시 원문</div>
+              <div class="sb"><u></u>배당</div></div></div>
+            <div><div class="dn">리스크·밸류</div><div class="subs">
+              <div class="sb run"><u></u>변동성·낙폭</div>
+              <div class="sb"><u></u>밸류에이션</div>
+              <div class="sb"><u></u>신용</div></div></div>
+            <div><div class="dn">시장·뉴스</div><div class="subs">
+              <div class="sb done"><u></u>뉴스</div>
+              <div class="sb off"><u></u>거시 <s style="text-decoration:none">꺼둠</s></div>
+              <div class="sb"><u></u>감성</div>
+              <div class="sb off"><u></u>업종 <s style="text-decoration:none">꺼둠</s></div></div></div>
+          </div>
+          <div class="cap" style="margin-top:8px">
+            <b style="color:var(--im)">지금까지 찾은 근거 7건.</b>
+            꺼 둔 두 갈래는 오른쪽에서 켤 수 있고, <b style="color:var(--im)">켜면 다시 돕니다.</b>
+          </div>
+        </div>
+
+        <div class="ans" style="color:var(--if)">
+          <p>2분기 매출은 <span style="background:var(--rs);border-radius:3px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            영업이익률은 <span style="background:var(--rs);border-radius:3px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> …</p>
+          <div class="cap">— 답은 <b style="color:var(--im)">근거가 모인 뒤부터</b> 한 글자씩 나옵니다.</div>
+        </div>
+      </div>
+      <div class="side">
+        <div style="font-size:11px;color:var(--im);margin-bottom:7px">무엇을 볼지</div>
+        <div class="sw on"><span class="t">공시<s>DART 원문·재무제표</s></span><span class="k"></span></div>
+        <div class="sw on"><span class="t">뉴스<s>금융 뉴스·감성</s></span><span class="k"></span></div>
+        <div class="sw on"><span class="t">내 계좌<s>보유 종목과 대조</s></span><span class="k"></span></div>
+        <div class="sw"><span class="t">웹 검색<s>공시에 없는 것</s></span><span class="k"></span></div>
+        <div class="sw"><span class="t">사내 문서<s>올려 둔 리서치</s></span><span class="k"></span></div>
+        <div class="cap" style="margin-top:9px;border-top:1px solid var(--hl);padding-top:8px">
+          끄면 그 갈래를 <b style="color:var(--im)">아예 안 봅니다</b> — 못 본 걸 「없다」고 답하지 않게,
+          답에 <b style="color:var(--im)">「이건 안 봤습니다」</b>가 붙습니다.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note good">
+  <b>꺼 둔 갈래를 흐리게 남깁니다.</b> 목록에서 지워 버리면 「원래 없는 것」처럼 보이는데,
+  실제로는 <b>안 본 것</b>입니다. 둘은 다릅니다 — 그리고 이 구분이 아래 <code>no_evidence</code> 라벨의 전제입니다.
+</div>
+
+<!-- ② 답 -->
+<h3>② 답 <em>— 근거가 붙은 것과 안 붙은 것을 갈라 보여줍니다</em></h3>
+
+<div class="win">
+  <div class="hud"><span class="wm">TRADING LAB</span><s>리서치</s>
+    <div class="sp"></div><s>1분 12초 걸림 · 근거 9건</s></div>
+  <div class="body" style="min-height:380px">
+    <div class="rail">
+      <i class="dim">▦</i><i class="act">◵</i><hr>
+      <i class="dim">◫</i><i class="dim">≡</i><i class="dim">◈</i><hr>
+      <i class="dim">◷</i><i class="dim">⌸</i>
+      <span class="gap"></span><i class="dim">✦</i><i class="dim">⚙</i>
+    </div>
+    <div class="main">
+      <div class="doc">
+        <div class="q">현대차 최근 실적이랑 지금 위험한 게 뭔지 알려줘</div>
+        <div class="qm">1분 12초 · 네 갈래 중 넷 다 끝남</div>
+
+        <span class="gl src">◆ 근거 있음 — 답의 모든 숫자가 출처에서 나왔습니다</span>
+
+        <div class="ans">
+          <p><b>실적</b> — 2분기 매출 <b>44조 2천억</b><span class="cite">1</span>,
+          영업이익 <b>4조 1천억</b><span class="cite">1</span>으로 작년 같은 기간보다 각각 <b>+7.2%</b>,
+          <b>+11.4%</b> 늘었습니다<span class="cite">2</span>. 영업이익률은 <b>9.3%</b>로
+          3개 분기 연속 9%를 넘겼습니다<span class="cite">2</span>.</p>
+
+          <p><b>지금 위험한 것 셋</b> —
+          ① <b>관세</b>. 미국 수입차 관세 논의가 다시 나왔고, 북미가 매출의 <b>38%</b>입니다<span class="cite">3</span>.
+          ② <b>환율</b>. 원/달러가 3개월간 <b>6.1%</b> 내려 수출 채산성이 낮아집니다<span class="cite">4</span>.
+          ③ <b>재고</b>. 미국 딜러 재고일수가 <b>72일</b>로 1년 전 54일보다 늘었습니다<span class="cite">5</span>.</p>
+
+          <p><b>내 계좌와 겹치는 것</b> — 지금 현대차를 <b>200만원</b>어치 들고 계시고,
+          기아도 함께 보유 중이라 <b>같은 위험에 두 번</b> 걸려 있습니다<span class="cite">6</span>.
+          두 종목의 최근 1년 일별 상관은 <b>0.74</b>입니다<span class="cite">6</span>.</p>
+
+          <p style="color:var(--im)"><b style="color:#E2837A">답하지 못한 것</b> —
+          「지금 사도 되나」는 답하지 않습니다. 그건 판단이고, 근거가 아닙니다.</p>
+
+          <div class="act">
+            <span class="pri">「정해야 할 것」으로 올리기</span>
+            <span>이 종목 봇에서 빼기</span>
+            <span>근거 9건 내보내기</span>
+          </div>
+
+          <div class="foot">
+            ⓘ 정보 제공 목적이며 투자 조언이 아닙니다.<br>
+            <b style="color:var(--im)">웹 검색·사내 문서는 꺼 두셔서 안 봤습니다</b> — 켜면 다시 돕니다.
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <div style="font-size:11px;color:var(--im);margin-bottom:6px">근거 9건 <span style="color:var(--if)">— 번호를 누르면 본문으로</span></div>
+        <div class="src"><div class="n1"><u>1</u>2026 반기보고서</div>
+          <div class="m1">DART 공시 원문 · 08-04 접수</div></div>
+        <div class="src"><div class="n1"><u>2</u>연결 재무제표</div>
+          <div class="m1">DART · 전년 동기 대비 계산은 원문 수치로</div></div>
+        <div class="src"><div class="n1"><u>3</u>「미 관세 재논의」 기사 4건</div>
+          <div class="m1">금융 뉴스 · 08-06 ~ 08-08</div></div>
+        <div class="src"><div class="n1"><u>4</u>원/달러 3개월 추이</div>
+          <div class="m1">시세 · 05-09 ~ 08-07 종가</div></div>
+        <div class="src"><div class="n1"><u>5</u>「북미 딜러 재고」 기사 2건</div>
+          <div class="m1">금융 뉴스 · 08-05</div></div>
+        <div class="src"><div class="n1"><u>6</u>내 보유 종목</div>
+          <div class="m1">계좌 · 상관은 일별 종가 252일</div></div>
+        <div class="cap" style="margin-top:9px;border-top:1px solid var(--hl);padding-top:8px">
+          출처는 <b style="color:var(--im)">답을 만들 때 실제로 부른 것</b>만 적힙니다 —
+          나중에 붙인 게 아닙니다.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note good">
+  <b>번호(각주)를 쓰는 이유</b> — 이 제품의 주장이 「근거가 붙는다」인데,
+  문단 끝에 출처를 몰아 적으면 <b>어느 숫자가 어디서 왔는지</b>가 사라집니다.
+  <b>숫자마다</b> 붙여야 그 주장이 검증 가능해집니다.
+</div>
+
+<!-- ③ 근거 없음 -->
+<h3>③ 근거를 못 찾았을 때 <em>— 이 화면에서 제일 중요한 상태</em></h3>
+<p class="lead">
+  백엔드의 라벨은 <code>sourced</code> / <code>no_evidence</code> <b>둘뿐</b>입니다. 중간이 없어 흑백으로 보여줄 수 있습니다.
+  <b>근거가 없으면 답을 예쁘게 쓰지 않습니다.</b>
+</p>
+
+<div class="win">
+  <div class="hud"><span class="wm">TRADING LAB</span><s>리서치</s>
+    <div class="sp"></div><s>41초 · 근거 0건</s></div>
+  <div class="body" style="min-height:210px">
+    <div class="rail">
+      <i class="dim">▦</i><i class="act">◵</i><hr>
+      <i class="dim">◫</i><i class="dim">≡</i><i class="dim">◈</i><hr>
+      <i class="dim">◷</i><i class="dim">⌸</i>
+      <span class="gap"></span><i class="dim">✦</i><i class="dim">⚙</i>
+    </div>
+    <div class="main">
+      <div class="doc">
+        <div class="q">이 회사 내년 실적 어떻게 될 것 같아?</div>
+        <div class="qm">41초 · 네 갈래 다 돌았지만 아무것도 못 찾음</div>
+
+        <span class="gl non">● 근거 없음 — 답을 만들지 않았습니다</span>
+
+        <div class="ans">
+          <p><b>물어보신 것에 답할 자료가 없습니다.</b>
+          내년 실적은 <b>아직 일어나지 않은 일</b>이라 공시에도 시세에도 없습니다.
+          찾은 것이 0건이라 <b style="color:#E2837A">추측으로 문장을 만들지 않았습니다.</b></p>
+
+          <p style="color:var(--im)">대신 이렇게 물어보시면 답할 수 있습니다 —<br>
+          <span style="color:var(--ik)">· 최근 4개 분기 실적이 어떻게 움직였나</span><br>
+          <span style="color:var(--ik)">· 회사가 공시에서 밝힌 올해 목표는 무엇인가</span><br>
+          <span style="color:var(--ik)">· 애널리스트 전망이 나온 게 있나 (웹 검색을 켜야 합니다)</span></p>
+
+          <div class="foot">ⓘ 정보 제공 목적이며 투자 조언이 아닙니다.</div>
+        </div>
+      </div>
+      <div class="side">
+        <div style="font-size:11px;color:var(--im);margin-bottom:6px">찾아본 것</div>
+        <div class="src"><div class="n1" style="color:var(--if)">공시 — 해당 없음</div>
+          <div class="m1">미래 실적을 담은 공시는 없습니다</div></div>
+        <div class="src"><div class="n1" style="color:var(--if)">뉴스 — 0건</div>
+          <div class="m1">「내년 실적」으로 걸린 기사 없음</div></div>
+        <div class="src"><div class="n1" style="color:var(--if)">웹 검색 — 꺼져 있음</div>
+          <div class="m1">켜면 전망 기사를 볼 수 있습니다</div></div>
+        <div class="cap" style="margin-top:9px;border-top:1px solid var(--hl);padding-top:8px">
+          <b style="color:var(--im)">「못 찾았다」와 「없다」는 다릅니다.</b>
+          어느 쪽인지 갈라 적습니다.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note bad">
+  <b>여기서 그럴듯한 답을 만들면 제품 전체가 거짓말이 됩니다.</b>
+  실험대는 「좋아 보이는 숫자를 의심하라」고 가르치는데(튜토리얼 함정, §21.1),
+  리서치가 근거 없이 말을 지어내면 <b>같은 제품이 정반대를 가르치는 것</b>입니다.
+  백엔드가 <code>no_evidence</code> 를 결정론적으로 판정하므로(<code>tool_calls</code> trace 기반),
+  화면은 그걸 <b>숨기지 않기만</b> 하면 됩니다.
+</div>
+
+<!-- ④ 되묻기 -->
+<h3>④ 되묻기와 반려 <em>— <code>clarification</code> 이벤트</em></h3>
+<div style="display:flex;gap:14px;flex-wrap:wrap">
+  <div style="flex:1 1 380px;min-width:0">
+    <div class="win" style="max-width:none">
+      <div class="hud"><span class="wm">TRADING LAB</span><s>리서치</s></div>
+      <div style="padding:13px 15px;background:var(--bg)">
+        <div class="q" style="font-size:13.5px">삼성 어때?</div>
+        <div class="ans" style="margin-top:9px">
+          <p style="color:var(--im)"><b style="color:var(--ik)">어느 회사를 말씀하시는 걸까요?</b><br>
+          삼성전자 · 삼성바이오로직스 · 삼성물산 …<br>
+          그리고 <b style="color:var(--ik)">무엇이 궁금하신지</b>도 알려주시면 정확합니다 — 실적 / 위험 / 밸류에이션.</p>
+          <div class="cap">— 되묻는 건 <b style="color:var(--im)">한 번</b>입니다. 두 번 되물으면 심문이 됩니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="flex:1 1 380px;min-width:0">
+    <div class="win" style="max-width:none">
+      <div class="hud"><span class="wm">TRADING LAB</span><s>리서치</s></div>
+      <div style="padding:13px 15px;background:var(--bg)">
+        <div class="q" style="font-size:13.5px">오늘 점심 뭐 먹지?</div>
+        <div class="ans" style="margin-top:9px">
+          <p style="color:var(--im)"><b style="color:var(--ik)">투자와 관련된 것만 답합니다.</b>
+          이 화면은 시세·공시·뉴스·내 계좌를 뒤져 근거를 붙이는 자리라, 다른 질문에는 붙일 근거가 없습니다.</p>
+          <div class="cap">— 반려는 <b style="color:var(--im)">짧게</b>. 왜 안 되는지 길게 설명하면 훈계가 됩니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑤ 두 기둥 -->
+<h3>⑤ 리서치 → 실험대로 흘러드는 자리</h3>
+<p class="lead">
+  두 기둥이 만나는 곳은 하나입니다(§22.2). 리서치 답에서 <b>「정해야 할 것」으로 올리기</b>를 누르면
+  보드 하단 카드가 됩니다 — <b>봇이 모르는 것</b>이라서입니다.
+</p>
+<table class="t2">
+  <tr><th style="width:30%">리서치가 찾은 것</th><th>보드에서</th></tr>
+  <tr><td>현대차 12일 실적 발표</td><td><b>「정해야 할 것」</b> — 봇은 일정을 안 봅니다. 그대로 둘지, 그 종목만 뺄지</td></tr>
+  <tr><td>기아와 상관 0.74</td><td><b>「정해야 할 것」</b> — 같은 위험에 두 번 걸림. 봇은 상관을 안 봅니다</td></tr>
+  <tr><td>2분기 영업이익률 9.3%</td><td><b>안 올라갑니다</b> — 봇이 이걸로 뭘 할 수 없습니다. 리서치 안에만 남습니다</td></tr>
+</table>
+<div class="note warn">
+  <b>전부 올리지 않습니다.</b> 리서치 결과를 죄다 보드로 밀면 「정해야 할 것」이 30건이 되고,
+  그러면 아무도 안 봅니다. <b>봇이 못 보는 것 중, 사람이 지금 정해야 하는 것</b>만 올라갑니다.
+</div>
+
+<h3>설계 요약</h3>
+<table class="t2">
+  <tr><th style="width:26%">백엔드 계약</th><th>화면에서</th></tr>
+  <tr><td><code>routing</code> · <code>step</code></td><td>네 갈래 진행 카드. <b>내부 이름 대신 사람 말</b>(시세·보유 / 재무·공시 / 리스크·밸류 / 시장·뉴스)</td></tr>
+  <tr><td>sub-agent 12개</td><td>갈래마다 점 2~4개. <b>끝난 것부터 초록</b>으로 차오름</td></tr>
+  <tr><td><code>enabled_mcps</code></td><td>오른쪽 토글 5개. <b>꺼 둔 것은 지우지 않고 흐리게</b> — 「없다」와 「안 봤다」를 가름</td></tr>
+  <tr><td><code>tool_call</code> · <code>trace</code></td><td>출처 목록. <b>실제로 부른 것만</b> 적힘</td></tr>
+  <tr><td><code>grounding: sourced</code></td><td>초록 배지 + <b>숫자마다 각주 번호</b></td></tr>
+  <tr><td><code>grounding: no_evidence</code></td><td><b>답을 만들지 않음.</b> 대신 「이렇게 물으면 답할 수 있다」 세 줄</td></tr>
+  <tr><td><code>clarification</code></td><td>되묻기 <b>한 번</b>만</td></tr>
+  <tr><td>컴플라이언스 푸터</td><td>답 끝에 항상 · 꺼 둔 갈래가 있으면 그것도 같이</td></tr>
+  <tr><td>멀티턴 (<code>gid</code>)</td><td>질문 위에 「이어지는 질문 3번째」</td></tr>
+</table>
+
+<div class="note">
+  <b>안 그린 것</b> — <code>media</code> 이벤트(사내 문서의 이미지 검색 결과)와
+  이미지가 답에 붙는 자리. <code>doc-search</code> 를 켰을 때만 나오는데,
+  <b>사내 문서를 올려 둔 상태</b>가 전제라 지금 단계에서는 뒤로 미뤘습니다.
+</div>
+
+</div>

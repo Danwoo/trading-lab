@@ -61,7 +61,8 @@ flowchart TD
 
 ```text
 frontend/
-├── app/(main)/      # Layout, Page (폴더 경로 = URL)
+├── app/admin/       # 관리 셸(MDI 탭) 아래 Layout, Page (폴더 경로 = URL)
+├── app/(main)/      # 제품 셸(46px 레일) 아래 Layout, Page
 ├── app/api/         #   common/ → Prisma 직접 · external/ → Backend 프록시
 ├── components/      # features/{Entity}/(PascalCase) · shared/ · providers/ · layouts/
 ├── hooks/shared/    # 재사용 훅 (useMasterGridData 등)
@@ -282,7 +283,7 @@ flowchart LR
     SV --> CONT["Container<br/>SplitPane + 훅"]
     CONT --> DV["DetailView<br/>읽기 전용"]
     CONT --> DF["DetailForm<br/>입력/수정"]
-    CONT --> PAGE["Page<br/>app/(main)/"]
+    CONT --> PAGE["Page<br/>app/admin/"]
     SV --> API["API Route<br/>withAuth + proxyApiRequest"]
 ```
 
@@ -556,7 +557,7 @@ export default function TodoDetailForm({ initialData, isNew, codeList, onSubmit,
 }
 ```
 
-### 9.6 Page — `app/(main)/admin/backend-service/todo/page.tsx`
+### 9.6 Page — `app/admin/backend-service/todo/page.tsx`
 
 ```tsx
 import TodoContainer from "@/components/features/Todo/TodoContainer";
@@ -633,7 +634,7 @@ export const POST = withAuth(postHandler);
 
 **신규 엔티티 추가 시 체크리스트** — 작업 완료판정을 위한 확인 목록:
 
-- [ ] 폴더 구조가 `schemas/`→`services/`→`components/features/`→`app/(main)/`→`app/api/` 순서로 파일 생성했는가
+- [ ] 폴더 구조가 `schemas/`→`services/`→`components/features/`→`app/admin/`→`app/api/` 순서로 파일 생성했는가
 - [ ] 모든 hooks/component 는 재훅/shared 컴포넌트 먼저 확인했는가 (useState/useEffect 자체 구현 안 했나)
 - [ ] 컴포넌트는 `features/`/`shared/`/`providers/`/`layouts/` 4 폴더 안에만 두었는가
 - [ ] Props 는 camelCase 로 작성했는가 (DB key 는 snake_case 유지)

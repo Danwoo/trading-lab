@@ -1,0 +1,249 @@
+<style>
+  .bn { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .bn .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:11px; overflow:hidden; }
+  .wbar { display:flex; align-items:center; gap:10px; height:38px; padding:0 13px; background:var(--pn); border-bottom:1px solid var(--ln); font-size:12px; color:var(--im); }
+  .wbar b { color:var(--is); font-weight:700; font-size:12.5px; }
+  .wbar .rt { margin-left:auto; display:flex; gap:7px; align-items:center; }
+  .body { display:flex; min-height:520px; }
+  .col { padding:13px; } .col + .col { border-left:1px solid var(--ln); }
+
+  .btn { font-size:12px; font-weight:500; padding:6px 13px; border-radius:8px; display:inline-block;
+         background:linear-gradient(180deg,#2E353B,#242A30); border:1px solid #434C54; color:var(--is);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.07); }
+  .btn2 { font-size:12px; font-weight:500; padding:6px 13px; border-radius:8px; display:inline-block;
+          background:transparent; border:1px solid var(--ls); color:var(--im); }
+  .btn.sm,.btn2.sm { font-size:11px; padding:4px 10px; }
+  .lg { font-size:9.5px; letter-spacing:.13em; font-weight:700; color:var(--if); margin:0 0 8px; }
+  .lg.m { margin-top:16px; }
+
+  /* 실험 이력 */
+  .try { display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:7px; border-left:2px solid transparent; font-size:11.5px; }
+  .try + .try { border-top:1px solid var(--hl); }
+  .try.on { background:var(--rs); border-left-color:var(--is); }
+  .try .no { flex:0 0 22px; color:var(--if); }
+  .try .bd { flex:1; min-width:0; }
+  .try .bd b { display:block; font-weight:400; color:var(--ik); }
+  .try.on .bd b { color:var(--is); font-weight:500; }
+  .try .bd s { text-decoration:none; font-size:10.5px; color:var(--if); }
+  .try .sc { text-align:right; }
+  .try .sc b { display:block; font-weight:500; }
+  .try .sc s { text-decoration:none; font-size:10px; color:var(--if); }
+  .try.dead { opacity:.5; }
+
+  /* 검증 카드 */
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+  .cd { background:var(--pn); border:1px solid var(--ln); border-radius:10px; padding:11px 12px; box-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.22); }
+  .cd.off { opacity:.42; }
+  .cd .hd { display:flex; align-items:center; gap:7px; margin-bottom:8px; }
+  .cd .hd b { font-size:12px; font-weight:700; color:var(--is); }
+  .cd .hd .tg { margin-left:auto; font-size:10px; color:var(--if); border:1px solid var(--ls); border-radius:4px; padding:1px 6px; }
+  .cd .hd .tg.on { color:var(--bg); background:var(--is); border-color:var(--is); font-weight:700; }
+
+  .duo { display:flex; gap:10px; }
+  .duo > div { flex:1; }
+  .kk { font-size:9.5px; letter-spacing:.1em; font-weight:700; color:var(--if); }
+  .vv { font-size:17px; font-weight:500; letter-spacing:-.02em; margin-top:2px; }
+  .ss { font-size:10.5px; color:var(--if); margin-top:1px; }
+
+  .rowl { display:flex; justify-content:space-between; font-size:11.5px; padding:4px 0; }
+  .rowl + .rowl { border-top:1px solid var(--hl); }
+  .rowl span:first-child { color:var(--im); }
+
+  .bars { display:flex; align-items:flex-end; gap:3px; height:44px; margin-top:6px; }
+  .bars i { flex:1; display:block; border-radius:1px; }
+
+  .ci { position:relative; height:26px; margin-top:6px; }
+  .ci .ax { position:absolute; left:0; right:0; top:12px; height:1px; background:var(--ln); }
+  .ci .bar2 { position:absolute; top:8px; height:9px; background:var(--rs); border:1px solid var(--ls); border-radius:2px; }
+  .ci .pt { position:absolute; top:6px; width:2px; height:13px; background:var(--is); }
+  .ci .lb { position:absolute; top:-1px; font-size:9.5px; color:var(--if); }
+
+  /* 판정 기준 */
+  .crit { display:flex; align-items:flex-start; gap:8px; padding:7px 0; font-size:11.5px; }
+  .crit + .crit { border-top:1px solid var(--hl); }
+  .crit .bx { flex:0 0 14px; height:14px; border-radius:4px; border:1px solid var(--ls); margin-top:1px; display:flex; align-items:center; justify-content:center; font-size:9px; }
+  .crit .bx.y { background:var(--is); border-color:var(--is); color:var(--bg); font-weight:800; }
+  .crit .bx.n { border-color:var(--dg); color:var(--dg); }
+  .crit .tx { flex:1; color:var(--ik); }
+  .crit .tx s { display:block; text-decoration:none; color:var(--if); font-size:10.5px; margin-top:1px; }
+
+  .cal { display:flex; gap:12px; margin-top:12px; font-size:11.5px; color:var(--im); line-height:1.65; }
+  .cal .pin { flex:0 0 auto; color:var(--if); font-weight:700; }
+  .cal b { color:var(--ik); font-weight:500; }
+</style>
+
+<div class="bn">
+<h2 style="color:#F5F3EF">실험대 — 홈</h2>
+<p class="subtitle" style="color:#8B877F">
+  <b style="color:#E6E4E0">도구는 판정하지 않습니다.</b> 검증 재료를 여러 벌 내놓고, 무엇을 볼지와 합격선은 사용자가 정합니다.
+  버튼은 <b style="color:#E6E4E0">잠그지 않습니다</b> — 대신 근거를 지나치기 어렵게 배치합니다.
+</p>
+
+<div class="win">
+  <div class="wbar">
+    <b>대형주 20일선 눌림목</b> · 가설 <span class="n">#7</span>
+    <span style="color:var(--if)">재무 필터 + 기술 진입</span>
+    <span class="rt"><span class="btn2 sm">가설 복제</span><span class="btn2 sm">파라미터 바꿔 재실행</span><span class="btn sm">새 실험</span></span>
+  </div>
+  <div class="body">
+
+    <!-- 실험 이력 -->
+    <div class="col" style="flex:0 0 236px">
+      <div class="lg">이 가설의 실험 <span class="n">32</span>회</div>
+      <div class="try on">
+        <span class="no n">32</span>
+        <div class="bd"><b>ma=20 · rsi=30 · 시총&gt;3천억</b><s class="n">08-08 14:12</s></div>
+        <div class="sc"><b class="n" style="color:var(--up)">+14.2%</b><s class="n">검증 +9.1%</s></div>
+      </div>
+      <div class="try"><span class="no n">31</span><div class="bd"><b>ma=20 · rsi=25</b><s class="n">08-08 13:58</s></div>
+        <div class="sc"><b class="n" style="color:var(--up)">+16.8%</b><s class="n">검증 +2.4%</s></div></div>
+      <div class="try"><span class="no n">30</span><div class="bd"><b>ma=15 · rsi=30</b><s class="n">08-08 13:41</s></div>
+        <div class="sc"><b class="n" style="color:var(--up)">+11.9%</b><s class="n">검증 +8.7%</s></div></div>
+      <div class="try dead"><span class="no n">29</span><div class="bd"><b>ma=60 · rsi=30</b><s class="n">08-08 13:22</s></div>
+        <div class="sc"><b class="n" style="color:var(--dn)">-3.1%</b><s class="n">버림</s></div></div>
+      <div class="try dead"><span class="no n">28</span><div class="bd"><b>ma=20 · rsi=40</b><s class="n">08-08 12:55</s></div>
+        <div class="sc"><b class="n" style="color:var(--up)">+4.2%</b><s class="n">버림</s></div></div>
+      <div style="font-size:11px;color:var(--if);margin-top:9px;line-height:1.5;border-top:1px solid var(--ln);padding-top:9px">
+        버려진 <span class="n" style="color:var(--im)">27</span>개도 남아 있습니다.
+        <b style="color:var(--im);font-weight:400">32번 중 최고를 고른 것</b>인지 스스로 보실 수 있게요.
+      </div>
+      <div class="lg m">다른 가설</div>
+      <div style="font-size:11.5px;color:var(--im);line-height:1.9">
+        #6 저PBR + 거래량 급증 <span class="n" style="color:var(--if)">· 12회</span><br>
+        #5 배당 + 월봉 추세 <span class="n" style="color:var(--if)">· 8회</span><br>
+        #4 반도체 페어 <span class="n" style="color:var(--if)">· 21회</span>
+      </div>
+    </div>
+
+    <!-- 검증 보드 -->
+    <div class="col" style="flex:1">
+      <div class="lg">검증 재료 — 켜고 끄실 수 있습니다</div>
+      <div class="cards">
+
+        <div class="cd">
+          <div class="hd"><b>학습 / 검증 구간</b><span class="tg on">켬</span></div>
+          <div class="duo">
+            <div><div class="kk">학습 2023-01 ~ 2025-06</div>
+              <div class="vv n" style="color:var(--up)">+14.2%</div>
+              <div class="ss n">MDD -16.9% · 샤프 1.21</div></div>
+            <div style="border-left:1px solid var(--hl);padding-left:10px">
+              <div class="kk">검증 2025-07 ~ 2026-08</div>
+              <div class="vv n" style="color:var(--up)">+9.1%</div>
+              <div class="ss n">MDD -14.2% · 샤프 0.88</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--im);margin-top:8px;line-height:1.5">
+            학습이 검증보다 <b style="color:var(--ik);font-weight:500" class="n">1.6배</b> 높습니다. 31번 시도는 <b style="color:var(--ik);font-weight:500" class="n">7.0배</b>였습니다.
+          </div>
+        </div>
+
+        <div class="cd">
+          <div class="hd"><b>워크포워드</b><span class="tg on">켬</span></div>
+          <div class="bars">
+            <i style="height:62%;background:var(--up)"></i><i style="height:38%;background:var(--up)"></i>
+            <i style="height:22%;background:var(--dn)"></i><i style="height:71%;background:var(--up)"></i>
+            <i style="height:48%;background:var(--up)"></i><i style="height:30%;background:var(--dn)"></i>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--if);margin-top:4px" class="n">
+            <span>20H2</span><span>21H1</span><span>21H2</span><span>22H1</span><span>22H2</span><span>23H1</span></div>
+          <div style="font-size:11px;color:var(--im);margin-top:7px;line-height:1.5">
+            6구간 중 <b style="color:var(--ik);font-weight:500" class="n">4</b>구간 양(+). 자르는 지점을 밀며 반복한 결과입니다.
+          </div>
+        </div>
+
+        <div class="cd">
+          <div class="hd"><b>시도 횟수 보정</b><span class="tg on">켬</span></div>
+          <div class="rowl"><span>이 결과의 시도 번호</span><span class="n">32번째</span></div>
+          <div class="rowl"><span>32회 중 상위</span><span class="n">1위</span></div>
+          <div class="rowl"><span>32회 검증구간 중앙값</span><span class="n">+3.8%</span></div>
+          <div style="font-size:11px;color:var(--im);margin-top:8px;line-height:1.5">
+            <b style="color:var(--ik);font-weight:500">32번 중 최고를 고른 결과</b>입니다. 중앙값과의 거리가 곧 <b style="color:var(--ik);font-weight:500">운의 몫</b>입니다.
+          </div>
+        </div>
+
+        <div class="cd">
+          <div class="hd"><b>지표 신뢰구간</b><span class="tg on">켬</span></div>
+          <div style="font-size:11.5px;color:var(--im);margin-bottom:2px">샤프 <b class="n" style="color:var(--is);font-weight:500">1.21</b> ± <span class="n">0.54</span></div>
+          <div class="ci">
+            <div class="ax"></div>
+            <div class="bar2" style="left:12%;width:52%"></div>
+            <div class="pt" style="left:38%"></div>
+            <div class="lb" style="left:10%">0.67</div><div class="lb" style="right:32%">1.75</div>
+          </div>
+          <div style="font-size:11px;color:var(--im);margin-top:6px;line-height:1.5">
+            880 세션 표본. <b style="color:var(--ik);font-weight:500">구간이 0을 안 넘지만 폭이 큽니다</b> — 순위 비교엔 부족합니다.
+          </div>
+        </div>
+
+        <div class="cd">
+          <div class="hd"><b>벤치마크 대비</b><span class="tg on">켬</span></div>
+          <div class="rowl"><span>이 전략</span><span class="n" style="color:var(--up)">+14.2%</span></div>
+          <div class="rowl"><span>코스피200 TR</span><span class="n" style="color:var(--up)">+9.6%</span></div>
+          <div class="rowl"><span>초과수익</span><span class="n" style="color:var(--is)">+4.6%p</span></div>
+          <div class="rowl"><span>평균 시장 노출도</span><span class="n">61%</span></div>
+          <div style="font-size:11px;color:var(--im);margin-top:7px;line-height:1.5">
+            노출 61% 로 시장을 <b style="color:var(--ik);font-weight:500" class="n">4.6%p</b> 이겼습니다.
+          </div>
+        </div>
+
+        <div class="cd off">
+          <div class="hd"><b>연도별 분해</b><span class="tg">끔</span></div>
+          <div style="font-size:11px;color:var(--if);line-height:1.6;padding:6px 0">
+            매년 반복된 성과인지, 한 구간에서 몰아서 나온 것인지 봅니다.<br>
+            <span style="color:var(--im)">켜면 연도별·롤링 12개월 표가 붙습니다.</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 내 판정 기준 -->
+    <div class="col" style="flex:0 0 250px">
+      <div class="lg">내 판정 기준 <span style="color:var(--im)">· 직접 정합니다</span></div>
+      <div class="crit"><span class="bx y">✓</span><div class="tx">검증구간 수익 &gt; 0<s class="n">+9.1%</s></div></div>
+      <div class="crit"><span class="bx y">✓</span><div class="tx">검증 MDD &lt; 20%<s class="n">-14.2%</s></div></div>
+      <div class="crit"><span class="bx n">✕</span><div class="tx">학습/검증 비율 &lt; 1.5<s class="n">1.6배 — 미달</s></div></div>
+      <div class="crit"><span class="bx y">✓</span><div class="tx">워크포워드 과반 양(+)<s class="n">6구간 중 4</s></div></div>
+      <div class="crit"><span class="bx n">✕</span><div class="tx">시도 20회 이하<s class="n">32회 — 미달</s></div></div>
+      <div class="crit"><span class="bx y">✓</span><div class="tx">벤치마크 초과<s class="n">+4.6%p</s></div></div>
+      <div style="margin-top:9px"><span class="btn2 sm">기준 편집</span> <span class="btn2 sm">프리셋 저장</span></div>
+
+      <div style="margin-top:16px;padding-top:13px;border-top:1px solid var(--ln)">
+        <div style="font-size:12px;color:var(--ik);line-height:1.6">
+          <b style="color:var(--is);font-weight:700">내 기준 6개 중 4개 충족</b><br>
+          <span style="color:var(--im)">미달: 학습/검증 비율 · 시도 횟수</span>
+        </div>
+        <div style="margin-top:11px;display:flex;flex-direction:column;gap:7px">
+          <span class="btn" style="text-align:center">모의 운용 시작</span>
+          <span class="btn2" style="text-align:center">전략 커밋만</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--if);margin-top:9px;line-height:1.5">
+          미달이어도 <b style="color:var(--im);font-weight:400">누를 수 있습니다.</b>
+          누르면 그 시점 판정 결과가 <b style="color:var(--im);font-weight:400">봇 이력에 함께 기록</b>됩니다.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cal"><span class="pin">UX 결정 1</span><span>
+  <b>버려진 시도 27개를 지우지 않습니다.</b> 왼쪽 목록에 흐리게 남습니다 —
+  이게 없으면 「32번째가 1위」라는 사실 자체가 화면에서 사라지고, 사용자는 자기가 몇 번 돌렸는지 잊습니다.
+</span></div>
+<div class="cal"><span class="pin">UX 결정 2</span><span>
+  <b>판정 기준을 사용자가 씁니다.</b> 시스템이 정한 합격선이 없고, 체크박스 6개는 예시일 뿐 편집·저장됩니다.
+  가설마다 다른 기준을 쓸 수 있어야 <b>실험</b>이 됩니다 — 고정 합격선은 실험이 아니라 심사입니다.
+</span></div>
+<div class="cal"><span class="pin">UX 결정 3</span><span>
+  <b>미달이어도 버튼이 눌립니다.</b> 대신 누른 시점의 판정 결과가 봇 이력에 함께 박힙니다 —
+  나중에 그 봇이 잘 안 됐을 때 <b>"내가 무엇을 무시하고 눌렀는지"</b>를 되짚을 수 있습니다. 차단 대신 기록입니다.
+</span></div>
+<div class="cal"><span class="pin">아직 안 그림</span><span>
+  <b>가설을 처음 만드는 화면</b>(자연어 + 팩터 조합)과 <b>유니버스·스크리너 편집</b>이 남았습니다.
+  이 화면은 "이미 만든 가설을 실험하는 곳"이고, 그 앞단이 아직 없습니다.
+</span></div>
+</div>

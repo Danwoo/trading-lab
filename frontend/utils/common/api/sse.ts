@@ -1,6 +1,6 @@
 export interface SSEChunk {
   // 옵션 — DevActivity 챗(`{status, content}`)처럼 type 판별자 없이 필드만으로 분기하는
-  // 이벤트도 있다(devActivityService.ts). type 이 있는 소비처(research-chat)는 자기 이벤트
+  // 이벤트도 있다. type 이 있는 소비처(research-chat)는 자기 이벤트
   // 타입에서 required 로 좁혀 쓴다.
   type?: string;
   error?: string;

@@ -67,6 +67,13 @@ export default async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// 세션 검사가 도는 경로. **페이지 라우트를 여기 빠뜨리면 보호가 조용히 사라진다** —
+// 화면은 그대로 열리고 데이터 API 만 401 을 내므로, 빈 화면이 뜰 뿐 아무도 눈치채지 못한다.
+// `/terminal` 이 실제로 그 상태였다(#73 S2 에서 발견 — 라우트는 2026-07 에 생겼는데 여기 안 들어왔다).
+//
+// Next 는 이 배열을 빌드 타임에 **정적으로** 읽으므로 상수 import 나 계산식을 쓸 수 없다.
+// 그래서 목록을 손으로 유지하고, `tests/proxyMatcher.test.ts` 가 `app/**/page.tsx` 전수와
+// 대조해 빠진 경로가 있으면 실패시킨다(검사 건수 0건도 실패).
 export const config = {
-  matcher: ["/api/:path*", "/admin/:path*", "/user/:path*"],
+  matcher: ["/api/:path*", "/admin/:path*", "/user/:path*", "/terminal/:path*", "/bench/:path*"],
 };

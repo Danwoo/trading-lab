@@ -388,7 +388,7 @@ ASSET_ALLOWLIST: list[tuple[str, str, str, bool]] = [
     ),
     (
         "frontend/public/favicon.ico",
-        "2197be23003206cbb649f8d18c5f5105f49038ef",
+        "8e07808572e2f78678893c3d73e6275ffc011876",
         "scripts/brand/favicon.svg 에서 생성 (generate-brand-assets.js, #361)",
         True,
     ),

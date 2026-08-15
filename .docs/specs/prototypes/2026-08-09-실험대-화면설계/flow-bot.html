@@ -1,0 +1,316 @@
+<style>
+  .fl { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --dg:#C94A3B;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .fl .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+  .fl h3.step { font-size:15px; font-weight:700; color:var(--is); margin:30px 0 3px; display:flex; align-items:center; gap:9px; }
+  .fl h3.step i { font-style:normal; width:20px; height:20px; border-radius:6px; background:var(--is); color:var(--bg);
+                  font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  .fl p.lead { font-size:12.5px; color:var(--im); line-height:1.6; margin:0 0 12px 29px; }
+  .fl p.lead b { color:var(--ik); font-weight:500; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:11px; overflow:hidden; }
+  .wbar { display:flex; align-items:center; gap:9px; height:34px; padding:0 13px; background:var(--pn); border-bottom:1px solid var(--ln); font-size:12px; color:var(--im); }
+  .wbar b { color:var(--is); font-weight:700; font-size:12.5px; }
+  .wbar .rt { margin-left:auto; display:flex; gap:7px; }
+
+  .btn { font-size:12px; font-weight:500; padding:6px 13px; border-radius:8px; display:inline-block;
+         background:linear-gradient(180deg,#2E353B,#242A30); border:1px solid #434C54; color:var(--is);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.07); }
+  .btn2 { font-size:12px; font-weight:500; padding:6px 13px; border-radius:8px; display:inline-block;
+          background:transparent; border:1px solid var(--ls); color:var(--im); }
+  .btn.sm, .btn2.sm { font-size:11px; padding:4px 10px; }
+
+  .cols { display:flex; }
+  .col { padding:14px; }
+  .col + .col { border-left:1px solid var(--ln); }
+
+  .fset { margin-bottom:16px; }
+  .fset > .lg { font-size:9.5px; letter-spacing:.13em; font-weight:700; color:var(--if); margin-bottom:8px; }
+  .fld { display:flex; align-items:center; gap:9px; font-size:12px; padding:5px 0; }
+  .fld > span:first-child { width:104px; color:var(--im); flex:0 0 auto; }
+  .inp { background:var(--rs); border:1px solid var(--ln); border-radius:7px; padding:4px 9px; font-size:12px; color:var(--ik); min-width:56px; }
+  .rng { flex:1; height:3px; background:var(--ln); border-radius:2px; position:relative; }
+  .rng i { position:absolute; top:-4px; width:11px; height:11px; border-radius:50%; background:var(--is); }
+  .hint { font-size:11px; color:var(--if); }
+
+  .card { border:1px solid var(--ln); border-radius:9px; background:var(--pn); padding:11px 12px; margin-bottom:9px; }
+  .card.on { border-color:var(--ls); background:var(--rs); }
+  .card .hd { display:flex; align-items:center; gap:8px; }
+  .card .hd b { font-size:12.5px; font-weight:700; color:var(--is); }
+  .card .hd .tf { font-size:10px; color:var(--if); border:1px solid var(--ln); border-radius:4px; padding:1px 6px; }
+  .card .hd .x { margin-left:auto; color:var(--if); font-size:13px; }
+
+  table.t { width:100%; border-collapse:collapse; font-size:12px; }
+  table.t th { font-size:11px; font-weight:500; color:var(--if); text-align:right; padding:6px 8px; border-bottom:1px solid var(--ln); white-space:nowrap; }
+  table.t th:first-child, table.t td:first-child { text-align:left; }
+  table.t td { padding:0 8px; height:28px; border-bottom:1px solid var(--hl); text-align:right; white-space:nowrap; }
+  table.t tr.me td { background:var(--rs); }
+  table.t tr.top td { color:var(--is); font-weight:500; }
+  table.t .b { font-weight:700; color:var(--is); }
+
+  .assume { border:1px solid var(--ls); border-radius:9px; padding:11px 13px; background:var(--rs); font-size:11.5px; line-height:1.7; }
+  .assume b { color:var(--is); font-weight:700; display:block; font-size:12px; margin-bottom:5px; }
+  .assume span { color:var(--im); }
+  .assume em { font-style:normal; color:var(--ik); }
+
+  .eq { height:118px; display:flex; align-items:flex-end; gap:1px; position:relative;
+        background-image:repeating-linear-gradient(0deg,var(--hl) 0 1px,transparent 1px 29px); }
+  .eq i { flex:1; background:var(--im); display:block; }
+  .eq .dd { position:absolute; border:1px dashed var(--dg); border-radius:3px; }
+  .eq .ddl { position:absolute; font-size:10px; color:var(--dg); }
+
+  .kpi { display:flex; gap:0; border:1px solid var(--ln); border-radius:9px; overflow:hidden; }
+  .kpi > div { flex:1; padding:10px 12px; }
+  .kpi > div + div { border-left:1px solid var(--ln); }
+  .kpi .k { font-size:10px; letter-spacing:.1em; font-weight:700; color:var(--if); }
+  .kpi .v { font-size:19px; font-weight:500; margin-top:3px; letter-spacing:-.02em; }
+  .kpi .s { font-size:10.5px; color:var(--if); margin-top:2px; }
+
+  .chat { font-size:12.5px; line-height:1.6; }
+  .chat .me { background:var(--rs); border:1px solid var(--ln); border-radius:9px; padding:9px 12px; margin-bottom:10px; }
+  .chat .ai { padding:0 2px 10px; color:var(--im); }
+  .diff { font-family:ui-monospace,monospace; font-size:11px; line-height:1.65; background:var(--bg); border:1px solid var(--ln); border-radius:8px; padding:10px 12px; overflow:auto; }
+  .diff .a { color:#7FAF6A; } .diff .c { color:var(--if); }
+
+  .cal { display:flex; gap:12px; margin-top:9px; margin-left:29px; font-size:11.5px; color:var(--im); line-height:1.6; }
+  .cal .pin { flex:0 0 auto; color:var(--if); font-weight:700; }
+</style>
+
+<div class="fl">
+<h2 style="color:#F5F3EF">봇을 만들어 굴리는 흐름 — 목데이터로 채운 실제 화면</h2>
+<p class="subtitle" style="color:#8B877F">
+  <b style="color:#E6E4E0">전략(파일) → 봇(조합) → 백테스트 → 리더보드 → 자연어 생성</b> 순서입니다.
+  숫자는 전부 그럴듯한 목데이터이고, <b style="color:#E6E4E0">화면 구조와 조작 흐름을 판단하시라고</b> 채웠습니다.
+</p>
+
+<!-- ══════════ 1. 봇 만들기 ══════════ -->
+<h3 class="step"><i>1</i> 봇 만들기 — 전략을 고르면 폼이 스스로 자란다</h3>
+<p class="lead">
+  전략 파일이 <b>"이 값을 이 범위에서 조절 가능"</b>을 선언하므로, 왼쪽에서 전략을 담으면 가운데 폼이 그만큼 늘어납니다.
+  새 전략을 추가해도 이 화면은 안 고칩니다.
+</p>
+
+<div class="win">
+  <div class="wbar"><b>새 봇</b> · 초안 저장됨 <span class="n">14:38</span>
+    <span class="rt"><span class="btn2 sm">취소</span><span class="btn sm">백테스트 실행</span></span></div>
+  <div class="cols">
+    <!-- 전략 서랍 -->
+    <div class="col" style="flex:0 0 218px">
+      <div class="fset"><div class="lg">담은 전략 3</div>
+        <div class="card on"><div class="hd"><b>골든크로스</b><span class="tf">일봉</span><span class="x">×</span></div></div>
+        <div class="card on"><div class="hd"><b>RSI 과매도</b><span class="tf">일봉</span><span class="x">×</span></div></div>
+        <div class="card on"><div class="hd"><b>추세 필터</b><span class="tf">월봉</span><span class="x">×</span></div></div>
+      </div>
+      <div class="fset"><div class="lg">추가 가능</div>
+        <div class="card"><div class="hd"><b>거래량 급증</b><span class="tf">일봉</span><span class="x" style="color:var(--im)">+</span></div></div>
+        <div class="card"><div class="hd"><b>변동성 돌파</b><span class="tf">분봉</span><span class="x" style="color:var(--im)">+</span></div></div>
+      </div>
+      <div class="hint" style="line-height:1.55">주기가 섞여도 됩니다 — 월봉 필터 위에 일봉 진입이 얹힙니다.</div>
+    </div>
+
+    <!-- 파라미터 -->
+    <div class="col" style="flex:1">
+      <div class="fset"><div class="lg">골든크로스 · 일봉</div>
+        <div class="fld"><span>단기 이평</span><span class="inp n">5</span><div class="rng"><i style="left:6%"></i></div><span class="hint n">5–60</span></div>
+        <div class="fld"><span>장기 이평</span><span class="inp n">20</span><div class="rng"><i style="left:22%"></i></div><span class="hint n">10–200</span></div>
+      </div>
+      <div class="fset"><div class="lg">RSI 과매도 · 일봉</div>
+        <div class="fld"><span>기간</span><span class="inp n">14</span><div class="rng"><i style="left:30%"></i></div><span class="hint n">5–30</span></div>
+        <div class="fld"><span>진입 기준</span><span class="inp n">30</span><div class="rng"><i style="left:33%"></i></div><span class="hint n">10–50</span></div>
+      </div>
+      <div class="fset"><div class="lg">추세 필터 · 월봉</div>
+        <div class="fld"><span>이평 개월</span><span class="inp n">6</span><div class="rng"><i style="left:41%"></i></div><span class="hint n">3–12</span></div>
+        <div class="fld"><span>조건</span><span class="inp">종가 &gt; 이평</span><span class="hint">하락장이면 전 종목 관망</span></div>
+      </div>
+    </div>
+
+    <!-- 봇 규칙 -->
+    <div class="col" style="flex:0 0 258px">
+      <div class="fset"><div class="lg">결합</div>
+        <div class="fld"><span>규칙</span><span class="inp">AND — 셋 다 만족</span></div>
+        <div class="hint" style="margin-top:3px;line-height:1.5">OR·스코어링으로 바꾸면 같은 전략 셋이 완전히 다른 봇이 됩니다.</div>
+      </div>
+      <div class="fset"><div class="lg">유니버스</div>
+        <div class="fld"><span>후보 풀</span><span class="inp">거래대금 상위 200</span></div>
+        <div class="fld"><span>관심종목</span><span class="inp">항상 포함 ✓</span></div>
+        <div class="hint n">현재 214 종목 · 저녁 배치가 갱신</div>
+      </div>
+      <div class="fset"><div class="lg">자금 배분</div>
+        <div class="fld"><span>종목당</span><span class="inp n">2,000,000</span><span class="hint">원</span></div>
+        <div class="fld"><span>최대 종목</span><span class="inp n">8</span><span class="hint n">= 1,600만</span></div>
+      </div>
+      <div class="fset" style="margin-bottom:0"><div class="lg">리스크</div>
+        <div class="fld"><span>손절</span><span class="inp n" style="color:var(--dn)">-7%</span><span>익절</span><span class="inp n" style="color:var(--up)">+15%</span></div>
+        <div class="fld"><span>하루 최대</span><span class="inp n">3</span><span class="hint">거래</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="cal"><span class="pin">UX 결정</span><span>
+  <b style="color:#E6E4E0">저장 버튼이 없습니다</b> — 초안은 자동 저장되고(상단 시각), 사용자가 누르는 건 <b style="color:#E6E4E0">「백테스트 실행」</b> 하나입니다.
+  봇은 검증 전엔 아무 일도 안 하므로 "저장"이 뜻이 없고, 저장/실행 두 버튼은 <b style="color:#E6E4E0">어느 걸 눌러야 하는지</b>를 매번 묻게 만듭니다.
+</span></div>
+
+<!-- ══════════ 2. 백테스트 리포트 ══════════ -->
+<h3 class="step"><i>2</i> 백테스트 리포트 — 가정을 숨기지 않는다</h3>
+<p class="lead">
+  체결가격·수수료·슬리피지·기간·유니버스가 결과를 좌우합니다. <b>접어두지 않고 결과 바로 옆에 상설로 둡니다</b> —
+  이 값을 모르고 보는 수익률은 숫자가 아니라 광고입니다.
+</p>
+
+<div class="win">
+  <div class="wbar"><b>코스피 눌림목 v3</b> · 백테스트
+    <span class="rt"><span class="btn2 sm">가정 바꿔 재실행</span><span class="btn sm">모의 운용 시작</span></span></div>
+  <div class="col" style="padding:14px">
+    <div class="kpi" style="margin-bottom:13px">
+      <div><div class="k">최대 낙폭</div><div class="v n" style="color:var(--dn)">-22.7%</div><div class="s n">2024-08 · 47일 회복</div></div>
+      <div><div class="k">샤프 / 칼마</div><div class="v n">1.14 <span style="color:var(--if)">/</span> 0.81</div><div class="s">위험 대비</div></div>
+      <div><div class="k">연환산</div><div class="v n" style="color:var(--up)">+18.4%</div><div class="s n">누적 +79.2%</div></div>
+      <div><div class="k">승률 / 손익비</div><div class="v n">47.2% <span style="color:var(--if)">/</span> 2.1</div><div class="s">적게 맞고 크게 먹음</div></div>
+      <div><div class="k">최대 연속 손실</div><div class="v n">6회</div><div class="s n">평균 보유 11.4일</div></div>
+    </div>
+
+    <div style="display:flex;gap:13px">
+      <div style="flex:1">
+        <div class="lg" style="font-size:9.5px;letter-spacing:.13em;font-weight:700;color:var(--if);margin-bottom:7px">자산 곡선 · 2023-01-01 → 2026-08-07</div>
+        <div class="eq">
+          <i style="height:12%"></i><i style="height:15%"></i><i style="height:14%"></i><i style="height:19%"></i><i style="height:23%"></i>
+          <i style="height:21%"></i><i style="height:27%"></i><i style="height:31%"></i><i style="height:29%"></i><i style="height:35%"></i>
+          <i style="height:39%"></i><i style="height:44%"></i><i style="height:41%"></i><i style="height:47%"></i><i style="height:52%"></i>
+          <i style="height:56%"></i><i style="height:61%"></i><i style="height:58%"></i><i style="height:49%"></i><i style="height:42%"></i>
+          <i style="height:38%"></i><i style="height:41%"></i><i style="height:46%"></i><i style="height:51%"></i><i style="height:55%"></i>
+          <i style="height:59%"></i><i style="height:64%"></i><i style="height:68%"></i><i style="height:66%"></i><i style="height:72%"></i>
+          <i style="height:76%"></i><i style="height:74%"></i><i style="height:79%"></i><i style="height:84%"></i><i style="height:88%"></i>
+          <div class="dd" style="left:48%;right:38%;top:14%;bottom:38%"></div>
+          <div class="ddl" style="left:48%;top:4%">MDD -22.7%</div>
+        </div>
+      </div>
+      <div style="flex:0 0 292px">
+        <div class="assume">
+          <b>이 숫자가 나온 가정</b>
+          <span>체결 &nbsp;<em>다음 봉 시가</em> — 종가 체결보다 보수적</span><br>
+          <span>수수료 <em class="n">0.015%</em> · 세금 <em class="n">0.20%</em>(매도)</span><br>
+          <span>슬리피지 <em class="n">0.05%</em> — 단타일수록 왜곡 큼</span><br>
+          <span>기간 &nbsp;<em class="n">3년 7개월</em> (1,315 거래일)</span><br>
+          <span>유니버스 <em>거래대금 상위 200 + 관심종목</em></span><br>
+          <span>시세 &nbsp;<em>data.go.kr 적재본 · 수정주가 적용</em></span>
+        </div>
+        <div class="hint" style="margin-top:9px;line-height:1.55">
+          슬리피지를 <span class="n" style="color:var(--ik)">0.15%</span>로 올리면 연환산이
+          <span class="n" style="color:var(--dn)">+13.1%</span>로 떨어집니다 —
+          <span style="color:var(--ik)">거래가 잦은 봇일수록 이 값에 민감합니다.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="cal"><span class="pin">UX 결정</span><span>
+  KPI 순서가 <b style="color:#E6E4E0">MDD → 샤프·칼마 → 수익률</b> 입니다. 수익률을 맨 앞에 두면
+  <b style="color:#E6E4E0">크게 먹고 크게 잃는 봇이 좋아 보입니다.</b> 실주문 승격을 판단하는 화면이라 순서 자체가 안전장치입니다.
+</span></div>
+
+<!-- ══════════ 3. 리더보드 ══════════ -->
+<h3 class="step"><i>3</i> 리더보드 — 내 실계좌를 같은 표에 넣는다</h3>
+<p class="lead">
+  봇끼리만 비교하면 "그래서 내가 직접 하는 것보다 나은가"에 답을 못 합니다. <b>실계좌를 같은 기준으로 한 행에 넣습니다.</b>
+</p>
+
+<div class="win">
+  <div class="wbar"><b>리더보드</b> · 같은 기간·같은 가정 <span class="n">2023-01-01 → 2026-08-07</span>
+    <span class="rt"><span class="btn2 sm">기간 바꾸기</span><span class="btn2 sm">봇 추가</span></span></div>
+  <div class="col" style="padding:4px 14px 12px">
+    <table class="t">
+      <tr><th>봇</th><th>최대 낙폭 ▲</th><th>샤프</th><th>칼마</th><th>연환산</th><th>승률</th><th>손익비</th><th>거래</th><th>보유</th><th>연속손실</th></tr>
+      <tr class="top"><td class="b">배당주 리밸런싱</td><td class="n" style="color:var(--dn)">-11.2%</td><td class="n">1.42</td><td class="n">1.05</td><td class="n" style="color:var(--up)">+11.8%</td><td class="n">61.0%</td><td class="n">1.3</td><td class="n">42</td><td class="n">68일</td><td class="n">3</td></tr>
+      <tr><td>반도체 페어</td><td class="n" style="color:var(--dn)">-14.8%</td><td class="n">1.28</td><td class="n">0.74</td><td class="n" style="color:var(--up)">+10.9%</td><td class="n">55.3%</td><td class="n">1.5</td><td class="n">96</td><td class="n">22일</td><td class="n">4</td></tr>
+      <tr class="me"><td class="b">내 실계좌</td><td class="n" style="color:var(--dn)">-19.3%</td><td class="n">0.71</td><td class="n">0.44</td><td class="n" style="color:var(--up)">+8.6%</td><td class="n" style="color:var(--if)">—</td><td class="n" style="color:var(--if)">—</td><td class="n">37</td><td class="n" style="color:var(--if)">—</td><td class="n" style="color:var(--if)">—</td></tr>
+      <tr><td>코스피 눌림목 v3</td><td class="n" style="color:var(--dn)">-22.7%</td><td class="n">1.14</td><td class="n">0.81</td><td class="n" style="color:var(--up)">+18.4%</td><td class="n">47.2%</td><td class="n">2.1</td><td class="n">168</td><td class="n">11.4일</td><td class="n">6</td></tr>
+      <tr><td>모멘텀 상위20</td><td class="n" style="color:var(--dn)">-38.4%</td><td class="n">0.92</td><td class="n">0.68</td><td class="n" style="color:var(--up)">+26.1%</td><td class="n">41.5%</td><td class="n">2.8</td><td class="n">310</td><td class="n">5.2일</td><td class="n">9</td></tr>
+    </table>
+    <div class="hint" style="margin-top:10px;line-height:1.6">
+      기본 정렬은 <span style="color:var(--ik)">최대 낙폭 오름차순</span>입니다.
+      <span style="color:var(--ik)">연환산으로 정렬하면 「모멘텀 상위20」(+26.1%)이 1위로 올라오지만, 낙폭 -38.4% 를 9번 연속 손실 구간에서 견뎌야 합니다.</span>
+      실계좌 행은 승률·손익비가 <span class="n">—</span> 입니다 — 수동 매매엔 진입 규칙이 없어 계산할 수 없습니다. <span style="color:var(--ik)">0 으로 채우지 않습니다.</span>
+    </div>
+  </div>
+</div>
+<div class="cal"><span class="pin">UX 결정</span><span>
+  실계좌 행은 <b style="color:#E6E4E0">정렬해도 자리를 지키지 않고 같이 섞입니다.</b> 위에 고정하면 기준점이 아니라 주인공이 되고,
+  "내가 3등"이라는 사실이 흐려집니다.
+</span></div>
+
+<!-- ══════════ 4. 자연어 생성 ══════════ -->
+<h3 class="step"><i>4</i> 말로 전략 만들기 — 결과물이 파일이라 되짚을 수 있다</h3>
+<p class="lead">
+  LLM 은 <b>연구 시점에만</b> 코드를 만들고, 장중엔 그 코드가 결정론적으로 돕니다. 만들어진 것이 파일이라 git 에 남고 diff 로 비교됩니다.
+</p>
+
+<div class="win">
+  <div class="wbar"><b>전략 만들기</b> · 자연어
+    <span class="rt"><span class="btn2 sm">프롬프트 고쳐 재생성</span><span class="btn sm">전략 커밋</span></span></div>
+  <div class="cols">
+    <div class="col" style="flex:0 0 330px">
+      <div class="chat">
+        <div class="me">대형주에서 20일선 눌림목 잡는 전략 만들어줘. 근데 시장 전체가 하락장이면 쉬게 해줘.</div>
+        <div class="ai">
+          두 부분으로 나눴습니다.<br>
+          ① <span style="color:var(--ik)">눌림목</span> — 20일선 위에 있던 종목이 20일선까지 조정 후 반등하는 첫 봉<br>
+          ② <span style="color:var(--ik)">하락장 회피</span> — KOSPI 가 자기 60일선 아래면 전 종목 관망<br><br>
+          "대형주"는 유니버스 조건이라 전략 파일이 아니라 <span style="color:var(--ik)">봇 설정</span>에 넣었습니다 —
+          같은 전략을 중소형주에도 쓸 수 있게요.
+        </div>
+      </div>
+      <div class="assume" style="margin-top:2px">
+        <b>즉시 백테스트 (기본 가정)</b>
+        <span>연환산 <em class="n" style="color:var(--up)">+14.2%</em> · MDD <em class="n" style="color:var(--dn)">-16.9%</em> · 샤프 <em class="n">1.21</em></span><br>
+        <span>거래 <em class="n">88회</em> · 승률 <em class="n">52.3%</em> · 평균 보유 <em class="n">9.1일</em></span>
+      </div>
+    </div>
+    <div class="col" style="flex:1">
+      <div class="lg" style="font-size:9.5px;letter-spacing:.13em;font-weight:700;color:var(--if);margin-bottom:7px">생성된 파일 · strategies/pullback_ma20.py <span style="color:#7FAF6A">+34</span></div>
+      <div class="diff">
+<span class="a">+ params = {</span>
+<span class="a">+     "ma_period":   Range(10, 60, default=20),</span>
+<span class="a">+     "bounce_pct":  Range(0.5, 5.0, default=1.5),</span>
+<span class="a">+     "market_ma":   Range(20, 120, default=60),</span>
+<span class="a">+ }</span>
+<span class="c">  </span>
+<span class="a">+ timeframe = "1d"</span>
+<span class="c">  </span>
+<span class="a">+ def entry(bar, ind, market):</span>
+<span class="a">+     if market.close &lt; market.ma(p.market_ma):</span>
+<span class="a">+         return False          # 하락장 — 전 종목 관망</span>
+<span class="a">+     touched = bar.low &lt;= ind.ma(p.ma_period)</span>
+<span class="a">+     bounced = bar.close &gt; ind.ma(p.ma_period) * (1 + p.bounce_pct/100)</span>
+<span class="a">+     return touched and bounced</span>
+      </div>
+      <div class="hint" style="margin-top:9px;line-height:1.55">
+        파라미터 3개가 <span style="color:var(--ik)">선언</span>됐으므로, 커밋하는 순간 <span style="color:var(--ik)">1단계 봇 만들기 화면에 슬라이더 3개가 자동으로 생깁니다.</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="cal"><span class="pin">UX 결정</span><span>
+  <b style="color:#E6E4E0">커밋 전에 백테스트 결과를 먼저 보여줍니다.</b> 코드를 읽을 줄 몰라도 판단할 수 있어야 하고,
+  코드를 읽을 줄 알면 오른쪽 diff 로 검산합니다. <b style="color:#E6E4E0">두 종류의 사용자가 같은 화면에서 각자 판단합니다.</b>
+</span></div>
+
+<div class="section" style="margin-top:30px">
+  <p class="label">이 흐름에서 제가 판단을 요청드리는 것</p>
+  <p style="line-height:1.75;color:#8B877F">
+    <b style="color:#E6E4E0">① 「모의 운용 시작」이 백테스트 리포트 안에 있는 게 맞습니까?</b>
+    백테스트를 본 직후가 그 결정을 내리는 순간이라 여기 뒀습니다. 별도 화면으로 빼면 흐름이 끊깁니다.
+    <br><br>
+    <b style="color:#E6E4E0">② 봇 만들기에 「저장」을 없앤 것</b> — 초안 자동저장 + 「백테스트 실행」 하나만 뒀습니다.
+    검증 안 된 봇을 저장하는 것에 의미가 없다고 봤는데, 만들다 말고 나가는 경우를 생각하면 명시적 저장이 안심될 수도 있습니다.
+    <br><br>
+    <b style="color:#E6E4E0">③ 리더보드에 실계좌를 섞은 것</b> — 고정하지 않고 같이 정렬됩니다.
+    "내가 3등"이 그대로 보이는 게 이 제품의 요점이라 봤습니다.
+    <br><br>
+    다음으로 <b style="color:#E6E4E0">아침 브리핑(터미널 첫 상태) · 승인 대기 · 모의 운용 중인 봇의 실시간 화면</b>을 이어서 그리겠습니다.
+    그게 <b style="color:#E6E4E0">매일 아침 실제로 보게 되는 화면</b>이라 가장 중요합니다.
+  </p>
+</div>
+</div>

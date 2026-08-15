@@ -1,0 +1,174 @@
+<style>
+  .hy-slider { display:flex; align-items:center; gap:10px; font-size:12px; opacity:.8; margin:6px 0 18px; }
+  .hy-slider .bar { flex:1; height:3px; background:linear-gradient(90deg,#232A36,#6366F1); border-radius:2px; position:relative; }
+  .hy-slider .pin { position:absolute; top:-5px; width:13px; height:13px; border-radius:50%; background:#D9A441; border:2px solid #0B0E13; }
+
+  .hy-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin:16px 0 8px; }
+  @media (max-width:1100px){ .hy-grid{grid-template-columns:1fr;} }
+  .hy-card { border-radius:10px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color .12s, transform .12s; }
+  .hy-card:hover { transform:translateY(-2px); }
+  .hy-card.selected { border-color:#4f8cff; }
+  .hy-shot { padding:18px; }
+  .hy-note { padding:13px 16px; font-size:12.5px; line-height:1.55; }
+  .hy-note b.t { display:block; font-size:14.5px; margin-bottom:5px; }
+  .hy-spec { font-size:11px; opacity:.68; margin-top:7px; font-family:ui-monospace,monospace; }
+
+  .hy-card .nm { font-weight:600; letter-spacing:-.015em; }
+  .hy-card .cd { color:#8A91A0; }
+  .hy-card .px { font-family:ui-monospace,monospace; font-variant-numeric:tabular-nums; color:#F0465A; letter-spacing:-.025em; line-height:1.1; }
+  .hy-card .dl { color:#F0465A; font-family:ui-monospace,monospace; }
+  .hy-card .rw { display:flex; justify-content:space-between; }
+  .hy-card .rw span:last-child { font-family:ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  .hy-card .bt { display:inline-block; background:#D9A441; color:#0B0E13; font-weight:600; }
+
+  /* ---- H1 : B 40% ---- */
+  .H1 { background:#0B0E13; color:#C9D1DC; font-family:Pretendard,system-ui,sans-serif; }
+  .H1 .p { background:#151A23; border:1px solid #242C39; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,.45); }
+  .H1 .p + .p { margin-top:10px; }
+  .H1 .hd { display:flex; justify-content:space-between; align-items:baseline; padding:10px 13px; border-bottom:1px solid #242C39; }
+  .H1 .nm { font-size:13.5px; } .H1 .cd { font-size:11.5px; }
+  .H1 .bd { padding:13px; }
+  .H1 .px { font-size:27px; font-weight:600; } .H1 .dl { font-size:12px; margin-top:2px; }
+  .H1 .rw { font-size:12px; padding:5px 0; } .H1 .rw + .rw { border-top:1px solid rgba(36,44,57,.7); }
+  .H1 .rw span:first-child { color:#6B7686; }
+  .H1 .bt { font-size:11.5px; padding:6px 13px; border-radius:5px; margin-top:11px; }
+  .H1 .tag { font-size:10px; color:#D9A441; border:1px solid rgba(217,164,65,.45); padding:2px 6px; border-radius:3px; }
+
+  /* ---- H2 : B 65% ---- */
+  .H2 { background:#0D1017; color:#D5DBE4; font-family:Pretendard,system-ui,sans-serif; }
+  .H2 .p { background:#171C26; border:1px solid rgba(255,255,255,.075); border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.25); }
+  .H2 .p + .p { margin-top:13px; }
+  .H2 .hd { display:flex; justify-content:space-between; align-items:center; padding:15px 17px 0; }
+  .H2 .nm { font-size:14.5px; } .H2 .cd { font-size:12px; }
+  .H2 .bd { padding:10px 17px 17px; }
+  .H2 .px { font-size:30px; font-weight:620; } .H2 .dl { font-size:12.5px; margin-top:3px; }
+  .H2 .rw { font-size:12.5px; padding:7px 0; } .H2 .rw + .rw { border-top:1px solid rgba(255,255,255,.055); }
+  .H2 .rw span:first-child { color:#8A91A0; }
+  .H2 .bt { font-size:12.5px; padding:7px 15px; border-radius:7px; margin-top:14px; }
+  .H2 .tag { font-size:11px; color:#E3B45C; background:rgba(217,164,65,.15); padding:3px 8px; border-radius:6px; }
+
+  /* ---- H3 : B 85% ---- */
+  .H3 { background:#0F1115; color:#E4E7EC; font-family:Pretendard,system-ui,sans-serif; }
+  .H3 .p { background:linear-gradient(180deg,#1A1F29 0%,#161A22 100%); border:1px solid rgba(255,255,255,.07); border-radius:13px; box-shadow:0 1px 2px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.3); }
+  .H3 .p + .p { margin-top:15px; }
+  .H3 .hd { display:flex; justify-content:space-between; align-items:center; padding:17px 19px 0; }
+  .H3 .nm { font-size:15.5px; font-weight:640; } .H3 .cd { font-size:12.5px; }
+  .H3 .bd { padding:11px 19px 19px; }
+  .H3 .px { font-size:33px; font-weight:650; } .H3 .dl { font-size:13px; margin-top:4px; }
+  .H3 .rw { font-size:13px; padding:9px 0; } .H3 .rw + .rw { border-top:1px solid rgba(255,255,255,.05); }
+  .H3 .rw span:first-child { color:#8A91A0; }
+  .H3 .bt { font-size:13px; padding:9px 17px; border-radius:9px; margin-top:16px; }
+  .H3 .tag { font-size:11.5px; color:#E3B45C; background:rgba(217,164,65,.16); padding:4px 11px; border-radius:999px; }
+
+  .hy-accent { display:flex; gap:26px; align-items:center; flex-wrap:wrap; background:#171C26; border:1px solid rgba(255,255,255,.075); border-radius:10px; padding:16px 18px; margin-top:8px; }
+  .hy-accent .sw { display:flex; align-items:center; gap:9px; font-size:12.5px; color:#D5DBE4; font-family:Pretendard,system-ui,sans-serif; }
+  .hy-accent .chip { padding:7px 15px; border-radius:7px; font-size:12.5px; font-weight:600; }
+</style>
+
+<h2>A ↔ B 사이 어디입니까?</h2>
+<p class="subtitle">
+  같은 패널을 슬라이더 위 세 지점에서 렌더했습니다. 액센트는 셋 다 <b>앰버로 고정</b>해서
+  <b>단 하나의 변수 — B 쪽으로 얼마나 미느냐</b>만 비교되게 했습니다. (보라 문제는 아래에서 따로)
+</p>
+
+<div class="hy-slider">
+  <span>A 계기판</span>
+  <div class="bar"><div class="pin" style="left:36%"></div><div class="pin" style="left:61%"></div><div class="pin" style="left:83%"></div></div>
+  <span>B 제도권</span>
+</div>
+
+<div class="hy-grid options">
+
+  <div class="hy-card option H1" data-choice="h1" onclick="toggleSelect(this)">
+    <div class="hy-shot">
+      <div class="p">
+        <div class="hd"><span class="nm">삼성전자</span><span class="cd">005930 · KRX</span></div>
+        <div class="bd">
+          <div class="px">71,400</div><div class="dl">▲ 1,200  +1.71%</div>
+          <div style="margin-top:9px">
+            <div class="rw"><span>거래량</span><span>12,847,301</span></div>
+            <div class="rw"><span>시가총액</span><span>426.1조</span></div>
+            <div class="rw"><span>PER</span><span>13.4</span></div>
+          </div>
+          <span class="bt">관심종목 추가</span>
+        </div>
+      </div>
+      <div class="p"><div class="hd"><span class="nm">수급</span><span class="tag">임시 데이터</span></div>
+        <div class="bd"><div class="rw"><span>외국인</span><span style="color:#3B82F6">-84,120</span></div></div></div>
+    </div>
+    <div class="hy-note" style="background:#151A23;color:#C9D1DC">
+      <b class="t">H1 — B 쪽 40%</b>
+      A 골격 유지. 라운드만 살짝 풀고, 버튼을 앰버 <b style="display:inline">채움</b>으로 바꿔 누를 곳이 분명해졌습니다.
+      여전히 조밀하고 하드합니다.
+      <div class="hy-spec">radius 6 · 그림자 1겹 · 패딩 13 · 헤더 구분선 있음</div>
+    </div>
+  </div>
+
+  <div class="hy-card option H2" data-choice="h2" onclick="toggleSelect(this)">
+    <div class="hy-shot">
+      <div class="p">
+        <div class="hd"><span class="nm">삼성전자</span><span class="cd">005930</span></div>
+        <div class="bd">
+          <div class="px">71,400</div><div class="dl">▲ 1,200 (+1.71%)</div>
+          <div style="margin-top:8px">
+            <div class="rw"><span>거래량</span><span>12,847,301</span></div>
+            <div class="rw"><span>시가총액</span><span>426.1조</span></div>
+            <div class="rw"><span>PER</span><span>13.4</span></div>
+          </div>
+          <span class="bt">관심종목 추가</span>
+        </div>
+      </div>
+      <div class="p"><div class="hd"><span class="nm">수급</span><span class="tag">임시 데이터</span></div>
+        <div class="bd"><div class="rw"><span>외국인</span><span style="color:#3B82F6">-84,120</span></div></div></div>
+    </div>
+    <div class="hy-note" style="background:#171C26;color:#D5DBE4">
+      <b class="t">H2 — B 쪽 65% · 제 추천</b>
+      B 의 <b style="display:inline">숨 쉴 여백·부드러운 깊이</b>는 다 가져오되, 배경은 A 의 어둠을 유지하고
+      숫자는 tabular mono 로 남깁니다. 편안하지만 여전히 <b style="display:inline">금융 화면</b>으로 읽힙니다.
+      <div class="hy-spec">radius 10 · 그림자 2겹 · 패딩 17 · 헤더 구분선 없음(여백으로 구분)</div>
+    </div>
+  </div>
+
+  <div class="hy-card option H3" data-choice="h3" onclick="toggleSelect(this)">
+    <div class="hy-shot">
+      <div class="p">
+        <div class="hd"><span class="nm">삼성전자</span><span class="cd">005930</span></div>
+        <div class="bd">
+          <div class="px">71,400</div><div class="dl">▲ 1,200 (+1.71%)</div>
+          <div style="margin-top:6px">
+            <div class="rw"><span>거래량</span><span>12,847,301</span></div>
+            <div class="rw"><span>시가총액</span><span>426.1조</span></div>
+            <div class="rw"><span>PER</span><span>13.4</span></div>
+          </div>
+          <span class="bt">관심종목 추가</span>
+        </div>
+      </div>
+      <div class="p"><div class="hd"><span class="nm">수급</span><span class="tag">임시 데이터</span></div>
+        <div class="bd"><div class="rw"><span>외국인</span><span style="color:#3B82F6">-84,120</span></div></div></div>
+    </div>
+    <div class="hy-note" style="background:#1A1F29;color:#E4E7EC">
+      <b class="t">H3 — B 쪽 85%</b>
+      거의 B. 그라데이션 패널·큰 라운드·pill 태그까지. 가장 편안하고 가장 현대적입니다.
+      대신 <b style="display:inline;color:#FFB4B4">한 화면에 들어가는 패널 수가 눈에 띄게 줄고</b>, 성격은 가장 옅습니다.
+      <div class="hy-spec">radius 13 · 그림자 2겹(강) · 패딩 19 · 그라데이션 패널</div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <p class="label">따로 결정할 것 — 액센트 색</p>
+  <p style="line-height:1.65; margin-bottom:12px">
+    B 의 보라(<code>#6366F1</code>)를 그대로 쓰기 어려운 <b>도메인 제약</b>이 있습니다.
+    이 앱은 상승/하락을 색으로 말하고, 그 색이 <b>한/미 관습에 따라 바뀝니다</b>
+    (<code>lib/terminal/marketColorPreset.ts</code> — 한국 적/청, 미국 초록/빨강).
+    즉 <b>빨강·파랑·초록 세 색이 이미 "숫자의 뜻"으로 예약</b>돼 있습니다.
+    남은 자리는 앰버 또는 보라인데, 인디고 <code>#6366F1</code> 은 하락 파랑 <code>#3B82F6</code> 과 인접해
+    작은 배지에서 헷갈립니다. 보라를 원하시면 <b>더 밀어야</b> 합니다.
+  </p>
+  <div class="hy-accent">
+    <span class="sw"><span class="chip" style="background:#D9A441;color:#0B0E13">관심종목 추가</span> 앰버 #D9A441 <span style="opacity:.6">(현행 signal-warn)</span></span>
+    <span class="sw"><span class="chip" style="background:#8B5CF6;color:#fff">관심종목 추가</span> 보라 #8B5CF6 <span style="opacity:.6">(하락 파랑과 분리됨)</span></span>
+    <span class="sw"><span class="chip" style="background:#6366F1;color:#fff">관심종목 추가</span> 인디고 #6366F1 <span style="opacity:.6">(B 원본 — 하락색과 인접)</span></span>
+    <span class="sw" style="opacity:.75">참고 · 하락 <span style="color:#3B82F6;font-weight:600">-84,120</span></span>
+  </div>
+</div>

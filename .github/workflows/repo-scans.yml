@@ -35,16 +35,16 @@ concurrency:
 
 jobs:
   # ── required 게이트 — `test: ` 체크런 전부를 체크 하나로 대표한다 (#23 Task 5) ──
-  # 테스트를 개별로 required 로 걸면 pending 창이 잡 수만큼 생긴다. `review-gate.yml` 머리의
-  # 「Orca 판정 규칙」 실측대로 pending 이 하나만 있어도 머지 버튼이 잠기므로, 대표 잡 하나만
+  # 테스트를 개별로 required 로 걸면 pending 창이 잡 수만큼 생긴다. scripts/verify_upstream_gate.py
+  # 머리의 「Orca 판정 규칙」 실측대로 pending 이 하나만 있어도 머지 버튼이 잠기므로, 대표 잡 하나만
   # 건다. required 로 **거는 것**은 레포 설정(ruleset) 소관이라 여기서는 걸 대상만 세운다.
   #
   # 판정 근거가 `needs:` 가 아니라 **head SHA 의 체크런 조회**인 이유: `needs:` 는 같은
-  # 워크플로 안만 묶어 ci.yml 7종·frontend-ci.yml 3종을 대표하지 못한다. 지금 그 열을 보는
-  # 것은 merge-router.yml 의 전수 초록 게이트인데 이 재설계(Task 8)가 그 파일을 지운다 —
-  # 지운 순간 자동 머지가 backend·frontend 테스트를 안 보게 된다. 그래서 판정 근거를
-  # merge-router 와 같은 것으로 맞춘다. 판정부는 scripts/verify_upstream_gate.py 의 순수
-  # 함수라 체크런 JSON 만 있으면 로컬에서 그대로 돈다.
+  # 워크플로 안만 묶어 ci.yml 7종·frontend-ci.yml 3종을 대표하지 못한다. 종전엔 그 열을
+  # 구 merge-router.yml 의 전수 초록 게이트가 봤고(#23 Task 8 이 삭제), 이 게이트가 같은
+  # 판정 근거(head SHA 의 `test: ` 접두 체크런 전수)로 그 자리를 승계했다 — 대비 없이
+  # 지우면 자동 머지가 backend·frontend 테스트를 안 보게 되기 때문이다. 판정부는
+  # scripts/verify_upstream_gate.py 의 순수 함수라 체크런 JSON 만 있으면 로컬에서 그대로 돈다.
   #
   # 게이트 자신도 `test: ` 접두 체크라 전수 조회에 자기가 잡힌다 — 판정부가 자기 이름을
   # 빼지 않으면 스스로를 기다린다. 그 이름 대조도 판정부가 한다.
@@ -101,6 +101,132 @@ jobs:
 
       - name: CI 배선 대조 (검증 단위 전수 ↔ 워크플로 실행 목록)
         run: python3 scripts/verify_ci_check_coverage.py
+
+  # ── 저자 신원 그물 — 「누가 썼는지 모르는 PR」을 막는다 (#23 Task 9) ──────────
+  # 에이전트 워크트리가 `git config --worktree user.email` 을 빠뜨리면 커밋이 리드 신원으로
+  # 찍히고, squash 뒤 main 에는 사람이 쓴 것으로 남는다. 판정부는 순수 함수
+  # (`scripts/pr_authorship.py`)이고 여기서는 PR 커밋을 모아 넘기기만 한다.
+  # **PR 이벤트에서만 돈다** — main push 에는 대조할 브랜치 선언이 없다. 건너뛴 잡도
+  # `skipped` 체크런을 남기고 게이트가 그것을 통과로 세므로 `test: gate` 는 흔들리지 않는다.
+  authorship:
+    name: "test: authorship"
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: PR 커밋 저자 신원 ↔ 브랜치 선언 대조 (fail-closed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          # 브랜치명·로그인은 데이터로만 다룬다 — 셸 보간에 넣지 않는다
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          IS_BOT: ${{ github.event.pull_request.user.type == 'Bot' }}
+        run: |
+          set -uo pipefail
+          set +e
+          # 조회 실패를 빈 목록으로 흡수하지 않는다 — 판정부의 R0 이 그것을 위반으로 잡아야
+          # 하므로 실패는 `null` 로 넘겨 「읽지 못했다」를 그대로 전달한다
+          COMMITS=$(gh api "repos/$REPO/pulls/$PR/commits" --paginate \
+            --jq '.[] | {sha, author_email: .commit.author.email, author_name: .commit.author.name}' \
+            | jq -s '.') || COMMITS=""
+          jq -n --arg ref "$HEAD_REF" --argjson bot "$IS_BOT" \
+                --argjson commits "${COMMITS:-null}" \
+                '{head_ref: $ref, pr_author_is_bot: $bot, commits: $commits}' \
+            | python3 scripts/pr_authorship.py
+          RC=$?
+          if [ "$RC" -ne 0 ]; then
+            echo "::error::PR 의 커밋 저자 신원을 읽을 수 없거나 브랜치 선언과 어긋난다 — 위 사유를 보고 디스패치의 §6.1 신원 설정(git config --worktree user.email)을 확인하라"
+          fi
+          exit "$RC"
+
+  # ── 문서 전용 PR 「독립 리뷰 없음」 고지 (#23 Task 8, 2026-08-10 리드 결정) ──────
+  # cross-review 는 paths-ignore(**.md·docs/**)로 문서 전용 PR 을 안 본다 — 판정 코멘트도
+  # 네이티브 리뷰 기록도 없이 required 만 초록이 되어, 「리뷰 통과」와 「안 봄」이 체크로
+  # 구분되지 않는다. 구 review-gate.yml 의 문서 전용 라우팅(human: merge)이 만들던 구분을
+  # 라벨 없이 잇는다: 문서 전용이면 「독립 리뷰 없음」 코멘트를 남기고, 이후 push 로 코드가
+  # 섞이면 그 고지를 낡음으로 고쳐 쓴다. 판정부는 scripts/review_notice.py 순수 함수다.
+  #
+  # 코멘트가 신호인 이유 — 초록 체크는 「통과」로 읽히고, 빨간 체크는 Orca 머지 버튼을
+  # 잠근다(scripts/verify_upstream_gate.py 머리의 「Orca 판정 규칙」). 둘 다 목적에 안 맞는다.
+  # `test: ` 접두 금지 — 게이트가 그 접두를 전수 판정하므로 사람 머지를 막게 된다.
+  #
+  # 이 잡은 빨갛게 끝나지 않는다 (fail-open) — 사람의 오독을 막는 보조 그물이 자기 인프라
+  # 오류(API 실패)로 문서 PR 머지를 잠그면 안 된다. 실패는 ::error:: 로 남긴다.
+  # 판정 자체는 fail-closed 다 — 파일 목록을 못 읽으면 고지하지 않는다 (리뷰가 돈 PR 에
+  # 「리뷰 없음」을 잘못 붙이는 방향이 더 나쁘다).
+  docs-notice:
+    name: "chore: docs-notice (비게이트)"
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 문서 전용 판정 → 「독립 리뷰 없음」 코멘트
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          set +e
+          FILES=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename' \
+            | jq -R -s 'split("\n") | map(select(length > 0))') || FILES=""
+          DECISION=$(jq -n --argjson files "${FILES:-null}" '{files: $files}' \
+            | python3 scripts/review_notice.py)
+          if [ -z "$DECISION" ]; then
+            echo "::error::판정부가 출력을 내지 못했다 — 고지 없음 (비게이트라 잡은 0 으로 끝난다)"
+            exit 0
+          fi
+          echo "판정: $DECISION"
+          if [ -n "$(jq -r '.error // empty' <<<"$DECISION")" ]; then
+            echo "::error::$(jq -r .error <<<"$DECISION")"
+            exit 0
+          fi
+          DOCS_ONLY=$(jq -r .docs_only <<<"$DECISION")
+
+          # 자기 고지 코멘트 조회 — 마커 + github-actions[bot] 저자 동시 일치만 자기 것으로
+          # 센다. 마커만 보면 제3자가 같은 문자열로 고지를 억제할 수 있다 (공개 레포).
+          MARKER='<!-- docs-review-notice v1 -->'
+          # --paginate + --jq 는 페이지마다 필터를 적용한다 — 첫 일치 한 줄만 취한다
+          EXISTING=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$MARKER\"))) | .id][0] // empty" \
+            | head -n1)
+
+          if [ "$DOCS_ONLY" = "true" ]; then
+            if [ -n "$EXISTING" ]; then
+              echo "문서 전용 — 고지 이미 있음 (comment $EXISTING), 무행동"
+              exit 0
+            fi
+            BODY=$(printf '%s\n%s' "$MARKER" '**독립 리뷰 없음 — 문서 전용 PR.** 변경이 문서(`**.md`·`docs/**`)뿐이라 cross-review 가 돌지 않는다. 판정 코멘트도 네이티브 리뷰 기록도 생기지 않으므로, 체크가 전부 초록이어도 그것은 「리뷰 통과」가 아니라 「리뷰 없음」이다 — 사람이 읽는 것이 리뷰다.')
+            gh pr comment "$PR" --repo "$REPO" --body "$BODY" \
+              && echo "문서 전용 — 「독립 리뷰 없음」 고지 게시" \
+              || echo "::error::고지 게시 실패 — 문서 전용 PR 이 표식 없이 흐른다. 재실행하거나 사람이 확인하라."
+          else
+            if [ -n "$EXISTING" ]; then
+              # 문서 전용으로 열렸다가 코드가 섞인 PR — 낡은 고지를 그대로 두면
+              # 정상 리뷰가 도는 PR 을 「리뷰 없음」으로 오독하게 한다.
+              BODY=$(printf '%s\n%s' "$MARKER" '~~독립 리뷰 없음 — 문서 전용 PR.~~ 이후 push 로 코드가 섞여 정상 리뷰 경로가 적용된다 — 이 고지는 낡았다.')
+              jq -n --arg b "$BODY" '{body: $b}' \
+                | gh api -X PATCH "repos/$REPO/issues/comments/$EXISTING" --input - >/dev/null \
+                && echo "코드 섞임 — 낡은 고지를 고쳐 씀 (comment $EXISTING)" \
+                || echo "::error::낡은 고지 정정 실패 (comment $EXISTING) — 리뷰가 도는 PR 에 「리뷰 없음」 고지가 남아 있다"
+            else
+              echo "코드 변경 포함 — 정상 리뷰 경로, 무행동 (비문서: $(jq -c .nondoc <<<"$DECISION"))"
+            fi
+          fi
+          exit 0
 
   # ── stdlib 전용 전수 스캔 ────────────────────────────────────────────────
   repo-scan:
@@ -177,6 +303,34 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_terminal_state.py
 
+      # 리뷰어 체인 처분·집계 — cross-review.yml 의 후보 루프가 부르는 순수 판정. 「그 리뷰어를
+      # 못 쓴다」(다음 후보로)와 「리뷰가 불가능하다」(unable)가 갈려 있는지를 못박는다. 종전엔
+      # 기동 실패가 후자로 접혀 체인이 첫 후보에서 끝났고(실측 run 31815113895), unable 이 나면
+      # 낡은 CHANGES_REQUESTED 가 살아남아 PR 이 교착에 빠진다. 반대로 이 자리가 너무 관대해지면
+      # 고장난 리뷰어가 조용히 claude 자기리뷰로 대체된다 — 양쪽을 다 케이스로 잡는다.
+      # 케이스를 0건 모으면 실패한다 (fail-closed).
+      - name: 리뷰어 체인 처분·집계 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_review_chain.py
+
+      # 위 판정이 옳아도 **워크플로가 그것을 안 부르면** 초록은 거짓말이다 — 이번 결함이 정확히
+      # 그것이었다(YAML 안 bash `case` 가 rc 두 종만 폴백으로 인정). 그래서 체인 루프를
+      # cross-review.yml 에서 **그대로 뽑아** Actions 기본 셸과 같은 `bash -e` 로 돌린다
+      # (헤더 「셸 플래그 함정」: -e 를 안 끄면 폴백이 통째로 안 돌던 실사건이 있고, 그때 로컬
+      # 56케이스가 통과한 이유가 `bash -e` 로 안 돌린 것이었다). 앵커가 밀려 엉뚱한 블록을
+      # 뽑으면 실패한다 (fail-closed).
+      - name: 리뷰어 체인 루프 검사 (워크플로 원문 · bash -e)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_cross_review_chain_loop.py
+
+      # 러너 동결 재실행 판정 — runner-freeze-rerun.yml 이 부르는 순수 판정. 동결 서명
+      # 정확 일치 + 여파(verdict unable)만 재실행하고, 진짜 실패가 섞이면 재실행하지
+      # 않는지를 실제 API 픽스처(fixtures/runner_freeze_annotations.json)로 못박는다.
+      # 케이스를 0건 모으면 실패한다 (fail-closed).
+      - name: 러너 동결 재실행 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_runner_freeze_rerun.py
+
       # 경로 필터 판정 (#23 Task 4) — ci.yml·frontend-ci.yml 의 `changes` 잡이 부르는 순수
       # 판정 + **배선 구조 자체**. 글롭 의미만 보면 "판정은 맞는데 아무도 안 부르는" 상태가
       # 초록이므로, on.paths 재유입·판정 잡 부재·`if:` 안 읽는 잡·추적 파일을 하나도 안 무는
@@ -196,9 +350,31 @@ jobs:
       # 위조 표면(비-멤버 마커·접두 sha·낡은 sha·source=manual·major 봇 PR·제목 파싱 실패)이
       # 봇 승인·자동 머지 arm 으로 이어지지 않는지를 공격 케이스로 못박는다.
       # 케이스를 0건 모으면 실패한다 (fail-closed).
+      - name: 저자 신원 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_pr_authorship.py
+
+      # 머지 본문 재현이 실물과 어긋나면 `--body-file` 이 커밋 메시지와 Co-authored-by 를
+      # 지운다. 픽스처는 머지된 PR 의 실제 본문이다 (`fixtures/squash_bodies.json`).
+      - name: 머지 provenance 판정·본문 재현 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_merge_provenance.py
+
       - name: 리뷰 기록기 판정 검사
         if: ${{ !cancelled() }}
         run: python3 scripts/test_review_record.py
+
+      # 문서 전용 판정 (#23 Task 8) — docs-notice 잡이 부르는 순수 판정. cross-review 의
+      # paths-ignore 와 어긋나면 리뷰가 돈 PR 에 「리뷰 없음」이 붙거나 그 반대가 된다.
+      - name: 문서 전용 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_review_notice.py
+
+      # 판정 → 체크 색 대응이 fail-closed 인지 (#23 Task 10) — merge_ok 정확 일치만 초록.
+      # 관대해지면 「빨개야 하는데 초록」으로, 어휘가 갈리면 「초록이어야 하는데 빨강」으로 죽는다.
+      - name: 리뷰 판정 가시화 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_review_verdict.py
 
       # 고지 문서 생성기의 fail-closed 축 (앵커 파손·미분류 라이선스·§3 보존·--check).
       # frontend 잡의 `generate_notices.py --check` 는 **지금 트리가 맞는지**만 보인다 —
@@ -207,6 +383,22 @@ jobs:
       - name: 고지 문서 생성기 회귀 검사
         if: ${{ !cancelled() }}
         run: python3 scripts/test_notices_generator.py
+
+      # 색 토큰 조합 전수의 WCAG 대비 (#73 S1, 디자인 시스템 §7.1) — 토큰을 하나 손보면 그
+      # 토큰이 얹히는 모든 바탕과의 조합이 같이 움직이는데 사람이 그 곱집합을 매번 다시 재지는
+      # 않는다. 계산식은 WCAG 명세 2점 + 문서의 손계산 3점으로 고정한다.
+      # **지금은 보고만 하고 미달로 실패하지 않는다** — 색 값이 리드 판단 대기다. 조이는 방법은
+      # 스크립트 머리의 「나중에 조이는 방법」에 적혀 있다. 조합 0건이면 실패한다 (fail-closed).
+      - name: 색 토큰 대비 검사 (보고)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_token_contrast.py
+
+      # 토큰 밖 색 검출 (#73 S1, 디자인 시스템 §8) — Tailwind 기본 팔레트·hex 리터럴은 아무
+      # 설정 없이 그냥 써지고 타입체커도 린터도 조용하다. 기존 위반은 상한과 함께 allowlist 에
+      # 등록했고 S2~S5 가 줄인다 — 늘어나거나 낡으면 실패한다. 검사 0건이면 실패 (fail-closed).
+      - name: 토큰 밖 색 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_color_token_usage.py
 
       # 프록시 라우트 ↔ 서비스 소비자 (#2) — `frontend/app/api/external/**` 를 스스로 순회해
       # 대상을 찾는 stdlib 스캔이라 이 잡의 클래스다. 경로 필터가 있는 워크플로에 두면 이

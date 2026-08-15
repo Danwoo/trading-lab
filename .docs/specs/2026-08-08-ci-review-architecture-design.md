@@ -137,9 +137,12 @@ CI 밖(Orca)에 둔다.
 - 좋으면 → 승인 → (저위험이면) 자동 머지
 - 피드백이면 → `Request changes` → **자동 머지가 안 걸린다** → 저자가 고쳐 push → 재리뷰
 
-**「Require approvals」는 켜지 않는다** (아래 결정 로그). 그래서 `Request changes` 는 사람 머지를
-막지 않는다 — 자동 경로만 멈춘다. AI 판정이 작업 정지 장치가 되지 않는다는 원칙(2026-08-06)의
-직접적 귀결이다.
+**「Require approvals」는 켜지 않는다** (아래 결정 로그). 설계 시점에는 「그래서 `Request changes`
+는 사람 머지를 막지 않는다 — 자동 경로만 멈춘다」로 적었는데, **실측은 다르다** (2026-08-10 정정,
+#23 Task 10): ruleset 에 `pull_request` 규칙이 있으면 `required_approving_review_count` 가 0 이어도
+살아 있는 `CHANGES_REQUESTED` 리뷰가 머지를 막는다 (PR #68 실측 — 체크 전부 초록 +
+mergeStateStatus=BLOCKED). 리뷰 판정이 이빨을 가진 것 자체는 의도에 부합해 수용하고, 리뷰 경로가
+죽었을 때의 출구(교착 해제)를 §4 에 둔다.
 
 **승인이 낡았는지는 기록기가 본다.** 승인을 required 로 걸지 않으므로 GitHub 의
 「dismiss stale approvals」에 기댈 수 없다. 대신 리뷰 API 가 리뷰마다 `commit_id` 를 주므로,
@@ -199,6 +202,18 @@ build(deps): bump pyjwt from 2.12.1 to 2.13.0 in /template-mcp-service
 때문이다. 제목 형식이 바뀌면 판별이 `None` 이 되고 **그때는 자동 머지를 arm 하지 않는다**
 (fail-closed).
 
+> **추가 (2026-08-13).** 그 「형식이 바뀌면」이 실제로 왔다 — 버전 업데이트(#106)를 켜자
+> uv 매니페스트의 제약을 올리는 PR 이 두 번째 형식으로 온다:
+>
+> ```
+> build(deps): update uvicorn[standard] requirement from ~=0.47.0 to ~=0.52.1 in /backend-service
+> ```
+>
+> 설계대로 자동 머지가 멈췄고(12건이 초록인 채 대기), 틀린 판정으로 흐른 것은 없다.
+> 판별부는 이제 **두 형식을 다 읽는다** — 패키지에 붙는 extras 대괄호와 버전에 붙는 제약
+> 연산자를 걷어낸 숫자로 major 를 가른다. 못 읽는 제목(묶음 PR·버전 없는 보안 업데이트·
+> 범위 제약)은 그대로 `None` 이고 arm 하지 않는다.
+
 ### 3. 상태 — 라벨은 위험도만
 
 라벨이 하던 상태 저장을 GitHub 이 가져간다. 남는 라벨은 **`risk: low|high` 하나**이고, 그
@@ -216,6 +231,35 @@ writer 는 이미 하나다(`gate declare`). `review: passed`·`review: unable`�
 **「Require approvals」는 켜지 않는다** (2026-08-08 리드 결정). 켜면 승인 없이는 사람도 머지할 수
 없어 1번이 깨지고, AI 리뷰가 죽었을 때 그대로 작업 정지 장치가 된다. 승인은 **자동 머지를 arm
 하는 신호**일 뿐이고, 사람의 머지 권한은 테스트 초록에만 걸린다.
+
+**교착 출구 — 리뷰 경로가 죽으면 dismiss 가 유일한 출구다** (2026-08-10, #23 Task 10). 승인
+하한이 0 이어도 ruleset 의 `pull_request` 규칙은 살아 있는 `CHANGES_REQUESTED` 리뷰를 존중해
+머지를 막는다 (§2 정정 참조). 새 판정은 재리뷰(push → cross-review → 기록기)가 내므로, **리뷰
+경로가 죽으면(kimi·codex 한도 + claude 폴백 실패 등) 낡은 `CHANGES_REQUESTED` 를 걷어낼 자동
+경로가 없다** — 영영 못 미는 교착이 된다. 그때는 사람이 리뷰를 해제한다:
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<N>/reviews          # 리뷰 ID 확인
+gh api -X PUT repos/<owner>/<repo>/pulls/<N>/reviews/<리뷰ID>/dismissals \
+  -f message="<사유>" -f event=DISMISS
+```
+
+같은 안내가 빨간 체크 `review: verdict (비게이트)` 의 로그(`scripts/review_verdict.py` 출력 —
+`needs_changes` 경로)와, `unable` 일 때는 publish 의 판정 코멘트 CAUTION 배너에도 실린다 —
+막힌 사람이 처음 여는 자리가 거기다.
+
+**판정은 체크로도 보인다** (#23 Task 10 · 2026-08-12 개정). `review: verdict (비게이트)` 가
+판정을 체크 색으로 확정한다 — `merge_ok` 만 초록, `needs_changes`·판정 미산출은 빨강,
+`unable` 은 **Skipped** (매핑의 SoT 는 `scripts/review_verdict.py` `CHECK_CONCLUSION`).
+`unable` 을 빨강에서 뺀 이유: Orca 는 required 여부와 무관하게 빨간 체크 하나로 머지 버튼을
+잠그는데, 판정을 못 낸 것(인프라·연결)은 코드 결함이 아니다 (PR #104 실측 — kimi 접수 확인
+오판으로 unable 빨강이 3회 남았고 그중 2회는 리뷰가 7~8분 뒤 실제 `merge_ok` 로 끝났다).
+`needs_changes` 의 빨강은 그대로다 — 그건 막는 게 목적이다.
+required 가 아니고 `test: ` 접두도 아니라서 1번(사람 머지)·자동 머지 어느 쪽도 막지 않는다 —
+「초록인데 못 민다」(PR #68 실측)를 체크 목록에서 읽히게 하는 알림이다.
+워크플로가 끝난 뒤 도착한 판정은 기록기(review-record)가 같은 이름의 체크런을 새로 써
+반영한다 (`checks: write`, 같은 매핑 표 재사용) — 판정을 읽는 곳과 체크를 쓰는 곳이 같아
+늦은 판정이 체크에서 어긋나지 않는다.
 
 **required checks 에 무엇을 넣나**: 테스트 9종을 개별로 걸지 말고 「전부 초록인가」를 대표하는
 **게이트 잡 하나**만 required 로 건다. pending 창이 하나로 줄어 Orca 머지 버튼이 닫혀 있는

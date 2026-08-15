@@ -1,0 +1,342 @@
+<style>
+  .dy { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --dg:#C94A3B; --ok:#5FA34C;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .dy .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+  .dy h3.step { font-size:15px; font-weight:700; color:var(--is); margin:32px 0 3px; display:flex; align-items:center; gap:9px; }
+  .dy h3.step i { font-style:normal; width:20px; height:20px; border-radius:6px; background:var(--is); color:var(--bg);
+                  font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  .dy p.lead { font-size:12.5px; color:var(--im); line-height:1.6; margin:0 0 12px 29px; }
+  .dy p.lead b { color:var(--ik); font-weight:500; }
+  .cal { display:flex; gap:12px; margin:9px 0 0 29px; font-size:11.5px; color:var(--im); line-height:1.65; }
+  .cal .pin { flex:0 0 auto; color:var(--if); font-weight:700; }
+  .cal b { color:var(--ik); font-weight:500; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:11px; overflow:hidden; }
+  .wbar { display:flex; align-items:center; gap:9px; height:36px; padding:0 13px; background:var(--pn); border-bottom:1px solid var(--ln); font-size:12px; color:var(--im); }
+  .wbar b { color:var(--is); font-weight:700; font-size:12.5px; }
+  .wbar .rt { margin-left:auto; display:flex; gap:7px; align-items:center; }
+  .body { padding:14px; }
+  .cols { display:flex; }
+  .col { padding:14px; } .col + .col { border-left:1px solid var(--ln); }
+
+  .btn { font-size:12px; font-weight:500; padding:6px 13px; border-radius:8px; display:inline-block;
+         background:linear-gradient(180deg,#2E353B,#242A30); border:1px solid #434C54; color:var(--is);
+         box-shadow:inset 0 1px 0 rgba(255,255,255,.07); }
+  .btn2 { font-size:12px; font-weight:500; padding:6px 13px; border-radius:8px; display:inline-block;
+          background:transparent; border:1px solid var(--ls); color:var(--im); }
+  .btn.sm,.btn2.sm { font-size:11px; padding:4px 10px; }
+  .btn.dgr { border-color:var(--dg); color:var(--dg); background:transparent; box-shadow:none; }
+
+  .lg { font-size:9.5px; letter-spacing:.13em; font-weight:700; color:var(--if); margin-bottom:8px; }
+  .ph { background:var(--pn); border:1px solid var(--ln); border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.5),0 6px 18px rgba(0,0,0,.24); }
+
+  /* 온보딩 체크리스트 */
+  .ck { display:flex; align-items:flex-start; gap:11px; padding:11px 0; }
+  .ck + .ck { border-top:1px solid var(--hl); }
+  .ck .mk { flex:0 0 20px; height:20px; border-radius:50%; border:1px solid var(--ls); display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--if); }
+  .ck.done .mk { background:var(--is); border-color:var(--is); color:var(--bg); font-weight:800; }
+  .ck .tx { flex:1; }
+  .ck .tx b { display:block; font-size:12.5px; color:var(--is); font-weight:500; }
+  .ck .tx span { font-size:11.5px; color:var(--im); line-height:1.5; }
+  .ck.done .tx b { color:var(--im); font-weight:400; }
+
+  .invert { background:var(--is); color:var(--bg); font-weight:700; padding:2px 7px; border-radius:5px; font-size:11px; display:inline-block; }
+  .prov { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--im); }
+
+  /* 브리핑 항목 */
+  .it { display:flex; gap:11px; padding:10px 0; }
+  .it + .it { border-top:1px solid var(--hl); }
+  .it .tg { flex:0 0 auto; font-size:10px; padding:2px 7px; border-radius:5px; border:1px solid var(--ls); color:var(--im); height:fit-content; }
+  .it .bd { flex:1; min-width:0; }
+  .it .bd b { font-size:12.5px; color:var(--is); font-weight:500; }
+  .it .bd .why { font-size:11.5px; color:var(--im); line-height:1.5; margin-top:3px; }
+  .it .bd .why em { font-style:normal; color:var(--ik); }
+  .it .rt { flex:0 0 auto; display:flex; gap:6px; align-items:flex-start; }
+
+  .band { border-radius:9px; padding:10px 12px; font-size:11.5px; line-height:1.6; }
+  .band.auto { border:1px solid var(--ln); background:var(--rs); color:var(--im); }
+  .band.need { border:1px solid var(--is); background:transparent; }
+  .band.never { border:1px dashed var(--ls); color:var(--if); }
+  .band b { display:block; font-size:12px; margin-bottom:4px; }
+
+  table.t { width:100%; border-collapse:collapse; font-size:12px; }
+  table.t th { font-size:11px; font-weight:500; color:var(--if); text-align:right; padding:5px 8px; border-bottom:1px solid var(--ln); }
+  table.t th:first-child, table.t td:first-child { text-align:left; }
+  table.t td { padding:0 8px; height:27px; border-bottom:1px solid var(--hl); text-align:right; }
+
+  .cond { display:flex; align-items:center; gap:8px; font-size:11.5px; padding:5px 0; }
+  .cond + .cond { border-top:1px solid var(--hl); }
+  .cond .st { flex:0 0 15px; text-align:center; font-weight:700; }
+  .cond .nm { flex:1; color:var(--ik); }
+  .cond .vl { color:var(--im); }
+</style>
+
+<div class="dy">
+<h2 style="color:#F5F3EF">매일 쓰는 흐름 — 처음 켠 날부터 굴리는 중까지</h2>
+<p class="subtitle" style="color:#8B877F">
+  앞 화면들이 <b style="color:#E6E4E0">만드는 흐름</b>이었다면 이건 <b style="color:#E6E4E0">쓰는 흐름</b>입니다.
+  숫자는 목데이터이고, 각 화면 아래에 <b style="color:#E6E4E0">왜 이렇게 했는지</b>와 <b style="color:#E6E4E0">리드가 정하실 것</b>을 붙였습니다.
+</p>
+
+<!-- ═══════ 5. 첫 실행 ═══════ -->
+<h3 class="step"><i>5</i> 첫 실행 — 키 없이도 뜨고, 뜬 화면이 정직하다</h3>
+<p class="lead">
+  G1 은 <b>"레포를 처음 클론한 사람이 문서만 보고 기동해 자기 화면을 띄운다"</b> 입니다.
+  그래서 API 키 0개로 기동되고, <b>대신 화면 전체가 지금 전부 임시 데이터라고 말합니다.</b>
+</p>
+
+<div class="win">
+  <div class="wbar"><b>TRADING LAB</b> · 처음 오셨습니다
+    <span class="rt"><span class="invert">전 패널 임시 데이터</span></span></div>
+  <div class="cols">
+    <div class="col" style="flex:0 0 340px">
+      <div class="lg">시작하기 — 3단계 중 <span class="n">1</span> 완료</div>
+      <div class="ck done"><div class="mk">✓</div><div class="tx"><b>워크스페이스 생성됨</b>
+        <span>가입과 동시에 <em class="n">danwoo</em> 개인 워크스페이스가 만들어졌습니다.</span></div></div>
+      <div class="ck"><div class="mk">2</div><div class="tx"><b>데이터 소스 키 등록</b>
+        <span>국내 시세는 <em>data.go.kr</em> 무료 키로 충분합니다. 키는 <em>내 워크스페이스에만</em> 암호화 저장됩니다.</span>
+        <div style="margin-top:7px"><span class="btn sm">키 등록하기</span> <span class="btn2 sm">나중에</span></div></div></div>
+      <div class="ck"><div class="mk">3</div><div class="tx"><b>시세 적재</b>
+        <span>관심종목 <em class="n">8</em>개의 일봉 <em class="n">3년</em>치 — 예상 <em class="n">약 4분</em>.
+        적재가 끝나야 차트와 백테스트가 실데이터가 됩니다.</span></div></div>
+      <div style="margin-top:14px;font-size:11.5px;color:var(--im);line-height:1.6;border-top:1px solid var(--ln);padding-top:12px">
+        <b style="color:var(--ik);font-weight:500">지금도 둘러볼 수 있습니다.</b>
+        전 패널이 샘플 데이터로 채워져 있어 화면 구조와 조작을 먼저 익히실 수 있습니다 —
+        <b style="color:var(--ik);font-weight:500">다만 그 숫자로 판단하지는 마십시오.</b>
+      </div>
+    </div>
+    <div class="col" style="flex:1">
+      <div class="ph" style="padding:0">
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 14px 0">
+          <span style="font-size:12.5px;font-weight:700;color:var(--is)">차트</span>
+          <span class="invert" style="margin-left:auto">임시 데이터</span></div>
+        <div style="padding:9px 14px 14px">
+          <div style="height:96px;border-radius:7px;border:1px solid var(--ls);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;text-align:center;
+                      background-image:repeating-linear-gradient(45deg,var(--hl) 0 1px,transparent 1px 9px)">
+            <b style="font-size:12.5px;color:var(--ik);font-weight:500">샘플 캔들입니다</b>
+            <span style="font-size:11.5px;color:var(--if);line-height:1.5">3단계 「시세 적재」를 마치면<br>실제 시세로 바뀝니다.</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:11px;margin-top:11px">
+        <div class="ph" style="flex:1;padding:12px 14px 14px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12.5px;font-weight:700;color:var(--is)">종목 정보</span>
+            <span class="invert" style="margin-left:auto">임시</span></div>
+          <div class="n" style="font-size:26px;font-weight:500;color:var(--up);margin-top:8px;letter-spacing:-.03em">71,400</div>
+          <div class="n" style="font-size:12px;color:var(--up);margin-top:3px">▲ 1,200 (+1.71%)</div>
+        </div>
+        <div class="ph" style="flex:1;padding:12px 14px 14px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12.5px;font-weight:700;color:var(--is)">봇 판단</span>
+            <span class="prov" style="margin-left:auto">⊖ 봇 없음</span></div>
+          <div style="font-size:11.5px;color:var(--im);margin-top:9px;line-height:1.5">아직 만든 봇이 없습니다.</div>
+          <div style="margin-top:9px"><span class="btn2 sm">봇 만들기</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="cal"><span class="pin">UX 결정</span><span>
+  <b>온보딩을 모달로 막지 않습니다.</b> 체크리스트는 화면 한쪽에 남고 뒤의 제품이 계속 보입니다 —
+  키 등록을 강제하면 "일단 뭔지 보자"는 사람이 그 자리에서 이탈합니다. G1 의 판정 기준은 <b>"자기 화면을 띄운다"</b>이지 "키를 넣는다"가 아닙니다.
+  <br><b>대신 임시 데이터 배지를 패널마다 답니다</b> — 편안해 보이면 사람은 그 숫자를 믿습니다.
+</span></div>
+
+<!-- ═══════ 6. 아침 브리핑 ═══════ -->
+<h3 class="step"><i>6</i> 아침 브리핑 — 터미널의 첫 상태 (별도 화면이 아님)</h3>
+<p class="lead">
+  종목을 <b>안 고른 상태</b>가 곧 브리핑입니다. 종목을 고르는 순간 이 자리가 패널 그리드로 바뀝니다.
+  밤사이 <b>저녁 배치(20:00)</b> 가 만들어 둔 것을 <b>읽기만</b> 합니다 — 아침엔 LLM 을 새로 부르지 않습니다.
+</p>
+
+<div class="win">
+  <div class="wbar"><b>브리핑</b> · <span class="n">8월 8일 금</span> · 장 시작 <span class="n">42분</span> 전
+    <span class="rt"><span class="prov">▤ 저녁 배치 <span class="n">08-07 20:04</span> · LLM <span class="n">1</span>회</span>
+      <span class="btn2 sm">지금 다시 돌리기</span></span></div>
+  <div class="cols">
+    <!-- 승인 대기 -->
+    <div class="col" style="flex:0 0 330px">
+      <div class="lg">승인 대기 <span class="n">2</span></div>
+      <div class="band need" style="margin-bottom:9px">
+        <b style="color:var(--is)">유니버스 교체 제안</b>
+        <span style="color:var(--im)">거래대금 상위 200 재계산 결과 <em style="font-style:normal;color:var(--ik)" class="n">14</em>종목 편입 ·
+          <em style="font-style:normal;color:var(--ik)" class="n">11</em>종목 편출.
+          「코스피 눌림목 v3」이 보는 종목이 바뀝니다.</span>
+        <div style="margin-top:9px;display:flex;gap:6px"><span class="btn sm">변경 내역 보기</span><span class="btn2 sm">승인</span><span class="btn2 sm">거절</span></div>
+      </div>
+      <div class="band need">
+        <b style="color:var(--is)">모의 주문 <span class="n">3</span>건</b>
+        <span style="color:var(--im)">「코스피 눌림목 v3」이 <em style="font-style:normal;color:var(--ik)">삼성전자·현대차·기아</em> 매수 신호.
+          종목당 <em style="font-style:normal;color:var(--ik)" class="n">200만</em>원.</span>
+        <div style="margin-top:9px;display:flex;gap:6px"><span class="btn sm">하나씩 보기</span><span class="btn2 sm">일괄 승인</span></div>
+      </div>
+
+      <div class="lg" style="margin-top:16px">자동으로 처리됨 <span class="n">1</span></div>
+      <div class="band auto">
+        <b style="color:var(--ik)">「모멘텀 상위20」 정지됨</b>
+        연속 손실 <em style="font-style:normal;color:var(--ik)" class="n">9</em>회로 한도 도달 — <em style="font-style:normal;color:var(--ik)">되돌릴 수 있는 조치</em>라 자동 실행했습니다.
+        <div style="margin-top:8px"><span class="btn2 sm">다시 켜기</span></div>
+      </div>
+    </div>
+
+    <!-- 밤사이 -->
+    <div class="col" style="flex:1">
+      <div class="lg">밤사이 시그널 <span class="n">3</span></div>
+      <div class="it">
+        <span class="tg">매수</span>
+        <div class="bd"><b>삼성전자 <span class="n" style="font-weight:400;color:var(--im)">005930</span></b>
+          <div class="why">「코스피 눌림목 v3」 — <em>20일선 터치 후 +1.7% 반등</em>, RSI <em class="n">28.4</em>,
+            KOSPI 월봉 <em>추세 상방</em>. 세 조건 모두 충족.</div></div>
+        <div class="rt"><span class="btn2 sm">차트로</span></div>
+      </div>
+      <div class="it">
+        <span class="tg">매수</span>
+        <div class="bd"><b>현대차 <span class="n" style="font-weight:400;color:var(--im)">005380</span></b>
+          <div class="why">같은 봇 — RSI <em class="n">29.1</em>, 반등 <em class="n">+2.1%</em>.
+            <em>단, 8월 12일 실적 발표 예정</em> (공시 기준).</div></div>
+        <div class="rt"><span class="btn2 sm">차트로</span></div>
+      </div>
+      <div class="it">
+        <span class="tg" style="border-color:var(--dg);color:var(--dg)">청산</span>
+        <div class="bd"><b>카카오 <span class="n" style="font-weight:400;color:var(--im)">035720</span></b>
+          <div class="why">손절선 <em class="n">-7%</em> 도달 (진입 <em class="n">44,900</em> → <em class="n">41,750</em>).
+            <em>모의 포지션 정리됨.</em></div></div>
+        <div class="rt"><span class="btn2 sm">차트로</span></div>
+      </div>
+
+      <div class="lg" style="margin-top:16px">어제 성과</div>
+      <table class="t">
+        <tr><th>봇</th><th>어제</th><th>누적</th><th>보유</th><th>상태</th></tr>
+        <tr><td>배당주 리밸런싱</td><td class="n" style="color:var(--up)">+0.4%</td><td class="n" style="color:var(--up)">+11.8%</td><td class="n">5</td><td style="color:var(--im)">운용 중</td></tr>
+        <tr><td>코스피 눌림목 v3</td><td class="n" style="color:var(--dn)">-0.9%</td><td class="n" style="color:var(--up)">+18.4%</td><td class="n">6</td><td style="color:var(--im)">운용 중</td></tr>
+        <tr><td>반도체 페어</td><td class="n" style="color:var(--up)">+0.2%</td><td class="n" style="color:var(--up)">+10.9%</td><td class="n">4</td><td style="color:var(--im)">운용 중</td></tr>
+        <tr><td style="color:var(--im)">모멘텀 상위20</td><td class="n" style="color:var(--dn)">-2.8%</td><td class="n" style="color:var(--up)">+26.1%</td><td class="n">0</td><td style="color:var(--if)">정지됨</td></tr>
+        <tr><td style="color:var(--is)">내 실계좌</td><td class="n" style="color:var(--dn)">-0.3%</td><td class="n" style="color:var(--up)">+8.6%</td><td class="n">7</td><td style="color:var(--if)">—</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="cal"><span class="pin">UX 결정</span><span>
+  <b>「자동으로 처리됨」을 승인 대기와 같은 화면에 둡니다.</b> 자동 조치를 조용히 넘기면
+  사람이 봇을 신뢰하지 못하거나, 반대로 무슨 일이 있었는지 모르게 됩니다.
+  <b>되돌리는 버튼(다시 켜기)을 그 자리에 함께</b> 둬서 "자동이지만 내 손 안에 있다"를 만듭니다.
+  <br>시그널마다 <b>왜 그 판단인지를 한 줄로</b> 답니다 — 근거 없는 신호는 신뢰도 안 쌓이고 개선도 안 됩니다.
+</span></div>
+
+<!-- ═══════ 7. 권한 경계 ═══════ -->
+<h3 class="step"><i>7</i> 승인 경계 — 화면이 규칙을 그대로 보여준다</h3>
+<p class="lead">
+  <b>자동은 되돌릴 수 있는 것만.</b> 이 한 줄이 이미 결정돼 있으므로, 화면은 그 셋을 <b>서로 다른 모양</b>으로 그려
+  사용자가 규칙을 읽지 않고도 알게 합니다.
+</p>
+
+<div class="win"><div class="body" style="display:flex;gap:12px">
+  <div style="flex:1">
+    <div class="band auto" style="min-height:96px">
+      <b style="color:var(--ik)">자동 — 사후 통보</b>
+      봇 정지 · 알림 · 리포트 생성<br>
+      <span style="color:var(--if)">회색 카드 · 버튼은 「되돌리기」 하나</span>
+    </div>
+    <div style="font-size:11.5px;color:var(--im);margin-top:8px;line-height:1.55">다시 켜면 그만인 것들. <b style="color:var(--ik)">묻지 않습니다</b> — 매번 물으면 알림이 소음이 됩니다.</div>
+  </div>
+  <div style="flex:1">
+    <div class="band need" style="min-height:96px">
+      <b style="color:var(--is)">승인 필요 — 흰 테두리</b>
+      봇 설정 변경 · 유니버스 교체 · 주문<br>
+      <span style="color:var(--im)">밝은 테두리 · 「승인 / 거절」 두 버튼</span>
+    </div>
+    <div style="font-size:11.5px;color:var(--im);margin-top:8px;line-height:1.55">되돌리려면 흔적이 남는 것들. <b style="color:var(--ik)">액센트가 없는 시스템에서 흰 테두리가 가장 강한 신호</b>라 이 자리에 씁니다.</div>
+  </div>
+  <div style="flex:1">
+    <div class="band never" style="min-height:96px">
+      <b style="color:var(--if)">금지 — 점선</b>
+      삭제 (전략 · 봇 · 적재 데이터)<br>
+      <span>LLM 이 제안조차 하지 않습니다</span>
+    </div>
+    <div style="font-size:11.5px;color:var(--im);margin-top:8px;line-height:1.55">복구 불가. <b style="color:var(--ik)">사람이 직접 메뉴에서만</b> 하고, 그때도 확인을 한 번 받습니다.</div>
+  </div>
+</div></div>
+<div class="cal"><span class="pin">리드 결정 필요</span><span>
+  <b>「모의 주문 3건」을 일괄 승인으로 열어둔 것</b>이 맞습니까? 모의 체결이라 실제 돈은 안 움직이지만,
+  일괄 승인에 익숙해진 손이 <b>나중에 실주문으로 승격했을 때 그대로 누를 위험</b>이 있습니다.
+  실주문 단계에서는 일괄을 막을지, 아니면 지금부터 하나씩만 승인하게 할지 — <b>지금 정하는 게 쌉니다.</b>
+</span></div>
+
+<!-- ═══════ 8. 운용 중인 봇 ═══════ -->
+<h3 class="step"><i>8</i> 운용 중 — 봇이 왜 그렇게 판단했는지 편다</h3>
+<p class="lead">
+  터미널에서 종목을 고르면 뜨는 <b>「봇 판단」 패널</b>입니다. 상태만 보여주면 신뢰가 안 쌓입니다 —
+  <b>어느 조건이 충족됐고 어느 것이 안 됐는지</b>를 폅니다.
+</p>
+
+<div class="win">
+  <div class="wbar">삼성전자 <span class="n">005930</span> · 장중 <span class="n">14:32</span>
+    <span class="rt"><span class="prov">● KIS · 실시간</span></span></div>
+  <div class="cols">
+    <div class="col" style="flex:1">
+      <div class="lg">이 종목을 보는 봇 <span class="n">2</span></div>
+      <div class="ph" style="padding:12px 14px 13px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <b style="font-size:12.5px;color:var(--is)">코스피 눌림목 v3</b>
+          <span style="font-size:11px;color:var(--up);margin-left:auto" class="n">보유 중 · +2.4%</span></div>
+        <div style="margin-top:9px">
+          <div class="cond"><span class="st" style="color:var(--ok)">✓</span><span class="nm">골든크로스 (5/20)</span><span class="vl n">5일선 71,180 &gt; 20일선 70,240</span></div>
+          <div class="cond"><span class="st" style="color:var(--ok)">✓</span><span class="nm">RSI 과매도 (14, &lt;30)</span><span class="vl n">진입 시 28.4</span></div>
+          <div class="cond"><span class="st" style="color:var(--ok)">✓</span><span class="nm">월봉 추세 필터 (6)</span><span class="vl n">KOSPI 2,684 &gt; 2,591</span></div>
+        </div>
+        <div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--hl);font-size:11.5px;color:var(--im);display:flex;gap:14px">
+          <span>진입 <em class="n" style="font-style:normal;color:var(--ik)">08-04 69,700</em></span>
+          <span>목표 <em class="n" style="font-style:normal;color:var(--up)">80,155</em></span>
+          <span>손절 <em class="n" style="font-style:normal;color:var(--dn)">64,821</em></span>
+        </div>
+      </div>
+      <div class="ph" style="padding:12px 14px 13px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <b style="font-size:12.5px;color:var(--is)">반도체 페어</b>
+          <span style="font-size:11px;color:var(--im);margin-left:auto">대기 — 조건 <span class="n">1</span>개 미충족</span></div>
+        <div style="margin-top:9px">
+          <div class="cond"><span class="st" style="color:var(--ok)">✓</span><span class="nm">SK하이닉스 대비 스프레드</span><span class="vl n">-1.8σ</span></div>
+          <div class="cond"><span class="st" style="color:var(--if)">·</span><span class="nm" style="color:var(--im)">거래대금 하한</span><span class="vl n">8,420억 / 필요 10,000억</span></div>
+        </div>
+        <div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--hl);font-size:11.5px;color:var(--im)">
+          거래대금이 <em class="n" style="font-style:normal;color:var(--ik)">1,580억</em> 더 늘면 진입합니다.
+        </div>
+      </div>
+    </div>
+    <div class="col" style="flex:0 0 300px">
+      <div class="lg">내 실계좌 vs 봇</div>
+      <table class="t">
+        <tr><th>주체</th><th>수량</th><th>평단</th><th>손익</th></tr>
+        <tr><td style="color:var(--is)">나 (실계좌)</td><td class="n">40</td><td class="n">73,200</td><td class="n" style="color:var(--dn)">-2.5%</td></tr>
+        <tr><td>눌림목 v3 <span style="color:var(--if)">(모의)</span></td><td class="n">28</td><td class="n">69,700</td><td class="n" style="color:var(--up)">+2.4%</td></tr>
+      </table>
+      <div style="font-size:11.5px;color:var(--im);margin-top:11px;line-height:1.6">
+        같은 종목을 <b style="color:var(--ik);font-weight:500">나는 고점에, 봇은 눌림에</b> 샀습니다.
+        이 비교가 이 제품의 요점입니다 — <b style="color:var(--ik);font-weight:500">봇이 옳다는 게 아니라, 내 판단에 기준점이 생긴다는 것.</b>
+      </div>
+      <div style="margin-top:12px;padding-top:11px;border-top:1px solid var(--ln)">
+        <div class="lg">모의 체결 내역</div>
+        <div style="font-size:11.5px;color:var(--im);line-height:1.8" class="n">
+          08-04 &nbsp;매수 28주 @69,700<br>
+          07-22 &nbsp;매도 31주 @71,050 <span style="color:var(--up)">+3.1%</span><br>
+          07-09 &nbsp;매수 31주 @68,900
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="cal"><span class="pin">UX 결정</span><span>
+  <b>미충족 조건도 값과 함께 보여줍니다</b>(거래대금 8,420억 / 필요 10,000억, "1,580억 더 늘면 진입").
+  "대기 중"만 쓰면 사용자는 <b>기다릴지 설정을 고칠지</b> 판단할 수 없습니다. 이 한 줄이 봇 튜닝의 입구입니다.
+</span></div>
+
+<div class="section" style="margin-top:30px">
+  <p class="label">다음</p>
+  <p style="line-height:1.75;color:#8B877F">
+    남은 것은 <b style="color:#E6E4E0">화면 지도(IA)</b> 입니다 — 여기까지 그린 화면들이 총 몇 개이고,
+    S2 아이콘 레일에 무엇이 들어가며, 서로 어떻게 오가는지. 그리고 그 위에
+    <b style="color:#E6E4E0">리드가 결정하실 항목만 모은 문서</b>를 만들겠습니다.
+  </p>
+</div>
+</div>

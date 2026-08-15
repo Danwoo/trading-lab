@@ -1,0 +1,517 @@
+<style>
+  .tl { --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+        --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+        --up:#DB4F3E; --dn:#4A8CC8; --ok:#7FA05A; --wr:#D9A441;
+        font-family:Pretendard,system-ui,sans-serif; letter-spacing:-.01em; color:var(--ik); }
+  .tl .n { font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+
+  .win { background:var(--bg); border:1px solid var(--ln); border-radius:12px; overflow:hidden; }
+  .hud { display:flex; align-items:center; height:46px; padding:0 15px; gap:13px; background:var(--pn);
+         border-bottom:1px solid var(--ln); font-size:12.5px; }
+  .hud .wm { font-size:11px; font-weight:700; letter-spacing:.16em; color:var(--is); }
+  .mode { display:flex; align-items:center; gap:7px; padding:4px 11px; border-radius:7px;
+          border:1px solid rgba(127,160,90,.45); background:rgba(127,160,90,.1); font-size:11.5px; color:#9BBE7A; }
+  .mode .dot { width:6px; height:6px; border-radius:50%; background:#9BBE7A; }
+  .mode s { text-decoration:none; color:var(--im); }
+  .hud .sp { flex:1; }
+  .btn2 { font-size:11.5px; padding:5px 11px; border-radius:7px; border:1px solid var(--ls); color:var(--im); }
+
+  /* 요약 */
+  .sum { display:flex; border-bottom:1px solid var(--ln); }
+  .sum > div { flex:1; padding:12px 15px; }
+  .sum > div + div { border-left:1px solid var(--ln); }
+  .sum .k { font-size:10.5px; color:var(--if); }
+  .sum .v { font-size:19px; font-weight:600; margin-top:3px; letter-spacing:-.02em; }
+  .sum .s { font-size:11px; color:var(--if); margin-top:2px; line-height:1.45; }
+
+  /* 필터 */
+  .flt { display:flex; align-items:center; gap:7px; padding:10px 15px; border-bottom:1px solid var(--ln);
+         font-size:11.5px; background:var(--pn); flex-wrap:wrap; }
+  .flt .lb { color:var(--if); margin-right:2px; }
+  .flt span.p { padding:4px 11px; border:1px solid var(--ln); border-radius:15px; color:var(--im); background:var(--bg); }
+  .flt span.p.on { background:var(--is); color:var(--bg); border-color:var(--is); font-weight:600; }
+  .flt .sp { flex:1; }
+
+  .body { display:flex; min-height:520px; }
+  .left { flex:1; min-width:0; }
+  .right { flex:0 0 268px; border-left:1px solid var(--ln); padding:14px 15px; }
+
+  table.t { width:100%; border-collapse:collapse; font-size:12px; }
+  table.t th { font-size:10.5px; font-weight:500; color:var(--if); text-align:left; padding:8px 12px;
+               border-bottom:1px solid var(--ln); background:var(--pn); white-space:nowrap; position:sticky; top:0; }
+  table.t th.r { text-align:right; }
+  table.t td { padding:9px 12px; border-bottom:1px solid var(--hl); vertical-align:top; }
+  table.t td.r { text-align:right; font-variant-numeric:tabular-nums; }
+  table.t tr.open td { background:rgba(245,243,239,.028); }
+  table.t .sym { color:var(--ik); font-weight:500; }
+  table.t .sym s { display:block; text-decoration:none; font-size:10.5px; color:var(--if); font-weight:400; }
+  table.t .why { font-size:11px; color:var(--im); }
+  table.t .tag { font-size:10px; padding:1px 7px; border-radius:5px; border:1px solid var(--ln); color:var(--im); }
+  table.t .tag.st { border-color:rgba(74,140,200,.45); color:#7FAEDA; }
+  table.t .tag.tp { border-color:rgba(219,79,62,.4); color:#E58273; }
+  table.t .tag.hd { border-color:var(--ls); color:var(--im); }
+
+  .exp { background:var(--rs); }
+  .exp td { padding:0 12px 12px; border-bottom:1px solid var(--ln); }
+  .exp .box { border:1px solid var(--ln); border-radius:9px; padding:11px 13px; background:var(--bg); }
+  .exp .t { font-size:11.5px; font-weight:600; color:var(--is); margin-bottom:7px; }
+  .exp .cond { display:flex; gap:9px; padding:5px 0; font-size:11.5px; color:var(--im); }
+  .exp .cond i { font-style:normal; flex:0 0 auto; width:13px; }
+  .exp .cond i.y { color:#9BBE7A; } .exp .cond i.n { color:var(--if); }
+  .exp .cond b { color:var(--ik); font-weight:500; }
+  .exp .meta { display:flex; gap:0; margin-top:9px; border:1px solid var(--ln); border-radius:8px; overflow:hidden; }
+  .exp .meta div { flex:1; padding:7px 10px; }
+  .exp .meta div + div { border-left:1px solid var(--ln); }
+  .exp .meta .k { font-size:10px; color:var(--if); }
+  .exp .meta .v { font-size:12.5px; color:var(--ik); margin-top:2px; font-variant-numeric:tabular-nums; }
+
+  .card { border:1px solid var(--ln); border-radius:10px; padding:12px 13px; background:var(--pn); margin-bottom:11px; }
+  .card .t { font-size:12px; font-weight:600; color:var(--is); margin-bottom:3px; }
+  .card .nt { font-size:11px; color:var(--if); line-height:1.5; margin-bottom:8px; }
+  .row { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:11.5px; }
+  .row + .row { border-top:1px solid var(--hl); }
+  .row .nm { flex:1; color:var(--ik); }
+  .row .bar { flex:0 0 62px; height:5px; border-radius:3px; background:var(--rs); overflow:hidden; }
+  .row .bar i { display:block; height:100%; }
+  .row .v { flex:0 0 42px; text-align:right; font-variant-numeric:tabular-nums; color:var(--im); }
+  .warn { font-size:11.5px; color:#D9B45C; line-height:1.55; margin-top:9px;
+          border-top:1px solid rgba(217,164,65,.25); padding-top:9px; }
+  .warn b { font-weight:600; }
+
+  .db { max-width:1320px; margin-top:16px; background:var(--pn); border:1px solid var(--ln); border-radius:11px; padding:15px 17px; }
+  .db h4 { margin:0 0 4px; font-size:13px; color:var(--is); font-weight:700; }
+  .db .nt { font-size:12px; color:var(--im); line-height:1.6; margin-bottom:11px; }
+  .db pre { margin:0; font-family:ui-monospace,monospace; font-size:11.5px; line-height:1.75; color:var(--im);
+            background:var(--bg); border:1px solid var(--ln); border-radius:9px; padding:12px 13px; overflow:auto; }
+  .db pre b { color:var(--ik); font-weight:500; }
+  .db pre em { font-style:normal; color:#9BBE7A; }
+  .db pre s { text-decoration:none; color:var(--if); }
+  .db .q { margin-top:11px; padding:10px 12px; border-left:2px solid #D9A441; background:rgba(217,164,65,.07);
+           border-radius:0 8px 8px 0; font-size:12px; color:var(--im); line-height:1.6; }
+  .db .q b { color:#D9B45C; display:block; margin-bottom:3px; }
+</style>
+
+<div class="tl">
+<h2 style="color:#F5F3EF">거래 로그 — 왜 벌었고 왜 잃었나</h2>
+<p class="subtitle" style="color:#8B877F">
+  페르소나 셋이 공통으로 「없으면 못 쓴다」고 꼽은 화면입니다.
+  <b style="color:#E6E4E0">이게 없으면 봇을 고칠 수가 없습니다.</b>
+  판 것도 전부 남아 있어서 — 보유 목록만 보면 생기는 <b style="color:#E6E4E0">「잘 된 것만 남아 보이는 착시」</b>가 여기서 깨집니다.
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span>
+    <span class="mode"><span class="dot"></span><b>모의</b><s>실제 주문 나가지 않음 · 오늘 나간 주문 <b style="color:var(--ik)">0</b>건</s></span>
+    <div class="sp"></div>
+    <span class="btn2">CSV 내보내기</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;padding:9px 15px;border-bottom:1px solid var(--ln);
+              background:rgba(74,140,200,.06);font-size:11.5px;color:var(--im);line-height:1.55">
+    <span style="flex:0 0 auto;font-family:ui-monospace,monospace;color:#7FAEDA">run#4821</span>
+    <span style="flex:1">
+      <b style="color:var(--ik)">이 숫자들이 나온 가정</b> —
+      위탁수수료 <b style="color:var(--ik)">0.015%</b>(왕복) · 증권거래세 <b style="color:var(--ik)">0.15%</b>(매도) ·
+      체결 <b style="color:var(--ik)">신호 다음 날 시가</b> · 슬리피지 <b style="color:var(--ik)">0.05%</b> ·
+      시세 <b style="color:var(--ik)">2026-08-07 스냅샷</b> <s style="font-size:10.5px;color:var(--if)">(직전 거래일)</s> · 원주가(수정 안 함)
+    </span>
+    <span style="flex:0 0 auto;border:1px solid var(--ls);border-radius:7px;padding:4px 10px;color:var(--im)">전체 가정 보기</span>
+  </div>
+
+  <!-- 요약 1줄: 결과 -->
+  <div class="sum">
+    <div><div class="k">거래</div><div class="v n">131건</div>
+      <div class="s">종료 125 · 보유 6<br>거래일 47일 · 하루 평균 2.8건<s style="display:block;text-decoration:none;font-size:10px;color:var(--if)">06-04 ~ 08-07 (달력 65일)</s></div></div>
+    <div><div class="k">이긴 비율</div><div class="v n">42%</div>
+      <div class="s">53승 72패 <span style="color:var(--if)">(종료한 125건만. 보유 6건은 아래 따로)</span><br>
+        <span style="color:var(--im)">이 봇은 <b style="color:var(--ik)">33%</b>만 맞아도 본전</span>
+        <span style="color:var(--if)">(1 ÷ (1+2.0))</span></div></div>
+    <div><div class="k">이길 때 : 질 때</div><div class="v n">2.0배</div>
+      <div class="s">이긴 53건 합 <b style="color:var(--ik)">+142만</b> (평균 2.7만)<br>
+        진 72건 합 <b style="color:var(--ik)">−95.8만</b> (평균 1.3만)</div></div>
+    <div><div class="k">실현 손익</div><div class="v n" style="color:var(--up)">+46.2만원</div>
+      <div class="s">142 − 95.8 = 46.2 <span style="color:var(--if)">(종료 125건, 비용 차감 후)</span><br>
+        아직 들고 있는 6건 평가 <b style="color:var(--ik)">+25.8</b> → 합 <b style="color:var(--ik)">+72.0</b></div></div>
+    <div style="background:rgba(217,164,65,.06)"><div class="k" style="color:#D9B45C">내가 손댄 거래</div>
+      <div class="v n" style="color:#D9B45C">2건</div>
+      <div class="s"><b style="color:#D9B45C">−31.4만원</b><br>
+        <span style="color:var(--if)">손절을 취소한 것 2건 — 나머지 129건과 나눠서 봅니다</span></div></div>
+  </div>
+
+  <!-- 요약 2줄: 비용 — 분해해서 크게 -->
+  <div class="sum" style="border-top:none">
+    <div style="background:rgba(74,140,200,.05)"><div class="k" style="color:#7FAEDA">비용으로 나간 돈</div>
+      <div class="v n" style="color:var(--dn)">−69.8만원</div>
+      <div class="s"><b style="color:#7FAEDA">비용이 없었으면 +116만원이었습니다.</b><br>
+        <span style="color:var(--if)">벌 수 있었던 이익의 <b style="color:var(--im)">60%</b>가 여기로 갔습니다</span></div></div>
+    <div><div class="k">위탁수수료</div><div class="v n" style="font-size:16px">−7.6만</div>
+      <div class="s">왕복 0.015% × <b style="color:#D9B45C">회전 2.5억</b><br>
+        <span style="color:var(--if)">1,600만원으로 <b style="color:var(--im)">15바퀴</b> 돌렸습니다</span></div></div>
+    <div><div class="k">증권거래세</div><div class="v n" style="font-size:16px">−37.4만</div>
+      <div class="s">매도금액의 0.15%<br><span style="color:#D9B45C">가장 큰 항목 — 팔 때만 나갑니다</span></div></div>
+    <div><div class="k">체결 밀림</div><div class="v n" style="font-size:16px">−24.8만</div>
+      <div class="s"><b style="color:#D9B45C">건건이 −0.02%씩인데 131건이면 24.8만원</b><br>
+        <span style="color:var(--if)">개별 화면에서 「작다」고 본 것이 여기 모입니다</span></div></div>
+    <div><div class="k">백테스트가 가정했던 비용</div><div class="v n" style="font-size:16px">−52.1만</div>
+      <div class="s"><b style="color:#D9B45C">실제가 17.7만원 더 나갔습니다</b><br>
+        <span style="color:var(--if)">거래세를 낮게 잡았던 탓</span></div></div>
+  </div>
+
+  <div class="flt">
+    <span class="lb">봇</span>
+    <span class="p on">전체</span><span class="p">대형주봇</span><span class="p">눌림목봇</span>
+    <span class="lb" style="margin-left:9px">기간</span>
+    <span class="p on">모의 전체 47일</span><span class="p">이번 주</span><span class="p">직접 고르기</span>
+    <span class="lb" style="margin-left:9px">결과</span>
+    <span class="p on">전부</span><span class="p">이긴 것</span><span class="p">진 것</span><span class="p">들고 있는 것</span>
+    <div class="sp"></div>
+    <span style="color:var(--if)">최근 8건 · <b style="color:var(--im)">아래에서 131건 전부 보기</b></span>
+  </div>
+
+  <div class="body">
+    <div class="left">
+      <table class="t">
+        <tr>
+          <th>종목</th><th>샀을 때</th><th>팔았을 때 <span style="color:var(--if);font-weight:400">/ 지금</span></th><th class="r">보유</th>
+          <th class="r">손익</th><th class="r">비용</th><th>왜 팔았나</th>
+        </tr>
+
+        <tr class="open">
+          <td class="sym">삼성전자<s>005930 · 28주</s></td>
+          <td class="n">08-07<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">71,400원</s></td>
+          <td class="n" style="color:var(--im)">지금<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">72,100원</s></td>
+          <td class="r n">1일</td>
+          <td class="r n" style="color:var(--up)">+2.0만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">+1.0%</s></td>
+          <td class="r n" style="color:var(--if)">0.06만</td>
+          <td><span class="tag hd">들고 있음</span></td>
+        </tr>
+
+        <tr class="open">
+          <td class="sym">현대차<s>005380 · 8주</s></td>
+          <td class="n">08-07<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">248,000원</s></td>
+          <td class="n" style="color:var(--im)">지금<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">245,500원</s></td>
+          <td class="r n">1일</td>
+          <td class="r n" style="color:var(--dn)">−2.0만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">−1.0%</s></td>
+          <td class="r n" style="color:var(--if)">0.06만</td>
+          <td><span class="tag hd">들고 있음</span> <span style="font-size:10.5px;color:#D9B45C">실적 D-3</span></td>
+        </tr>
+
+        <!-- 펼친 행 -->
+        <tr>
+          <td class="sym">카카오<s>035720 · 45주</s></td>
+          <td class="n">07-27<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">45,050원<br><span style="color:var(--im)">전 거래일 신호</span></s></td>
+          <td class="n">08-07<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">41,887원</s></td>
+          <td class="r n">9거래일</td>
+          <td class="r n" style="color:var(--dn)">−14.2만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">−7.0%</s></td>
+          <td class="r n" style="color:var(--if)">0.39만</td>
+          <td><span class="tag st">손절</span></td>
+        </tr>
+        <tr class="exp"><td colspan="7">
+          <div class="box">
+            <div class="t">왜 샀나 — 07월 24일(금) 종가로 판정, <span style="font-weight:400;color:var(--im)">07월 27일(월) 시가에 체결</span></div>
+            <div class="cond"><i class="y">✓</i><span><b>20일 평균선까지 떨어졌다 반등</b> — 저가 44,150원이 평균선(44,320)을 찍고 종가 44,900으로 <b>+1.7%</b> 회복</span></div>
+            <div class="cond"><i class="y">✓</i><span><b>내린 폭이 오른 폭보다 훨씬 큼</b> — 최근 14거래일 중 <b>오른 날 상승폭 합 : 내린 날 하락폭 합 = 27 : 73</b> (30 아래면 조건 충족)</span></div>
+            <div class="cond"><i class="n">·</i><span style="color:var(--if)">거래량 급증 — <b>봇을 만들 때 이 조건을 켜지 않았습니다</b>(기본 꺼짐). 켜려면 봇 설정에서 →</span></div>
+            <div class="cond"><i class="n">·</i><span style="color:var(--if)">최근 3개월 급등 제외 — 이 종목은 3개월 수익률 <b>상위 63%</b>(=중하위권)라 <b>안 걸렀습니다</b>. 상위 20% 안에 들었으면 걸렀습니다</span></div>
+            <div class="meta">
+              <div><div class="k">사고 나서 가장 좋았을 때</div><div class="v" style="color:var(--up)">+3.2% (07-29)</div></div>
+              <div><div class="k">가장 나빴을 때</div><div class="v" style="color:var(--dn)">−7.4% (08-07)</div></div>
+              <div><div class="k">손절선</div><div class="v">−7.0%</div></div>
+              <div><div class="k">실제 체결</div><div class="v" style="color:#D9B45C">−7.02%</div></div>
+              <div><div class="k">밀린 정도</div><div class="v">−0.02%p<s style="display:block;text-decoration:none;font-size:10px;color:var(--if)">건건이 작음</s></div></div>
+            </div>
+            <div style="font-size:11.5px;color:var(--im);line-height:1.6;margin-top:9px">
+              <b style="color:var(--ik)">한 번은 +3.2%까지 갔었습니다.</b> 익절선(+15%)에는 한참 못 미쳐서 그냥 두었고, 그 뒤로 내려가 손절선에 닿았습니다.
+              <span style="color:var(--if)">— 이 한 건을 보고 익절선을 만지지 마십시오.
+              진 거래 하나를 열어보고 파라미터를 고치는 것이 <b style="color:var(--im)">과최적화가 시작되는 자리</b>입니다.
+              바꾸려면 131건 전체를 놓고 보십시오.</span>
+            </div>
+          </div>
+        </td></tr>
+
+        <tr>
+          <td class="sym">SK하이닉스<s>000660 · 11주</s></td>
+          <td class="n">08-03<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">181,000원</s></td>
+          <td class="n" style="color:var(--im)">지금<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">193,900원</s></td>
+          <td class="r n">6일</td>
+          <td class="r n" style="color:var(--up)">+14.0만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">+7.1%</s></td>
+          <td class="r n" style="color:var(--if)">0.06만</td>
+          <td><span class="tag hd">들고 있음</span></td>
+        </tr>
+
+        <tr>
+          <td class="sym">한화에어로<s>012450 · 6주</s></td>
+          <td class="n">07-11<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">712,000원</s></td>
+          <td class="n">07-31<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">819,000원</s></td>
+          <td class="r n">20일</td>
+          <td class="r n" style="color:var(--up)">+64.2만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">+15.0%</s></td>
+          <td class="r n" style="color:var(--if)">0.95만</td>
+          <td><span class="tag tp">익절</span></td>
+        </tr>
+
+        <tr>
+          <td class="sym">POSCO홀딩스<s>005490 · 5주</s></td>
+          <td class="n">08-06<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">400,000원</s></td>
+          <td class="n" style="color:var(--im)">지금<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">388,000원</s></td>
+          <td class="r n">3일</td>
+          <td class="r n" style="color:var(--dn)">−6.0만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">−3.0%</s></td>
+          <td class="r n" style="color:var(--if)">0.06만</td>
+          <td><span class="tag hd">들고 있음</span></td>
+        </tr>
+
+        <tr>
+          <td class="sym">NAVER<s>035420 · 9주</s></td>
+          <td class="n">06-28<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">218,000원</s></td>
+          <td class="n">07-28<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">211,000원</s></td>
+          <td class="r n">30일</td>
+          <td class="r n" style="color:var(--dn)">−6.3만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">−3.2%</s></td>
+          <td class="r n" style="color:var(--if)">0.35만</td>
+          <td><span class="tag hd" style="border-color:var(--ls)">30일 지남</span></td>
+        </tr>
+
+        <tr>
+          <td class="sym">기아<s>000270 · 19주</s></td>
+          <td class="n">07-28<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">104,000원</s></td>
+          <td class="n" style="color:var(--im)">지금<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">107,700원</s></td>
+          <td class="r n">12일</td>
+          <td class="r n" style="color:var(--up)">+7.0만<s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">+3.6%</s></td>
+          <td class="r n" style="color:var(--if)">0.06만</td>
+          <td><span class="tag hd">들고 있음</span></td>
+        </tr>
+        <tr><td colspan="7" style="text-align:center;padding:13px;color:var(--im);font-size:12px;
+            border-bottom:none;background:var(--pn)">
+          나머지 <b style="color:var(--ik)">123건</b> 더 보기 ↓ &nbsp;·&nbsp;
+          <span style="color:var(--if)">CSV 로 받으면 엑셀에서 전부 볼 수 있습니다</span>
+        </td></tr>
+      </table>
+    </div>
+
+    <div class="right">
+      <div class="card">
+        <div class="t">지금 어디쯤인가</div>
+        <div class="nt">표만 보면 내가 낙폭 어디에 서 있는지 모릅니다.</div>
+        <div style="height:56px;position:relative;background-image:repeating-linear-gradient(0deg,var(--hl) 0 1px,transparent 1px 18px)">
+          <svg viewBox="0 0 240 56" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+            <polyline fill="none" stroke="#F5F3EF" stroke-width="1.4" vector-effect="non-scaling-stroke"
+              points="0,50 20,46 40,40 60,44 80,34 100,28 120,33 140,22 160,14 180,26 200,20 220,17 240,19"/>
+            <rect x="160" y="0" width="80" height="56" fill="rgba(217,164,65,.09)"/>
+          </svg>
+        </div>
+        <div class="warn" style="color:var(--im);border-top-color:var(--hl)">
+          가장 좋았던 건 <b style="color:var(--ik)">7월 31일 +130만원</b>. 지금은 거기서
+          <b style="color:#D9B45C">−58만원 내려온 9일째</b>입니다.<br>
+          <span style="color:var(--if)">지금까지 최장은 <b style="color:var(--im)">14일</b>이었습니다 —
+          아직 그보다 짧습니다.</span>
+        </div>
+        <div class="warn" style="border-top-color:var(--hl);color:var(--im)">
+          <b style="color:var(--ik)">지금 3연패 중</b>입니다. 47일간 최장 연패는 <b style="color:var(--ik)">7회</b>였습니다.
+          <span style="color:var(--if)">— 연패 중에 설정을 만지는 것이 과최적화가 늘어나는 가장 흔한 경로입니다.</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="t">번 돈이 어디서 나왔나</div>
+        <div class="nt">한두 종목이 다 한 거라면 그 종목이 안 뜰 때 성적이 달라집니다.</div>
+        <div class="row"><span class="nm">한화에어로</span><span class="bar"><i style="width:100%;background:var(--up)"></i></span><span class="v">64만</span></div>
+        <div class="row"><span class="nm">HD현대중공업</span><span class="bar"><i style="width:44%;background:var(--up)"></i></span><span class="v">28만</span></div>
+        <div class="row"><span class="nm">SK하이닉스</span><span class="bar"><i style="width:22%;background:var(--up)"></i></span><span class="v">14만</span></div>
+        <div class="row"><span class="nm" style="color:var(--if)">나머지 38종목</span><span class="bar"><i style="width:13%;background:var(--if)"></i></span><span class="v">−34만</span></div>
+        <div class="warn">
+          <b>이익 낸 종목들이 번 120만원 중 106만원(88%)이 이 세 종목에서 나왔습니다.</b>
+          <span style="color:var(--im);font-weight:400">— 거래 단위 합계(+142만)와 다른 이유는
+          손해 본 거래가 있는 종목은 순액으로 셌기 때문입니다.</span>
+          셋을 빼면 남는 건 <b>−34만원</b> — 나머지 38종목은 합쳐서 손해였습니다.
+          이 성적은 <b>세 번의 큰 거래</b>가 만든 것입니다.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="t">진짜로 몇 개에 걸고 있나</div>
+        <div class="nt">일별 수익률 상관으로 계산합니다 — 업종 라벨로 묶은 게 아닙니다.</div>
+        <div style="display:flex;align-items:baseline;gap:9px;padding:4px 0 9px">
+          <span style="font-size:26px;font-weight:600;color:var(--is);letter-spacing:-.02em">2.4</span>
+          <span style="font-size:11.5px;color:var(--im);line-height:1.5">개어치<br>
+            <span style="color:var(--if)">6종목을 들고 있지만</span></span>
+        </div>
+        <div class="row"><span class="nm">삼성전자 ↔ SK하이닉스</span><span class="v" style="color:#D9B45C">0.81</span></div>
+        <div class="row"><span class="nm">현대차 ↔ 기아</span><span class="v" style="color:#D9B45C">0.74</span></div>
+        <div class="row"><span class="nm">POSCO ↔ 셀트리온</span><span class="v" style="color:var(--im)">0.09</span></div>
+        <div class="warn">
+          <b>지금 들고 있는 6종목이 유효하게는 2.4개어치입니다.</b><s style="display:block;text-decoration:none;font-size:10.5px;color:var(--if)">「내 기준」의 <b>증거 9건어치</b>와 다른 값입니다 — 저건 41종목의 <b>수익 비중</b>으로 잰 것이고, 이건 보유 6종목의 <b>일별 상관</b>으로 잰 것입니다. 묻는 것이 다릅니다.</s>
+          삼성전자·SK하이닉스가 0.81, 현대차·기아가 0.74로 거의 같이 움직여서
+          <b>평가액의 67%</b>가 사실상 두 덩어리입니다.
+          <span style="color:var(--im)">— 업종이 같아서가 아니라 <b style="color:var(--ik)">실제로 같이 움직여서</b>입니다.
+          업종이 달라도 같이 움직이면 여기 잡힙니다.</span>
+          <div style="margin-top:9px;padding-top:9px;border-top:1px solid rgba(217,164,65,.2)">
+            <span style="border:1px solid var(--ln);border-radius:7px;padding:4px 10px;color:var(--if);font-size:11px">
+              한 업종에 30%까지만 → <b style="color:var(--if)">지금 3연패 중이라 잠겨 있습니다</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="border-color:rgba(217,164,65,.3)">
+        <div class="t">백테스트는 몇 건이었나</div>
+        <div class="nt">체결된 것만 보면 「안 일어난 일」이 영원히 안 보입니다.</div>
+        <div class="row"><span class="nm">백테스트가 잡은 신호</span><span class="v" style="color:var(--ik)">168건</span></div>
+        <div class="row"><span class="nm">실제로 주문이 나간 것</span><span class="v" style="color:var(--ik)">131건</span></div>
+        <div class="row"><span class="nm" style="color:#D9B45C">안 나간 것</span><span class="v" style="color:#D9B45C">37건</span></div>
+        <div class="warn">
+          <b>안 나간 37건 중 34건은 매수, 3건은 손절이었습니다.</b><br>
+          <span style="color:var(--im)">놓친 매수 34건은 기회비용(+24만원어치)이지만,
+          <b style="color:#E2837A">놓친 손절 3건은 실제 손실(−3만원)</b>입니다 — 뭉쳐서 보면 안 됩니다.</span><br>
+          <span style="color:var(--im)">앱 꺼짐 <b style="color:var(--ik)">14건</b> ·
+          상한가라 못 삼 <b style="color:var(--ik)">9건</b> ·
+          현금 부족 <b style="color:var(--ik)">11건</b> ·
+          거래정지 <b style="color:var(--ik)">3건</b></span><br>
+          <span style="color:var(--if)">— 백테스트가 실제보다 좋아 보이는 이유의 상당 부분이 여기 있습니다.
+          체결이 밀려서가 아니라 <b style="color:var(--im)">주문이 아예 안 나가서</b>입니다.</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="t">어떻게 끝났나</div>
+        <div class="row"><span class="nm">손절</span><span class="bar"><i style="width:47%;background:var(--dn)"></i></span><span class="v">62건</span></div>
+        <div class="row"><span class="nm">익절</span><span class="bar"><i style="width:26%;background:var(--up)"></i></span><span class="v">34건</span></div>
+        <div class="row"><span class="nm">30일 지남</span><span class="bar"><i style="width:22%;background:var(--if)"></i></span><span class="v">29건</span></div>
+        <div class="row"><span class="nm" style="color:var(--if)">아직 보유</span><span class="bar"><i style="width:5%;background:var(--if)"></i></span><span class="v">6건</span></div>
+        <div class="warn" style="color:var(--im);border-top-color:var(--hl)">
+          손절이 <b style="color:var(--ik)">47%</b>로 가장 많습니다. 손절 자체는 규칙대로 된 것이지만,
+          <b style="color:var(--ik)">「30일 지남」 29건</b>은 사지 말았어야 할 자리였을 수 있습니다 — 오르지도 내리지도 않고 돈만 묶였습니다.
+          <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--hl)">
+            <span style="border:1px solid var(--ln);border-radius:7px;padding:4px 10px;color:var(--if);font-size:11px">
+              최대 보유 30일 → <b style="color:var(--if)">지금 3연패 중이라 잠겨 있습니다</b></span>
+            <div style="font-size:10.5px;color:var(--if);line-height:1.5;margin-top:6px">
+              연패가 끝나면 열립니다. 발견은 남기고 <b style="color:var(--im)">실행만 미룹니다</b> —
+              연패 중에 설정을 만지는 것이 과최적화가 늘어나는 가장 흔한 경로라서입니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="db">
+  <h4>이 화면이 요구하는 표</h4>
+  <p class="nt">
+    화면에 보이는 값 하나하나가 어느 컬럼에서 나오는지를 맞춰 둡니다.
+    <b style="color:var(--ik)">화면을 먼저 그리고 스키마를 역산하는 이유</b>가 여기 있습니다 —
+    「크게 번 거래 1% 빼면」이나 「왜 샀나」는 나중에 컬럼을 추가해서 만들 수 없습니다.
+  </p>
+  <pre><b>tn_run</b>  <s>— 실행 맥락. tn_trade.run_id 가 가리키던 「없는 표」다. 이게 가정 시트이자 재현 단위다</s>
+  run_id · bot_id · <em>mode</em> <s>(backtest|paper|live)</s>
+  strategy_version_id · <em>params_json</em> · <em>params_hash</em>        <s>① 파라미터</s>
+  <em>code_version</em> <s>(git sha)</s> · lib_versions_json               <s>② 코드</s>
+  <em>seed</em>                                                    <s>③ 난수</s>
+  <em>data_snapshot_id</em> · vendor · <em>adjustment_policy</em>          <s>④ 데이터</s>
+  <em>universe_id</em> · <em>universe_asof</em>                            <s>⑤ 유니버스 (생존편향)</s>
+  <em>cost_assumption_id</em> · <em>fill_rule</em> · slippage_model        <s>⑥ 비용·체결</s>
+  period_start · period_end · calendar_id · timezone         <s>⑦ 기간·휴장일</s>
+  tie_break_rule                                             <s>⑧ 동시신호 우선순위</s>
+  started_at · finished_at · <em>result_hash</em>
+  <s>result_hash = 에쿼티 곡선 + 거래목록의 체크섬. 컬럼 하나로 「재현됐다」를 사람 눈이 아니라</s>
+  <s>기계가 판정한다. 6개월 뒤 같은 run 을 다시 돌려 해시가 다르면 위 8개를 대조하면 원인이 나온다.</s>
+  <s>그리고 「설정 바꿔본 횟수」의 정의가 여기서 정해진다 — 시도 1회 = run 1건.</s>
+  <s>그리드 100조합을 1회로 세면 과적합 게이트 전체가 무력해진다(10,000조합도 1회가 된다).</s>
+
+<b>tn_order</b> / <b>tn_fill</b>  <s>— 주문·체결 원장. tn_trade 는 라운드트립 1건 = 1행이라</s>
+  <s>부분체결·미체결·거부·취소가 존재할 자리가 없다. 그리고 이건 나중에 컬럼 추가로 못 만든다 —</s>
+  <s>데이터가 애초에 안 남는다. 스키마 확정 전에 넣어야 하는 유일한 항목.</s>
+  order_id · trade_id <s>(nullable)</s> · bot_id · instrument_id · side
+  placed_ts · order_type · limit_price · qty_ordered
+  <em>status</em> <s>(filled|partial|cancelled|rejected|expired)</s> · qty_filled · avg_fill_price
+  <em>reject_reason</em> · <em>cancelled_by</em> <s>(bot|human|broker)</s> · broker_order_id
+  <s>status=rejected 와 qty_filled=0 행이 안 나오면 모의–실전 괴리를 설명할 수 없다.</s>
+
+<b>tn_bot_equity_daily</b>  <s>— 봇 × 날짜. 낙폭·언더워터·벤치마크 비교의 유일한 근거</s>
+  date · bot_id · run_id · nav · cash · market_value · <em>gross_exposure</em>
+  deposit · withdrawal · <em>benchmark_close</em> · benchmark_ticker · benchmark_type
+  <s>라운드트립 목록으로는 미실현 포함 낙폭을 만들 수 없다. tn_bot_position 은 현재값만 안다.</s>
+
+<b>tn_signal_evaluation</b>  <s>— 거래로 이어지지 않은 신호. tn_trade_signal 은 PK 가 trade_id 라</s>
+  <s>구조적으로 「왜 안 샀나」를 담을 수 없다 — 조건은 맞았는데 현금 부족·종목수 상한으로 스킵한 것</s>
+  signal_id · run_id · bar_ts · instrument_id · trade_id <s>(nullable — 안 샀으면 NULL)</s>
+  rule_key · observed_value · threshold
+  <em>rule_state</em> <s>(enabled_passed|enabled_failed|disabled|not_evaluated — 4값이어야 한다.</s>
+  <s>지금 화면이 「꺼둠」과 「통과」를 똑같은 회색 점으로 그리는 이유가 passed boolean 하나뿐이라서다)</s>
+  <em>skip_reason</em> <s>(cash|max_positions|risk_limit|halt|universe_out)</s>
+
+<b>tn_instrument</b> + <b>tn_universe_membership</b>  <s>— 생존편향은 사후 복원이 불가능한 유일한 편향이다.</s>
+  <s>상장폐지 종목은 오늘의 종목 표에서 그냥 없어지고, 없어진 것은 백테스트에서 손실을 내지 않는다.</s>
+  instrument_id · ticker · name · <em>listed_at</em> · <em>delisted_at</em> · delist_reason · prev_codes
+  universe_id · <em>as_of</em> · instrument_id
+
+<b>tn_cost_assumption</b>  <s>— 가정 시트의 실체. run 이 이걸 가리킨다</s>
+  cost_assumption_id · commission_bp_buy · commission_bp_sell · min_commission
+  <em>tax_bp_sell</em> · tax_basis · 시장별 세율 <s>(KOSPI/KOSDAQ 분리)</s>
+  slippage_model · slippage_params · <em>fill_rule</em> · partial_fill_policy
+  <s>거래세 가정 하나로 총비용이 7.7만 → 45.2만이 되고, 「비용 쿠션 2.0배」 게이트가</s>
+  <s>통과(3.2)에서 탈락(약 1.0)으로 뒤집힌다. 가정이 안 보이면 합격/탈락을 판정할 수 없다.</s>
+
+<b>tn_trade</b>  <s>— 실행 거래 (모의·실전 공용). 백테스트 거래와 같은 모양이어야 괴리 비교가 조인 한 번으로 끝난다</s>
+  trade_id · bot_id · <em>mode</em> <s>(paper|live|backtest)</s> · <em>run_id</em> <s>(모든 mode.</s>
+  <s>paper/live 도 「어느 파라미터셋으로 돌던 구간인가」를 가리켜야 백테스트–실전 대조가 된다)</s>
+  instrument_id · side · qty
+  entry_ts · entry_price · entry_fee
+  exit_ts  · exit_price  · exit_fee · exit_tax
+  <em>exit_reason</em> <s>(stop|target|max_hold|manual|halt)</s>
+  realized_pnl · <em>mae</em> <s>(사고 나서 가장 나빴을 때)</s> · <em>mfe</em> <s>(가장 좋았을 때)</s>
+  <em>intended_price</em> <s>(봇이 내려 한 가격 — 이게 없으면 슬리피지를 나중에 검산 못 한다)</s>
+  <em>entry_slippage_bp</em> · <em>exit_slippage_bp</em> <s>(진입·청산을 뭉치지 않는다)</s>
+  <em>entry_slippage_amt</em> · <em>exit_slippage_amt</em> <s>(원화 금액. bp × 금액으로 재계산하면</s>
+  <s>그때 실제 값이 아니라 사후 추정이 된다 — 화면 요약은 −24.8만원을 원화로 보여준다)</s>
+  <em>actor</em> <s>(bot | human — 사람이 손댄 거래를 나눈다)</s> · <em>overridden_from</em>
+  <em>param_set_hash</em> <s>(그 거래 시점의 봇 설정 전체 해시)</s>
+  <em>data_snapshot_id</em> <s>(가격 데이터 버전 — 수정주가는 분할·배당으로 소급 변경된다.</s>
+  <s>이게 없으면 지금 계산한 20일선이 6개월 뒤 같은 쿼리로 재현되지 않는다)</s>
+
+<b>tn_trade_signal</b>  <s>— 「왜 샀나」의 근거. 거래당 조건 개수만큼 행이 생긴다</s>
+  trade_id · <em>rule_key</em> <s>(ma_pullback|rsi_oversold|…)</s> · <em>passed</em> · <em>observed_value</em> · threshold
+  <s>이 표가 없으면 「왜 샀는지」를 나중에 복원할 수 없다. 시세를 다시 받아 재계산해도</s>
+  <s>그때 쓴 파라미터·데이터 스냅샷이 다르면 같은 답이 안 나온다.</s>
+
+<b>tn_missed_signal</b>  <s>— 나갔어야 했는데 안 나간 주문. tn_trade 에는 행이 안 생겨서 별도로 둔다</s>
+  signal_ts · bot_id · instrument_id · intended_side · <em>intended_price</em>
+  <em>miss_reason</em> <s>(app_down | api_error | limit_up | suspended | insufficient_cash)</s>
+  <em>price_at_next_open</em>
+  <em>simulated_exit_ts</em> · <em>simulated_exit_price</em> · <em>simulated_pnl</em> · <em>simulated_at</em>
+  <s>화면이 「매수 34건 +24만 / 손절 3건 −3만」을 원화로 말하는데,</s>
+  <s>그러려면 봇 규칙대로 언제 팔았을지를 시뮬레이션한 결과를 담을 자리가 있어야 한다.</s>
+  <s>홈이 "손절도 나가지 않았습니다"라고 말하는데 그 문장을 뒷받침할 표가 없었다.</s>
+
+<b>tn_bot_capital_allocation</b>  <s>— 봇별 배정. 한계선이 계좌 하나가 되면서 필요해졌다.</s>
+  <s>봇이 여러 개면 각자의 캡이 더해지는데, 지금은 그 합을 아무도 안 본다.</s>
+  bot_id · user_id · <em>allocation_pct</em> · allocation_amount
+  <em>account_total_allocated_pct_at_time</em> <s>(이 배정 시점에 계좌 전체가 몇 % 나가 있었나)</s>
+  <em>correlation_adjusted_pct</em> <s>(봇끼리 같은 종목을 사면 낙폭도 같이 온다 — 아직 미구현)</s>
+
+<b>tn_bot_position_cache</b>  <s>— 이름에 cache 를 박는다. tn_trade + 최신가로 파생되는 값이고,</s>
+  <s>「매번 계산하면 느리다」는 캐시의 이유지 기록의 이유가 아니다. 없어져도 복원된다 —</s>
+  <s>tn_bot_equity_daily 와 반대다(그건 없으면 낙폭을 영원히 못 만든다).</s>
+  bot_id · instrument_id · qty · avg_price · <em>last_valued_at</em> · market_value · unrealized_pnl</pre>
+
+  <div class="q">
+    <b>결정 안건 D-S1 — 백테스트 거래와 실행 거래를 한 표에 둘 것인가</b>
+    <b style="color:var(--ik);display:inline">두 페르소나 모두 「한 표」를 권했고, 퀀트가 세 번째 길을 제시했습니다</b> —
+    한 스키마에 <b style="color:var(--ik);display:inline">`mode` 로 리스트 파티션</b>(Postgres 선언적 파티셔닝).
+    비교는 여전히 SQL 한 번, 백테스트 파티션만 보관정책·인덱스를 따로 두고,
+    <b style="color:var(--ik);display:inline">컬럼이 어긋나는 것이 구조적으로 불가능</b>합니다.
+    보너스로 `run_id NOT NULL`(백테스트) / `order_id NOT NULL`(실전) 같은 상반된 제약을 파티션별 CHECK 로 걸 수 있어
+    지금 설계의 NULL 지뢰도 사라집니다.
+    <br><b style="color:#D9B45C;display:inline">확인하실 것</b>: 이대로 갈지, 그리고 12개월 행수를 먼저 실측할지
+    (봇 수 × 일간 재실행 × 조합 수 × 평균 거래수).
+  </div>
+
+  <div class="q">
+    <b>결정 안건 D-S2 — 「왜 샀나」를 모든 거래에 남길 것인가</b>
+    <b style="color:var(--ik);display:inline">퀀트가 전제를 고쳤습니다</b> — "8만 행은 겁줄 숫자가 아닙니다.
+    행당 80바이트면 6MB입니다. 진짜 위험 구간은 매일 100조합 × 12개월이고, 그건 이 안건이 다루지 않습니다."
+    <br>제안: 모의·실전은 <b style="color:var(--ik);display:inline">무조건 전량</b>, 백테스트는
+    <b style="color:var(--ik);display:inline">사람이 승격한 run 만</b> 신호를 남기고 나머지는 요약만.
+    대신 <b style="color:var(--ik);display:inline">재계산 재료(`tn_run` 의 8개 필드)는 모든 조합에</b> 남깁니다 —
+    「백테스트에서 왜 샀나를 못 본다」는 걱정이 <b style="color:var(--ik);display:inline">"한 번 더 돌려서 본다"</b>로 내려앉습니다.
+    재현성이 저장 비용을 사는 거래입니다.
+    <br>그리고 `tn_trade_signal` 을 EAV 대신 <b style="color:var(--ik);display:inline">거래당 1행 JSONB</b>로 바꾸면 행수가 애초에 1/5입니다.
+  </div>
+</div>
+</div>

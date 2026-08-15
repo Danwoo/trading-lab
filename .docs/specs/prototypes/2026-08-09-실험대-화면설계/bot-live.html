@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>봇 실험실 — 매매 주기별 적응</title>
+<style>
+  :root{
+    --bg:#0D0F11; --pn:#16191C; --rs:#1C2126; --hl:rgba(38,43,48,.75); --ln:#262B30; --ls:#3A4249;
+    --is:#F5F3EF; --ik:#E6E4E0; --im:#8B877F; --if:#625E58;
+    --up:#DB4F3E; --dn:#4A8CC8; --dg:#C94A3B; --ok:#7FA05A;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0A0C0E;color:var(--ik);font-family:Pretendard,system-ui,-apple-system,sans-serif;
+       letter-spacing:-.01em;padding:22px}
+  .n{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  h2{font-size:19px;color:var(--is);margin:0 0 5px;font-weight:700}
+  .sub{font-size:12.5px;color:var(--im);margin:0 0 16px;line-height:1.6}
+  .sub b{color:var(--ik);font-weight:500}
+
+  .win{background:var(--bg);border:1px solid var(--ln);border-radius:12px;overflow:hidden;position:relative;max-width:1300px}
+
+  .hud{display:flex;align-items:center;height:46px;padding:0 14px;background:var(--pn);
+       border-bottom:1px solid var(--ln);font-size:12.5px}
+  .hud .wm{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--is);margin-right:18px}
+  .hud .cell{display:flex;align-items:center;gap:7px;padding:0 15px;border-left:1px solid var(--ln);height:100%}
+  .hud .cell:first-of-type{border-left:none}
+  .hud .cell>span:first-child{color:var(--if);font-size:11.5px}
+  .hud .cell b{color:var(--ik);font-weight:500}
+  .hud .sp{flex:1}
+  .seg{display:flex;border:1px solid var(--ln);border-radius:7px;overflow:hidden}
+  .seg b{font-size:11.5px;font-weight:400;padding:4px 10px;color:var(--im);cursor:pointer;user-select:none}
+  .seg b+b{border-left:1px solid var(--ln)}
+  .seg b:hover{background:var(--rs);color:var(--ik)}
+  .seg b.on{background:var(--is);color:var(--bg);font-weight:600}
+  .databar{display:flex;align-items:center;gap:9px;padding:9px 15px;font-size:12px;
+           background:rgba(217,164,65,.09);border-bottom:1px solid rgba(217,164,65,.3);color:#D9B45C;display:none}
+  .databar.show{display:flex}
+  .databar b{font-weight:600}
+
+  .mode{display:flex;align-items:center;gap:8px;padding:4px 11px;border-radius:7px;
+        border:1px solid rgba(127,160,90,.45);background:rgba(127,160,90,.1);font-size:11.5px;color:#9BBE7A;
+        white-space:nowrap}
+  .mode b{font-weight:700}
+  .mode s{text-decoration:none;color:var(--im);font-variant-numeric:tabular-nums}
+  .mode .dot{width:6px;height:6px;border-radius:50%;background:#9BBE7A;flex:0 0 auto}
+  .btn{font-size:12.5px;font-weight:500;padding:7px 14px;border-radius:8px;cursor:pointer;user-select:none;
+       background:linear-gradient(180deg,#2E353B,#242A30);border:1px solid #434C54;color:var(--is);
+       box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+  .btn:hover{background:linear-gradient(180deg,#39424A,#2C333A)}
+  .btn2{font-size:11.5px;padding:5px 11px;border-radius:7px;cursor:pointer;user-select:none;
+        background:transparent;border:1px solid var(--ls);color:var(--im)}
+  .btn2:hover{color:var(--ik)}
+
+  .body{display:flex;height:660px}
+
+  /* 왼쪽 메뉴 — 아이콘만 두지 않고 이름을 함께 */
+  .menu{flex:0 0 132px;background:var(--pn);border-right:1px solid var(--ln);padding:10px 8px;
+        display:flex;flex-direction:column;gap:3px}
+  .menu a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;font-size:12.5px;
+          color:var(--im);cursor:pointer;user-select:none;text-decoration:none;border:1px solid transparent}
+  .menu a:hover{background:var(--rs);color:var(--ik)}
+  .menu a.on{background:var(--rs);border-color:var(--ls);color:var(--is);font-weight:500}
+  .menu a.act{background:var(--is);color:var(--bg);font-weight:600}
+  .menu a i{font-style:normal;width:15px;text-align:center;font-size:13px}
+  .menu .gap{flex:1}
+  .menu .hint{font-size:10.5px;color:var(--if);line-height:1.5;padding:0 10px 6px}
+
+  .board{flex:1;display:flex;flex-direction:column;min-width:0}
+  .btop{flex:1;display:flex;min-height:0}
+  .curve{flex:1;display:flex;flex-direction:column;padding:14px 15px 0;min-width:0}
+  .chd{display:flex;align-items:baseline;gap:11px;margin-bottom:4px;flex-wrap:wrap}
+  .chd b{font-size:14px;font-weight:700;color:var(--is)}
+  .chd .meta{font-size:11.5px;color:var(--im)}
+  .chd .lg{display:flex;gap:13px;margin-left:auto;font-size:11.5px}
+  .chd .lg span{display:flex;align-items:center;gap:5px;color:var(--im)}
+  .chd .lg i{width:15px;height:0;display:block}
+  .expl{font-size:11.5px;color:var(--if);margin-bottom:9px;line-height:1.5}
+
+  .plot{flex:1;position:relative;min-height:0;cursor:crosshair;
+        background-image:repeating-linear-gradient(0deg,var(--hl) 0 1px,transparent 1px 48px)}
+  .plot svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .brush{position:absolute;top:0;bottom:0;background:rgba(245,243,239,.06);
+         border-left:1px solid var(--ls);border-right:1px solid var(--ls);pointer-events:none;display:none}
+  .brush em{position:absolute;top:5px;left:50%;transform:translateX(-50%);font-style:normal;font-size:10.5px;
+            color:var(--ik);white-space:nowrap;background:var(--rs);padding:2px 8px;border-radius:4px;border:1px solid var(--ls)}
+  .under{height:84px;padding:0 15px 12px}
+  .under .lb{font-size:11.5px;color:var(--im);margin:8px 0 4px;display:flex;align-items:baseline;gap:9px}
+  .under .lb b{color:var(--ik);font-weight:500;font-size:12px}
+  .under .up2{position:relative;height:48px;
+              background-image:repeating-linear-gradient(0deg,var(--hl) 0 1px,transparent 1px 24px)}
+  .under svg{position:absolute;inset:0;width:100%;height:100%}
+
+  .side{flex:0 0 300px;border-left:1px solid var(--ln);padding:14px 15px;display:flex;flex-direction:column;
+        min-height:0;overflow:auto}
+  .stitle{font-size:12.5px;font-weight:700;color:var(--is);margin-bottom:3px}
+  .snote{font-size:11.5px;color:var(--if);line-height:1.5;margin-bottom:9px}
+  .stitle.m{margin-top:17px}
+
+  .grid{display:grid;grid-template-columns:repeat(10,1fr);gap:2px}
+  .grid i{aspect-ratio:1;border-radius:2px;display:block;cursor:pointer}
+  .grid i:hover{outline:1px solid var(--im);outline-offset:-1px}
+  .grid i.sel{box-shadow:0 0 0 1.5px var(--is);z-index:2;position:relative}
+  .gaxis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--if);margin-top:6px}
+  .verdict{font-size:12px;line-height:1.55;margin-top:9px;padding:9px 11px;border-radius:8px;border:1px solid}
+  .verdict.good{border-color:rgba(127,160,90,.4);background:rgba(127,160,90,.08)}
+  .verdict.bad{border-color:rgba(201,74,59,.45);background:rgba(201,74,59,.09)}
+  .verdict b{display:block;font-weight:600;margin-bottom:3px}
+  .verdict.good b{color:#9BBE7A} .verdict.bad b{color:#E2837A}
+  .verdict span{color:var(--im)}
+
+  .tile{padding:8px 0}
+  .tile+.tile{border-top:1px solid var(--hl)}
+  .tile .top{display:flex;justify-content:space-between;align-items:baseline}
+  .tile .k{font-size:12px;color:var(--ik)}
+  .tile .v{font-size:14.5px;font-weight:500;color:var(--ik)}
+  .tile .why{font-size:11px;color:var(--if);line-height:1.45;margin-top:2px}
+  .tile.hero .k{font-size:12.5px}
+  .tile.hero .v{font-size:22px;letter-spacing:-.02em;color:var(--is)}
+
+  .dock{flex:0 0 104px;border-top:1px solid var(--ln);background:var(--pn);padding:10px 15px}
+  .dock .hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:3px}
+  .dock .hdr b{font-size:12px;font-weight:600;color:var(--ik)}
+  .dock .hdr span{font-size:11.5px;color:var(--im)}
+  .dock .exp{font-size:11px;color:var(--if);margin-bottom:6px;line-height:1.4}
+  .strip{display:flex;gap:4px;align-items:flex-end;height:40px}
+  .strip u{flex:1;border-radius:2px 2px 0 0;text-decoration:none;display:block;cursor:pointer;min-height:2px}
+  .strip u:hover{outline:1px solid var(--im)}
+  .strip u.on{box-shadow:0 0 0 1.5px var(--is)}
+  .strip u.dead{opacity:.3}
+
+  .panel{position:absolute;right:15px;top:60px;width:306px;background:var(--pn);border:1px solid var(--ls);
+         border-radius:11px;box-shadow:0 8px 28px rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.5);z-index:9;display:none}
+  .panel.open{display:block}
+  .panel .ph{display:flex;align-items:center;gap:8px;padding:13px 15px 0}
+  .panel .ph b{font-size:13px;font-weight:700;color:var(--is)}
+  .panel .ph .x{margin-left:auto;color:var(--if);font-size:16px;cursor:pointer;line-height:1}
+  .panel .pb{padding:9px 15px 15px;font-size:12px;line-height:1.55;color:var(--im)}
+  .panel .row{display:flex;justify-content:space-between;padding:7px 0}
+  .panel .row+.row{border-top:1px solid var(--hl)}
+  .panel .row b{color:var(--ik);font-weight:500}
+
+  .warnbar{display:flex;align-items:center;gap:9px;padding:9px 15px;font-size:12px;
+           background:rgba(201,74,59,.1);border-bottom:1px solid rgba(201,74,59,.3);color:#E2837A}
+  .warnbar b{font-weight:600}
+  .warnbar.calm{background:var(--rs);border-bottom-color:var(--ln);color:var(--im)}
+  .warnbar.calm b{color:var(--ik)}
+
+  .money{background:var(--rs);border:1px solid var(--ls);border-radius:10px;padding:12px 13px}
+  .money .mh{display:flex;align-items:baseline;gap:7px;font-size:11.5px;color:var(--im);margin-bottom:9px}
+  .money .mh input{width:62px;background:var(--bg);border:1px solid var(--ln);border-radius:6px;color:var(--is);
+                   font:inherit;font-size:12.5px;padding:3px 7px;text-align:right;font-variant-numeric:tabular-nums}
+  .money .mr{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0}
+  .money .mr+.mr{border-top:1px solid var(--hl)}
+  .money .mk{font-size:12px;color:var(--ik)}
+  .money .mv{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+  .money .mw{font-size:11px;color:var(--if);line-height:1.45;margin-top:6px}
+
+  .qa{padding:11px 0;border-bottom:1px solid var(--hl)}
+  .qa:last-child{border-bottom:none}
+  .qa h4{margin:0 0 3px;font-size:12.5px;font-weight:600;color:var(--is)}
+  .qa .ans{font-size:12px;line-height:1.55;color:var(--im)}
+  .qa .ans b{font-weight:600}
+  .qa .why{font-size:11px;color:var(--if);line-height:1.45;margin-top:5px}
+
+  .tips{max-width:1300px;margin-top:14px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .tip{background:var(--pn);border:1px solid var(--ln);border-radius:9px;padding:12px 14px;font-size:12px;
+       line-height:1.6;color:var(--im)}
+  .tip b{color:var(--ik);font-weight:500;display:block;margin-bottom:3px}
+</style>
+</head>
+<body>
+
+<h2>봇 실험실 — 눌러지는 프로토타입</h2>
+<p class="sub">
+  <b>봇이 중심입니다.</b> 그리고 봇마다 <b>매매 주기</b>가 다릅니다 — 하루 안에 정리하는 봇과 몇 달 들고 가는 봇은
+  <b>봐야 할 숫자의 순서가 다릅니다.</b> 상단에서 주기를 바꿔 보세요 — 화면이 따라 바뀝니다.
+</p>
+
+<div class="win">
+  <div class="hud">
+    <span class="wm">TRADING LAB</span>
+    <span class="mode"><span class="dot"></span><b>모의</b><s>실제 주문 나가지 않음 · 연결된 계좌 없음 · 오늘 나간 주문 <b style="color:var(--ik)">0</b>건</s></span>
+    <div class="cell"><span>봇</span><b>대형주 눌림목 봇</b></div>
+    <div class="cell"><span>매매 주기</span><span class="seg" id="seg"><b data-h="day">단타</b><b data-h="swing" class="on">스윙</b><b data-h="long">중장기</b></span></div>
+    <div class="cell"><span>설정 바꿔본 횟수</span><b class="n" id="hTry">32</b><span class="n" id="hLimit">번</span></div>
+    <div class="cell"><span>모의로 돌린 지</span><b class="n">47</b><span>일</span></div>
+    <div class="sp"></div>
+    <span class="btn" id="runBtn">설정 바꿔 다시 돌리기</span>
+  </div>
+
+  <div class="databar" id="databar"></div>
+  <div class="warnbar calm" id="warn"></div>
+
+  <div class="panel" id="panel">
+    <div class="ph"><b id="pTitle"></b><span style="font-size:11.5px;color:var(--im)" id="pSub"></span><span class="x" id="pClose">×</span></div>
+    <div class="pb" id="pBody"></div>
+  </div>
+
+  <div class="body">
+    <div class="menu" id="menu">
+      <a class="on" data-p="board"><i>▦</i>봇 실험실</a>
+      <a data-p="chart"><i>◵</i>종목 차트</a>
+      <a data-p="note"><i>◷</i>내 메모</a>
+      <a data-p="account"><i>⌸</i>내 계좌</a>
+      <div class="gap"></div>
+      <div class="hint">누르면 이 화면 위에 뜹니다. 화면을 떠나지 않습니다.</div>
+      <a data-p="rule"><i>⚙</i>내 합격 기준</a>
+    </div>
+
+    <div class="board">
+      <div class="btop">
+        <div class="curve">
+          <div class="chd">
+            <b>이 봇으로 돈이 어떻게 불었나</b>
+            <span class="meta n" id="rangeLbl"></span>
+            <span class="btn2" id="clearBrush" style="display:none">구간 해제</span>
+            <div class="lg">
+              <span><i style="border-top:2px solid #F5F3EF"></i>이 봇</span>
+              <span><i style="border-top:1px solid #8B877F"></i>코스피200 그냥 사기</span>
+              <span><i style="border-top:1px dashed #625E58"></i>후보 종목 골고루 사기</span>
+            </div>
+          </div>
+          <div class="expl">
+            회색 두 줄보다 <b style="color:var(--ik)">흰 줄이 위에 있어야</b> 이 봇이 값을 합니다.
+            점선(후보를 골고루 산 것)보다 못하면 <b style="color:var(--ik)">종목을 고른 보람이 없다</b>는 뜻입니다.
+            · <b style="color:var(--ik)">드래그해서 구간을 잡아 보세요.</b>
+          </div>
+          <div class="plot" id="plot">
+            <svg viewBox="0 0 600 250" preserveAspectRatio="none">
+              <polyline id="cEq" fill="none" stroke="#625E58" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>
+              <polyline id="cBm" fill="none" stroke="#8B877F" stroke-width="1" vector-effect="non-scaling-stroke"/>
+              <polyline id="cSt" fill="none" stroke="#F5F3EF" stroke-width="2" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <div class="brush" id="brush"><em id="brushLbl"></em></div>
+          </div>
+          <div class="under">
+            <div class="lb"><b>고점에서 얼마나 까였나</b> <span id="ddLbl"></span></div>
+            <div class="up2">
+              <svg viewBox="0 0 600 48" preserveAspectRatio="none">
+                <polyline id="cDd" fill="none" stroke="#4A8CC8" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="side">
+          <div class="money" id="money"></div>
+          <div class="stitle m">설정 100가지를 전부 돌려봤습니다</div>
+          <div class="snote">밝을수록 성적이 좋습니다. <b style="color:var(--ik)">눌러서 바꿔 보세요</b> — 왼쪽 그래프가 그 설정의 것으로 바뀝니다.</div>
+          <div class="grid" id="grid"></div>
+          <div class="gaxis"><span>← 평균선 짧게</span><span class="n" id="selLbl"></span><span>길게 →</span></div>
+          <div class="gaxis" style="margin-top:2px"><span>↑ 웬만해선 안 삼</span><span></span><span>조금만 떨어져도 삼 ↓</span></div>
+          <div class="verdict" id="verdict"></div>
+
+          <div class="stitle m">이 설정의 성적 <span style="font-weight:400;color:var(--im);font-size:11.5px" id="scopeLbl"></span></div>
+          <div id="tiles"></div>
+          <div class="stitle m">이 예상을 믿을 수 있나</div>
+          <div class="snote">아래 다섯 가지가 흔들리면 위 금액은 그대로 안 나옵니다.</div>
+          <div id="exam"></div>
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="hdr"><b>지금까지 바꿔본 설정</b><span class="n" id="dockN"></span></div>
+        <div class="exp">막대 하나가 시도 한 번입니다. 흐린 것은 버린 것 · <b style="color:var(--im)">눌러서 그때로 돌아갈 수 있습니다</b></div>
+        <div class="strip" id="strip"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tips">
+  <div class="tip"><b>격자를 눌러 보세요</b>
+    100가지 설정 중 하나를 고르는 것입니다. <b style="color:var(--ik);display:inline">밝은 칸이 뭉쳐 있는 자리</b>를 고르면 안전하고,
+    <b style="color:var(--ik);display:inline">혼자 떠 있는 밝은 칸</b>은 우연일 가능성이 큽니다 — 눌러서 경고를 확인해 보세요.</div>
+  <div class="tip"><b>그래프를 드래그해 보세요</b>
+    구간을 잡으면 <b style="color:var(--ik);display:inline">오른쪽 성적이 그 기간만으로 다시 계산</b>됩니다.
+    많이 까인 구간을 잡아 보면 같은 봇의 숫자가 얼마나 달라지는지 보입니다.</div>
+  <div class="tip"><b>왼쪽 메뉴를 눌러 보세요</b>
+    화면을 <b style="color:var(--ik);display:inline">떠나지 않고</b> 위에 창이 뜹니다. 잡아둔 구간과 고른 설정이 그대로인지 확인해 보세요.</div>
+  <div class="tip"><b>「설정 바꿔 다시 돌리기」를 눌러 보세요</b>
+    횟수가 오릅니다. <b style="color:var(--ik);display:inline">45번을 넘기면 위에 경고가 뜹니다</b> — 너무 많이 바꿔보면 결과를 믿을 수 없게 되기 때문입니다.</div>
+</div>
+
+<script>
+(function(){
+  const N=880, ROWS=10, COLS=10;
+  const $=id=>document.getElementById(id);
+  const rnd=s=>()=>(s=s*1664525+1013904223&0x7fffffff,s/0x7fffffff);
+  const g2=(r,c,r0,c0,sig)=>Math.exp(-(((r-r0)**2+(c-c0)**2)/(2*sig*sig)));
+  const quality=(r,c)=>1.00*g2(r,c,3.4,3.6,1.75)+1.22*g2(r,c,6.0,8.0,0.42)+0.30*g2(r,c,5.2,2.0,1.10);
+
+  const Q=[],flat=[];
+  for(let r=0;r<ROWS;r++){Q.push([]);for(let c=0;c<COLS;c++){const q=quality(r,c);Q[r].push(q);flat.push(q);}}
+  const qMax=Math.max(...flat);
+
+  function build(drift,seed){const R=rnd(seed),o=[1];let v=1;
+    for(let i=1;i<N;i++){const s=(i>300&&i<360)?-0.0022:0;v*=1+drift/N+s+(R()-0.5)*0.019;o.push(v);}return o;}
+  const bench=build(0.28,12345), equal=build(0.42,777), cache={};
+  const curveFor=(r,c)=>cache[r+'_'+c]||(cache[r+'_'+c]=build(0.12+(Q[r][c]/qMax)*0.72,1000+r*97+c*31));
+
+  function metrics(eq){
+    const n=eq.length; const total=eq[n-1]/eq[0]; const cagr=Math.pow(total,252/n)-1;
+    let peak=eq[0],mdd=0,run=0,longest=0,peakAt=1,cur=0; const dd=[];
+    for(let i=0;i<n;i++){
+      if(eq[i]>peak) peak=eq[i];
+      const d=eq[i]/peak-1; dd.push(d);
+      if(d<mdd){mdd=d; peakAt=peak/eq[0];}          // 낙폭이 일어난 시점의 '고점 배수'
+      if(d<-1e-9){run++; if(run>longest){longest=run; cur=1;}}else run=0;
+    }
+    const unresolved = dd[n-1] < -1e-9;              // 끝에서 아직 못 회복
+    return {cagr,mdd,dd,longest,n,total,peakAt,unresolved};
+  }
+
+  // ── 매매 주기: 봇이 선언하는 1급 속성. 화면이 여기에 맞춰 바뀐다 ──
+  const H = {
+    day:{ label:'단타', hold:'하루 안에 정리',
+      unit:d=>`${Math.max(1,Math.round(d))}일`, span:'최근 3개월',
+      need:'분봉', have:0, limit:120,
+      order:['cush','mdd','uw','cagr'],
+      note:'하루에도 여러 번 사고팔기 때문에 <b>수수료가 수익을 먼저 먹습니다.</b> 그래서 그 숫자가 맨 위입니다.' },
+    swing:{ label:'스윙', hold:'며칠 ~ 몇 주',
+      unit:d=>`${(d/5).toFixed(1)}주`, span:'최근 3년 7개월',
+      need:'일봉', have:880, limit:45,
+      order:['uw','mdd','cush','cagr'],
+      note:'며칠~몇 주 들고 가므로 <b>물려 있는 기간</b>이 가장 먼저입니다.' },
+    long:{ label:'중장기', hold:'몇 달 ~ 몇 년',
+      unit:d=>`${(d/21).toFixed(1)}개월`, span:'최근 3년 7개월',
+      need:'일봉', have:880, limit:45,
+      order:['uw','mdd','cagr','cush'],
+      note:'오래 들고 가므로 <b>회복까지 걸린 기간</b>이 견딜 수 있는 길이인지가 첫 질문입니다.' },
+  };
+  const TILE = {
+    uw:{k:'원금 회복까지 최장', why:'그동안 계좌는 계속 마이너스였습니다. 여기를 못 견디면 중간에 끄게 됩니다.'},
+    mdd:{k:'최악일 때 얼마나 까였나', why:'이 크기를 감당할 수 있는지가 첫 질문입니다.'},
+    cush:{k:'수수료 내고도 남는 정도', why:'1배 아래면 수수료가 수익을 다 먹습니다.'},
+    cagr:{k:'1년에 평균 몇 %', why:'위 숫자들을 본 다음에 볼 값입니다.'},
+  };
+  const seenCells=new Set(['3_4']);
+  let horizon='swing';
+  let sel={r:3,c:4}, brush=null, tries=32, open=null;
+  const hist=(()=>{const R=rnd(4242),a=[];
+    for(let i=0;i<32;i++){const r=Math.floor(R()*ROWS),c=Math.floor(R()*COLS);
+      a.push({r,c,q:Q[r][c]/qMax,kept:R()<0.09});}
+    a[31]={r:3,c:4,q:Q[3][4]/qMax,kept:true};return a;})();
+
+  const poly=(el,a,lo,hi,h)=>el.setAttribute('points',
+    a.map((_,i)=>`${(i/(a.length-1))*600},${h-((a[i]-lo)/(hi-lo))*(h-8)-4}`).join(' '));
+
+  function render(){
+    const full=curveFor(sel.r,sel.c);
+    const s=brush?brush[0]:0, e=brush?brush[1]:N-1, cut=a=>a.slice(s,e+1);
+    const st=cut(full),bm=cut(bench),eq=cut(equal);
+    const all=[...st,...bm,...eq],lo=Math.min(...all)*0.985,hi=Math.max(...all)*1.015;
+    poly($('cSt'),st,lo,hi,250);poly($('cBm'),bm,lo,hi,250);poly($('cEq'),eq,lo,hi,250);
+
+    const m=metrics(st);
+    poly($('cDd'),m.dd,Math.min(...m.dd,-0.01),0.002,48);
+
+    const h=H[horizon], recover=h.unit(m.longest);
+    const cush=1.4+(Q[sel.r][sel.c]/qMax)*2.6;
+    const VAL={
+      uw:recover,
+      mdd:`<span style="color:var(--dn)">${(m.mdd*100).toFixed(1)}%</span>`,
+      cush:cush.toFixed(1)+'<span style="font-size:11.5px;color:var(--if)">배</span>',
+      cagr:`<span style="color:${m.cagr>=0?'var(--up)':'var(--dn)'}">${m.cagr>=0?'+':''}${(m.cagr*100).toFixed(1)}%</span>`,
+    };
+    $('tiles').innerHTML = h.order.map((k,i)=>
+      `<div class="tile${i===0?' hero':''}"><div class="top"><span class="k">${TILE[k].k}</span>`+
+      `<span class="v n">${VAL[k]}</span></div><div class="why">${TILE[k].why}</div></div>`).join('');
+
+    // 데이터 가용성 — 없으면 정직하게 비운다
+    const db=$('databar');
+    if(h.have===0){
+      db.className='databar show';
+      db.innerHTML=`<b>${h.label} 봇은 분봉이 필요합니다 — 아직 안 받아왔습니다.</b>`+
+        ` <span style="color:var(--im)">미국 종목은 <b style="color:#D9B45C">지금 바로 가능</b>(2016년~ 1분봉). `+
+        `국내는 <b style="color:#D9B45C">하룻밤 적재</b>로 1년치가 쌓입니다(200종목 · 약 9.6만 회 호출).</span>`+
+        ` <span class="btn2" style="margin-left:auto;white-space:nowrap" id="fetchBtn">분봉 받아오기</span>`;
+      const fb=document.getElementById('fetchBtn');
+      if(fb) fb.onclick=()=>{
+        db.innerHTML=`<b>미국 1분봉 적재 중 · <span class="n">2016-01</span> → <span class="n">2026-08</span></b>`+
+          ` <span style="color:var(--im)">후보 200종목 · 예상 <b style="color:#D9B45C">8시간</b> · 진행 <b class="n" style="color:#D9B45C">3%</b></span>`+
+          ` <span style="color:var(--if);margin-left:auto">국내는 토스 키 등록 후 이어서 →</span>`;
+      };
+    } else db.className='databar';
+
+    let worst=0,cnt=0;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
+      if(!dr&&!dc)continue; const r=sel.r+dr,c=sel.c+dc;
+      if(r<0||c<0||r>=ROWS||c>=COLS)continue; cnt++;
+      worst=Math.max(worst,(Q[sel.r][sel.c]-Q[r][c])/qMax);
+    }
+    const cliff=worst>0.42, v=$('verdict');
+    v.className='verdict '+(cliff?'bad':'good');
+    v.innerHTML=cliff
+      ? `<b>⚠ 이 설정만 유독 좋습니다</b><span>옆으로 한 칸만 옮겨도 성적이 <b style="color:#E2837A;display:inline">${(worst*100).toFixed(0)}%</b> 떨어집니다. 실력이 아니라 <b style="color:#E2837A;display:inline">우연히 잘 맞은 것</b>일 가능성이 큽니다 — 실전에서 무너지기 쉽습니다.</span>`
+      : `<b>✓ 주변도 비슷하게 좋습니다</b><span>설정을 조금 빗나가도 성적이 유지됩니다(최대 <b style="color:#9BBE7A;display:inline">${(worst*100).toFixed(0)}%</b> 차이). <b style="color:#9BBE7A;display:inline">믿을 만한 자리</b>입니다.</span>`;
+
+    $('selLbl').textContent=`평균선 ${5+sel.c*6}일 · 많이 팔림 기준 ${10+sel.r*4}`;
+    $('rangeLbl').textContent=brush?`고른 구간 ${m.n}일 (전체 ${N}일 중)`:`${h.span} · ${N}일`;
+    $('scopeLbl').textContent=brush?'· 고른 구간만':'';
+    $('ddLbl').innerHTML=`가장 많이 까였을 때 <b style="color:var(--dn)">${(m.mdd*100).toFixed(1)}%</b> · 회복까지 최장 <b style="color:var(--ik)">${recover}</b>`;
+    $('clearBrush').style.display=brush?'':'none';
+
+    document.querySelectorAll('#grid i').forEach(el=>
+      el.classList.toggle('sel',+el.dataset.r===sel.r&&+el.dataset.c===sel.c));
+    renderMoney(m,h); renderExam(m,h,worst);
+    $('hTry').textContent=tries;
+
+    const LIM=h.limit, w=$('warn'), over=tries>LIM;
+    w.className='warnbar'+(over?'':' calm');
+    w.innerHTML=over
+      ? `<b>⚠ 설정을 너무 많이 바꿔봤습니다 — ${tries}번</b> ${h.span} 데이터로는 <b>${LIM}번</b>까지가 한계입니다. 이보다 많이 시도하면 "잘 되는 설정"을 찾은 게 아니라 <b>우연히 잘 맞은 것을 고른 것</b>이 됩니다.`
+      : `설정을 바꿔본 횟수 <b>${tries}번</b> · 앞으로 <b>${LIM-tries}번</b>까지는 결과를 믿어도 됩니다. ${h.span} 데이터로 ${LIM}번이 한계입니다.`
+        + ` <span style="margin-left:auto;color:var(--if)">${h.label} 봇 · ${h.hold} · ${h.note.replace(/<[^>]+>/g,'')}</span>`;
+  }
+
+  const grid=$('grid');
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const el=document.createElement('i'), t=Q[r][c]/qMax, v=Math.round(28+t*196);
+    el.style.background=`rgb(${Math.round(v*.92)},${Math.round(v*.98)},${Math.round(v*1.02)})`;
+    el.dataset.r=r;el.dataset.c=c;
+    el.title=`평균선 ${5+c*6}일 · 많이 팔림 기준 ${10+r*4}`;
+    el.onclick=()=>{ if(!seenCells.has(r+'_'+c)){seenCells.add(r+'_'+c); tries++;} sel={r,c}; render(); };
+    grid.appendChild(el);
+  }
+
+  const strip=$('strip');
+  const refreshDock=()=>$('dockN').textContent=`${hist.length}번 · 남긴 것 ${hist.filter(h=>h.kept).length}개`;
+  hist.forEach((h,i)=>{
+    const u=document.createElement('u');
+    u.style.height=Math.max(4,h.q*100)+'%';
+    u.style.background=h.q>0.42?'var(--up)':'var(--dn)';
+    if(!h.kept&&i!==31)u.classList.add('dead');
+    u.title=`${i+1}번째 · 평균선 ${5+h.c*6}일`;
+    u.onclick=()=>{sel={r:h.r,c:h.c};render();};
+    strip.appendChild(u);
+  });
+  refreshDock();
+
+  const plot=$('plot'),bEl=$('brush');
+  let dragging=false,x0=0;
+  const toIdx=ev=>{const r=plot.getBoundingClientRect();
+    return Math.max(0,Math.min(N-1,Math.round((ev.clientX-r.left)/r.width*(N-1))));};
+  plot.addEventListener('mousedown',e=>{dragging=true;x0=toIdx(e);bEl.style.display='none';});
+  window.addEventListener('mousemove',e=>{if(!dragging)return;
+    const x1=toIdx(e),a=Math.min(x0,x1),b=Math.max(x0,x1);
+    bEl.style.display='';bEl.style.left=(a/(N-1)*100)+'%';bEl.style.right=(100-b/(N-1)*100)+'%';
+    $('brushLbl').textContent=`${b-a+1}일 선택`;});
+  window.addEventListener('mouseup',e=>{if(!dragging)return;dragging=false;
+    const x1=toIdx(e),a=Math.min(x0,x1),b=Math.max(x0,x1);
+    if(b-a<25){bEl.style.display='none';brush=null;}else brush=[a,b];render();});
+  $('clearBrush').onclick=()=>{brush=null;bEl.style.display='none';render();};
+
+  const C={
+    chart:['종목 차트','삼성전자 005930',`<div class="row"><span>현재가</span><b class="n" style="color:var(--up)">71,400</b></div>
+      <div class="row"><span>이 봇이 지금 들고 있음</span><b class="n">28주 · +2.4%</b></div>
+      <div style="margin-top:10px;font-size:11.5px;color:var(--if);line-height:1.5">잡아둔 구간과 고른 설정이 그대로 유지됩니다.</div>`],
+    note:['내 메모','이 봇 관련',`<div class="row"><b>반도체 사이클 메모</b><span class="n">08-02</span></div>
+      <div class="row"><b>HBM 공급과잉 정리</b><span class="n">07-28</span></div>
+      <div style="margin-top:10px;font-size:11.5px;color:var(--if);line-height:1.5">봇을 만들 때 참고한 자료를 여기 붙여둡니다.</div>`],
+    account:['내 계좌','내가 직접 한 것과 비교',`<div class="row"><span>내가 직접</span><b class="n" style="color:var(--up)">+8.6%</b></div>
+      <div class="row"><span>이 봇(모의)</span><b class="n" style="color:var(--up)">+14.2%</b></div>
+      <div class="row"><span>후보 골고루 사기</span><b class="n" style="color:var(--up)">+11.9%</b></div>
+      <div style="margin-top:10px;font-size:11.5px;color:var(--if);line-height:1.5">봇이 이겼는지가 아니라, <b style="color:var(--ik)">내 판단에 기준이 생기는 것</b>이 요점입니다.</div>`],
+    rule:['내 합격 기준','모든 봇에 같은 자로',`<div class="row"><span>회복까지 9개월 이내</span><b style="color:#9BBE7A">통과</b></div>
+      <div class="row"><span>최악 낙폭 20% 이내</span><b style="color:#9BBE7A">통과</b></div>
+      <div class="row"><span>설정 45번 이내로 시도</span><b style="color:#E2837A">미달</b></div>
+      <div style="margin-top:10px;font-size:11.5px;color:var(--if);line-height:1.5">봇마다 따로 정하지 않습니다. <b style="color:var(--ik)">기준이 흔들리면 비교가 무의미</b>해집니다.</div>`],
+  };
+  $('menu').addEventListener('click',e=>{
+    const a=e.target.closest('a');if(!a)return;const p=a.dataset.p;
+    document.querySelectorAll('#menu a').forEach(x=>x.classList.remove('act'));
+    if(p==='board'||open===p){open=null;$('panel').classList.remove('open');return;}
+    open=p;a.classList.add('act');
+    const[t,s,b]=C[p];$('pTitle').textContent=t;$('pSub').textContent=s;$('pBody').innerHTML=b;
+    $('panel').classList.add('open');
+  });
+  $('pClose').onclick=()=>{open=null;$('panel').classList.remove('open');
+    document.querySelectorAll('#menu a').forEach(x=>x.classList.remove('act'));};
+
+  // ── 내 돈으로 치면 + 이 예상을 믿을 수 있나 (상시 표시) ──
+  let capital = 1600;   // 만원 — 봇 설정과 같은 금액에서 시작한다
+  const won = v => (v>=0?'+':'−') + Math.abs(Math.round(v)).toLocaleString() + '만원';
+
+  function renderMoney(m,h){
+    const gain = capital*m.cagr;
+    const loss = capital*m.peakAt*m.mdd;   // 원금이 아니라 그때 불어 있던 돈 기준
+    const tooShort = m.n < 120;
+    const gainRow = tooShort
+      ? `<div class="mr"><span class="mk">이 구간에서</span><span class="mv" style="color:var(--up)">${won(capital*(m.total-1))}</span></div>`
+      : `<div class="mr"><span class="mk">1년에 평균</span><span class="mv" style="color:var(--up)">${won(gain)}</span></div>`;
+    $('money').innerHTML =
+      `<div class="mh">투자금 <input id="cap" value="${capital}"> 만원이라면</div>`+
+      gainRow+
+      `<div class="mr"><span class="mk">최악일 때 이만큼 까임</span><span class="mv" style="color:var(--dn)">${won(loss)}</span></div>`+
+      `<div class="mr"><span class="mk">전 고점 아래에 머문 최장</span><span class="mv">${h.unit(m.longest)}${m.unresolved?' (아직 회복 중)':''}</span></div>`+
+      (tooShort
+        ? `<div class="mw" style="color:#D9B45C">고른 구간이 <b>${m.n}일</b>뿐이라 1년치로 환산하지 않습니다 — 짧은 구간을 늘려 잡으면 실제와 크게 달라집니다.</div>`
+        : `<div class="mw">가장 좋았던 시점 대비 얼마나 까였는지입니다. 원금 기준이 아닙니다. 못 견디면 첫 줄은 못 받습니다.</div>`);
+    const cap=document.getElementById('cap');
+    cap.onchange=cap.oninput=()=>{const v=parseInt(cap.value.replace(/[^0-9]/g,''),10);
+      if(v>0){capital=v; const c=cap.selectionStart; render(); const n=document.getElementById('cap');
+        if(n){n.focus(); n.setSelectionRange(c,c);} }};
+  }
+
+  function renderExam(m,h,worst){
+    const q=Q[sel.r][sel.c]/qMax, overTry=tries>h.limit;
+    const gapRatio=1.15+(1-q)*1.3, top3=Math.round(38+(1-q)*44);
+    const exTop=capital*m.cagr*(1-(top3-38)/100*1.4);
+    const cush=1.4+q*2.6, folds=Math.max(2,Math.round(2+q*4)), drift=-(0.4+(1-q)*2.2);
+    const C=v=>v?'var(--ik)':'#E2837A';
+
+    const rows=[
+      ['이 성적이 앞으로도 나올까',
+       overTry
+        ? `<b style="color:#E2837A">설정을 ${tries}번 바꿔봤습니다.</b> ${h.span} 데이터로는 ${h.limit}번이 한계입니다 — 이쯤이면 좋은 설정을 <b>찾은</b> 게 아니라 우연히 맞은 걸 <b>고른</b> 것에 가깝고, 실제로 돌리면 성적이 뚝 떨어집니다.`
+        : (worst>0.42
+          ? `<b style="color:#E2837A">이 설정에서만 좋습니다.</b> 옆으로 한 칸(평균선 6일 차이)만 옮겨도 성적이 ${(worst*100).toFixed(0)}% 떨어집니다. 이런 자리는 실제로 돌리면 무너집니다.`
+          : `주변 설정도 비슷하게 좋고(차이 ${(worst*100).toFixed(0)}%), 시도 횟수도 ${tries}/${h.limit}번으로 한계 안입니다. <b style="color:var(--ik)">지금 성적은 재현될 가능성이 있습니다.</b>`),
+       '같은 데이터로 설정을 많이 바꿔볼수록, 진짜 좋은 걸 찾는 게 아니라 그 기간에 우연히 맞은 걸 고르게 됩니다.'],
+
+      ['그 종목이 안 뜨면 어떻게 되나 <span style="font-weight:400;color:var(--if);font-size:11px">· 거래 기록이 붙으면 실제 값으로 바뀝니다</span>',
+       `수익의 <b style="color:${C(top3<62)}">${top3}%</b>가 종목 3개에서 나왔습니다. 크게 번 거래 1%를 빼면 1년 수익이 <b>${won(capital*m.cagr)} → ${won(exTop)}</b>로 줄어듭니다.`,
+       '몇 번의 대박으로 만들어진 성적은, 다음에도 그 대박이 나야 재현됩니다.'],
+
+      ['실제로 사고팔면 얼마 남나 <span style="font-weight:400;color:var(--if);font-size:11px">· 수수료·세금 가정에서 유도</span>',
+       `거래 한 번에 버는 돈이 수수료·체결 밀림의 <b style="color:${C(cush>=2.0)}">${cush.toFixed(1)}배</b>입니다. ${cush<2.0?'조금만 밀려도 수익이 사라집니다.':'여유가 있습니다.'}`,
+       horizon==='day'
+         ? '단타는 하루에도 여러 번 사고팔아서, 수수료가 수익을 먼저 먹습니다. 이 줄이 가장 중요합니다.'
+         : '화면 가격과 실제 체결가는 다릅니다. 그 차이를 견딜 여유가 있어야 통장에 남습니다.'],
+
+      ['장이 나쁠 때도 버텼나',
+       `기간을 6조각으로 나눠 보니 <b style="color:${C(folds>=4)}">${folds}조각</b>에서 플러스였습니다.${folds<4?' 특정 시기에만 통했을 수 있습니다.':''} 가장 나빴던 구간에서 <b style="color:var(--dn)">${won(capital*m.mdd)}</b>까지 까였습니다.`,
+       '한 구간에서만 좋은 성적은 그 시기 장세 덕일 수 있습니다.'],
+
+      ['백테스트대로 되고 있나',
+       `모의로 <b>47일</b> 돌렸는데 백테스트보다 <b style="color:#D9B45C">${drift.toFixed(1)}%p</b> 낮습니다. 그중 <b>3일</b>은 컴퓨터가 꺼져 있어 봇이 안 돌았습니다.`,
+       '백테스트는 과거 데이터고 실제는 다릅니다. 차이가 벌어지면 전략이 아니라 실행 환경 문제일 수 있습니다.'],
+    ];
+    $('exam').innerHTML = rows.map(([q,a,w])=>
+      `<div class="qa"><h4>${q}</h4><div class="ans">${a}</div><div class="why">${w}</div></div>`).join('');
+  }
+
+  $('seg').addEventListener('click',e=>{
+    const b=e.target.closest('b'); if(!b) return;
+    horizon=b.dataset.h;
+    document.querySelectorAll('#seg b').forEach(x=>x.classList.toggle('on',x===b));
+    render();
+  });
+
+  $('runBtn').onclick=()=>{
+    tries++;const R=rnd(tries*991);
+    const r=Math.floor(R()*ROWS),c=Math.floor(R()*COLS);sel={r,c};
+    const u=document.createElement('u');
+    u.style.height=Math.max(4,(Q[r][c]/qMax)*100)+'%';
+    u.style.background=(Q[r][c]/qMax)>0.42?'var(--up)':'var(--dn)';
+    u.title=`${tries}번째`;u.onclick=()=>{sel={r,c};render();};
+    strip.appendChild(u);hist.push({r,c,q:Q[r][c]/qMax,kept:false});
+    refreshDock();render();
+  };
+
+  document.addEventListener('click',e=>{if(e.target.id==='examBtn')openExam();});
+
+  render();
+})();
+</script>
+</body>
+</html>
