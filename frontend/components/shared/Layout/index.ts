@@ -1,6 +1,9 @@
+// 관리 셸(MDI 탭 섀시) 3종
 export { Header } from "./Header";
 export { Sidebar } from "./Sidebar";
 export { GlobalTabs } from "./GlobalTabs";
+
+export { AppRail } from "./AppRail"; // 제품 셸의 46px 아이콘 레일
 
 export { TableGroup } from "./TableGroup"; // 폼 그룹
 export { TableRow } from "./TableRow"; // 폼 행

@@ -23,6 +23,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { NavItem } from "@/lib/shell/nav";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -148,14 +149,7 @@ const { ensurePersonalWorkspace } = await import("@/lib/auth/authUtils");
 const { PERSONAL_WORKSPACE_DEFAULT_MENU_IDS, DEFAULT_USER_AUTHOR_ID } = await import("@/constants/protected");
 const { GET } = await import("@/app/api/common/system/menu/navigation/route");
 const { Sidebar } = await import("@/components/shared/Layout/Sidebar");
-const { useNavStore } = await import("@/stores/shared/navStore");
-
-interface NavItem {
-  id: string;
-  text: string;
-  path?: string;
-  items?: NavItem[];
-}
+const { selectAdminNavItems } = await import("@/lib/shell/nav");
 
 /** 가입 흐름이 하는 일(개인 워크스페이스 생성) → 메뉴 API 호출. 실제 구현을 그대로 탄다. */
 async function signupThenFetchNav(): Promise<NavItem[]> {
@@ -167,7 +161,6 @@ async function signupThenFetchNav(): Promise<NavItem[]> {
 
 beforeEach(() => {
   workspaceMenuRows.length = 0;
-  useNavStore.setState({ items: [] });
   cleanup();
 });
 
@@ -195,13 +188,12 @@ describe("개인 워크스페이스 사이드바 (#251)", () => {
     }
   });
 
-  it("사이드바가 실제로 찬다 — 터미널·관심종목이 보이고 경로가 붙어 있다", async () => {
+  it("관리 셸 사이드바가 실제로 찬다 — 관심종목이 보이고 경로가 붙어 있다", async () => {
     const user = userEvent.setup();
     const items = await signupThenFetchNav();
-    useNavStore.setState({ items });
 
     render(
-      <Sidebar isDrawerOpen>
+      <Sidebar isDrawerOpen items={selectAdminNavItems(items)}>
         <div>본문</div>
       </Sidebar>,
     );
@@ -211,12 +203,31 @@ describe("개인 워크스페이스 사이드바 (#251)", () => {
     expect(group).toBeTruthy();
     await user.click(group);
 
-    expect(screen.getByRole("treeitem", { name: /터미널/ })).toBeTruthy();
     expect(screen.getByRole("treeitem", { name: /관심종목/ })).toBeTruthy();
 
     // 잎 메뉴에 이동 경로가 실제로 붙어 있어야 클릭이 화면을 연다.
-    const terminal = items.flatMap((p) => p.items ?? []).find((c) => c.id === "mbiz1008");
-    expect(terminal?.path).toBe("/terminal");
+    const watchlist = items.flatMap((p) => p.items ?? []).find((c) => c.id === "mbiz1001");
+    expect(watchlist?.path).toBe("/admin/watchlist");
+  });
+
+  it("제품 경로는 관리 셸 사이드바에 없다 — 있으면 iframe 탭 안에서 열린다 (#73 S2)", async () => {
+    const user = userEvent.setup();
+    const items = await signupThenFetchNav();
+
+    // 네비게이션 자체에는 남아 있다 — 제품 셸의 메뉴 게이트가 이 경로로 접근 여부를 판정한다.
+    const leaves = items.flatMap((p) => p.items ?? []);
+    expect(leaves.find((c) => c.id === "mbiz1009")?.path).toBe("/bench");
+    expect(leaves.find((c) => c.id === "mbiz1008")?.path).toBe("/terminal");
+
+    render(
+      <Sidebar isDrawerOpen items={selectAdminNavItems(items)}>
+        <div>본문</div>
+      </Sidebar>,
+    );
+    await user.click(screen.getByRole("treeitem", { name: /업무관리/ }));
+
+    expect(screen.queryByRole("treeitem", { name: /실험대/ })).toBeNull();
+    expect(screen.queryByRole("treeitem", { name: /시세/ })).toBeNull();
   });
 
   it("권한 축과 워크스페이스 축이 어긋나지 않는다 — seed.sql 의 기본 권한이 기본 메뉴를 전부 갖는다", () => {

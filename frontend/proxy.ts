@@ -67,6 +67,11 @@ export default async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// 세션을 요구할 경로. **allowlist 라 새 화면을 여기 넣지 않으면 보호가 조용히 빠진다** —
+// `/terminal` 이 실제로 그렇게 빠져 있었다(#73 S2 착수 시점 실측). Next.js 가 정적으로 읽어야
+// 해서 리터럴만 쓸 수 있으므로, 상수(`constants/shell.ts` 의 `PRODUCT_PATHS`)와 이 목록의
+// 대조는 `tests/regressions/73-middleware-route-coverage.test.ts` 가 맡는다 — 페이지 라우트를
+// 전수로 세어 공개 경로 밖인데 여기 없는 것이 있으면 실패한다.
 export const config = {
-  matcher: ["/api/:path*", "/admin/:path*", "/user/:path*"],
+  matcher: ["/api/:path*", "/admin/:path*", "/user/:path*", "/bench/:path*", "/terminal/:path*"],
 };

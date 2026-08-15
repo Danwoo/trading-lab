@@ -2,14 +2,7 @@
 
 import { create } from "zustand";
 import { fetchNavigation } from "@/services/common/menuService";
-
-interface NavItem {
-  id: string;
-  text: string;
-  icon?: string;
-  path?: string;
-  items?: NavItem[];
-}
+import type { NavItem } from "@/lib/shell/nav";
 
 interface NavStore {
   items: NavItem[];
@@ -17,12 +10,12 @@ interface NavStore {
   error: boolean;
   fetchNav: () => Promise<void>;
   reset: () => void;
-  getAllPaths: () => string[];
 }
 
-const collectPaths = (items: NavItem[]): string[] =>
-  items.flatMap((item) => [...(item.path ? [item.path] : []), ...(item.items ? collectPaths(item.items) : [])]);
-
+/**
+ * DB 메뉴 트리 한 벌. 셸 둘이 같은 트리를 각자 읽는다 — 제품 셸은 접근 가능 경로 판정에,
+ * 관리 셸은 사이드바 렌더에. 트리를 골라 읽는 함수는 `lib/shell/nav.ts` 가 소유한다.
+ */
 export const useNavStore = create<NavStore>((set, get) => ({
   items: [],
   loaded: false,
@@ -39,6 +32,4 @@ export const useNavStore = create<NavStore>((set, get) => ({
   },
 
   reset: () => set({ items: [], loaded: false, error: false }),
-
-  getAllPaths: () => collectPaths(get().items),
 }));

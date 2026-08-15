@@ -42,18 +42,18 @@ export const AUTO_SYSTEM_MENUS_BY_AUTHOR: Record<string, string[]> = {
  * 그 교집합의 한쪽인 `tn_workspace_menu` 행이 하나도 없어서, SaaS 가입자가 로그인하면
  * 메뉴 API 가 `{"items":[]}` 를 반환하고 **사이드바가 빈 채로 떴다** (#251).
  *
- * **무엇을 넣는가 (판단 근거)**: 리드 결정(#242)은 "대시보드가 메인, 터미널은 여는 것"이고
- * 대시보드 화면은 아직 없다(#2 — 시세 적재 뒤). 그래서 **지금 존재하고 개인이 혼자 쓸 수
- * 있는 화면만** 넣는다 — 터미널(mbiz1008)과 관심종목(mbiz1001). 대시보드가 생기면 그 메뉴를
- * 여기에 더한다. 이 목록에 있어도 DB 에 없거나 `use_at='N'` 인 메뉴는 건너뛴다(운영자가 끈
- * 메뉴를 되살리지 않는다).
+ * **무엇을 넣는가 (판단 근거)**: 화면 설계 §20.2 가 **실험대를 홈으로** 정했고, 로그인 후
+ * 착지점이 그 경로다(`constants/shell.ts` 의 `BENCH_PATH`). 착지점이 이 목록에 없으면 가입자가
+ * 로그인 직후 게이트에 튕긴다. 그래서 **지금 존재하고 개인이 혼자 쓸 수 있는 화면만** 넣는다 —
+ * 실험대(mbiz1009)·시세(mbiz1008)·관심종목(mbiz1001). 이 목록에 있어도 DB 에 없거나
+ * `use_at='N'` 인 메뉴는 건너뛴다(운영자가 끈 메뉴를 되살리지 않는다).
  *
  * 교집합의 다른 한쪽(권한)은 `prisma/init/seed.sql` 의 `tn_author_menu` 가 정한다 — 기본
  * 권한(`DEFAULT_USER_AUTHOR_ID`)이 이 목록을 전부 갖지 않으면 여기 넣어도 안 보인다.
  * 두 곳이 어긋나면 사이드바가 다시 조용히 비므로
  * `tests/regressions/251-personal-workspace-menu.test.ts` 가 둘을 대조한다.
  */
-export const PERSONAL_WORKSPACE_DEFAULT_MENU_IDS = ["mbiz1008", "mbiz1001"];
+export const PERSONAL_WORKSPACE_DEFAULT_MENU_IDS = ["mbiz1009", "mbiz1008", "mbiz1001"];
 
 /**
  * 공용/개인 이메일 도메인 블랙리스트.

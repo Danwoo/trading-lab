@@ -13,17 +13,18 @@ import { TextBox } from "@/components/shared/ui/TextBox";
 import { showMessage } from "@/stores/shared/messageStore";
 import { fetchNavigation } from "@/services/common/menuService";
 import { useNavStore } from "@/stores/shared/navStore";
+import { BENCH_PATH } from "@/constants/shell";
+import { collectNavPaths, findFirstNavPath, type NavItem } from "@/lib/shell/nav";
 
-const findFirstPath = (items: { path?: string; items?: any[] }[]): string | null => {
-  for (const item of items) {
-    if (item.path) return item.path;
-    if (item.items) {
-      const found = findFirstPath(item.items);
-      if (found) return found;
-    }
-  }
-  return null;
-};
+/**
+ * 로그인 후 착지점 — **실험대가 홈이다**(화면 설계 §20.2).
+ *
+ * 그래도 메뉴에 있는지를 먼저 본다. 메뉴 게이트가 fail-closed 라, 실험대 메뉴를 못 받은
+ * 사용자를 그리로 보내면 셸이 곧바로 로그인 화면으로 되튕겨 "로그인이 안 된다"로 보인다.
+ * 그 경우에는 예전처럼 접근 가능한 첫 화면으로 간다.
+ */
+const resolveLandingPath = (items: NavItem[]): string | null =>
+  collectNavPaths(items).includes(BENCH_PATH) ? BENCH_PATH : findFirstNavPath(items);
 
 export const Login = () => {
   const router = useRouter();
@@ -59,8 +60,8 @@ export const Login = () => {
               return;
             }
             const nav = await fetchNavigation();
-            const firstPath = findFirstPath(nav.items);
-            if (!firstPath) {
+            const landingPath = resolveLandingPath(nav.items);
+            if (!landingPath) {
               // 접근 가능한 메뉴 없음 — 비정상 상태, 안내 후 admin 밖으로
               await showMessage(
                 "알림",
@@ -73,7 +74,7 @@ export const Login = () => {
               router.replace("/");
               return;
             }
-            router.replace(firstPath);
+            router.replace(landingPath);
             return;
           } else if (error?.message?.includes("RejectedUser")) {
             await showMessage(
