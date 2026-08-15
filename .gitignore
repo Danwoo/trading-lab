@@ -9,3 +9,6 @@ __pycache__/
 
 # 브레인스토밍 시안 (세션 산출물 — 공유 대상 아님)
 .superpowers/
+
+# 어느 깊이의 node_modules 든 (frontend/.gitignore 의 `/node_modules` 는 그 폴더에만 앵커된다)
+node_modules/
