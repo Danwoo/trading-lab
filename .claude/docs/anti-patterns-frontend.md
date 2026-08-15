@@ -88,7 +88,7 @@ hit = Container 후보. 각 파일 Read 후 `useState` + `useEffect` + `fetch` �
 
 ```
 ❌ components/customer/CustomerList.tsx
-❌ app/(main)/admin/customer/_components/CustomerForm.tsx
+❌ app/admin/customer/_components/CustomerForm.tsx
 
 ✅ components/features/Customer/CustomerContainer.tsx
 ✅ components/features/Customer/CustomerDetailView.tsx
@@ -470,7 +470,7 @@ hit = React hook 사용 파일. 각 파일 Read 후 첫 줄에 `'use client'` �
    const BACKEND_URL = env.DOCS_SERVICE_URL + "/chat-session"
 ```
 
-**룰**: external proxy route 가 호출하는 backend path — `{SERVICE}_SERVICE_URL + "<P>"` 의 `<P>` — 의 prefix 부분이 실제 backend `APIRouter(prefix=...)` 와 **byte-identical** (sub-path 호출 시 prefix + 추가 segment). backend 가 SoT — case 변환·복수형화·임의 rename·재유도 금지. external 디렉토리(`app/api/external/{service}/{prefix}/`)는 frontend 그룹핑이라 디렉토리명 자체는 자유지만 **proxied `<P>` 는 backend 와 일치해야** 한다. client `BASE_URL`(`/api/external/{service}/{prefix}`)·admin page(`app/(main)/admin/{service}/{prefix}/`)·1:N `{child_route}` 도 동일. backend prefix 변경 시 lockstep. (route 컨벤션 = [`design-patterns-backend.md`](design-patterns-backend.md) 의 "라우트 (REST) 컨벤션")
+**룰**: external proxy route 가 호출하는 backend path — `{SERVICE}_SERVICE_URL + "<P>"` 의 `<P>` — 의 prefix 부분이 실제 backend `APIRouter(prefix=...)` 와 **byte-identical** (sub-path 호출 시 prefix + 추가 segment). backend 가 SoT — case 변환·복수형화·임의 rename·재유도 금지. external 디렉토리(`app/api/external/{service}/{prefix}/`)는 frontend 그룹핑이라 디렉토리명 자체는 자유지만 **proxied `<P>` 는 backend 와 일치해야** 한다. client `BASE_URL`(`/api/external/{service}/{prefix}`)·admin page(`app/admin/{service}/{prefix}/`)·1:N `{child_route}` 도 동일. backend prefix 변경 시 lockstep. (route 컨벤션 = [`design-patterns-backend.md`](design-patterns-backend.md) 의 "라우트 (REST) 컨벤션")
 
 **Detection** (📍 — proxied path 와 backend prefix cross-side 대조):
 ```bash

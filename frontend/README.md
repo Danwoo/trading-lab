@@ -69,8 +69,8 @@ npm run lint                     # eslint --fix
 ```
 app/
   (auth)/signup/          회원가입 플로우
-  (product)/              제품 셸 — 46px 아이콘 레일 + 372px 패널 자리 (실험대·시세)
-  (main)/admin/           관리 셸 — MDI 탭 섀시. 시스템관리 + 업무 화면 (관심종목/포트폴리오/리서치 챗)
+  (main)/                 제품 셸 (46px 레일 + 372px 패널) — 실험대·시세
+  admin/                  관리 셸 (MDI 탭 iframe) — 시스템관리 + 업무 화면
   api/common/             Prisma 직접 (system·signup·mypage)
   api/external/           Backend·MCP 프록시 (multi-agent·portfolio·devactivity 등)
   api/auth/[...all]/      Better Auth 핸들러

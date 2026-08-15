@@ -2,16 +2,22 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useNavStore } from "@/stores/shared/navStore";
 import { useTabStore } from "@/stores/shared/tabStore";
-import type { NavItem } from "@/lib/shell/nav";
 import { Icon } from "@/components/shared/ui/primitives/icons";
 import { cn } from "@/components/shared/ui/primitives/cn";
 
 interface Props {
   isDrawerOpen: boolean;
-  /** 그릴 메뉴 트리. 셸이 골라서 넘긴다 — 관리 셸은 자기 화면만 넘긴다(`selectAdminNavItems`). */
-  items: NavItem[];
   children: ReactNode;
+}
+
+interface NavItem {
+  id: string;
+  text: string;
+  icon?: string;
+  path?: string;
+  items?: NavItem[];
 }
 
 /**
@@ -30,9 +36,10 @@ interface Props {
  * 접근성: `<nav>` 랜드마크 + `role="tree"`/`treeitem` 과 `aria-expanded`·`aria-selected` 를
  * 붙인다. 그룹은 실제 `<button>` 이라 Tab·Enter·Space 로 펼칠 수 있다.
  */
-export function Sidebar({ isDrawerOpen, items: navItems, children }: Props) {
+export function Sidebar({ isDrawerOpen, children }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const navItems = useNavStore((s) => s.items);
   const openTab = useTabStore((s) => s.openTab);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 

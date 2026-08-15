@@ -359,7 +359,7 @@ flowchart LR
 - Create: `frontend/components/features/Terminal/PanelUnavailable.tsx`
 - Create: `frontend/components/features/Terminal/PanelSkeleton.tsx`
 - Create: `frontend/components/features/Terminal/panelProvenanceBridge.ts`
-- Create: `frontend/app/(product)/terminal/page.tsx` (착수 시점 경로는 `app/(main)/terminal/` — #73 S2 가 제품 셸로 옮겼다)
+- Create: `frontend/app/(main)/terminal/page.tsx`
 - Create: `frontend/lib/terminal/__tests__/capabilityMatrix.test.ts`
 - Modify: `frontend/prisma/init/seed.sql` (메뉴 행 추가 — 아래 T3-8)
 - Modify: `frontend/package.json` (`react-grid-layout` 2.2.3 추가)
@@ -395,14 +395,14 @@ flowchart LR
 - T3-4 `PanelFrame` + `PanelMenu` + `PanelErrorBoundary` + `PanelSkeleton`. 메뉴에는 이동 4방향·크기 2축·접기·닫기가 **버튼**으로 들어가 키보드로 도달 가능해야 한다.
 - T3-5 `PanelPicker` — 닫힌 패널 목록에서 다시 여는 UI. `listPanelDefinitions()` 중 현재 레이아웃에 없는 것만 보여준다.
 - T3-6 `ProvenanceBadge` · `PanelUnavailable` · `panelProvenanceBridge`.
-- T3-7 `TerminalContainer` + `app/(product)/terminal/page.tsx`. 컨테이너는 레이아웃 스토어의 `recovered` 가 true 면 "저장된 배치를 읽지 못해 기본 배치로 열었습니다" 알림을 띄우고 `dismissRecovered` 로 닫는다.
-- T3-8 **메뉴 등록.** 제품 셸(`app/(product)/layout.tsx`)은 DB 메뉴에 없는 경로를 fail-closed 로 막고 `/` 로 되돌린다 — 등록하지 않으면 화면이 아예 안 열린다 [Source: 설계 §3.8]. `frontend/prisma/init/seed.sql` 의 "3. 메뉴" 절 형식을 따라 `tn_menu` 에 행을 추가하고(`url` 값은 앞의 슬래시 없이 `admin/watchlist` 와 같은 형식), 같은 파일의 `tn_workspace_menu`·`tn_author_menu` 절에도 대응 행을 추가한다. 개발 DB 에는 그 INSERT 를 직접 실행해 반영한다.
+- T3-7 `TerminalContainer` + `app/(main)/terminal/page.tsx`. 컨테이너는 레이아웃 스토어의 `recovered` 가 true 면 "저장된 배치를 읽지 못해 기본 배치로 열었습니다" 알림을 띄우고 `dismissRecovered` 로 닫는다.
+- T3-8 **메뉴 등록.** `app/(main)/layout.tsx` 는 DB 메뉴에 없는 경로를 fail-closed 로 막고 `/` 로 되돌린다 — 등록하지 않으면 화면이 아예 안 열린다 [Source: 설계 §3.8]. `frontend/prisma/init/seed.sql` 의 "3. 메뉴" 절 형식을 따라 `tn_menu` 에 행을 추가하고(`url` 값은 앞의 슬래시 없이 `admin/watchlist` 와 같은 형식), 같은 파일의 `tn_workspace_menu`·`tn_author_menu` 절에도 대응 행을 추가한다. 개발 DB 에는 그 INSERT 를 직접 실행해 반영한다.
 
 **완료 조건**
 
 - `cd frontend && npm test` 0 종료 (가용성 매트릭스 5 케이스 포함)
 - `cd frontend && npx tsc --noEmit` 0 종료
-- `git grep -n "devextreme" -- frontend/components/features/Terminal/ frontend/lib/terminal/ 'frontend/app/(product)/terminal/'` 0 hit
+- `git grep -n "devextreme" -- frontend/components/features/Terminal/ frontend/lib/terminal/ 'frontend/app/(main)/terminal/'` 0 hit
 - `git grep -n "contextActions\|contextStore" -- frontend/components/features/Terminal/` 의 hit 가 `TerminalContainer.tsx` 밖에 없다(셸은 문맥을 바꿀 수 있다 — 패널이 못 바꾸는 것이 규약이다)
 - 브라우저에서 터미널 경로를 열어 확인: 빈 격자가 뜨고(접근 거부 토스트가 뜨지 않고), 패널 목록 UI 가 열리며, `localStorage` 를 손으로 손상시킨 뒤 새로고침하면 기본 배치 + 알림이 뜬다
 

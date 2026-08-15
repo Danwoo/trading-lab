@@ -3,7 +3,6 @@ import { MenuOut, MenusOut, MenuCreateInSchema, MenuUpdateInSchema, MenuParentOp
 import { AuthorOptionsOut } from "@/schemas/common/author";
 import { CreateOut, UpdateOut, DeleteOut } from "@/schemas/common/types";
 import { handleZodValidationError, validateWithZod } from "@/lib/zod/validation";
-import type { NavItem } from "@/lib/shell/nav";
 
 const BASE_URL = "/api/common/system/menu";
 
@@ -44,8 +43,8 @@ export const deleteMenu = async (data: any): Promise<DeleteOut | null> => {
   return apiCall<DeleteOut>(`${BASE_URL}/${menu_id}`, { method: "DELETE" });
 };
 
-export const fetchNavigation = async (): Promise<{ items: NavItem[] }> => {
-  const result = await apiCall<{ items: NavItem[] }>(`${BASE_URL}/navigation`, { method: "GET" });
+export const fetchNavigation = async (): Promise<{ items: any[] }> => {
+  const result = await apiCall<{ items: any[] }>(`${BASE_URL}/navigation`, { method: "GET" });
   return result ?? { items: [] };
 };
 
