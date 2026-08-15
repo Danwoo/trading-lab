@@ -58,7 +58,7 @@ SCAN_ROOTS = ("components", "app")
 MIN_SCANNED_FILES = 100
 
 # allowlist 상한. **내려가기만 한다** — 머리 주석 「allowlist」 참조.
-ALLOWLIST_CAP = 64
+ALLOWLIST_CAP = 61
 
 # 위반 사유별 문구. 지금 등록분은 전부 「디자인 시스템 적용 전」이라 사유가 갈리지 않는다 —
 # 자리마다 다른 이유를 지어내기보다 무엇을 기다리는 등록인지 한 줄로 밝힌다.
@@ -78,9 +78,6 @@ ALLOWLIST: dict[str, str] = {
     "components/features/Common/Auth/Signupcmpl.tsx": TEMPLATE_SCREEN,
     "components/features/Common/Auth/Signupinfo.tsx": TEMPLATE_SCREEN,
     "components/features/Common/Mypage/Mypage.tsx": TEMPLATE_SCREEN,
-    "components/features/Common/Policy/PolicyPopup.tsx": TEMPLATE_SCREEN,
-    "components/features/Common/Policy/Privacy.tsx": TEMPLATE_SCREEN,
-    "components/features/Common/Policy/Terms.tsx": TEMPLATE_SCREEN,
     "components/features/Common/System/Author/AuthorDetailForm.tsx": SYSTEM_SCREEN,
     "components/features/Common/System/Author/AuthorMenuGrid.tsx": SYSTEM_SCREEN,
     "components/features/Common/System/Menu/MenuDetailForm.tsx": SYSTEM_SCREEN,

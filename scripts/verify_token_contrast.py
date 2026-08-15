@@ -137,14 +137,14 @@ LEGACY_TOKENS = frozenset(
 # 셋째 항목은 레거시 토큰이 그 벌에 실제로 뜨는지.
 TOKEN_SETS: list[tuple[str, tuple[str, ...], bool]] = [
     ("다크 · 한국식", (":root",), True),
-    ("다크 · 미국식", (":root", ':root[data-market-preset="us"]'), True),
-    ("라이트 · 한국식", (":root", ':root[data-theme="light"]'), False),
+    ("다크 · 미국식", (":root", '[data-market-preset="us"]'), True),
+    ("라이트 · 한국식", (":root", '[data-theme="light"]'), False),
     (
         "라이트 · 미국식",
         (
             ":root",
-            ':root[data-theme="light"]',
-            ':root[data-theme="light"][data-market-preset="us"]',
+            '[data-theme="light"]',
+            '[data-theme="light"][data-market-preset="us"]',
         ),
         False,
     ),
@@ -237,8 +237,15 @@ def verdict(ratio: float) -> str:
 
 
 def block_bodies(css: str, selector: str) -> list[str]:
-    """`selector { ... }` 블록의 본문 전부 (같은 선택자가 여러 번 나오면 순서대로)."""
-    pattern = re.compile(re.escape(selector) + r"\s*\{(.*?)\}", re.S)
+    """`selector { ... }` 블록의 본문 전부 (같은 선택자가 여러 번 나오면 순서대로).
+
+    앞을 `(?:^|[\s;}])` 로 막는 이유: 그냥 찾으면 `[data-market-preset="us"]` 가
+    `[data-theme="light"][data-market-preset="us"]` 안에서도 걸려 다크 벌이 라이트 값을
+    집어온다. 실제로 그렇게 잘못 조립됐고, 미달 10건으로 시끄럽게 드러났다.
+    """
+    pattern = re.compile(
+        r"(?:^|[\s;}])" + re.escape(selector) + r"\s*\{(.*?)\}", re.S | re.M
+    )
     return pattern.findall(css)
 
 

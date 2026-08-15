@@ -44,11 +44,15 @@
    .auth-backdrop, .auth-backdrop--hero, lib/terminal/candleChart.ts 네 곳이 그 계약을 따른다.
 
    ── 두 벌(다크·라이트) 구성 ──────────────────────────────────────────────
-   `:root` 가 다크(기본), `:root[data-theme="light"]` 가 라이트다. 등락색 프리셋(kr/us)은
+   `:root` 가 다크(기본), `[data-theme="light"]` 가 라이트다. 등락색 프리셋(kr/us)은
    `data-market-preset` 속성으로 갈린다 — 네 벌(모드 2 × 프리셋 2)이 전부 CSS 안에 있고,
    전환은 속성 하나를 바꾸는 것뿐이라 모드와 프리셋이 서로를 덮어쓸 수 없다.
-   선택자 순서 주의: `:root[data-theme="light"]` 와 `:root[data-market-preset="us"]` 는
-   명시도가 같으므로(0,2,0) **라이트 블록이 뒤에 와야** 라이트에서 다크 us 값이 남지 않는다.
+
+   두 속성 선택자를 `:root` 로 묶지 않은 이유: 커스텀 프로퍼티는 상속되므로, 루트가 아닌
+   컨테이너에 `data-theme="light"` 를 달면 **그 부분 트리만** 라이트가 된다. 다크 셸 안의
+   밝은 화면(정책 본문 등)이 토큰을 그대로 쓰려면 이 자리가 필요하다.
+   선택자 순서 주의: `[data-theme="light"]` 와 `[data-market-preset="us"]` 는 명시도가
+   같으므로(0,1,0) **라이트 블록이 뒤에 와야** 라이트에서 다크 us 값이 남지 않는다.
 
    값의 근거는 scripts/verify_token_contrast.py 가 매 PR 에 전수로 출력한다. 잉크 4단은
    `--ink-faint` 를 AA(4.5:1) 바로 위에 놓고 `--ink-muted` 를 `--ink` 와 `--ink-faint` 의
@@ -150,14 +154,14 @@
 
 /* 등락색 미국식(녹=상승·적=하락). 상태색(--danger/--success)은 여기 없다 — 프리셋을 따라가지
    않는 것이 §2.2 의 불변식이다. */
-:root[data-market-preset="us"] {
+[data-market-preset="us"] {
   --market-up: 95 163 76;
   --market-down: 240 87 68;
 }
 
 /* 라이트 — 명도만 뒤집고 온도 배치는 유지한다: 바탕은 차갑고(#E8EAEC) 글자는 따뜻하다(#2E2B26).
    따뜻함이 글자에만 있으므로 라이트 배경이 크림색으로 흐를 여지가 구조적으로 없다. */
-:root[data-theme="light"] {
+[data-theme="light"] {
   --bg-base: 232 234 236;
   --bg-panel: 244 245 246;
   --bg-raised: 226 229 232;
@@ -187,7 +191,7 @@
   --e1: 0 1px 2px rgb(40 45 50 / 0.08), 0 6px 18px rgb(40 45 50 / 0.06);
 }
 
-:root[data-theme="light"][data-market-preset="us"] {
+[data-theme="light"][data-market-preset="us"] {
   --market-up: 67 111 51;
   --market-down: 176 58 41;
 }

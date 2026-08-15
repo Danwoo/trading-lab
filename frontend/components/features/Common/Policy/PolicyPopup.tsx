@@ -47,7 +47,7 @@ const PolicyPopup = forwardRef<PolicyPopupRef, Props>(
     return (
       <>
         {showButtons && (
-          <ul className="hidden sm:flex justify-end text-white pb-5">
+          <ul className="hidden sm:flex justify-end text-ink-strong pb-5">
             <li className="mr-5">
               <Button text="이용약관" onClick={showTermsPopup} stylingMode="text" className={finalClassName} />
             </li>
