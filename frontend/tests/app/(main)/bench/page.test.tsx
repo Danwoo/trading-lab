@@ -198,6 +198,21 @@ describe("봇 목록 실패 — 「0개」로 뭉개지 않는다", () => {
     expect(zone.textContent).not.toContain("아직 만든 봇이 없습니다");
     expect(zone.textContent).toContain("멈추는 것");
   });
+
+  it("원인 문구가 영향 범위보다 앞에 서지 않는다 (§21.5)", async () => {
+    givenBackend({ bots: null });
+    render(<BenchPage />);
+
+    const zone = firstRegion("내 봇");
+    await waitFor(() => expect(zone.textContent).toContain("멈추는 것"));
+
+    const text = zone.textContent ?? "";
+    // 훅이 내는 일반 실패 문구(`useOnDemand` 의 `unavailable` 사유). 자리의 사유 줄로 한 번 더
+    // 나오면 영향 범위 위에 서게 된다.
+    expect(text).not.toContain("요청을 처리하지 못했습니다");
+    // 원인(`detail`)은 맨 뒤 — 영향 범위 다음이다.
+    expect(text.indexOf("멈추는 것")).toBeLessThan(text.indexOf("봇 목록을 불러오지 못했습니다"));
+  });
 });
 
 describe("폭 구간은 CSS 가 가른다 (§21.6 · 반응형 규칙)", () => {

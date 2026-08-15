@@ -20,7 +20,9 @@ export function useBotRoster(): PanelData<BotOut[]> {
   return useOnDemand<BotOut[]>({
     group: "bench-bot-roster",
     enabled: true,
-    source: "내 봇",
+    // 자리 이름(「내 봇」)과 같은 말을 쓰면 제목 옆에 같은 낱말이 두 번 선다 — 배지는 어디서 온
+    // 값인지를 말하는 자리다.
+    source: "봇 목록",
     fetcher: async () => {
       const result = await selectBotList({ skip: 0, take: ROSTER_PAGE_SIZE });
       if (result === null) throw new Error("봇 목록을 불러오지 못했습니다");

@@ -178,16 +178,18 @@ export default function Page() {
           incoming="만든 봇과 지금 상태."
           provenance={rosterProvenance}
           marked={selection?.kind === "bot"}
+          notice={
+            rosterUnreadable ? (
+              <ImpactNotice
+                headline="봇 목록을 읽지 못했습니다 — 「0개」인지 「못 읽었다」인지 모르는 상태입니다"
+                halted={["내 봇 목록", "봇 수에 따른 안내"]}
+                running={["봇 만들기", "시세 보기"]}
+                detail={roster.error?.message ?? null}
+              />
+            ) : undefined
+          }
         >
           <SelectionLine selection={selection} kind="bot" />
-          {rosterUnreadable && (
-            <ImpactNotice
-              headline="봇 목록을 읽지 못했습니다 — 「0개」인지 「못 읽었다」인지 모르는 상태입니다"
-              halted={["내 봇 목록", "봇 수에 따른 안내"]}
-              running={["봇 만들기", "시세 보기"]}
-              detail={roster.error?.message ?? null}
-            />
-          )}
           {bots !== null && bots.length > 0 && (
             <ul className="flex flex-col gap-1">
               {bots.map((bot) => (

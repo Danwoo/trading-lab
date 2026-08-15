@@ -14,6 +14,12 @@ interface Props {
   provenance: Provenance;
   /** 보드↔패널 선택이 이 자리를 가리키고 있나 (§20.2) */
   marked?: boolean;
+  /**
+   * 이 자리가 **실패**했을 때의 알림(`ImpactNotice`). 주면 `reason` 한 줄을 **대신한다** —
+   * 둘 다 내면 원인 문구가 영향 범위 위에 서서 §21.5 의 순서가 뒤집힌다. 원인은 알림의
+   * `detail` 로 내려가 맨 뒤에 온다.
+   */
+  notice?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -25,7 +31,7 @@ interface Props {
  *
  * 폭·높이를 px 로 박지 않는다. 부모 격자가 주는 자리를 채우고, 글은 잘리지 않고 접힌다.
  */
-export function BoardZone({ title, incoming, provenance, marked = false, children }: Props) {
+export function BoardZone({ title, incoming, provenance, marked = false, notice, children }: Props) {
   const reason = provenance.kind === "unavailable" ? provenance.reason : null;
 
   return (
@@ -45,10 +51,14 @@ export function BoardZone({ title, incoming, provenance, marked = false, childre
 
       <p className="mt-1 break-keep text-2xs text-ink-muted">{incoming}</p>
 
-      {reason && (
-        <p role="status" className="mt-2 break-keep text-sm text-ink">
-          {reason}
-        </p>
+      {notice ? (
+        <div className="mt-2 min-w-0">{notice}</div>
+      ) : (
+        reason && (
+          <p role="status" className="mt-2 break-keep text-sm text-ink">
+            {reason}
+          </p>
+        )
       )}
 
       {children && <div className="mt-2 min-w-0">{children}</div>}
