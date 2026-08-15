@@ -13,7 +13,7 @@
 ## 무엇을 검사하나
 
 1. **고정 기준 케이스** — WCAG 명세가 값을 못박은 두 점(검정↔흰색 = 21:1, 같은 색 = 1:1)과
-   `--ink-faint` 결정(#73 S1 ㉠)의 전후 값. 계산식이 틀어지면 여기가 먼저 빨개진다.
+   `--ink-faint` 결정(#73 S1 ㉡)의 전후 값. 계산식이 틀어지면 여기가 먼저 빨개진다.
    케이스를 0건 모으면 실패한다.
 2. **네 벌 전수 조합** — 화면이 실제로 띄우는 조합은 모드(다크·라이트) × 등락 프리셋(kr·us)
    네 벌이고, 각 벌은 `:root` 위에 자기 선택자를 겹쳐 만들어진다. 네 벌을 각각 따로 조립해
@@ -91,10 +91,12 @@ EXACT_ROLES: dict[str, str] = {
     "--btn-inset": NON_TEXT,
     "--ink": INK_ANY,
     "--ink-strong": INK_ANY,
-    "--ink-muted": INK_ANY,
     "--ink-primary": INK_ANY,
-    # 라벨·표 헤더 전용. 버튼 라벨로는 쓰지 않는다(§1.4).
-    "--ink-faint": INK_CONTENT,
+    # 라벨·표 헤더가 여기로 강등됐다(리드 결정 ㉡). 버튼 라벨은 --ink 계열이 받는다(§1.4).
+    "--ink-muted": INK_CONTENT,
+    # **비텍스트 전용** — 선·아이콘에만 쓴다. 글자에 쓰지 않기로 한 값이라 텍스트 대비
+    # 곱집합에서 뺀다. 이 분류가 ㉡ 결정을 코드로 강제하는 자리다.
+    "--ink-faint": NON_TEXT,
     # 상태색은 메시지·배지·테두리에만 온다 — 버튼 채움이 되지 않는다(§2.3).
     "--danger": INK_CONTENT,
     "--success": INK_CONTENT,
@@ -150,17 +152,18 @@ TOKEN_SETS: list[tuple[str, tuple[str, ...], bool]] = [
     ),
 ]
 
-# WCAG 명세가 못박은 두 점 + `--ink-faint` 결정(㉠)의 전후 값.
-# 앞 세 줄은 디자인 시스템 §7.1 이 손계산으로 적은 값이고, 뒤 두 줄은 그 자리에 들어간 새 값이다.
+# WCAG 명세가 못박은 두 점 + `--ink-faint` 결정(㉡)의 전후 값.
+# 앞 세 줄은 디자인 시스템 §7.1 이 손계산으로 적은 값이고(그중 `--ink-faint` 두 줄이 ㉡ 으로
+# 텍스트에서 내려온 값이다), 뒤 두 줄은 라벨·표 헤더를 새로 받는 `--ink-muted` 자리다.
 # **문서 값이 바뀌면 여기도 같이 바꾼다.** `expected` 는 소수 둘째 자리까지 일치해야 한다.
 REFERENCE_CASES: list[tuple[str, str, str, float]] = [
     ("WCAG 최대 — 검정 on 흰색", "#000000", "#FFFFFF", 21.00),
     ("WCAG 최소 — 같은 색", "#16191C", "#16191C", 1.00),
     ("§7.1 옛 다크 --ink-faint on --bg-panel", "#625E58", "#16191C", 2.74),
     ("§7.1 옛 라이트 --ink-faint on --bg-panel", "#94908A", "#F4F5F6", 2.91),
-    ("§7.1 옛 다크 --ink-muted on --bg-raised", "#8B877F", "#1C2126", 4.53),
-    ("㉠ 새 다크 --ink-faint on --bg-panel", "#8F8A81", "#16191C", 5.14),
-    ("㉠ 새 라이트 --ink-faint on --bg-panel", "#66635F", "#F4F5F6", 5.47),
+    ("§7.1 다크 --ink-muted on --bg-raised", "#8B877F", "#1C2126", 4.53),
+    ("㉡ 라벨 자리 다크 --ink-muted on --bg-panel", "#8B877F", "#16191C", 4.93),
+    ("㉡ 라벨 자리 라이트 --ink-muted on --bg-panel", "#67635D", "#F4F5F6", 5.47),
 ]
 
 DECLARATION = re.compile(r"(--[A-Za-z0-9-]+)\s*:\s*([^;]+);")
@@ -425,9 +428,12 @@ def check_set(
 
 
 def print_ink_ladder(sets: dict[str, dict[str, str]]) -> None:
-    """잉크 4단이 서로 얼마나 갈리는지 — ㉠ 이 감수한 「판별력」을 수치로 남긴다."""
-    print("── 잉크 사다리 인접 단 대비 (색만으로 위계가 서는지) ──")
-    ladder = ["--ink-strong", "--ink", "--ink-muted", "--ink-faint"]
+    """텍스트 잉크 3단이 서로 얼마나 갈리는지 — 위계가 색만으로 서는지 수치로 남긴다.
+
+    `--ink-faint` 는 여기 없다. ㉡ 이 그 값을 비텍스트로 내렸고, 텍스트 위계는 3단이다.
+    """
+    print("── 텍스트 잉크 사다리 인접 단 대비 (색만으로 위계가 서는지) ──")
+    ladder = ["--ink-strong", "--ink", "--ink-muted"]
     for label in ("다크 · 한국식", "라이트 · 한국식"):
         tokens = sets[label]
         values = [parse_color(tokens[name]) for name in ladder]
@@ -442,8 +448,8 @@ def print_ink_ladder(sets: dict[str, dict[str, str]]) -> None:
         ]
         print(f"  {label}: " + " · ".join(pairs))
     print(
-        "  좁은 간격은 굵기가 받는다 — 라벨·표 헤더(--ink-faint 자리)는 본문 400 이 아니라 "
-        "--weight-ui(500)를 쓴다(globals.css 「굵기 3단」)."
+        "  라벨·표 헤더는 --ink-muted 가 받는다(리드 결정 ㉡). --ink-faint 는 비텍스트 전용이라 "
+        "이 사다리에 없다."
     )
     print()
 
