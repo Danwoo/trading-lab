@@ -10,7 +10,7 @@ interface Props {
 // 종전엔 devextreme-react/scroll-view 였다(#341 ⑤) — Terms.tsx 와 같은 이유로 자체 스크롤 박스 없이 본문만.
 export const Privacy: FC<Props> = ({ onClose }) => {
   return (
-    <div className="p-4 text-[#455172] bg-[#F5F7FC] whitespace-pre-wrap">
+    <div data-theme="light" className="p-4 text-ink bg-bg-panel whitespace-pre-wrap">
       <h1 className="font-extrabold text-xl my-3">1. 개인정보의 수집 항목 및 이용 목적</h1>
 
       {`수집 항목: 이름, 이메일 주소, IP 주소 등 서비스 이용에 필요한 최소한의 개인정보를 수집합니다.

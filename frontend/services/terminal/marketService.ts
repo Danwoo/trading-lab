@@ -192,3 +192,42 @@ export async function selectMarketCapabilities(market?: string): Promise<MarketC
     reason: row.reason,
   }));
 }
+
+interface GapsOut {
+  items: string[];
+  total_count: number;
+  market: string;
+  symbol: string;
+  date_from: string;
+  date_to: string;
+}
+
+export interface BarGaps {
+  /** 캘린더상 거래일인데 적재본에 없는 날짜(`YYYY-MM-DD`). 휴장일은 여기 들어오지 않는다. */
+  missingDates: string[];
+  dateFrom: string;
+  dateTo: string;
+}
+
+/**
+ * 적재 완결성 — "이 종목 이 구간에 빠진 거래일이 있는가". 서버가 거래일 캘린더와 적재본을 대조해
+ * 계산하며 저장하지 않는다(MD-AD-23).
+ *
+ * **결측과 휴장을 가르는 것이 이 조회의 전부다.** 캔들이 없는 날을 화면이 스스로 세면 휴장일까지
+ * 결측으로 세게 되고, 그러면 "빠진 게 있다"가 늘 참이라 아무 정보도 아니게 된다.
+ */
+export async function selectBarGaps(params: {
+  ticker: string;
+  market: string;
+  from: string;
+  to: string;
+}): Promise<BarGaps> {
+  const result = await apiCall<GapsOut>(`${BAR_URL}/gaps`, {
+    method: "GET",
+    params: { market: params.market, symbol: params.ticker, date_from: params.from, date_to: params.to },
+  });
+  if (result === null) {
+    return { missingDates: [], dateFrom: params.from, dateTo: params.to };
+  }
+  return { missingDates: result.items, dateFrom: result.date_from, dateTo: result.date_to };
+}

@@ -42,7 +42,7 @@ export function TerminalContainer() {
 
   useEffect(() => {
     const preset = readStoredMarketColorPreset() ?? DEFAULT_MARKET_COLOR_PRESET;
-    applyMarketColorPreset(preset, document.documentElement.style);
+    applyMarketColorPreset(preset, document.documentElement);
   }, []);
 
   const knownTypes = useMemo(() => listPanelDefinitions().map((d) => d.type), []);

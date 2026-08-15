@@ -3,6 +3,7 @@ import {
   applyMarketColorPreset,
   DEFAULT_MARKET_COLOR_PRESET,
   isMarketColorPreset,
+  MARKET_PRESET_ATTRIBUTE,
   readStoredMarketColorPreset,
   storeMarketColorPreset,
 } from "@/lib/terminal/marketColorPreset";
@@ -21,25 +22,22 @@ describe("marketColorPreset", () => {
     expect(isMarketColorPreset("green")).toBe(false);
   });
 
-  it("kr 과 us 의 상승/하락 값이 서로 다르다 (뒤집힘 방지)", () => {
-    const setProperty = vi.fn();
-    applyMarketColorPreset("kr", { setProperty });
-    const krCalls = [...setProperty.mock.calls];
-    setProperty.mockClear();
-    applyMarketColorPreset("us", { setProperty });
-    const usCalls = setProperty.mock.calls;
+  it("kr 과 us 가 서로 다른 속성값을 싣는다 (뒤집힘 방지)", () => {
+    const setAttribute = vi.fn();
+    applyMarketColorPreset("kr", { setAttribute });
+    applyMarketColorPreset("us", { setAttribute });
 
-    const krUp = krCalls.find(([name]) => name === "--market-up")?.[1];
-    const usUp = usCalls.find(([name]) => name === "--market-up")?.[1];
-    expect(krUp).not.toBe(usUp);
+    const values = setAttribute.mock.calls.map(([, value]) => value);
+    expect(values).toEqual(["kr", "us"]);
   });
 
-  it("applyMarketColorPreset 이 --market-up/--market-down 두 변수를 모두 설정한다", () => {
-    const setProperty = vi.fn();
-    applyMarketColorPreset("kr", { setProperty });
-    expect(setProperty).toHaveBeenCalledWith("--market-up", expect.any(String));
-    expect(setProperty).toHaveBeenCalledWith("--market-down", expect.any(String));
-    expect(setProperty).toHaveBeenCalledTimes(2);
+  it("applyMarketColorPreset 은 속성 하나만 싣는다 — 인라인 스타일을 박지 않는다", () => {
+    // 인라인 스타일은 모든 선택자를 이기므로 값을 박으면 라이트 모드의 등락색이 다크 값에
+    // 영원히 덮인다(#73 S1). 이 테스트가 그 회귀를 막는다.
+    const setAttribute = vi.fn();
+    applyMarketColorPreset("kr", { setAttribute });
+    expect(setAttribute).toHaveBeenCalledTimes(1);
+    expect(setAttribute).toHaveBeenCalledWith(MARKET_PRESET_ATTRIBUTE, "kr");
   });
 });
 
