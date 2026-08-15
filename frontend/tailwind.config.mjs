@@ -12,9 +12,9 @@ export const theme = {
       // 변수는 "R G B" 채널 문자열(예: "217 164 65")로 저장하고 여기서 rgb() + <alpha-value>
       // 로 감싼다 — Tailwind v3 는 순수 var() 문자열엔 opacity modifier(`/40` 등)를 적용하지
       // 못하고 그 유틸리티를 조용히 생략한다(#313). 이 패턴이라야 `bg-signal-warn/10` 같은
-      // 조합이 실제 CSS 로 생성된다. 채널을 직접 읽는 다른 소비자(lib/terminal/candleChart.ts
-      // 의 getComputedStyle, lib/terminal/marketColorPreset.ts 의 setProperty)도 같은 형식을
-      // 맞춰야 한다 — 전수 확인은 #313 커밋 참고.
+      // 조합이 실제 CSS 로 생성된다. 채널을 직접 읽는 소비자는 이제 하나다 —
+      // lib/terminal/candleChart.ts 의 getComputedStyle 이고, 그 폴백 채널도 같은 형식이어야
+      // 한다. marketColorPreset.ts 는 속성만 싣고 값은 globals.css 가 소유한다(#73 S1).
       bg: {
         base: "rgb(var(--bg-base) / <alpha-value>)",
         panel: "rgb(var(--bg-panel) / <alpha-value>)",

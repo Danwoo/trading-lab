@@ -41,7 +41,7 @@ export function createCandleChart(container: HTMLElement): CandleChartHandle {
   const upColor = readCssColor(container, "--market-up", "240 87 68");
   const downColor = readCssColor(container, "--market-down", "77 147 209");
   const gridColor = readCssColor(container, "--hairline", "38 43 48");
-  const textColor = readCssColor(container, "--ink-muted", "185 179 169");
+  const textColor = readCssColor(container, "--ink-muted", "139 135 127");
   const bgColor = readCssColor(container, "--bg-panel", "22 25 28");
 
   const chart: IChartApi = createChart(container, {
