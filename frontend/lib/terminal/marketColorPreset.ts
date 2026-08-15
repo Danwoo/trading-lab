@@ -1,7 +1,8 @@
 /**
  * 상승/하락 의미 토큰(`--market-up`/`--market-down`)의 전환 기전 (#242 O3 착수 코멘트).
  * 한국식(적=상승·청=하락)과 미국식(녹=상승·적=하락)은 관습이 정반대라, 패널은 이 값을
- * 직접 참조하지 않고 CSS 변수만 참조한다 — 프리셋이 값을 채운다.
+ * 직접 참조하지 않고 CSS 변수만 참조한다 — 이 모듈은 어느 벌을 쓸지만 고른다.
+ * 값 자체는 `styles/globals.css` 가 소유한다(모드 2 × 프리셋 2 네 벌, #73 S1).
  *
  * O3 범위는 기전까지다: 토큰 + 전환 함수 + 지속. 프리셋을 고르는 설정 UI 는 만들지 않는다
  * (설정 표면이 아직 없다) — 이 모듈은 그 UI 가 생겼을 때 곧바로 붙일 수 있는 형태로만 존재한다.
@@ -14,13 +15,8 @@ export type MarketColorPreset = "kr" | "us";
 /** 기본값은 한국식 — 앱이 한국어 우선이라는 것 자체가 결정이므로 명시한다. */
 export const DEFAULT_MARKET_COLOR_PRESET: MarketColorPreset = "kr";
 
-// "R G B" 채널 문자열(헤더 없음) — styles/globals.css 의 --market-up/--market-down 초기값과
-// 같은 형식이어야 한다. Tailwind 가 이 값을 `rgb(var(--x) / <alpha-value>)` 로 소비해
-// opacity modifier 를 지원한다(#313) — 여기서 hex 를 돌려주면 그 조합이 다시 조용히 깨진다.
-const PRESET_VALUES: Record<MarketColorPreset, { up: string; down: string }> = {
-  kr: { up: "240 70 90", down: "59 130 246" },
-  us: { up: "34 197 94", down: "239 68 68" },
-};
+/** 프리셋을 싣는 루트 속성. 값 네 벌(모드 2 × 프리셋 2)은 styles/globals.css 가 갖는다. */
+export const MARKET_PRESET_ATTRIBUTE = "data-market-preset";
 
 const STORAGE_KEY = "terminal-market-color-preset";
 
@@ -46,13 +42,18 @@ export function storeMarketColorPreset(preset: MarketColorPreset): void {
   }
 }
 
-export interface CssPropertyTarget {
-  setProperty(name: string, value: string): void;
+export interface MarketPresetTarget {
+  setAttribute(name: string, value: string): void;
 }
 
-/** `target` 은 보통 `document.documentElement.style` — DOM 없이도 순수하게 테스트하기 위해 주입받는다. */
-export function applyMarketColorPreset(preset: MarketColorPreset, target: CssPropertyTarget): void {
-  const values = PRESET_VALUES[preset];
-  target.setProperty("--market-up", values.up);
-  target.setProperty("--market-down", values.down);
+/**
+ * `target` 은 보통 `document.documentElement` — DOM 없이도 순수하게 테스트하기 위해 주입받는다.
+ *
+ * 채널값을 인라인 스타일로 박지 않고 **속성만 바꾼다.** 인라인 스타일은 모든 선택자를 이기므로,
+ * 값을 여기서 박으면 라이트 모드(`:root[data-theme="light"]`)의 등락색이 영원히 다크 값에
+ * 덮인다 — 모드와 프리셋 두 축이 하나의 자리를 두고 다투게 된다. 속성 하나만 실으면 네 벌의
+ * 조합은 CSS 캐스케이드가 알아서 고르고, 모드가 바뀌어도 다시 부를 것이 없다.
+ */
+export function applyMarketColorPreset(preset: MarketColorPreset, target: MarketPresetTarget): void {
+  target.setAttribute(MARKET_PRESET_ATTRIBUTE, preset);
 }

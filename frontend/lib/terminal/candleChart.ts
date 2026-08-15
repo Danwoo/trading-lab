@@ -32,16 +32,17 @@ function toUtcTimestamp(time: string): UTCTimestamp {
 /**
  * `lightweight-charts` 를 import 하는 유일한 파일이다(#242 O6 계약) — 라이브러리 타입은 이
  * 함수의 반환 형태(`CandleChartHandle`) 밖으로 나가지 않는다. 색은 호출 시점의 CSS 변수
- * (`--market-up`·`--market-down`·`--slate-*`·`--ink-muted`)를 읽어 시각 정체성(#242 O3)을
- * 그대로 따른다. `layout.attributionLogo` 는 건드리지 않는다 — 기본값(표시)을 유지한다
+ * (`--market-up`·`--market-down`·`--hairline`·`--ink-muted`·`--bg-panel`)를 읽어 시각 정체성을
+ * 그대로 따른다 — `getComputedStyle` 이 캐스케이드 결과를 주므로 모드·프리셋 전환이 그대로
+ * 반영된다. `layout.attributionLogo` 는 건드리지 않는다 — 기본값(표시)을 유지한다
  * [Source: 설계 §7 판단 2 권고안].
  */
 export function createCandleChart(container: HTMLElement): CandleChartHandle {
-  const upColor = readCssColor(container, "--market-up", "240 70 90");
-  const downColor = readCssColor(container, "--market-down", "59 130 246");
-  const gridColor = readCssColor(container, "--slate-line", "35 42 54");
-  const textColor = readCssColor(container, "--ink-muted", "107 118 134");
-  const bgColor = readCssColor(container, "--slate-panel", "20 25 34");
+  const upColor = readCssColor(container, "--market-up", "240 87 68");
+  const downColor = readCssColor(container, "--market-down", "77 147 209");
+  const gridColor = readCssColor(container, "--hairline", "38 43 48");
+  const textColor = readCssColor(container, "--ink-muted", "185 179 169");
+  const bgColor = readCssColor(container, "--bg-panel", "22 25 28");
 
   const chart: IChartApi = createChart(container, {
     layout: {

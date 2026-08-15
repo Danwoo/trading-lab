@@ -1,5 +1,7 @@
-/** @type {import('tailwindcss').Config} */
+/** @type {import('tailwindcss').Config['content']} */
 export const content = ["./app/**/*.{js,ts,jsx,tsx}", "./components/**/*.{js,ts,jsx,tsx}"];
+
+/** @type {import('tailwindcss').Config['theme']} */
 export const theme = {
   extend: {
     fontFamily: {
