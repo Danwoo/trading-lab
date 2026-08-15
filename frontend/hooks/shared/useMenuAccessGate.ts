@@ -24,10 +24,16 @@ const matchesPath = (pathname: string, allowed: string): boolean =>
  * 둘로 갈리면서 게이트도 두 벌이 될 뻔했는데, 두 벌이 되면 한쪽만 고쳐 다른 쪽이 조용히
  * 열리는 사고가 난다(`#68` 이 그 계열이었다) — 그래서 한 자리에 둔다.
  *
- * @param alwaysAllowedPaths DB 메뉴에 없어도 여는 경로. **모듈 상수를 넘겨라** — 렌더마다 새
- *   배열을 만들면 아래 이펙트가 매 렌더 다시 돈다.
+ * @param alwaysAllowedPaths DB 메뉴에 없어도 여는 경로. **하위 경로까지 함께 열린다.**
+ *   **모듈 상수를 넘겨라** — 렌더마다 새 배열을 만들면 아래 이펙트가 매 렌더 다시 돈다.
+ * @param exactAllowedPaths DB 메뉴에 없어도 여는 경로 중 **자기 자신만** 여는 것. 셸의 진입점
+ *   (`/admin`)처럼 하위가 전부 메뉴로 게이팅돼야 하는 자리에 쓴다 — 이것을
+ *   `alwaysAllowedPaths` 에 넣으면 접두어 매칭이라 `/admin/*` 전체가 게이트 밖으로 나간다.
  */
-export function useMenuAccessGate(alwaysAllowedPaths: readonly string[] = NO_ALWAYS_ALLOWED_PATHS) {
+export function useMenuAccessGate(
+  alwaysAllowedPaths: readonly string[] = NO_ALWAYS_ALLOWED_PATHS,
+  exactAllowedPaths: readonly string[] = NO_ALWAYS_ALLOWED_PATHS,
+) {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -39,7 +45,8 @@ export function useMenuAccessGate(alwaysAllowedPaths: readonly string[] = NO_ALW
 
   useEffect(() => {
     if (!loaded) return;
-    const isAlwaysAllowed = alwaysAllowedPaths.some((p) => matchesPath(pathname, p));
+    const isAlwaysAllowed =
+      exactAllowedPaths.includes(pathname) || alwaysAllowedPaths.some((p) => matchesPath(pathname, p));
 
     // 네비 로드 실패 시 fail-closed — always-allowed 만 허용, 나머지는 fallback 으로
     if (error) {
@@ -61,7 +68,7 @@ export function useMenuAccessGate(alwaysAllowedPaths: readonly string[] = NO_ALW
       return;
     }
     setAuthorized(true);
-  }, [loaded, error, pathname, getAllPaths, router, alwaysAllowedPaths]);
+  }, [loaded, error, pathname, getAllPaths, router, alwaysAllowedPaths, exactAllowedPaths]);
 
   return { loaded, authorized };
 }

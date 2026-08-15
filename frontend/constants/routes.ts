@@ -14,6 +14,14 @@ export const BENCH_PATH = "/bench";
 export const MARKET_PATH = "/terminal";
 
 /**
+ * 관리 화면 — MDI 탭 섀시의 진입점(§20.2 「화면 전환은 「시세」와 `/admin` 둘뿐」).
+ *
+ * 이 경로에 페이지가 실재해야 레일의 「설정」이 열린다 — `app/admin/layout.tsx` 만 있고
+ * `page.tsx` 가 없으면 `/admin/*` 는 열려도 `/admin` 자체는 404 다.
+ */
+export const ADMIN_PATH = "/admin";
+
+/**
  * 로그인 후 착지점.
  *
  * **메뉴 게이트가 fail-closed 라 무조건 여기로 보내면 안 된다** — 이 경로가 사용자의
