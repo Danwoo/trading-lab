@@ -50,7 +50,10 @@ def check(condition: bool, message: str) -> None:
 
 def _engine():
     url = DB_URL if DB_URL.startswith("postgresql+") else DB_URL.replace("postgresql://", "postgresql+psycopg://", 1)
-    return create_engine(url)
+    # 레포 규약 — 바인드 파라미터 값이 예외 메시지·로그로 새지 않게 한다
+    # (tests/test_sql_parameter_hiding.py 가 전수 강제). 제약 이름은 그대로 보이므로
+    # 아래 유니크·CHECK 단언은 영향을 받지 않는다.
+    return create_engine(url, hide_parameters=True)
 
 
 def _bot_args(name: str) -> dict:
