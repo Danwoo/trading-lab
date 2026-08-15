@@ -14,10 +14,15 @@
   우회된다.
 """
 
+from functools import partial
 from pathlib import Path
 
-from claude_agent_sdk import ClaudeAgentOptions
+from agents.tool_scope import scope_hook
+from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
 
+# 이 목록은 **자동승인**이고 경로를 좁히지 않는다 — 경로 스코프는 `tool_scope.py` 의 PreToolUse
+# 훅이 건다. 둘을 함께 봐야 경계가 완성된다 (PR #154 독립 리뷰가 잡은 결함: bare name 허용은
+# `cwd` 와 무관하게 절대경로·`..` 로 밖을 읽는다).
 # 지금 범위(M2)에서 에이전트가 하는 일은 **대화가 폼을 채우는 것**이다. 값을 내놓는 일이라
 # 파일 쓰기도 셸도 필요 없다 — 전략 파일 생성(봇-전략-모델 §6)은 백테스트에 물려 있어 다음 베팅이다.
 ALLOWED_TOOLS = ["Read", "Glob", "Grep"]
@@ -53,15 +58,23 @@ SYSTEM_PROMPT = """\
 def build_options(*, strategies_dir: Path | str, max_turns: int) -> ClaudeAgentOptions:
     """봇 만들기 대화 한 번에 쓸 옵션.
 
-    `cwd` 를 전략 디렉터리로 못박아 기본 접근 범위를 그 아래로 한정한다. 읽기 도구만 열려
-    있으므로 이 경계 밖으로 나갈 손잡이가 없다.
+    경계는 **셋이 겹쳐** 만들어진다:
+
+    1. `disallowed_tools` — 쓰기·실행 도구는 정의 자체가 요청에서 빠진다(모델이 시도조차 못 한다).
+    2. `permission_mode="dontAsk"` — 자동승인 목록 밖은 프롬프트가 아니라 거부다.
+    3. **PreToolUse 훅** — 허용된 읽기 도구가 전략 디렉터리 밖을 가리키면 거부한다.
+
+    `cwd` 는 3번의 기준점일 뿐이다. `cwd` 만으로는 접근 범위가 안 좁혀진다 — SDK 가
+    *"Filesystem read restrictions: Use Read deny rules"* 라고 적는 이유다.
     """
+    root = Path(strategies_dir).resolve()
     return ClaudeAgentOptions(
         allowed_tools=list(ALLOWED_TOOLS),
         disallowed_tools=list(DISALLOWED_TOOLS),
         permission_mode=PERMISSION_MODE,
         setting_sources=list(SETTING_SOURCES),
         system_prompt=SYSTEM_PROMPT,
-        cwd=str(strategies_dir),
+        cwd=str(root),
         max_turns=max_turns,
+        hooks={"PreToolUse": [HookMatcher(hooks=[partial(scope_hook, root=root)])]},
     )

@@ -28,18 +28,23 @@ cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload
 | | 지금 |
 |---|---|
 | 자동승인 | `Read` · `Glob` · `Grep` — 전략 파일을 **읽는** 것까지 |
+| 경로 스코프 | PreToolUse 훅([`app/agents/tool_scope.py`](app/agents/tool_scope.py))이 위 셋의 경로 인자를 검사해 **전략 디렉터리 밖이면 거부**한다 |
 | 제거 | `Bash` · `Write` · `Edit` · `NotebookEdit` · `WebSearch` · `WebFetch` · `Task` (bare name 이라 도구 정의가 요청에서 빠진다) |
 | 권한 모드 | `dontAsk` — 미승인은 프롬프트가 아니라 **거부** |
 | 설정 소스 | 없음 — `~/.claude`·레포 `.claude/` 를 안 읽는다 |
-| 작업 디렉터리 | `strategies/` |
+| 작업 디렉터리 | `strategies/` — 상대경로의 기준점이자 위 스코프의 뿌리다 |
 | 턴 상한 | `AGENT_MAX_TURNS` (기본 12) |
+
+> **`cwd` 는 접근 범위를 좁히지 않는다.** `allowed_tools` 에 bare name 으로 적은 허용은 경로와 무관한 전체 자동승인이라, `cwd` 만 걸어 두면 절대경로나 `..` 로 밖을 읽을 수 있다 (SDK 자신이 *"Filesystem read restrictions: Use Read deny rules"* 라고 적는다). 그래서 훅이 실제 통제 수단이고, 권한 평가 순서(훅 → deny → ask → 권한 모드 → allow → `can_use_tool`)에서 훅이 맨 앞이라 자동승인보다 먼저 판정된다. 자동승인된 도구는 `can_use_tool` 콜백에 아예 오지 않으므로 그 자리로는 못 막는다. — PR #154 독립 리뷰가 잡은 결함.
 
 전략 **파일 생성**(봇-전략-모델 §6)은 백테스트에 물려 있어 다음 베팅이다. 그때 `Write`·`Edit` 를 자동승인으로 옮기고, 전략 디렉터리 밖 쓰기를 절대경로 deny 규칙(`Edit(//경로/**)` — 슬래시 **둘**)로 막는다.
 
 ## 검증
 
 ```bash
-uv run python tests/test_agent_boundary.py     # 도구 경계 21건
+uv run python tests/test_agent_boundary.py     # 도구 경계 21건 (정적 구성)
+uv run python tests/test_tool_scope.py         # 경로 스코프 6건 — 탈출 시도 11개를 실제로 판정
+uv run python tests/test_http_contract.py      # HTTP 경계 3건 — 빈 메시지 422 · 키 없을 때 사유
 uv run ruff check app/
 ```
 
