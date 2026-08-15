@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { TextArea } from "@/components/shared/ui/TextArea";
 import Button from "@/components/shared/ui/Button";
 import { getApiErrorMessage } from "@/utils/common/errors";
-import { selectBotAgentReadiness, streamBotAgent, type BotAgentEvent } from "@/services/bot/botAgentService";
+import {
+  selectBotAgentReadiness,
+  streamBotAgent,
+  type BotAgentEvent,
+  type BotFormState,
+} from "@/services/bot/botAgentService";
 
 /** 대화가 낸 설정 제안 — 폼이 이것을 받아 채운다. */
 export interface BotProposal {
@@ -32,7 +37,14 @@ interface Turn {
  *
  * 빈 대화창만 있으면 「고장」으로 읽히고, 그럴싸한 가짜 답을 채우면 「된다」로 읽힌다 — 둘 다 안 한다.
  */
-export function BotConversation({ onProposal }: { onProposal?: (proposal: BotProposal) => void }) {
+export function BotConversation({
+  onProposal,
+  formState,
+}: {
+  onProposal?: (proposal: BotProposal) => void;
+  /** 매 턴 함께 보낸다 — 사용자가 손으로 고친 값을 대화가 모르면 「그대로 뒀습니다」가 거짓이 된다. */
+  formState?: BotFormState;
+}) {
   const [reasons, setReasons] = useState<string[] | null>(null);
   const [ready, setReady] = useState<boolean | null>(null);
   const [draft, setDraft] = useState("");
@@ -67,25 +79,29 @@ export function BotConversation({ onProposal }: { onProposal?: (proposal: BotPro
       setTurns((prev) => prev.map((turn, index) => (index === prev.length - 1 ? update(turn) : turn)));
 
     try {
-      await streamBotAgent(message, (event: BotAgentEvent) => {
-        if (event.type === "text") apply((turn) => ({ ...turn, text: turn.text + event.text }));
-        else if (event.type === "tool") {
-          // 폼을 채우는 도구는 「읽음」이 아니다 — 그 결과는 아래 「폼에 채움」 줄이 말한다.
-          // 내부 이름(`mcp__…`)이 화면에 새는 것도 여기서 막는다.
-          if (!event.name.startsWith("mcp__")) {
-            apply((turn) => ({ ...turn, tools: [...(turn.tools ?? []), event.name] }));
+      await streamBotAgent(
+        message,
+        (event: BotAgentEvent) => {
+          if (event.type === "text") apply((turn) => ({ ...turn, text: turn.text + event.text }));
+          else if (event.type === "tool") {
+            // 폼을 채우는 도구는 「읽음」이 아니다 — 그 결과는 아래 「폼에 채움」 줄이 말한다.
+            // 내부 이름(`mcp__…`)이 화면에 새는 것도 여기서 막는다.
+            if (!event.name.startsWith("mcp__")) {
+              apply((turn) => ({ ...turn, tools: [...(turn.tools ?? []), event.name] }));
+            }
+          } else if (event.type === "proposal") {
+            onProposal?.({ strategyKey: event.strategy_key, params: event.params, note: event.note });
+            const filled = Object.entries(event.params).map(([name, value]) => `${name}=${String(value)}`);
+            apply((turn) => ({ ...turn, filled: [...(turn.filled ?? []), ...filled] }));
+          } else if (event.type === "unavailable") {
+            // 정상 응답이다 — 대화가 왜 안 도는지 그대로 보여준다.
+            setReady(false);
+            setReasons(event.reasons);
+            apply((turn) => ({ ...turn, text: event.reasons.join("\n") }));
           }
-        } else if (event.type === "proposal") {
-          onProposal?.({ strategyKey: event.strategy_key, params: event.params, note: event.note });
-          const filled = Object.entries(event.params).map(([name, value]) => `${name}=${String(value)}`);
-          apply((turn) => ({ ...turn, filled: [...(turn.filled ?? []), ...filled] }));
-        } else if (event.type === "unavailable") {
-          // 정상 응답이다 — 대화가 왜 안 도는지 그대로 보여준다.
-          setReady(false);
-          setReasons(event.reasons);
-          apply((turn) => ({ ...turn, text: event.reasons.join("\n") }));
-        }
-      });
+        },
+        { form: formState },
+      );
     } catch (error) {
       apply((turn) => ({ ...turn, text: getApiErrorMessage(error) }));
     } finally {

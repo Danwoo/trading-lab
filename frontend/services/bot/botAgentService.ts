@@ -41,11 +41,27 @@ export const selectBotAgentReadiness = async (): Promise<BotAgentReadiness> => {
   }
 };
 
-/** 대화 한 턴을 스트리밍한다. 이벤트는 오는 대로 `onEvent` 로 흘린다. */
+/** 지금 폼에 들어 있는 값 — 대화가 자기 기억이 아니라 **폼**을 읽게 한다 (스펙 §8.6.1). */
+export interface BotFormState {
+  strategy_key: string | null;
+  params: Record<string, unknown>;
+}
+
+/**
+ * 대화 한 턴을 스트리밍한다. 이벤트는 오는 대로 `onEvent` 로 흘린다.
+ *
+ * 세션 id 를 안 보낸다 — 이어갈 대화는 **서버가 신원으로** 고른다(남의 대화를 이어받는
+ * 손잡이를 만들지 않는다).
+ */
 export const streamBotAgent = async (
   message: string,
   onEvent: (event: BotAgentEvent) => void,
-  signal?: AbortSignal,
+  options?: { form?: BotFormState; signal?: AbortSignal },
 ): Promise<void> => {
-  await fetchSSE<BotAgentEvent>({ url: BASE_URL, body: { message }, onChunk: onEvent, signal });
+  await fetchSSE<BotAgentEvent>({
+    url: BASE_URL,
+    body: { message, form: options?.form },
+    onChunk: onEvent,
+    signal: options?.signal,
+  });
 };

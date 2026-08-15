@@ -181,7 +181,10 @@ export function BotWorkbench({ botId }: Props) {
         <p className="text-sm text-ink-muted">불러오는 중입니다…</p>
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,5fr)]">
-          <BotConversation onProposal={handleProposal} />
+          <BotConversation
+            onProposal={handleProposal}
+            formState={{ strategy_key: strategy?.strategyKey ?? null, params: strategy?.params ?? {} }}
+          />
           <BotForm
             draft={draft}
             onDraftChange={handleDraftChange}
