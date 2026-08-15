@@ -96,7 +96,7 @@ export function TerminalContainer() {
                 {resetButton}
               </div>
             ) : (
-              <div className="grid auto-rows-[minmax(20rem,1fr)] gap-2 p-2 xl:grid-cols-2">
+              <div className="grid min-h-full auto-rows-[minmax(20rem,1fr)] gap-2 p-2 xl:grid-cols-2">
                 {renderable.map((instance) => {
                   const definition = getPanelDefinition(instance.type);
                   if (!definition) return null;
