@@ -13,22 +13,84 @@ export const theme = {
       // 조합이 실제 CSS 로 생성된다. 채널을 직접 읽는 다른 소비자(lib/terminal/candleChart.ts
       // 의 getComputedStyle, lib/terminal/marketColorPreset.ts 의 setProperty)도 같은 형식을
       // 맞춰야 한다 — 전수 확인은 #313 커밋 참고.
+      bg: {
+        base: "rgb(var(--bg-base) / <alpha-value>)",
+        panel: "rgb(var(--bg-panel) / <alpha-value>)",
+        raised: "rgb(var(--bg-raised) / <alpha-value>)",
+      },
+      hairline: "rgb(var(--hairline) / <alpha-value>)",
+      line: {
+        DEFAULT: "rgb(var(--line) / <alpha-value>)",
+        strong: "rgb(var(--line-strong) / <alpha-value>)",
+      },
+      btn: {
+        from: "rgb(var(--btn-from) / <alpha-value>)",
+        to: "rgb(var(--btn-to) / <alpha-value>)",
+        line: "rgb(var(--btn-line) / <alpha-value>)",
+      },
+      danger: "rgb(var(--danger) / <alpha-value>)",
+      success: "rgb(var(--success) / <alpha-value>)",
+      market: {
+        up: "rgb(var(--market-up) / <alpha-value>)",
+        down: "rgb(var(--market-down) / <alpha-value>)",
+      },
+      ink: {
+        DEFAULT: "rgb(var(--ink) / <alpha-value>)",
+        strong: "rgb(var(--ink-strong) / <alpha-value>)",
+        muted: "rgb(var(--ink-muted) / <alpha-value>)",
+        faint: "rgb(var(--ink-faint) / <alpha-value>)",
+        // 레거시 (#242 O3) — 소비자가 살아 있어 #73 S5 가 지운다.
+        primary: "rgb(var(--ink-primary) / <alpha-value>)",
+      },
+      // 레거시 (#242 O3) — 위와 같다.
       slate: {
         void: "rgb(var(--slate-void) / <alpha-value>)",
         panel: "rgb(var(--slate-panel) / <alpha-value>)",
         line: "rgb(var(--slate-line) / <alpha-value>)",
       },
-      ink: {
-        primary: "rgb(var(--ink-primary) / <alpha-value>)",
-        muted: "rgb(var(--ink-muted) / <alpha-value>)",
-      },
       signal: {
         warn: "rgb(var(--signal-warn) / <alpha-value>)",
       },
-      market: {
-        up: "rgb(var(--market-up) / <alpha-value>)",
-        down: "rgb(var(--market-down) / <alpha-value>)",
-      },
+    },
+    // 타이포 — 크기 대역은 12–13px 로 좁고 위계는 굵기·잉크 명도가 만든다(디자인 시스템 §3).
+    // **`xs`·`sm`·`base` 를 여기서 덮지 않는다** — Tailwind 기본값(12/14/16px)을 토큰값
+    // (12/12.5/14px)으로 바꾸면 그 유틸리티를 쓰는 기존 화면 55개 파일의 글자가 이 커밋에서
+    // 한꺼번에 작아진다. 화면과 함께 옮기는 것이 #73 S2~S5 다. 여기서는 충돌하지 않는
+    // 두 이름만 연다.
+    fontSize: {
+      "2xs": ["var(--text-2xs)", { lineHeight: "var(--text-2xs-lh)" }],
+      num: ["var(--text-num)", { lineHeight: "var(--text-num-lh)", letterSpacing: "var(--tracking-num)" }],
+    },
+    fontWeight: {
+      body: "var(--weight-body)",
+      ui: "var(--weight-ui)",
+      title: "var(--weight-title)",
+    },
+    letterSpacing: {
+      ui: "var(--tracking-ui)",
+      num: "var(--tracking-num)",
+    },
+    lineHeight: {
+      prose: "var(--leading-prose)",
+      ui: "var(--leading-ui)",
+    },
+    borderRadius: {
+      badge: "var(--radius-badge)",
+      control: "var(--radius-control)",
+      panel: "var(--radius-panel)",
+      full: "var(--radius-full)",
+    },
+    spacing: {
+      "panel-x": "var(--space-panel-x)",
+      "panel-top": "var(--space-panel-top)",
+      "panel-gap": "var(--space-panel-gap)",
+      "icon-gap": "var(--space-icon-gap)",
+      group: "var(--space-group)",
+      section: "var(--space-section)",
+      row: "var(--size-row)",
+    },
+    boxShadow: {
+      e1: "var(--e1)",
     },
     // 오버레이 프리미티브(components/shared/ui/primitives/dialog.tsx) 전용 트랜지션.
     // `tailwindcss-animate` 플러그인 없이 네이티브 keyframes/animation 확장만 쓴다(#341 O8-3
