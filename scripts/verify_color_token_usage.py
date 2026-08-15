@@ -70,10 +70,7 @@ SHARED_COMPONENT = "공용 컴포넌트 — 토큰 전환이 이 컴포넌트를
 # 알고 남겨 둔 위반. 키는 `frontend/` 기준 상대 경로.
 ALLOWLIST: dict[str, str] = {
     "components/features/Common/Auth/Agreettac.tsx": TEMPLATE_SCREEN,
-    "components/features/Common/Auth/Idsearch.tsx": TEMPLATE_SCREEN,
     "components/features/Common/Auth/Login.tsx": TEMPLATE_SCREEN,
-    "components/features/Common/Auth/PassSearch.tsx": TEMPLATE_SCREEN,
-    "components/features/Common/Auth/PassSearchinfo.tsx": TEMPLATE_SCREEN,
     "components/features/Common/Auth/Signup.tsx": TEMPLATE_SCREEN,
     "components/features/Common/Auth/Signupcmpl.tsx": TEMPLATE_SCREEN,
     "components/features/Common/Auth/Signupinfo.tsx": TEMPLATE_SCREEN,
@@ -84,10 +81,6 @@ ALLOWLIST: dict[str, str] = {
     "components/features/Common/System/Author/AuthorDetailForm.tsx": SYSTEM_SCREEN,
     "components/features/Common/System/Author/AuthorMenuGrid.tsx": SYSTEM_SCREEN,
     "components/features/Common/System/Menu/MenuDetailForm.tsx": SYSTEM_SCREEN,
-    "components/features/DevActivity/AccountListPanel.tsx": FEATURE_SCREEN,
-    "components/features/DevActivity/ChatPanel.tsx": FEATURE_SCREEN,
-    "components/features/DevActivity/MessageBubble.tsx": FEATURE_SCREEN,
-    "components/features/Nav/NavDashboardContainer.tsx": FEATURE_SCREEN,
     "components/features/ResearchChat/ConversationPanel.tsx": FEATURE_SCREEN,
     "components/features/ResearchChat/MessageBubble.tsx": FEATURE_SCREEN,
     "components/features/ResearchChat/SessionListPanel.tsx": FEATURE_SCREEN,
