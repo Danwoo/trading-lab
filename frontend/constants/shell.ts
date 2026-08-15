@@ -3,8 +3,31 @@ import { ADMIN_PATH, BENCH_PATH, MARKET_PATH } from "@/constants/routes";
 /** 아이콘 레일 폭 (화면 결정 §20 — 세로줄 하나로 유지, 넓은 사이드바는 쓰지 않는다). */
 export const RAIL_WIDTH_PX = 46;
 
-/** 패널 폭 (§20.2 — 보드를 덮지 않고 옆으로 민다. 에이전트 620px 토글은 §21.3, S3 소관). */
+/** 패널 폭 (§20.2 — 보드를 덮지 않고 옆으로 민다). */
 export const PANEL_WIDTH_PX = 372;
+
+/**
+ * 에이전트 패널만 여기까지 넓힌다 (§21.3). 전체 폭은 없다 — 에이전트가 격자를 돌리는 동안
+ * 보드에서 채워지는 것이 보여야 「증명하라, 주장하지 마라」가 성립한다.
+ */
+export const PANEL_EXPANDED_WIDTH_PX = 620;
+
+/** 1024~1280 구간의 패널 폭 (§21.6 — 보드가 먼저 양보하지만 패널도 조금 줄인다). */
+export const PANEL_COMPACT_WIDTH_PX = 300;
+
+/**
+ * §21.6 의 폭 구간. 이름이 「무엇이 달라지는가」를 말한다 — 숫자만 두면 1280 이 무엇의
+ * 경계인지 읽는 쪽이 표를 다시 찾아야 한다.
+ *
+ * - `wide` (1280 이상): 보드는 격자+곡선 나란히, 패널 372(에이전트는 620까지)
+ * - `compact` (1024~1280): 보드는 격자/곡선 탭으로 하나씩, 패널 300
+ * - `overlay` (1024 미만): 보드는 탭, 패널이 **보드를 덮는다**
+ *
+ * 모바일은 다루지 않는다 — 격자를 손가락으로 고르는 것도 손으로 적는 칸도 성립하지 않아
+ * 별도 설계가 필요하고 지금 범위 밖이다(§21.6).
+ */
+export const VIEWPORT_WIDE_MIN_PX = 1280;
+export const VIEWPORT_COMPACT_MIN_PX = 1024;
 
 /**
  * 레일 항목 하나.
@@ -25,6 +48,8 @@ export interface RailItem {
    * (§21.4 「실루엣만 남기지 않는다」). 화면이 붙으면 이 줄이 사라진다.
    */
   pending?: string;
+  /** 372 ↔ 620 토글을 주는 패널. §21.3 이 **에이전트에만** 준 예외다 */
+  expandable?: boolean;
   /** 이 항목 다음에 구분선을 긋는다 */
   dividerAfter?: boolean;
   /** 레일 바닥에 붙인다 (위 묶음과 떨어뜨린다) */
@@ -34,10 +59,14 @@ export interface RailItem {
 /**
  * 레일 순서 — 화면 결정 §20.2 의 확정값이자 `bench-shell.html` 시안의 배치다.
  *
- * 실험대 · 리서치 / 봇 · 거래 로그 · 내 기준 / 시세 · 포트폴리오 / (바닥) 설정.
+ * 실험대 · 리서치 / 봇 · 에이전트 · 거래 로그 · 내 기준 / 시세 · 포트폴리오 / (바닥) 설정.
  * §20.2 본문은 리서치를 셋째 묶음에 적었는데, 같은 문서 §22.5 가 리서치를 **동등한 기둥**으로
  * 올리며 전체 폭 화면을 주기로 했다 — 시안(`bench-shell.html`)과 `#73` 계획의 열거가 둘 다
  * 실험대 옆이라 그쪽을 따랐다.
+ *
+ * 「에이전트」는 §20.2 의 열거에 없다. §20.4 가 그 자리를 미결로 남겼고 **§21.3 이 「패널
+ * 372 ↔ 620 토글」로 닫았다** — 패널이라면 그것을 여는 자리는 레일이다. 봇 옆에 둔 것은
+ * §21.4 가 첫 화면에서 줄 길을 「봇 만들기」와 「에이전트에게 맡기기」 둘로 못박았기 때문이다.
  */
 export const RAIL_ITEMS: readonly RailItem[] = [
   { id: "bench", label: "실험대", icon: "home", kind: "route", path: BENCH_PATH },
@@ -50,6 +79,14 @@ export const RAIL_ITEMS: readonly RailItem[] = [
     dividerAfter: true,
   },
   { id: "bot", label: "봇", icon: "box", kind: "panel", pending: "봇 패널 내용은 아직 없습니다." },
+  {
+    id: "agent",
+    label: "에이전트",
+    icon: "robot",
+    kind: "panel",
+    expandable: true,
+    pending: "에이전트 대화는 아직 없습니다. 긴 대화를 위해 폭만 620px 까지 넓힐 수 있습니다.",
+  },
   {
     id: "trades",
     label: "거래 로그",
