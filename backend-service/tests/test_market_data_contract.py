@@ -150,9 +150,7 @@ def test_empty_response_carries_reason_not_bare_zero() -> str:
     )
     # 사유가 「키가 아직 없다」뿐이면 코드도 함께 온다 — 화면은 이 코드로만 임시 데이터를 그린다
     # (문구로 가르면 문구만 바뀌어도 조용히 갈린다). 코드를 흘리면 화면은 영영 빈 채로 남는다.
-    assert out["unavailable_code"] == "credential_missing", (
-        f"사유는 키 얘기인데 코드가 {out['unavailable_code']!r} 다"
-    )
+    assert out["unavailable_code"] == "credential_missing", f"사유는 키 얘기인데 코드가 {out['unavailable_code']!r} 다"
 
     minute = _bar_service().select_minute_bar_list(
         {
