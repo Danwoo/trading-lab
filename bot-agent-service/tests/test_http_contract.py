@@ -89,8 +89,9 @@ def test_session_id_is_not_accepted_from_the_client() -> str:
     """세션 id 를 요청으로 못 준다 — 받으면 남의 세션 id 를 넣어 남의 대화를 이어받을 수 있다."""
     from schemas.bot_agent.bot_agent_schema import BotAgentIn
 
+    # 필드가 늘면 여기서 걸린다 — 세션 id 같은 「남의 것을 가리키는 손잡이」가 조용히 생기지 않게.
     fields = set(BotAgentIn.model_fields)
-    assert fields == {"message", "reset"}, f"요청 필드가 늘었다: {fields}"
+    assert fields == {"message", "reset", "form"}, f"요청 필드가 늘었다: {fields}"
 
     # 몰래 실어 보내도 무시된다 (pydantic 기본이 무시지만, 그 기본이 바뀌면 여기서 걸린다).
     parsed = BotAgentIn(message="안녕", session_id="남의-세션")  # type: ignore[call-arg]
