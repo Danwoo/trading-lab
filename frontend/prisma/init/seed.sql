@@ -88,6 +88,9 @@ INSERT INTO tn_menu (menu_id, menu_nm, upper_menu_id, menu_level, sort_ordr, use
 VALUES
 ('mbiz0000', '업무관리',   NULL,       1, 10,  'Y', NULL,                            'event',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('msys0000', '시스템관리', NULL,       1, 999, 'Y', NULL,                            'preferences', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
+-- 실험대는 제품의 홈이다(화면 결정 §20.2). 메뉴 게이트가 fail-closed 라 이 행이 없으면
+-- 로그인 후 착지점(`constants/routes.ts` 의 POST_LOGIN_PATH)이 아예 안 열린다.
+('mbiz1009', '실험대',      'mbiz0000', 2, 1,   'Y', 'bench',                         'home',        CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('mbiz1008', '터미널',      'mbiz0000', 2, 5,   'Y', 'terminal',                      'chart',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('mbiz1001', '관심종목',    'mbiz0000', 2, 10,  'Y', 'admin/watchlist',               'check',       CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('mbiz1002', '포트폴리오',   'mbiz0000', 2, 20,  'Y', 'admin/portfolio',               'box',         CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
@@ -111,6 +114,7 @@ VALUES
 --      상위는 보이는 하위가 하나라도 있으면 자동 노출된다.
 INSERT INTO tn_workspace_menu (workspace_id, menu_id, reg_dt, reg_id, mod_dt, mod_id)
 VALUES
+(1, 'mbiz1009', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 (1, 'mbiz1008', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 (1, 'mbiz1001', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 (1, 'mbiz1002', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
@@ -129,8 +133,9 @@ VALUES
 -- 5. 권한별 메뉴
 INSERT INTO tn_author_menu (author_id, menu_id, reg_dt, reg_id, mod_dt, mod_id)
 VALUES
--- operator: 전 업무 화면 접근 (mbiz1001~1008). isVisible = 권한메뉴 ∩ 워크스페이스메뉴 라,
--- tn_workspace_menu 만 부여하고 여기를 mbiz1001 로 두면 나머지 업무 화면(카테고리·대시보드·개발활동·스케줄러·리서치·터미널)이 안 보인다.
+-- operator: 전 업무 화면 접근 (mbiz1001~1009). isVisible = 권한메뉴 ∩ 워크스페이스메뉴 라,
+-- tn_workspace_menu 만 부여하고 여기를 mbiz1001 로 두면 나머지 업무 화면(카테고리·대시보드·개발활동·스케줄러·리서치·터미널·실험대)이 안 보인다.
+('operator', 'mbiz1009', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1008', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1001', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1002', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
@@ -142,6 +147,7 @@ VALUES
 -- user: 개인 워크스페이스 기본 메뉴(constants/protected.ts 의 PERSONAL_WORKSPACE_DEFAULT_MENU_IDS)를
 -- 전부 포함해야 한다. isVisible = 권한메뉴 ∩ 워크스페이스메뉴 라 한쪽만 부여하면 가입자의
 -- 사이드바가 조용히 빈다(#251). 두 목록의 대조는 tests/regressions/251-personal-workspace-menu.test.ts.
+('user', 'mbiz1009', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('user', 'mbiz1008', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('user', 'mbiz1001', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR');
 

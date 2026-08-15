@@ -1,129 +1,66 @@
 "use client";
 
-// 보안 경계 아님 — 이 파일 전체가 "use client" 라 아래 인가 체크는 브라우저에서 도는 UX 게이트일
-// 뿐이다(메뉴·탭에 뭘 보여줄지 결정). devtools/응답 변조로 얼마든지 우회 가능하고, 우회해도 이
-// 컴포넌트가 렌더하는 건 화면 구조(라벨·컬럼 헤더)뿐 — 실제 데이터는 각 API Route 가 개별적으로
-// `withAuth`(lib/auth/withAuth.ts, `auth.api.getSession()`)로 서버측 검증한다. 진짜 보안 경계는
-// 거기다. 여기서 authorized 를 조작해도 데이터 API 는 여전히 401/403 을 낸다(실측: #299).
-import { useState, useEffect, ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { Header, Sidebar, GlobalTabs } from "@/components/shared/Layout";
-import { showToast } from "@/components/shared/Feedback";
-import { useNavStore } from "@/stores/shared/navStore";
-import { useTabStore } from "@/stores/shared/tabStore";
+import { useCallback, useState, type ReactNode } from "react";
+import { ProductRail } from "@/components/shared/Layout";
+import { Icon } from "@/components/shared/ui/primitives/icons";
+import { useMenuAccessGate } from "@/hooks/shared/useMenuAccessGate";
+import { PANEL_WIDTH_PX, RAIL_ITEMS } from "@/constants/shell";
 
-// path 매칭: 정확히 같거나 슬래시 경계로 시작 (`/admin/foo` 가 `/admin/foobar` 잘못 매칭하는 over-match 방지)
-const matchesPath = (pathname: string, allowed: string): boolean =>
-  pathname === allowed || pathname.startsWith(allowed + "/");
+const PANEL_REGION_ID = "product-panel";
 
-// DB 메뉴에 없지만 항상 접근 가능한 경로 + 탭 제목. Object.keys() 가 곧 access 체크용 path 목록.
-const ALWAYS_ALLOWED_TABS: Record<string, string> = {
-  "/admin/common/mypage": "마이페이지",
-};
-const ALWAYS_ALLOWED_PATHS = Object.keys(ALWAYS_ALLOWED_TABS);
-// 권한 없는 경로 접근 시도 시 admin 밖으로 (URL 직접 입력 같은 비정상 흐름 — 정상 사용자라면 사이드바를 거치므로 여기 도달 안 함)
-const FALLBACK_PATH = "/";
+/**
+ * 제품 셸 — 46px 레일 + 본문 + 372px 패널 자리 (화면 결정 §20).
+ *
+ * 관리 셸(`app/admin/layout.tsx`)과 **갈라져 있다**. 예전에는 한 레이아웃이 제품·관리를 다
+ * 덮으면서 제품 화면에도 MDI 탭 iframe 이 얹혔는데, 그러면 크롬이 두 겹이 된다(§20.3).
+ * 여기에는 iframe 이 없다 — 제품 경로에서 `window.self === window.top` 이다.
+ *
+ * **S2 가 만드는 것은 자리와 토글까지다.** 패널이 열리고 닫히고 폭을 차지하는 것까지가
+ * 여기이고, 패널 내용과 §20.2 의 이동 규칙 세 줄(보드↔패널 양방향 선택)은 S3 다.
+ * 그래서 지금 패널 본문은 무엇이 올 자리인지만 적는다 — 비워 두면 고장으로 읽힌다(§21.4).
+ */
+export default function ProductLayout({ children }: { children: ReactNode }) {
+  const [openPanelId, setOpenPanelId] = useState<string | null>(null);
+  const { loaded, authorized } = useMenuAccessGate();
 
-interface NavItem {
-  id: string;
-  text: string;
-  icon?: string;
-  path?: string;
-  items?: NavItem[];
-}
-
-function findNavByPath(items: NavItem[], path: string): NavItem | null {
-  for (const item of items) {
-    if (item.path === path) return item;
-    if (item.items) {
-      const found = findNavByPath(item.items, path);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-export default function RootLayout({ children }: { children: ReactNode }) {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(true);
-  const [authorized, setAuthorized] = useState<boolean | null>(null);
-  const [isEmbed, setIsEmbed] = useState<boolean | null>(null);
-  const pathname = usePathname();
-  const router = useRouter();
-  const { items: navItems, fetchNav, getAllPaths, loaded, error } = useNavStore();
-  const openTab = useTabStore((s) => s.openTab);
-
-  // iframe 내부인지 감지 (MDI 탭 콘텐츠로 로드된 경우 chrome 생략)
-  useEffect(() => {
-    setIsEmbed(window.self !== window.top);
+  const togglePanel = useCallback((id: string) => {
+    setOpenPanelId((current) => (current === id ? null : id));
   }, []);
 
-  useEffect(() => {
-    fetchNav();
-  }, [fetchNav]);
+  const closePanel = useCallback(() => setOpenPanelId(null), []);
 
-  useEffect(() => {
-    if (!loaded) return;
-    const isAlwaysAllowed = ALWAYS_ALLOWED_PATHS.some((p) => matchesPath(pathname, p));
+  if (!loaded || authorized === null) return null;
 
-    // 네비 로드 실패 시 fail-closed — always-allowed 만 허용, 나머지는 fallback 으로
-    if (error) {
-      if (isAlwaysAllowed) {
-        setAuthorized(true);
-      } else {
-        showToast("메뉴 정보를 불러오지 못했습니다.", "error");
-        setAuthorized(false);
-        router.replace(FALLBACK_PATH);
-      }
-      return;
-    }
+  const openPanel = RAIL_ITEMS.find((item) => item.id === openPanelId) ?? null;
 
-    const hasAccess = isAlwaysAllowed || getAllPaths().some((p) => matchesPath(pathname, p));
-    if (!hasAccess) {
-      showToast("접근 권한이 없습니다.", "error");
-      setAuthorized(false);
-      router.replace(FALLBACK_PATH);
-      return;
-    }
-    setAuthorized(true);
-  }, [loaded, error, pathname, getAllPaths, router]);
-
-  // URL 직접 접근 시 nav 항목을 탭으로 자동 오픈 (메인 프레임에서만)
-  useEffect(() => {
-    if (isEmbed || !loaded || !authorized) return;
-    const nav = findNavByPath(navItems, pathname);
-    if (nav?.path) {
-      openTab({ id: nav.id, title: nav.text, path: nav.path });
-      return;
-    }
-    const alwaysTitle = ALWAYS_ALLOWED_TABS[pathname];
-    if (alwaysTitle) {
-      openTab({ id: pathname, title: alwaysTitle, path: pathname });
-    }
-  }, [isEmbed, loaded, authorized, pathname, navItems, openTab]);
-
-  if (isEmbed === null || !loaded || authorized === null) return null;
-
-  // iframe 내부: chrome 없이 페이지만 렌더 (탭 콘텐츠)
-  if (isEmbed) {
-    return (
-      <>
-        <style>{`nextjs-portal { display: none !important; }`}</style>
-        <div className="h-screen">{authorized ? children : null}</div>
-      </>
-    );
-  }
-
-  // 메인 프레임: Header + Sidebar + MDI 탭 섀시
   return (
-    <>
-      <div className="h-screen flex flex-col">
-        <div className="flex-shrink-0">
-          <Header isDrawerOpen={isDrawerOpen} setIsDrawerOpen={setIsDrawerOpen} />
-        </div>
-        <div className="flex-1 min-h-0">
-          <Sidebar isDrawerOpen={isDrawerOpen}>{authorized ? <GlobalTabs /> : null}</Sidebar>
-        </div>
-      </div>
-    </>
+    <div className="flex h-screen bg-slate-void text-ink-primary">
+      <ProductRail openPanelId={openPanelId} onTogglePanel={togglePanel} panelRegionId={PANEL_REGION_ID} />
+
+      <main className="min-w-0 flex-1 overflow-auto">{authorized ? children : null}</main>
+
+      {/* 패널은 모달이 아니다 — 보드를 덮지 않고 옆으로 민다(§20.2). 그래서 flex 형제다. */}
+      {openPanel && (
+        <aside
+          id={PANEL_REGION_ID}
+          aria-label={openPanel.label}
+          style={{ flex: `0 0 ${PANEL_WIDTH_PX}px` }}
+          className="flex h-full flex-col border-l border-slate-line bg-slate-panel"
+        >
+          <div className="flex flex-none items-center gap-2 border-b border-slate-line px-3 py-2">
+            <h2 className="min-w-0 flex-1 truncate text-sm font-medium text-ink-primary">{openPanel.label}</h2>
+            <button
+              type="button"
+              aria-label={`${openPanel.label} 패널 닫기`}
+              onClick={closePanel}
+              className="rounded p-1 text-ink-muted hover:bg-slate-line hover:text-ink-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto p-3 text-sm text-ink-muted">{openPanel.pending}</div>
+        </aside>
+      )}
+    </div>
   );
 }
