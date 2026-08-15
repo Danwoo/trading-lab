@@ -13,7 +13,7 @@ interface Props {
 // 다시 만들지 않고 본문만 돌려준다(실측: 팝업 본문 clientHeight 653 / scrollHeight 2024 로 스크롤됨).
 export const Terms: FC<Props> = ({ onClose }) => {
   return (
-    <div className="p-4 text-[#455172] bg-[#F5F7FC] whitespace-pre-wrap">
+    <div data-theme="light" className="p-4 text-ink bg-bg-panel whitespace-pre-wrap">
       <h1 className="font-extrabold text-xl my-3">제1조 목적</h1>
       {`약관의 목적은 본 약관에 동의하는 고객(이하 "회원")이 ACME(이하 "회사")가 제공하는 서비스를 이용함에 있어 회사와 회원 간의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.`}
       <h1 className="font-extrabold text-xl my-3">제2조 약관의 효력</h1>

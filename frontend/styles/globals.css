@@ -41,23 +41,186 @@
    Tailwind(tailwind.config.mjs)가 `rgb(var(--x) / <alpha-value>)` 로 감싸 opacity modifier
    (`/40` 등)를 지원하려면 이 형태가 필요하다(#313). 이 변수를 직접 읽는 다른 소비자는
    반드시 `rgb(var(--x))` 로 감싸야 한다 — 아래 .terminal-placeholder-hatch,
-   .auth-backdrop, .auth-backdrop--hero, lib/terminal/candleChart.ts,
-   lib/terminal/marketColorPreset.ts 다섯 곳이 그 계약을 따른다(2026-08-03 실측 — 이 열거는
-   PR 마다 손으로 갱신해야 해서 두 번 stale 해졌다(§3 "7곳→8곳"과 이 항목); 갱신을 놓쳐도
-   빌드·테스트가 조용히 통과해 CI 가 못 잡는다 — 자동 검사로 옮기는 편이 낫다는 판단은
-   PR 코멘트 참조, 이번 변경 범위 밖). */
-:root {
+   .auth-backdrop, .auth-backdrop--hero, lib/terminal/candleChart.ts 네 곳이 그 계약을 따른다.
+
+   ── 두 벌(다크·라이트) 구성 ──────────────────────────────────────────────
+   `:root` 가 다크(기본), `[data-theme="light"]` 가 라이트다. 등락색 프리셋(kr/us)은
+   `data-market-preset` 속성으로 갈린다 — 네 벌(모드 2 × 프리셋 2)이 전부 CSS 안에 있고,
+   전환은 속성 하나를 바꾸는 것뿐이라 모드와 프리셋이 서로를 덮어쓸 수 없다.
+
+   두 속성 선택자를 `:root` 로 묶지 않은 이유: 커스텀 프로퍼티는 상속되므로, 루트가 아닌
+   컨테이너에 `data-theme="light"` 를 달면 **그 부분 트리만** 라이트가 된다. 다크 셸 안의
+   밝은 화면(정책 본문 등)이 토큰을 그대로 쓰려면 이 자리가 필요하다.
+   선택자 순서 주의: `[data-theme="light"]` 와 `[data-market-preset="us"]` 는 명시도가
+   같으므로(0,1,0) **라이트 블록이 뒤에 와야** 라이트에서 다크 us 값이 남지 않는다.
+
+   `.auth-backdrop` 이 선택자에 함께 있는 이유: 인증 배경은 모드와 무관하게 **어두운 섬**이다
+   (배경 자체가 레거시 다크 토큰으로 그려진다). 루트가 라이트로 가도 그 위의 글자는 다크
+   잉크를 써야 읽힌다 — 안 그러면 어두운 배경 위에 어두운 글자가 얹힌다.
+
+   값의 근거는 scripts/verify_token_contrast.py 가 매 PR 에 전수로 출력한다. 텍스트 잉크는
+   3단이고 `--ink-faint` 는 비텍스트 전용이다(#73 S1, 리드 결정 ㉡ — 아래 「잉크」 참조). */
+:root,
+[data-theme="dark"],
+.auth-backdrop {
+  /* ── 바탕 ── */
+  --bg-base: 13 15 17;
+  --bg-panel: 22 25 28;
+  --bg-raised: 28 33 38;
+
+  /* ── 선 위계 4단 중 1~3단 (4단은 --ink-strong 2px) ── */
+  --hairline: 38 43 48;
+  --line: 38 43 48;
+  --line-strong: 58 66 73;
+
+  /* ── 잉크 ── 텍스트는 3단, `--ink-faint` 는 비텍스트 전용이다 ──
+     라벨·표 헤더는 `--ink-muted` 가 받는다. 4단째를 텍스트로 쓰면 규격상 못 읽는 값이 위계의
+     한 칸을 차지한다(리드 결정 ㉡). `--ink-faint` 는 선·아이콘에만 쓰고, 글자에 쓰지 않는다 —
+     대비 스크립트가 이 토큰을 비텍스트로 분류해 곱집합에서 뺀다. */
+  --ink-strong: 245 243 239;
+  --ink: 230 228 224;
+  --ink-muted: 139 135 127;
+  --ink-faint: 98 94 88;
+
+  /* ── 버튼 서피스 (계조 + 보더 + 인셋 하이라이트) ── */
+  --btn-from: 46 53 59;
+  --btn-to: 36 42 48;
+  --btn-line: 67 76 84;
+  --btn-inset: 255 255 255;
+  --btn-inset-alpha: 0.07;
+
+  /* ── 상태색 — 등락 프리셋을 따라가지 않는다 ──
+     미국식에서 --market-up 이 초록일 때 오류까지 초록이 되면 화면이 거짓말을 한다. */
+  --danger: 236 87 69;
+  --success: 95 163 76;
+
+  /* ── 등락색 — 프리셋 기본은 한국식(적=상승·청=하락) ──
+     파랑의 명도를 빨강보다 조금 위에 둔다. 어두운 배경에서 사람 눈은 파랑을 약하게 지각해,
+     숫자상 같게 맞추면 하락이 상승보다 흐려 보이고 그것이 편향이 된다. */
+  --market-up: 240 87 68;
+  --market-down: 77 147 209;
+
+  /* ── 깊이 — 다크는 그림자로 띄운다 ── */
+  --e1: 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 18px rgb(0 0 0 / 0.24);
+
+  /* ── 레거시 토큰 (#242 O3) ──
+     소비자가 살아 있어 이 단계에서 지우지 않는다. #73 S5 가 0 hit 를 확인하고 지운다.
+     `--ink-muted` 는 이름이 겹쳐 위 잉크 3단이 값을 가져갔다 — 옛 값(107 118 134)은
+     --slate-panel 위 3.83:1 로 이미 AA 미달이었고, 새 값은 같은 바탕에서 4.92:1 이다. */
   --slate-void: 11 14 19;
   --slate-panel: 20 25 34;
   --slate-line: 35 42 54;
   --ink-primary: 201 209 220;
-  --ink-muted: 107 118 134;
   --signal-warn: 217 164 65;
 
-  /* 상승/하락 의미 토큰 — 관습 프리셋(lib/terminal/marketColorPreset.ts)이 값을 채운다.
-     기본은 한국식(적=상승·청=하락). 패널은 시장색을 직접 쓰지 않고 이 두 변수만 참조한다. */
-  --market-up: 240 70 90;
-  --market-down: 59 130 246;
+  /* ── 타이포 ── 크기는 12–13px 좁은 대역에 묶고 위계는 굵기·잉크 명도가 만든다.
+     Tailwind 유틸리티는 충돌하지 않는 이름(text-2xs·text-num)만 노출한다 — xs/sm/base 를
+     여기 값으로 덮으면 기존 화면 64개 파일의 글자가 한꺼번에 작아진다(S2~S5 가 화면과 함께 옮긴다). */
+  --text-2xs: 11px;
+  --text-2xs-lh: 16px;
+  --text-xs: 12px;
+  --text-xs-lh: 17px;
+  --text-sm: 12.5px;
+  --text-sm-lh: 18px;
+  --text-base: 14px;
+  --text-base-lh: 21px;
+  --text-num: 26px;
+  --text-num-lh: 30px;
+
+  /* ── 굵기 3단 (디자인 시스템 §3.1) ──
+     크기를 12–13px 좁은 대역에 묶는 대신 위계를 굵기와 잉크 명도가 만든다. 텍스트 잉크가
+     3단이 되면서 인접 단 간격은 넉넉하다 — 다크 --ink ↔ --ink-muted 2.82:1, 라이트 2.36:1.
+     굵기로 따로 보강할 자리가 없다. */
+  --weight-body: 400;
+  --weight-ui: 500;
+  --weight-title: 700;
+
+  /* ── 자간·행간 (한글 조판) ── */
+  --tracking-ui: -0.01em;
+  --tracking-num: -0.03em;
+  --leading-prose: 1.6;
+  --leading-ui: 1.45;
+
+  /* ── 간격 (4px 기반) · 라운드 (0 은 쓰지 않는다) ── */
+  --space-panel-x: 14px;
+  --space-panel-top: 13px;
+  --space-panel-gap: 8px;
+  --space-icon-gap: 6px;
+  --space-group: 12px;
+  --space-section: 20px;
+  --size-row: 26px;
+  --radius-badge: 5px;
+  --radius-control: 8px;
+  --radius-panel: 10px;
+  --radius-full: 999px;
+
+  /* ── 포커스 ── 선택·활성과 같은 --ink-strong 을 쓰므로 선 종류로 가른다(포커스만 점선). */
+  --focus-width: 1.5px;
+  --focus-offset: 2px;
+}
+
+/* 등락색 미국식(녹=상승·적=하락). 상태색(--danger/--success)은 여기 없다 — 프리셋을 따라가지
+   않는 것이 §2.2 의 불변식이다. */
+[data-market-preset="us"] {
+  --market-up: 95 163 76;
+  --market-down: 240 87 68;
+}
+
+/* 라이트 — 명도만 뒤집고 온도 배치는 유지한다: 바탕은 차갑고(#E8EAEC) 글자는 따뜻하다(#2E2B26).
+   따뜻함이 글자에만 있으므로 라이트 배경이 크림색으로 흐를 여지가 구조적으로 없다. */
+[data-theme="light"] {
+  --bg-base: 232 234 236;
+  --bg-panel: 244 245 246;
+  --bg-raised: 226 229 232;
+
+  --hairline: 182 186 190;
+  --line: 214 217 220;
+  --line-strong: 182 186 190;
+
+  --ink-strong: 32 30 26;
+  --ink: 46 43 38;
+  /* 문서 §1.2 의 `110 106 99` 는 --bg-base 4.46:1 · --bg-raised 4.25:1 로 AA 에 못 미친다.
+     ㉡ 이 이 자리에 라벨·표 헤더를 얹으므로 가장 불리한 바탕에서 AA 를 넘도록 명도만 내렸다. */
+  --ink-muted: 103 99 93;
+  --ink-faint: 148 144 138;
+
+  --btn-from: 255 255 255;
+  --btn-to: 240 241 243;
+  --btn-line: 198 203 209;
+  --btn-inset: 255 255 255;
+  --btn-inset-alpha: 0.9;
+
+  --danger: 166 56 42;
+  --success: 67 111 51;
+
+  --market-up: 176 58 41;
+  --market-down: 43 99 156;
+
+  /* 검정 알파를 밝은 배경에 그대로 쓰면 회색 때가 낀다 — 그림자를 옅게 깔고 보더로 층을 가른다. */
+  --e1: 0 1px 2px rgb(40 45 50 / 0.08), 0 6px 18px rgb(40 45 50 / 0.06);
+}
+
+[data-theme="light"][data-market-preset="us"] {
+  --market-up: 67 111 51;
+  --market-down: 176 58 41;
+}
+
+@layer base {
+  body {
+    letter-spacing: var(--tracking-ui);
+    /* 표에서 자릿수가 흔들리지 않게. Pretendard 가 tnum 을 담고 있는지는 미확인이며(디자인
+       시스템 §7), 없으면 이 선언은 조용한 무효과라 어느 쪽이든 해가 없다. */
+    font-feature-settings: "tnum";
+  }
+
+  /* 포커스는 ring 이 아니라 outline — 레이아웃을 밀지 않으면서 한 속성으로 두 모드·모든
+     컴포넌트에 같은 규칙을 건다. 선택(실선 2px)·활성(실선 1.5px)과 색이 같으므로 점선으로
+     가른다. overflow 조상 안에서 잘리는 것은 offset 부호(-2px)로 따로 막는다 — 그 자리는
+     PanelFrame·DataTable 이라 #73 S3 소관이다. */
+  :focus-visible {
+    outline: var(--focus-width) dashed rgb(var(--ink-strong));
+    outline-offset: var(--focus-offset);
+  }
 }
 
 /* 인증 화면 배경 — 출처 불명 스톡 배경 이미지(#287) 대체. 터미널 패널 시스템과 같은

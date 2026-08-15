@@ -12,18 +12,36 @@ import postcss, { type Rule } from "postcss";
 import tailwindcss from "tailwindcss";
 import * as tailwindConfig from "@/tailwind.config.mjs";
 
-// 팔레트 전량(8개 색 토큰) x opacity modifier 1건씩 — 지금 화면이 실제로 쓰는 조합만이 아니라
+// 팔레트 전량 x opacity modifier 1건씩 — 지금 화면이 실제로 쓰는 조합만이 아니라
 // "앞으로 쓸 수 있는" 조합 전체를 검사한다(클래스를 닫는다는 이슈의 취지).
+// 디자인 시스템 토큰(#73 S1)과 레거시 토큰(#242 O3)을 함께 담는다 — 레거시는 S5 가 지운다.
 const COLOR_UTILITIES = [
+  "bg-bg-base/40",
+  "bg-bg-panel/60",
+  "bg-bg-raised/30",
+  "border-hairline/50",
+  "border-line/60",
+  "border-line-strong/40",
+  "bg-btn-from/80",
+  "bg-btn-to/80",
+  "border-btn-line/40",
+  "text-ink/90",
+  "text-ink-strong/80",
+  "text-ink-muted/30",
+  "text-ink-faint/70",
+  "text-danger/60",
+  "bg-danger/10",
+  "text-success/60",
+  "bg-success/10",
+  "text-market-up/50",
+  "bg-market-down/25",
+  // 레거시
   "bg-slate-void/40",
   "border-slate-panel/60",
   "text-slate-line/20",
   "bg-ink-primary/70",
-  "border-ink-muted/30",
   "border-signal-warn/40",
   "bg-signal-warn/10",
-  "text-market-up/50",
-  "bg-market-down/25",
 ];
 
 async function compileUtilities(classNames: string[]): Promise<Rule[]> {

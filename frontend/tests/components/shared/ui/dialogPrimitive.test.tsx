@@ -369,7 +369,9 @@ describe("dialog primitive — 구조·스타일 소유권 (일부만 잠김 —
   });
 
   it("tailwind dialog keyframes 에 위치값이 없다 (전수 검사, 0건이면 실패)", () => {
-    const keyframes: Record<string, Record<string, Record<string, string>>> = theme.extend.keyframes;
+    // `theme` 은 Tailwind 의 Config['theme'] 로 타입이 붙어 있어 extend·keyframes 가 옵셔널이다.
+    // 비면 아래 0건 검사가 잡는다(fail-closed) — 여기서 조용히 통과시키지 않는다.
+    const keyframes = (theme?.extend?.keyframes ?? {}) as Record<string, Record<string, Record<string, string>>>;
     const dialogKeyframes = Object.entries(keyframes).filter(([name]) => name.startsWith("dialog-"));
 
     // fail-closed: 검사 대상이 사라지면(이름 변경·삭제) 조용히 통과하지 않는다.
