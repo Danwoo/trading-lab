@@ -3,7 +3,7 @@
 import { useCallback, useState, type ReactNode } from "react";
 import { ProductPanel, ProductRail } from "@/components/shared/Layout";
 import { useMenuAccessGate } from "@/hooks/shared/useMenuAccessGate";
-import { useViewportBand } from "@/hooks/shared/useViewportBand";
+import { usePanelOverlaysBoard } from "@/hooks/shared/usePanelOverlaysBoard";
 import { RAIL_ITEMS } from "@/constants/shell";
 
 const PANEL_REGION_ID = "product-panel";
@@ -24,7 +24,8 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   const [focusRailItemId, setFocusRailItemId] = useState<string | null>(null);
   const { loaded, authorized } = useMenuAccessGate();
-  const band = useViewportBand();
+  // 폭·배분은 CSS 가 정한다. JS 가 아직 답해야 하는 것은 이 하나 — 덮는가(그래서 보드가 죽는가).
+  const panelOverlaysBoard = usePanelOverlaysBoard();
 
   const togglePanel = useCallback((id: string) => {
     setOpenPanelId((current) => (current === id ? null : id));
@@ -46,7 +47,7 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
   if (!loaded || authorized === null) return null;
 
   const openPanel = RAIL_ITEMS.find((item) => item.id === openPanelId) ?? null;
-  const panelCoversBoard = openPanel !== null && band === "overlay";
+  const panelCoversBoard = openPanel !== null && panelOverlaysBoard;
 
   return (
     <div className="flex h-screen bg-slate-void text-ink-primary">
@@ -68,7 +69,6 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
           <ProductPanel
             id={PANEL_REGION_ID}
             item={openPanel}
-            band={band}
             expanded={expanded}
             onToggleExpanded={() => setExpanded((v) => !v)}
             onClose={closePanel}

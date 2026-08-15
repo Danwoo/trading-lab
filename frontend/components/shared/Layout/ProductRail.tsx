@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { showToast } from "@/components/shared/Feedback";
 import { Icon } from "@/components/shared/ui/primitives/icons";
 import { cn } from "@/components/shared/ui/primitives/cn";
-import { RAIL_ITEMS, RAIL_WIDTH_PX, type RailItem } from "@/constants/shell";
+import { RAIL_ITEMS, type RailItem } from "@/constants/shell";
 
 interface Props {
   /** 지금 열려 있는 패널 항목 id. 닫혀 있으면 null */
@@ -115,11 +115,12 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
     return rendered;
   };
 
+  // 레일은 어느 폭에서도 46px 이다 — 18px 아이콘 한 줄이라 늘려도 담을 것이 없고 줄이면
+  // 표적이 무너진다. 그래서 여기만 구간을 안 탄다(값은 globals.css 의 `--shell-rail`).
   return (
     <nav
       aria-label="제품 레일"
-      style={{ flex: `0 0 ${RAIL_WIDTH_PX}px` }}
-      className="flex h-full flex-col items-center gap-1 border-r border-slate-line bg-slate-panel py-2"
+      className="flex h-full w-shell-rail flex-none flex-col items-center gap-1 border-r border-slate-line bg-slate-panel py-2"
     >
       <ul className="flex flex-col items-center gap-1">{renderGroup(mainItems)}</ul>
       <ul className="mt-auto flex flex-col items-center gap-1">{renderGroup(footerItems)}</ul>

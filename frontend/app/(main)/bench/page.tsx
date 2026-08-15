@@ -2,7 +2,6 @@
 
 import { useRef, useState, type KeyboardEvent } from "react";
 import { cn } from "@/components/shared/ui/primitives/cn";
-import { useViewportBand } from "@/hooks/shared/useViewportBand";
 import { useBenchSelectionStore, type BenchSelectionKind } from "@/stores/shell/benchSelectionStore";
 
 /**
@@ -61,9 +60,13 @@ function Zone({ zone }: { zone: (typeof BOARD_ZONES)[number] }) {
  *
  * 1280 미만에서 격자·곡선을 **탭으로 하나씩** 내놓는다(§21.6) — 나란히 두면 둘 다 못 읽고,
  * 양보하는 쪽은 패널이 아니라 보드다. 내 봇·오늘 할 일은 접지 않는다(읽는 데 폭이 덜 든다).
+ *
+ * 어느 쪽을 내놓을지는 **CSS 가 정한다**(`xl:`). 두 벌을 다 그려 두고 한 벌을 `display:none`
+ * 으로 끄는 이유는, 탭과 나란히가 폭 차이가 아니라 **ARIA 역할 자체가 다른 두 마크업**이기
+ * 때문이다 — 하나로 합치면 탭이 없는 폭에 `role="tabpanel"` 이 떠서 이름 없는 고아가 된다.
+ * `display:none` 은 접근성 트리에서도 빠지므로 어느 폭에서든 한 벌만 살아 있다.
  */
 export default function Page() {
-  const band = useViewportBand();
   const [activeTab, setActiveTab] = useState<TabbedZoneId>("grid");
   const tabRefs = useRef(new Map<TabbedZoneId, HTMLButtonElement>());
 
@@ -89,50 +92,50 @@ export default function Page() {
         </p>
       </header>
 
-      {band === "wide" ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+      {/* 1280 이상 — 격자·곡선이 나란히 (§21.6) */}
+      <div className="hidden gap-3 xl:grid xl:grid-cols-2">
+        {TABBED_ZONE_IDS.map((id) => (
+          <Zone key={id} zone={zoneById(id)} />
+        ))}
+      </div>
+
+      {/* 1280 미만 — 격자 / 곡선 탭으로 하나씩 (§21.6) */}
+      <div className="min-w-0 xl:hidden">
+        <div role="tablist" aria-label="보드 보기" onKeyDown={handleTabKeyDown} className="flex flex-wrap gap-1">
           {TABBED_ZONE_IDS.map((id) => (
-            <Zone key={id} zone={zoneById(id)} />
+            <button
+              key={id}
+              ref={(el) => {
+                if (el) tabRefs.current.set(id, el);
+                else tabRefs.current.delete(id);
+              }}
+              type="button"
+              role="tab"
+              id={`board-tab-${id}`}
+              aria-selected={activeTab === id}
+              aria-controls={`board-panel-${id}`}
+              tabIndex={activeTab === id ? 0 : -1}
+              onClick={() => setActiveTab(id)}
+              className={cn(
+                "rounded-t border-b-2 px-3 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
+                activeTab === id ? "border-ink-primary text-ink-primary" : "border-transparent text-ink-muted",
+              )}
+            >
+              {zoneById(id).title}
+            </button>
           ))}
         </div>
-      ) : (
-        <div>
-          <div role="tablist" aria-label="보드 보기" onKeyDown={handleTabKeyDown} className="flex gap-1">
-            {TABBED_ZONE_IDS.map((id) => (
-              <button
-                key={id}
-                ref={(el) => {
-                  if (el) tabRefs.current.set(id, el);
-                  else tabRefs.current.delete(id);
-                }}
-                type="button"
-                role="tab"
-                id={`board-tab-${id}`}
-                aria-selected={activeTab === id}
-                aria-controls={`board-panel-${id}`}
-                tabIndex={activeTab === id ? 0 : -1}
-                onClick={() => setActiveTab(id)}
-                className={cn(
-                  "rounded-t border-b-2 px-3 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
-                  activeTab === id ? "border-ink-primary text-ink-primary" : "border-transparent text-ink-muted",
-                )}
-              >
-                {zoneById(id).title}
-              </button>
-            ))}
-          </div>
-          <div
-            role="tabpanel"
-            id={`board-panel-${activeTab}`}
-            aria-labelledby={`board-tab-${activeTab}`}
-            className="mt-2"
-          >
-            <Zone zone={zoneById(activeTab)} />
-          </div>
+        <div
+          role="tabpanel"
+          id={`board-panel-${activeTab}`}
+          aria-labelledby={`board-tab-${activeTab}`}
+          className="mt-2 min-w-0"
+        >
+          <Zone zone={zoneById(activeTab)} />
         </div>
-      )}
+      </div>
 
-      <div className="grid min-h-0 flex-1 gap-3 sm:grid-cols-2">
+      <div className="grid min-h-0 min-w-0 flex-1 gap-3 lg:grid-cols-2">
         {restZones.map((zone) => (
           <Zone key={zone.id} zone={zone} />
         ))}

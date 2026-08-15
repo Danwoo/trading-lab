@@ -90,6 +90,11 @@ export const theme = {
       group: "var(--space-group)",
       section: "var(--space-section)",
       row: "var(--size-row)",
+      // 셸 치수 (§21.6) — `w-shell-*` 로 쓴다. 값은 globals.css 가 SoT.
+      "shell-rail": "var(--shell-rail)",
+      "shell-panel": "var(--shell-panel)",
+      "shell-panel-compact": "var(--shell-panel-compact)",
+      "shell-panel-expanded": "var(--shell-panel-expanded)",
     },
     boxShadow: {
       e1: "var(--e1)",
