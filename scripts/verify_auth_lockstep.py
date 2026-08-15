@@ -104,6 +104,7 @@ REPLICA_GROUPS: dict[str, dict[str, list[str]]] = {
     "app/core/exceptions.py": {
         "members": [
             "backend-service",
+            "bot-agent-service",
             "disclosure-mcp-service",
             "doc-search-mcp-service",
             "market-data-mcp-service",
@@ -118,6 +119,7 @@ REPLICA_GROUPS: dict[str, dict[str, list[str]]] = {
     "app/core/exception_handler.py": {
         "members": [
             "backend-service",
+            "bot-agent-service",
             "disclosure-mcp-service",
             "doc-search-mcp-service",
             "market-data-mcp-service",
@@ -132,6 +134,7 @@ REPLICA_GROUPS: dict[str, dict[str, list[str]]] = {
     "app/core/logger.py": {
         "members": [
             "backend-service",
+            "bot-agent-service",
             "disclosure-mcp-service",
             "doc-search-mcp-service",
             "market-data-mcp-service",
@@ -160,7 +163,7 @@ REPLICA_GROUPS: dict[str, dict[str, list[str]]] = {
             "template-mcp-service",
             "web-mcp-service",
         ],
-        "known_divergent": ["backend-service", "single-agent-service"],
+        "known_divergent": ["backend-service", "bot-agent-service", "single-agent-service"],
     },
     "app/clients/mcp/mcp_auth.py": {
         "members": ["backend-service", "multi-agent-service"],
