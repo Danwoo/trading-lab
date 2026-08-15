@@ -236,17 +236,31 @@ def verdict(ratio: float) -> str:
     return "미달"
 
 
-def block_bodies(css: str, selector: str) -> list[str]:
-    """`selector { ... }` 블록의 본문 전부 (같은 선택자가 여러 번 나오면 순서대로).
+# `선택자목록 { 선언 }` 한 덩어리. 중첩 규칙(@media 등)은 이 파일에 없으므로 평면 파싱으로 충분하다.
+RULE = re.compile(r"([^{}]+)\{([^{}]*)\}", re.S)
 
-    앞을 `(?:^|[\s;}])` 로 막는 이유: 그냥 찾으면 `[data-market-preset="us"]` 가
-    `[data-theme="light"][data-market-preset="us"]` 안에서도 걸려 다크 벌이 라이트 값을
-    집어온다. 실제로 그렇게 잘못 조립됐고, 미달 10건으로 시끄럽게 드러났다.
+
+def block_bodies(css: str, selector: str) -> list[str]:
+    """`selector` 가 **선택자 목록의 한 항목**인 규칙들의 본문 (등장 순서대로).
+
+    쉼표로 나눠 정확히 대조하는 이유가 둘 있다.
+    - 부분 문자열로 찾으면 `[data-market-preset="us"]` 가
+      `[data-theme="light"][data-market-preset="us"]` 안에서도 걸려 다크 벌이 라이트 값을
+      집어온다. 실제로 그렇게 잘못 조립됐고 미달 10건으로 드러났다.
+    - `:root, [data-theme="dark"], .auth-backdrop` 처럼 한 규칙이 여러 선택자를 가질 때
+      `:root` 만 보고도 그 본문을 찾을 수 있어야 한다.
     """
-    pattern = re.compile(
-        r"(?:^|[\s;}])" + re.escape(selector) + r"\s*\{(.*?)\}", re.S | re.M
-    )
-    return pattern.findall(css)
+    bodies: list[str] = []
+    for prelude, body in RULE.findall(css):
+        # 주석은 선택자 목록 앞뒤에만 오므로 통째로 걷어낸다.
+        cleaned = re.sub(r"/\*.*?\*/", " ", prelude, flags=re.S)
+        # 앞선 문장(`@tailwind utilities;` 등)이 붙어 오므로 마지막 `;` 뒤만 남긴다.
+        # 선택자에는 `;` 가 올 수 없어 안전하다.
+        cleaned = cleaned.rsplit(";", 1)[-1]
+        parts = [part.strip() for part in cleaned.split(",")]
+        if selector in parts:
+            bodies.append(body)
+    return bodies
 
 
 def declarations_of(css: str, selector: str) -> dict[str, str]:

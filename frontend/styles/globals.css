@@ -54,10 +54,16 @@
    선택자 순서 주의: `[data-theme="light"]` 와 `[data-market-preset="us"]` 는 명시도가
    같으므로(0,1,0) **라이트 블록이 뒤에 와야** 라이트에서 다크 us 값이 남지 않는다.
 
+   `.auth-backdrop` 이 선택자에 함께 있는 이유: 인증 배경은 모드와 무관하게 **어두운 섬**이다
+   (배경 자체가 레거시 다크 토큰으로 그려진다). 루트가 라이트로 가도 그 위의 글자는 다크
+   잉크를 써야 읽힌다 — 안 그러면 어두운 배경 위에 어두운 글자가 얹힌다.
+
    값의 근거는 scripts/verify_token_contrast.py 가 매 PR 에 전수로 출력한다. 잉크 4단은
    `--ink-faint` 를 AA(4.5:1) 바로 위에 놓고 `--ink-muted` 를 `--ink` 와 `--ink-faint` 의
    기하중간에 두어 사다리 간격을 고르게 맞춘 값이다(#73 S1, 리드 결정 ㉠). */
-:root {
+:root,
+[data-theme="dark"],
+.auth-backdrop {
   /* ── 바탕 ── */
   --bg-base: 13 15 17;
   --bg-panel: 22 25 28;
