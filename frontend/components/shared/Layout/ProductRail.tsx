@@ -88,7 +88,9 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId }: Props
     items.forEach((item) => {
       rendered.push(renderItem(item));
       if (item.dividerAfter) {
-        rendered.push(<li key={`${item.id}-divider`} aria-hidden className="my-1 w-[22px] border-t border-slate-line" />);
+        rendered.push(
+          <li key={`${item.id}-divider`} aria-hidden className="my-1 w-[22px] border-t border-slate-line" />,
+        );
       }
     });
     return rendered;

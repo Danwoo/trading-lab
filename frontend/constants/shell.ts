@@ -50,7 +50,13 @@ export const RAIL_ITEMS: readonly RailItem[] = [
     dividerAfter: true,
   },
   { id: "bot", label: "봇", icon: "box", kind: "panel", pending: "봇 패널 내용은 아직 없습니다." },
-  { id: "trades", label: "거래 로그", icon: "bulletlist", kind: "panel", pending: "거래 로그 패널 내용은 아직 없습니다." },
+  {
+    id: "trades",
+    label: "거래 로그",
+    icon: "bulletlist",
+    kind: "panel",
+    pending: "거래 로그 패널 내용은 아직 없습니다.",
+  },
   {
     id: "rules",
     label: "내 기준",
@@ -60,7 +66,13 @@ export const RAIL_ITEMS: readonly RailItem[] = [
     dividerAfter: true,
   },
   { id: "market", label: "시세", icon: "chart", kind: "route", path: MARKET_PATH },
-  { id: "portfolio", label: "포트폴리오", icon: "money", kind: "panel", pending: "포트폴리오 패널 내용은 아직 없습니다." },
+  {
+    id: "portfolio",
+    label: "포트폴리오",
+    icon: "money",
+    kind: "panel",
+    pending: "포트폴리오 패널 내용은 아직 없습니다.",
+  },
   {
     id: "settings",
     label: "설정",
