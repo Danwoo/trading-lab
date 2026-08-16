@@ -132,13 +132,3 @@ Backend exception_handler → {detail: "한글 메시지", status: 4xx/5xx}
 15. **패널이 데이터 세 갈래 훅을 우회** → `*Panel/` 안에서 `apiCall`/`WebSocket` 직접 호출 금지, `useLoadedSeries`/`useRealtimeQuote`/`useOnDemand` 경유
 16. **패널 데이터 훅이 provenance 없이 반환** → `hooks/terminal/` 데이터 훅은 `PanelData<T>`(또는 `provenance` 필드 포함)로 반환
 17. **샘플 데이터가 실데이터 경로에서 쓰임** → `sample*`/`Sample*` 모듈은 `provenance.kind === "placeholder"` 분기에서만
-
-<!-- BEGIN:nextjs-agent-rules -->
-
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
-
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->

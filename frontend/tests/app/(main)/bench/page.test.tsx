@@ -70,6 +70,9 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.clearAllMocks();
+  // `matchMedia` 를 undefined 로 세우는 테스트가 있다 — 해제하지 않으면 뒤 테스트가
+  // 그 상태로 돈다 (vitest 설정에 `unstubGlobals` 가 없어 자동 해제도 없다).
+  vi.unstubAllGlobals();
 });
 
 describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", () => {
@@ -237,21 +240,20 @@ describe("폭 구간은 CSS 가 가른다 (§21.6 · 반응형 규칙)", () => {
     expect(screen.getByRole("tablist", { name: "보드 보기" })).toBeTruthy();
   });
 
-  it("보드가 아래 줄보다 넓은 세로 몫을 갖는다 — 비율이지 고정 px 가 아니다", () => {
+  it("보드가 뷰포트 비례 바닥을 갖는다 — 아래 줄 내용이 늘어도 보드가 밀리지 않는다", () => {
     const { container } = render(<BenchPage />);
 
-    // 넓은 배치(나란히)와 좁은 배치(탭) 둘 다 보드가 2, 아래 줄이 1 이다.
+    // 이 자리는 클래스만 본다. **비가 실제로 성립하는지는 jsdom 이 CSS 를 적용하지 않아
+    // 여기서 못 잰다** — 브라우저 실측이 정본이고, 여기서는 바닥이 사라지는 것만 막는다.
     const wide = container.querySelector(".xl\\:grid-cols-2")!;
-    expect(wide.className).toContain("xl:flex-[2]");
+    expect(wide.className).toContain("xl:min-h-[50svh]");
 
     const narrow = screen.getByRole("tablist", { name: "보드 보기" }).parentElement!;
-    expect(narrow.className).toContain("flex-[2]");
+    expect(narrow.className).toContain("min-h-[50svh]");
 
-    const rest = container.querySelector(".lg\\:grid-cols-2")!;
-    expect(rest.className).toContain("flex-1");
-
-    // 고정 px 로 높이를 박으면 반응형이 깨진다 — 세로 몫에 h-<숫자> 가 없어야 한다.
-    for (const el of [wide, narrow, rest]) {
+    // 바닥은 뷰포트 비례여야 한다 — 고정 px/rem 으로 박으면 화면 크기를 안 따라간다.
+    for (const el of [wide, narrow]) {
+      expect(el.className).toMatch(/min-h-\[\d+s?vh\]/);
       expect(el.className).not.toMatch(/(^|\s)h-\d/);
     }
   });
