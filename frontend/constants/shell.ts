@@ -67,7 +67,7 @@ export const RAIL_ITEMS: readonly RailItem[] = [
     pending: "리서치 전체 폭 화면은 아직 없습니다.",
     dividerAfter: true,
   },
-  { id: "bot", label: "봇", icon: "box", kind: "panel", pending: "봇 패널 내용은 아직 없습니다." },
+  { id: "bot", label: "봇", icon: "box", kind: "panel" },
   {
     id: "agent",
     label: "에이전트",

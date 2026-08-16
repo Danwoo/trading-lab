@@ -62,7 +62,10 @@ export async function fetchSSE<T extends SSEChunk = SSEChunk>({
 
           if (chunk.type === "error") {
             const err = new Error("HTTP 500") as any;
-            err.response = { data: { detail: chunk.error || "스트리밍 중 오류가 발생했습니다." }, status: 500 };
+            err.response = {
+              data: { detail: chunk.error || chunk.message || "스트리밍 중 오류가 발생했습니다." },
+              status: 500,
+            };
             throw err;
           }
 
@@ -84,7 +87,10 @@ export async function fetchSSE<T extends SSEChunk = SSEChunk>({
         const chunk = JSON.parse(jsonStr) as T;
         if (chunk.type === "error") {
           const err = new Error("HTTP 500") as any;
-          err.response = { data: { detail: chunk.error || "스트리밍 중 오류가 발생했습니다." }, status: 500 };
+          err.response = {
+            data: { detail: chunk.error || chunk.message || "스트리밍 중 오류가 발생했습니다." },
+            status: 500,
+          };
           throw err;
         }
         onChunk(chunk);

@@ -16,6 +16,10 @@ import userEvent from "@testing-library/user-event";
 import BenchPage from "@/app/(main)/bench/page";
 import { useBenchSelectionStore } from "@/stores/shell/benchSelectionStore";
 import { useProductPanelStore } from "@/stores/shell/productPanelStore";
+import { RAIL_ITEMS } from "@/constants/shell";
+
+/** 보드가 내놓는 두 갈래의 목적지 (`BenchPaths` 의 PATHS 와 같은 순서). */
+const BENCH_PATH_RAIL_IDS = ["bot", "agent"] as const;
 import { selectBotList } from "@/services/bot/botService";
 import { selectIngestRunList } from "@/services/terminal/ingestService";
 import type { IngestRunOut } from "@/schemas/terminal/ingest";
@@ -121,10 +125,34 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
     expect(useProductPanelStore.getState().openPanelId).toBe("agent");
   });
 
+  // 이 성질은 「봇이 준비 중이다」가 아니라 **「준비 중인 것만 준비 중이라 말한다」**이다.
+  // 봇 패널이 배선되면서 봇은 준비 중이 아니게 됐다 — 그래서 대상을 레일 표식으로 잡는다.
   it("목적지가 아직 준비 중이면 그 사실이 버튼에 보인다", () => {
     render(<BenchPage />);
 
-    expect(screen.getByRole("button", { name: /봇 만들기/ }).textContent).toContain("준비 중");
+    const pendingPaths = BENCH_PATH_RAIL_IDS.filter(
+      (railId) => RAIL_ITEMS.find((item) => item.id === railId)?.pending !== undefined,
+    );
+    expect(pendingPaths.length).toBeGreaterThan(0);
+
+    for (const railId of pendingPaths) {
+      const label = railId === "bot" ? /봇 만들기/ : /에이전트에게 맡기기/;
+      expect(screen.getByRole("button", { name: label }).textContent).toContain("준비 중");
+    }
+  });
+
+  it("배선된 목적지는 「준비 중」이라 말하지 않는다", () => {
+    render(<BenchPage />);
+
+    const readyPaths = BENCH_PATH_RAIL_IDS.filter(
+      (railId) => RAIL_ITEMS.find((item) => item.id === railId)?.pending === undefined,
+    );
+    expect(readyPaths).toContain("bot");
+
+    for (const railId of readyPaths) {
+      const label = railId === "bot" ? /봇 만들기/ : /에이전트에게 맡기기/;
+      expect(screen.getByRole("button", { name: label }).textContent).not.toContain("준비 중");
+    }
   });
 });
 

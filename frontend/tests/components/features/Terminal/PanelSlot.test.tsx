@@ -102,17 +102,33 @@ describe("PanelSlot — market 결측(출처 불문)과 진짜 시장 불명을 
     expect(screen.queryByText(/등록된 시장 값이 비어 있습니다/)).toBeNull();
   });
 
-  it("needsSymbol: false 패널은 market 결측이어도 게이트를 타지 않는다 — 가용성 매트릭스만 본다", async () => {
+  it("needsSymbol: false 패널은 market 결측 게이트를 타지 않는다", async () => {
     // 브리핑 게이트와 대칭인 회귀 방지 — 결측 게이트도 needsSymbol 스코프 밖으로 새면 안 된다.
-    // positions·bot-state 등 시장이 필요 없는 후속 패널(레지스트리 주석 예고)이 이 조합이다.
     setSymbol({ ticker: "005930", market: "", name: "삼성전자" });
     const definition = definitionOf({ needsSymbol: false, capability: "candles" });
     render(<PanelSlot instance={INSTANCE} definition={definition} region="UNKNOWN" {...NOOP} />);
 
-    // needsSymbol:false 라 market 결측 판정을 건너뛰고 resolveCapability(region=UNKNOWN) 로
-    // 판정한다 — 그 결과는 가용성 매트릭스의 UNKNOWN 문구다(결측 문구가 아니다).
-    expect(await screen.findByText("시장 정보를 알 수 없는 종목입니다")).toBeTruthy();
     expect(screen.queryByText(/등록된 시장 값이 비어 있습니다/)).toBeNull();
+  });
+
+  // 이 자리는 종전에 「시장 정보를 알 수 없는 종목입니다」를 기대했다. 그 기대가 실제 화면에서
+  // 틀렸음이 드러났다 — 종목을 안 고른 채 /terminal 을 열면 「봇 상태」가 봇과 아무 상관 없는
+  // 그 문구로 가려졌다(브라우저로 재현). 종목에 안 매인 자리에 시장을 묻는 것이 잘못이다.
+  it("시장을 몰라도 종목에 안 매인 자리는 열린다 — 시장이 변수가 아닌 자료일 때", async () => {
+    setSymbol(null);
+    const definition = definitionOf({ needsSymbol: false, capability: "botState" });
+    render(<PanelSlot instance={INSTANCE} definition={definition} region="UNKNOWN" {...NOOP} />);
+
+    expect(await screen.findByTestId("panel-body")).toBeTruthy();
+    expect(screen.queryByText("시장 정보를 알 수 없는 종목입니다")).toBeNull();
+  });
+
+  it("그래도 시장마다 답이 갈리는 자료면 모르는 채로 열어 주지 않는다 (fail-closed)", async () => {
+    setSymbol(null);
+    const definition = definitionOf({ needsSymbol: false, capability: "orderbook" });
+    render(<PanelSlot instance={INSTANCE} definition={definition} region="UNKNOWN" {...NOOP} />);
+
+    expect(await screen.findByText("시장 정보를 알 수 없는 종목입니다")).toBeTruthy();
     expect(screen.queryByTestId("panel-body")).toBeNull();
   });
 });
