@@ -105,6 +105,9 @@ jobs:
             scripts/verify_auth_lockstep.py
             *-service/CLAUDE.md
             scripts/verify_backend_claude_md.py
+            */app/.env.example
+            frontend/.env.example
+            scripts/verify_env_example_coverage.py
             # 스위트 러너 — 고치면 이 파일의 전 잡에 영향
             scripts/run_standalone_tests.py
             scripts/run_verify_scripts.py
@@ -413,3 +416,7 @@ jobs:
       - name: Backend CLAUDE.md common section check
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_backend_claude_md.py
+
+      - name: Bootstrap env.example coverage check
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_env_example_coverage.py
