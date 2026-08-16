@@ -5,7 +5,7 @@ import type { TerminalLayout } from "@/types/terminal/layout";
  * 생긴다(그쪽이 폴백값으로 이 파일의 `DEFAULT_LAYOUT` 을 가져간다). 스키마 버전이 오르면
  * 이 값도 함께 올린다.
  */
-const DEFAULT_LAYOUT_SCHEMA_VERSION = 2;
+const DEFAULT_LAYOUT_SCHEMA_VERSION = 3;
 
 /**
  * 「시세」 화면의 기본 패널 구성 — 패널 타입 문자열은 패널 레지스트리의 키와 반드시 일치해야
@@ -16,6 +16,8 @@ export const DEFAULT_LAYOUT: TerminalLayout = {
   panels: [
     { instanceId: "chart-1", type: "chart", collapsed: false, settings: {} },
     { instanceId: "symbol-info-1", type: "symbol-info", collapsed: false, settings: {} },
+    { instanceId: "orderbook-1", type: "orderbook", collapsed: false, settings: {} },
+    { instanceId: "bot-state-1", type: "bot-state", collapsed: false, settings: {} },
   ],
 };
 

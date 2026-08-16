@@ -135,7 +135,10 @@ describe("v1 → v2 — 좌표(grid) 가 있던 옛 저장본", () => {
 
     expect(result.recovered).toBe(false);
     expect(result.layout.schemaVersion).toBe(LAYOUT_SCHEMA_VERSION);
-    expect(result.layout.panels).toEqual(V1_SAVED_LAYOUT.panels);
+    // 열려 있던 패널은 **그대로**(설정·접힘까지) 앞에 남는다. 뒤에 붙는 것은 v3 이 들여온
+    // 새 패널이고, 그것 때문에 옛 구성이 바뀌면 안 된다.
+    expect(result.layout.panels.slice(0, V1_SAVED_LAYOUT.panels.length)).toEqual(V1_SAVED_LAYOUT.panels);
+    expect(result.layout.panels.map((panel) => panel.type)).toEqual(["chart", "symbol-info", "orderbook", "bot-state"]);
   });
 
   it("좌표는 떨어져 나간다 — 새 스키마에 grid 라는 자리가 없다", () => {

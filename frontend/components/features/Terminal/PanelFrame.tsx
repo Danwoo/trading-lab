@@ -46,11 +46,17 @@ export function PanelFrame({ instance, definition, provenance, onToggleCollapse,
 
       {instance.collapsed ? (
         <div className="flex flex-1 items-center justify-center text-xs text-ink-muted">패널이 접혀 있습니다</div>
-      ) : isUnavailable ? (
-        <PanelUnavailable reason={provenance.reason} />
       ) : (
         <div className="relative flex-1 overflow-auto">
-          {children}
+          {isUnavailable && <PanelUnavailable reason={provenance.reason} />}
+          {/*
+            사유가 떠 있어도 **자식은 트리에 남긴다.** 언마운트하면 그 사유를 갱신할 수 있는
+            유일한 주체(자기 provenance 를 올리는 패널 자신)가 사라져, 한 번 unavailable 을
+            올린 패널은 문맥이 바뀌어도 영영 그 사유에 갇힌다 — 구조적 교착이다
+            (`SymbolInfoPanel` 의 긴 주석이 그 교착을 우회하려고 남아 있다).
+            `contents` 는 이 래퍼가 레이아웃에 끼어들지 않게 한다.
+          */}
+          <div className={isUnavailable ? "hidden" : "contents"}>{children}</div>
           {isPlaceholder && (
             <div className="terminal-placeholder-hatch pointer-events-none absolute inset-0" aria-hidden="true" />
           )}

@@ -1,4 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_LAYOUT } from "@/lib/terminal/layoutDefaults";
+
+/** 기본 구성은 `layoutDefaults` 가 소유한다 — 여기서 베껴 적으면 기본이 늘 때마다 이 파일이 깨진다. */
+const DEFAULT_TYPES = DEFAULT_LAYOUT.panels.map((panel) => panel.type);
+const DEFAULT_IDS = DEFAULT_LAYOUT.panels.map((panel) => panel.instanceId);
+const idsWithout = (...closed: string[]) => DEFAULT_IDS.filter((id) => !closed.includes(id));
 
 /**
  * vitest 환경은 jsdom 이 아니라 node(O0 결정)라 `localStorage` 가 없다 — 진짜 `Storage`
@@ -58,20 +64,20 @@ describe("layoutStore", () => {
     const store = await freshStore();
 
     expect(store.getState().workspaceId).toBeNull();
-    expect(store.getState().layout.panels.map((p) => p.type)).toEqual(["chart", "symbol-info"]);
+    expect(store.getState().layout.panels.map((p) => p.type)).toEqual(DEFAULT_TYPES);
   });
 
   it("패널 구성을 바꾸고 '새로고침'해도 그대로 열린다 (FR-005)", async () => {
     const store1 = await freshStore();
     store1.getState().setWorkspace("ws-a");
     store1.getState().closePanel("chart-1");
-    expect(store1.getState().layout.panels.map((p) => p.instanceId)).toEqual(["symbol-info-1"]);
+    expect(store1.getState().layout.panels.map((p) => p.instanceId)).toEqual(idsWithout("chart-1"));
 
     // "새로고침" — 모듈을 새로 평가해 완전히 새 스토어 인스턴스를 만들고, 같은 워크스페이스로 연다
     const store2 = await freshStore();
     store2.getState().setWorkspace("ws-a");
 
-    expect(store2.getState().layout.panels.map((p) => p.instanceId)).toEqual(["symbol-info-1"]);
+    expect(store2.getState().layout.panels.map((p) => p.instanceId)).toEqual(idsWithout("chart-1"));
     expect(store2.getState().recovered).toBe(false);
   });
 
@@ -83,14 +89,14 @@ describe("layoutStore", () => {
 
     store.getState().setWorkspace("ws-b");
     // ws-b 는 아직 저장본이 없다 — 기본 구성으로 열려야 하고, ws-a 값이 새어 들어오면 안 된다
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1"]);
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(DEFAULT_IDS);
     store.getState().closePanel("symbol-info-1");
 
     store.getState().setWorkspace("ws-a");
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["symbol-info-1"]);
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(idsWithout("chart-1"));
 
     store.getState().setWorkspace("ws-b");
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1"]);
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(idsWithout("symbol-info-1"));
   });
 
   it("한 워크스페이스의 localStorage 키가 다른 워크스페이스 키와 물리적으로 분리돼 있다", async () => {
@@ -105,10 +111,12 @@ describe("layoutStore", () => {
     const rawB = sharedStorage.getItem("terminal-layout:ws-b");
     expect(rawA).not.toBeNull();
     expect(rawB).not.toBeNull();
-    expect(JSON.parse(rawA!).state.layout.panels.map((p: { instanceId: string }) => p.instanceId)).toEqual([
-      "symbol-info-1",
-    ]);
-    expect(JSON.parse(rawB!).state.layout.panels.map((p: { instanceId: string }) => p.instanceId)).toEqual(["chart-1"]);
+    expect(JSON.parse(rawA!).state.layout.panels.map((p: { instanceId: string }) => p.instanceId)).toEqual(
+      idsWithout("chart-1"),
+    );
+    expect(JSON.parse(rawB!).state.layout.panels.map((p: { instanceId: string }) => p.instanceId)).toEqual(
+      idsWithout("symbol-info-1"),
+    );
   });
 
   it("손상된 저장본을 만나면 기본 구성으로 폴백하고 recovered:true 로 알린다", async () => {
@@ -121,7 +129,7 @@ describe("layoutStore", () => {
     store.getState().setWorkspace("ws-broken");
 
     expect(store.getState().recovered).toBe(true);
-    expect(store.getState().layout.panels.map((p) => p.type)).toEqual(["chart", "symbol-info"]);
+    expect(store.getState().layout.panels.map((p) => p.type)).toEqual(DEFAULT_TYPES);
   });
 
   it("dismissRecovered 는 알림만 닫고 구성은 유지한다", async () => {
@@ -136,7 +144,7 @@ describe("layoutStore", () => {
     store.getState().dismissRecovered();
 
     expect(store.getState().recovered).toBe(false);
-    expect(store.getState().layout.panels.map((p) => p.type)).toEqual(["chart", "symbol-info"]);
+    expect(store.getState().layout.panels.map((p) => p.type)).toEqual(DEFAULT_TYPES);
   });
 
   it("closePanel·toggleCollapsed·updateSettings 가 panels 를 유지한다", async () => {
@@ -159,13 +167,12 @@ describe("layoutStore", () => {
     const store = await freshStore();
     store.getState().setWorkspace("ws-a");
 
-    store.getState().closePanel("chart-1");
-    store.getState().closePanel("symbol-info-1");
+    for (const id of DEFAULT_IDS) store.getState().closePanel(id);
     expect(store.getState().layout.panels).toEqual([]);
 
     store.getState().resetPanels();
 
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1"]);
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(DEFAULT_IDS);
   });
 
   it("resetPanels 는 기본 패널만 되살리고 레지스트리 밖 패널(FE-AD-8 preserved)은 지우지 않는다", async () => {
@@ -183,11 +190,17 @@ describe("layoutStore", () => {
     );
     const store = await freshStore();
     store.getState().setWorkspace("ws-ghost");
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["ghost-1"]);
+    // 레지스트리 밖 패널은 남고, v3 이 들여온 새 패널이 뒤에 붙는다.
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["ghost-1", "orderbook-1", "bot-state-1"]);
 
     store.getState().resetPanels();
 
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1", "ghost-1"]);
+    expect(
+      store
+        .getState()
+        .layout.panels.map((p) => p.instanceId)
+        .sort(),
+    ).toEqual([...DEFAULT_IDS, "ghost-1"].sort());
   });
 
   it("resetPanels 는 열려 있는 기본 패널의 설정·접힘을 건드리지 않는다 — 되살리기지 초기화가 아니다", async () => {
@@ -203,7 +216,12 @@ describe("layoutStore", () => {
     const chart = store.getState().layout.panels.find((p) => p.instanceId === "chart-1");
     expect(chart?.settings).toEqual({ interval: "1h" });
     expect(chart?.collapsed).toBe(true);
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1"]);
+    expect(
+      store
+        .getState()
+        .layout.panels.map((p) => p.instanceId)
+        .sort(),
+    ).toEqual([...DEFAULT_IDS].sort());
   });
 
   it("되살릴 것이 없으면 resetPanels 는 아무것도 바꾸지 않는다", async () => {
@@ -236,7 +254,8 @@ describe("layoutStore", () => {
     store.getState().setWorkspace("ws-legacy");
 
     expect(store.getState().recovered).toBe(false);
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1"]);
+    // 열려 있던 것은 그대로 살아나고, v3 이 들여온 새 패널이 뒤에 붙는다 (마이그레이션 3).
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "orderbook-1", "bot-state-1"]);
     expect(store.getState().layout).not.toHaveProperty("grid");
   });
 });

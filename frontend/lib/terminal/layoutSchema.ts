@@ -1,7 +1,7 @@
 import type { PanelInstance, TerminalLayout } from "@/types/terminal/layout";
 import { DEFAULT_LAYOUT, cloneLayout } from "./layoutDefaults";
 
-export const LAYOUT_SCHEMA_VERSION = 2;
+export const LAYOUT_SCHEMA_VERSION = 3;
 
 export type LayoutMigration = (input: Record<string, unknown>) => Record<string, unknown>;
 
@@ -17,9 +17,33 @@ function dropGrid(input: Record<string, unknown>): Record<string, unknown> {
   return { ...rest, schemaVersion: 2 };
 }
 
+/**
+ * v2 → v3 — 패널 두 종(호가·봇 상태)이 생겼다. **옛 저장본에 없으면 덧붙인다.**
+ *
+ * 덧붙이는 쪽을 고른 이유: 이 저장본은 「내가 고른 구성」이 아니라 대부분 **기본값이 굳은 것**
+ * 이다(패널을 고르는 UI 가 아직 없다). 그대로 두면 새 패널이 생겨도 아무에게도 안 보인다.
+ * 패널을 스스로 닫을 수 있게 되면 이 마이그레이션은 「닫은 것을 되살리는」 동작이 되므로,
+ * 그때는 이 방식을 다시 판단해야 한다 — 지금은 닫기가 곧 이 세션 한정이라 문제되지 않는다.
+ */
+function addPanelsIntroducedInV3(input: Record<string, unknown>): Record<string, unknown> {
+  // 깨진 저장본은 **고치지 않는다** — 여기서 빈 배열을 만들어 주면 뒤의 검증이 통과해 버려
+  // 폴백이 사라진다(그물이 실제로 잡았다). 모양이 아니면 그대로 흘려보내고 검증이 판정한다.
+  if (!Array.isArray(input.panels)) return { ...input, schemaVersion: 3 };
+  const panels = [...(input.panels as PanelInstance[])];
+  const existing = new Set(panels.map((panel) => panel?.type));
+  for (const [type, instanceId] of [
+    ["orderbook", "orderbook-1"],
+    ["bot-state", "bot-state-1"],
+  ] as const) {
+    if (!existing.has(type)) panels.push({ instanceId, type, collapsed: false, settings: {} });
+  }
+  return { ...input, panels, schemaVersion: 3 };
+}
+
 /** 키는 "적용하면 도달하는 버전" */
 export const LAYOUT_MIGRATIONS: Record<number, LayoutMigration> = {
   2: dropGrid,
+  3: addPanelsIntroducedInV3,
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

@@ -2,6 +2,7 @@
 
 import { type ReactNode } from "react";
 import { ProductPanel, ProductRail } from "@/components/shared/Layout";
+import { RAIL_PANEL_CONTENT } from "@/components/shared/Layout/railPanelContent";
 import { useMenuAccessGate } from "@/hooks/shared/useMenuAccessGate";
 import { usePanelOverlaysBoard } from "@/hooks/shared/usePanelOverlaysBoard";
 import { useProductPanelStore } from "@/stores/shell/productPanelStore";
@@ -38,6 +39,8 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
   if (!loaded || authorized === null) return null;
 
   const openPanel = RAIL_ITEMS.find((item) => item.id === openPanelId) ?? null;
+  // 레지스트리에 없으면 `ProductPanel` 이 `item.pending` 을 대신 보여준다.
+  const PanelContent = openPanel === null ? undefined : RAIL_PANEL_CONTENT[openPanel.id];
   const panelCoversBoard = openPanel !== null && panelOverlaysBoard;
 
   return (
@@ -63,7 +66,9 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
             expanded={expanded}
             onToggleExpanded={toggleExpanded}
             onClose={closePanel}
-          />
+          >
+            {PanelContent ? <PanelContent /> : undefined}
+          </ProductPanel>
         )}
       </div>
     </div>

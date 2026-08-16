@@ -32,6 +32,8 @@ export const env = createEnv({
     BACKEND_SERVICE_URL: z.string(),
     DEV_ACTIVITY_SERVICE_URL: z.string().default(""),
     MULTI_AGENT_SERVICE_URL: z.string().default("http://localhost:8003"),
+    // 봇 만들기 대화 — 로컬 배포 모드 전용이라 없을 수도 있다(그때 화면이 이유를 보여준다).
+    BOT_AGENT_SERVICE_URL: z.string().default("http://localhost:8011"),
     PORTFOLIO_MCP_SERVICE_URL: z.string().default("http://localhost:8002"),
     MARKET_DATA_MCP_SERVICE_URL: z.string().default("http://localhost:8004"),
     DISCLOSURE_MCP_SERVICE_URL: z.string().default("http://localhost:8005"),
