@@ -31,7 +31,9 @@ class BotAgentService:
         """대화를 걸 수 있는 상태인지 — 화면이 「왜 안 되는지」를 보여줄 재료."""
         directory = self.strategies_dir()
         reasons = []
-        if not self.config.ANTHROPIC_API_KEY:
+        # 공백만 든 값은 「설정됨」이 아니다 — truthy 라 그냥 통과하면 화면이 「쓸 수 있다」고
+        # 답하는데 실제로는 인증 수단이 없다.
+        if not self.config.ANTHROPIC_API_KEY.strip():
             reasons.append("ANTHROPIC_API_KEY 가 설정되지 않았습니다 (.env 의 프로세스 환경변수).")
         if not directory.is_dir():
             reasons.append(f"전략 디렉터리가 없습니다: {directory}")

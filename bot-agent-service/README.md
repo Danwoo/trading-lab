@@ -14,7 +14,9 @@ cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload
 
 ### 인증 경계 — 키 설정만으로 다른 경로가 닫히지는 않는다
 
-기계에 Claude Code 로그인(`~/.claude/.credentials.json`)이 있으면 CLI 가 **그 자격증명으로 인증할 수 있다.** SDK 는 부모 프로세스의 환경을 통째로 상속하고(`subprocess_cli.py` 의 `inherited_env`), 옵션으로 그 파일을 가리는 길은 없다 — 실측으로 확인했다(가짜 키로도 대화가 왕복했다).
+기계에 Claude Code 로그인(`~/.claude/.credentials.json`)이 있으면 CLI 가 **그 자격증명으로 인증할 수 있다.** SDK 는 `options.env` 를 부모 환경 **위에 병합**할 뿐 격리하지 않아 `HOME` 이 그대로 상속되고, 그래서 그 파일이 계속 보이는 자리에 있다 — 여기까지는 SDK 소스(`subprocess_cli.py` 의 `inherited_env`)로 확인한 사실이다.
+
+**확인하지 않은 것**: 키를 `env` 로 명시해 넘기는 지금 상태에서 CLI 가 (a) 유효한 키를 실제로 쓰는지, (b) 무효한 키일 때 정말 OAuth 로 넘어가는지. 가짜 키로 대화가 왕복한 관측은 **이 배선이 없던 시점**의 것이라 조건이 다르다. 다시 재려면 소유자의 실제 자격증명을 소모해야 해서 하지 않았다.
 
 따라서 `readiness()` 의 `ready` 는 **「키가 설정돼 있다」이지 「그 키로 인증한다」가 아니다.** 이 서비스를 로컬 배포 모드에서만 띄우는 결정이 그 잔여 위험의 실질적 경계다 — 호스팅에서 띄우면 로그인한 누구든 기계 소유자의 자격증명을 소모시킬 수 있다.
 
@@ -50,7 +52,7 @@ cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload
 ```bash
 uv run python tests/test_agent_boundary.py     # 도구 경계 23건 (정적 구성)
 uv run python tests/test_tool_scope.py         # 경로 스코프 6건 — 탈출 시도 11개를 실제로 판정
-uv run python tests/test_http_contract.py      # HTTP 경계 5건 — 빈 메시지 422 · 키 없을 때 사유
+uv run python tests/test_http_contract.py      # HTTP 경계 7건 — 빈 메시지 422 · 키 없을 때 사유 · 권한 게이트
 uv run ruff check app/
 ```
 

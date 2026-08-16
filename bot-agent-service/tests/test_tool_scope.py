@@ -169,6 +169,10 @@ if __name__ == "__main__":
     if missing:
         print(f"  FAIL TESTS 목록에 없는 테스트: {', '.join(missing)}")
         raise SystemExit(1)
+    # 검사 0건은 통과가 아니다 — `TESTS` 가 비면(나쁜 머지·실수) 조용히 exit 0 이 된다.
+    if len(TESTS) < 6:
+        print(f"  FAIL 검사가 {len(TESTS)}건뿐이다 — 그물이 죽어 있다 (하한 6)")
+        raise SystemExit(1)
     failures = 0
     for test in TESTS:
         try:

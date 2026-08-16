@@ -83,9 +83,14 @@ def build_options(
 
     **인증**: `api_key` 를 `env` 로 명시해 자식 프로세스에 넘긴다. 안 넘기면 SDK 가 부모
     프로세스의 환경을 통째로 상속하므로(`subprocess_cli.py` 의 `inherited_env`), 설정한 키가
-    실제로 쓰이는지 알 수 없다. 다만 **이것으로 다른 인증 경로가 막히지는 않는다** — 기계에
-    `~/.claude/.credentials.json` 이 있으면 CLI 가 그것으로 인증할 수 있고, 그 파일은 옵션으로
-    가릴 수 없다. 그 잔여 위험은 README 「인증 경계」에 적혀 있다.
+    실제로 쓰이는지 알 수 없다.
+
+    **이것으로 다른 인증 경로가 막힌다고 주장하지 않는다.** SDK 는 `options.env` 를 부모 환경
+    **위에 병합**할 뿐 격리하지 않아 `HOME` 이 그대로 상속되고, 그래서 CLI 가
+    `~/.claude/.credentials.json` 을 계속 볼 수 있다 — 여기까지가 SDK 소스로 확인한 사실이다.
+    CLI 가 실제로 무엇을 먼저 쓰는지는 **확인하지 않았다**: 가짜 키로 대화가 돌아간 관측은 이
+    `env` 배선이 **없던 시점**의 것이라 지금 조건과 다르고, 다시 재려면 소유자의 실제 자격증명을
+    소모해야 해서 하지 않았다. 잔여 위험과 그 경계는 README 「인증 경계」에 있다.
     """
     root = Path(strategies_dir).resolve()
     return ClaudeAgentOptions(

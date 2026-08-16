@@ -26,18 +26,29 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 
-def _client() -> TestClient:
-    """라우터를 실물 그대로 태우되 인증만 통과시킨다 — 인증 자체는 공통 계약이 따로 검증한다."""
+def _client(*, role: str = "operator", workspace_id: int | None = 1) -> TestClient:
+    """라우터를 실물 그대로 태우되 토큰 검증만 대신한다.
+
+    **권한 게이트는 대신하지 않는다** — 신원을 ContextVar 에 실제로 박아 게이트가 그것을 읽게
+    한다. 게이트까지 우회하면 「게스트가 소유자 자격증명을 태운다」를 막았는지 여기서 못 본다.
+    """
+    from core.auth_context import set_auth_context
     from core.container import Container
+    from core.exception_handler import get_exception_handlers
     from core.security import verify_access_token
     from routers.bot_agent import bot_agent_router
 
     container = Container()
     container.wire(modules=[bot_agent_router])
 
-    app = FastAPI()
+    # 동기 의존성은 스레드풀에서 돌아 ContextVar 가 요청 컨텍스트로 안 넘어온다 — async 여야 한다.
+    async def _as_caller() -> None:
+        set_auth_context(user_id="u1", email="lead@local", role=role, workspace_id=workspace_id)
+
+    # 실물과 같은 예외 핸들러를 단다 — 안 달면 게이트가 던진 403/401 이 응답이 되지 않는다.
+    app = FastAPI(exception_handlers=get_exception_handlers())
     app.include_router(bot_agent_router.router)
-    app.dependency_overrides[verify_access_token] = lambda: None
+    app.dependency_overrides[verify_access_token] = _as_caller
     return TestClient(app)
 
 
@@ -101,8 +112,8 @@ def test_session_id_is_not_accepted_from_the_client() -> str:
 
 def test_continuation_is_keyed_by_caller() -> str:
     """이어가기는 **신원별**이다 — 한 사람의 세션이 다른 사람에게 새면 안 된다."""
-    from services.bot_agent.bot_agent_service import BotAgentService
     from core.config import settings
+    from services.bot_agent.bot_agent_service import BotAgentService
 
     service = BotAgentService(config=settings)
     service._sessions["user-a"] = "session-a"
@@ -115,12 +126,38 @@ def test_continuation_is_keyed_by_caller() -> str:
     return "test_continuation_is_keyed_by_caller"
 
 
+def test_read_only_guest_cannot_burn_the_owners_credentials() -> str:
+    """대화 한 턴은 기계 소유자의 LLM 자격증명을 소모한다 — 읽기전용 게스트는 못 건드린다.
+
+    개인 워크스페이스 모델이 **읽기전용 게스트 초대**를 전제하므로, 로그인만 하면 닿는
+    엔드포인트로 두면 초대받은 사람이 소유자 구독을 태울 수 있다.
+    """
+    guest = _client(role="user")
+    for method, path, body in [
+        ("post", "/bot-agent", {"message": "봇 만들어줘"}),
+        ("get", "/bot-agent/readiness", None),
+    ]:
+        response = guest.post(path, json=body) if method == "post" else guest.get(path)
+        assert response.status_code == 403, f"{path} → {response.status_code} (게스트가 통과했다)"
+    return "test_read_only_guest_cannot_burn_the_owners_credentials (2건)"
+
+
+def test_service_token_and_missing_workspace_are_refused() -> str:
+    """워크스페이스가 없는 토큰은 어느 워크스페이스의 자격증명을 쓰는지 말할 수 없다 — 거부."""
+    no_workspace = _client(role="operator", workspace_id=None)
+    response = no_workspace.get("/bot-agent/readiness")
+    assert response.status_code == 401, f"workspace 없음 → {response.status_code}"
+    return "test_service_token_and_missing_workspace_are_refused"
+
+
 TESTS = [
     test_blank_message_is_rejected_at_the_boundary,
     test_session_id_is_not_accepted_from_the_client,
     test_continuation_is_keyed_by_caller,
     test_missing_key_answers_with_a_reason_not_silence,
     test_readiness_tells_why_not,
+    test_read_only_guest_cannot_burn_the_owners_credentials,
+    test_service_token_and_missing_workspace_are_refused,
 ]
 
 
@@ -137,6 +174,10 @@ if __name__ == "__main__":
     missing = _unregistered()
     if missing:
         print(f"  FAIL TESTS 목록에 없는 테스트: {', '.join(missing)}")
+        raise SystemExit(1)
+    # 검사 0건은 통과가 아니다 — `TESTS` 가 비면(나쁜 머지·실수) 조용히 exit 0 이 된다.
+    if len(TESTS) < 7:
+        print(f"  FAIL 검사가 {len(TESTS)}건뿐이다 — 그물이 죽어 있다 (하한 7)")
         raise SystemExit(1)
     failures = 0
     for test in TESTS:

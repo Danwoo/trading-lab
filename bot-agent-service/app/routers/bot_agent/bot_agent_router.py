@@ -3,6 +3,7 @@
 import json
 
 from core.auth_context import get_email, get_user_id
+from core.authorization import WRITE_ROLES, require_role
 from core.container import Container
 from core.logger import logger
 from core.security import verify_access_token
@@ -12,7 +13,13 @@ from fastapi.responses import StreamingResponse
 from schemas.bot_agent.bot_agent_schema import BotAgentIn, ReadinessOut
 from services.bot_agent.bot_agent_service import BotAgentService
 
-router = APIRouter(prefix="/bot-agent", dependencies=[Depends(verify_access_token)])
+# 대화 한 턴은 기계 소유자의 LLM 자격증명을 소모한다 — 읽기전용 게스트가 그것을 태우면 안 되므로
+# 쓰기 권한자(operator·admin)만 통과시킨다. `readiness` 도 같은 게이트다: 게스트에게 「쓸 수
+# 있다」고 답하면 화면이 없는 길을 안내하게 된다.
+router = APIRouter(
+    prefix="/bot-agent",
+    dependencies=[Depends(verify_access_token), Depends(require_role(*WRITE_ROLES))],
+)
 
 
 @router.get("/readiness", response_model=ReadinessOut)
