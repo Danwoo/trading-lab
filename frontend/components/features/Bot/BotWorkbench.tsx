@@ -38,6 +38,12 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
   const router = useRouter();
   const [draft, setDraft] = useState<BotDraft>(NEW_BOT_DRAFT);
   const [strategy, setStrategy] = useState<StrategyDraft | null>(null);
+  /**
+   * 이 화면은 전략을 **하나만** 다룬다. 그런데 저장은 전략 배열을 통째로 갈아 끼우므로
+   * (백엔드 `_replace_strategies` 가 지우고 다시 넣는다), 전략이 여럿인 봇을 열어 그냥
+   * 저장하면 나머지가 조용히 사라진다. 「못 고친다」는 괜찮지만 「부순다」는 안 된다.
+   */
+  const [loadedStrategyCount, setLoadedStrategyCount] = useState(0);
   const [strategyForms, setStrategyForms] = useState<StrategyForm[]>([]);
   const [catalogErrors, setCatalogErrors] = useState<{ source: string; message: string }[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -62,6 +68,14 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
           setDraft(toDraft(bot));
           // 저장된 값을 그대로 되돌려 놓는다 — 다시 열었을 때 조건이 그대로 보이는 것이
           // 마일스톤 2 의 완료 조건이다. 전략 파일이 사라졌으면 `form` 이 null 로 온다.
+          setLoadedStrategyCount(bot.strategies.length);
+          if (bot.strategies.length > 1) {
+            // 누른 뒤에 막는 것보다 열자마자 보이는 것이 낫다 — 무엇을 못 하는지 먼저 안다.
+            setLoadError(
+              `이 봇에는 전략이 ${bot.strategies.length}개 실려 있는데 이 화면은 하나만 다룹니다. ` +
+                "여기서 저장하면 나머지가 지워지므로 저장을 막아 뒀습니다.",
+            );
+          }
           const loaded = bot.strategies[0];
           if (loaded) {
             setStrategy({
@@ -146,6 +160,14 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
     }
     if (strategy === null) {
       showToast("전략을 하나 고르면 저장할 수 있습니다.", "warning");
+      return;
+    }
+    if (loadedStrategyCount > 1) {
+      showToast(
+        `이 봇에는 전략이 ${loadedStrategyCount}개 실려 있는데 이 화면은 하나만 다룹니다. ` +
+          "여기서 저장하면 나머지가 지워지므로 막았습니다.",
+        "warning",
+      );
       return;
     }
     setIsSaving(true);

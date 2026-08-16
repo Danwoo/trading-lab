@@ -95,10 +95,6 @@ export function BotConversation({
             onProposal?.({ strategyKey: event.strategy_key, params: event.params, note: event.note });
             const filled = Object.entries(event.params).map(([name, value]) => `${name}=${String(value)}`);
             apply((turn) => ({ ...turn, filled: [...(turn.filled ?? []), ...filled] }));
-          } else if (event.type === "error") {
-            // 스트림이 시작된 뒤 난 예외는 예외로 오지 않고 이 이벤트로 온다 —
-            // 여기서 안 받으면 실패가 빈 턴으로 사라진다.
-            apply((turn) => ({ ...turn, text: event.message, failed: true }));
           } else if (event.type === "unavailable") {
             // 정상 응답이다 — 대화가 왜 안 도는지 그대로 보여준다.
             setReady(false);
@@ -109,7 +105,9 @@ export function BotConversation({
         { form: formState },
       );
     } catch (error) {
-      apply((turn) => ({ ...turn, text: getApiErrorMessage(error) }));
+      // 스트림이 시작된 뒤 난 실패도 여기로 온다 — `fetchSSE` 가 `{type:"error"}` 이벤트를
+      // 가로채 예외로 바꾸기 때문이다. 그래서 이 한 자리가 실패의 유일한 출구다.
+      apply((turn) => ({ ...turn, text: getApiErrorMessage(error), failed: true }));
     } finally {
       setIsStreaming(false);
     }
