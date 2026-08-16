@@ -25,6 +25,8 @@ interface Turn {
   tools?: string[];
   /** 이 턴이 폼에 채운 것 — 대화만 보고도 무엇이 바뀌었는지 알 수 있어야 한다. */
   filled?: string[];
+  /** 스트림 도중 실패했다 — 조용히 빈 턴으로 끝나지 않게 이유를 남긴다. */
+  failed?: boolean;
 }
 
 /**
@@ -93,6 +95,10 @@ export function BotConversation({
             onProposal?.({ strategyKey: event.strategy_key, params: event.params, note: event.note });
             const filled = Object.entries(event.params).map(([name, value]) => `${name}=${String(value)}`);
             apply((turn) => ({ ...turn, filled: [...(turn.filled ?? []), ...filled] }));
+          } else if (event.type === "error") {
+            // 스트림이 시작된 뒤 난 예외는 예외로 오지 않고 이 이벤트로 온다 —
+            // 여기서 안 받으면 실패가 빈 턴으로 사라진다.
+            apply((turn) => ({ ...turn, text: event.message, failed: true }));
           } else if (event.type === "unavailable") {
             // 정상 응답이다 — 대화가 왜 안 도는지 그대로 보여준다.
             setReady(false);
@@ -144,7 +150,11 @@ export function BotConversation({
             {turns.map((turn, index) => (
               <li key={index} className="text-sm leading-relaxed">
                 <span className="mr-2 font-mono text-2xs text-ink-faint">{turn.role === "user" ? "나" : "봇"}</span>
-                <span className={`whitespace-pre-wrap ${turn.role === "user" ? "text-ink-primary" : "text-ink-muted"}`}>
+                <span
+                  className={`whitespace-pre-wrap ${
+                    turn.failed ? "text-danger" : turn.role === "user" ? "text-ink-primary" : "text-ink-muted"
+                  }`}
+                >
                   {turn.text || (isStreaming && index === turns.length - 1 ? "…" : "")}
                 </span>
                 {turn.tools && turn.tools.length > 0 && (

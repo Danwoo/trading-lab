@@ -25,9 +25,15 @@ export default function OrderbookPanel({ instanceId }: PanelProps) {
 
   const verdict = useMemo(() => {
     if (symbol === null) return { reason: NO_SYMBOL, rows: [] };
-    const rows = (capabilities.data ?? []).filter(
-      (row) => row.dataKind === "orderbook" && row.market === symbol.market,
-    );
+    // 아직 물어보는 중이면 「소스가 없다」고 단언하지 않는다 — 사유를 지어내지 않는 것이 이 자리의 요점이다.
+    if (capabilities.data === null) {
+      const reason =
+        capabilities.provenance.kind === "unavailable"
+          ? capabilities.provenance.reason
+          : "호가를 다루는 소스를 확인하고 있습니다";
+      return { reason, rows: [] };
+    }
+    const rows = capabilities.data.filter((row) => row.dataKind === "orderbook" && row.market === symbol.market);
     if (rows.length === 0) {
       return {
         reason: `${symbol.market} 시장의 호가를 다루는 소스가 등록되어 있지 않습니다`,
@@ -40,7 +46,7 @@ export default function OrderbookPanel({ instanceId }: PanelProps) {
     }
     // 소스는 있는데 적재가 없는 상태 — 「소스 없음」과 구분해서 말한다.
     return { reason: `${symbol.ticker} 의 적재된 호가가 아직 없습니다`, rows };
-  }, [symbol, capabilities.data]);
+  }, [symbol, capabilities.data, capabilities.provenance]);
 
   useEffect(() => {
     const provenance: Provenance = { kind: "unavailable", reason: verdict.reason };
