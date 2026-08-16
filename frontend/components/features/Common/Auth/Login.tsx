@@ -155,142 +155,111 @@ export const Login = () => {
   };
 
   return (
-    <>
-      <div className="relative h-[100dvh] w-screen">
-        <div className="auth-backdrop auth-backdrop--hero absolute left-1/2 transform -translate-x-1/2 z-10 m-auto w-full h-full min-h-[667px] px-4 py-4 sm:py-8">
-          <PolicyPopup additionalClassName="!text-white" />
-
-          <div className="grid grid-flow-col grid-rows-1 h-[calc(100%-2rem)]">
-            {/* Hero Section - 왼쪽 영역 */}
-            <div className="absolute top-[10%] left-[100px] z-50 col-span-9 hidden xl:block w-full max-w-[600px]">
-              <div className="text-left">
-                <h1 className="font-bold text-5xl text-white leading-tight mb-2">ACME</h1>
-                <p className="mt-4 text-xl text-white/90 font-normal leading-relaxed max-w-[520px]">
-                  Next.js 16 + React 19 + FastAPI + Prisma
-                  <br />
-                  하이브리드 풀스택 아키텍처
-                </p>
-                <div className="mt-8 space-y-3 text-white/85">
-                  <div className="flex items-start gap-3">
-                    <svg className="w-6 h-6 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="text-lg">🔐 Better Auth + Prisma 공통 기능</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <svg className="w-6 h-6 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="text-lg">⚡ FastAPI 고성능 백엔드</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <svg className="w-6 h-6 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="text-lg">🎨 Radix UI + Tailwind CSS</span>
-                  </div>
-                </div>
-                <p className="mt-6 text-base text-white/70">트레이딩 봇을 만들고, 검증하고, 운용하는 도구입니다.</p>
-              </div>
-            </div>
-
-            {/* Login Form - 오른쪽 영역 */}
-            <div className="col-span-2 flex justify-center xl:justify-end">
-              <div className="card lg:card-side rounded-3xl bg-[#F0F1F2] w-full sm:h-full max-h-[780px] min-h-[540px] sm:min-h-[640px] sm:min-w-[460px] max-w-[460px] m-auto sm:m-0">
-                <div className="card-body">
-                  <h2 className="font-semibold text-5xl sm:text-6xl mt-1 sm:mt-20 text-center tracking-tight text-[#303F67]">
-                    Login
-                  </h2>
-                  <div className="font-medium text-center w-full mt-1 sm:mt-3 text-[#303F67] text-base">
-                    서비스를 이용하시려면 로그인해주세요.
-                  </div>
-
-                  <div className="border-t-[1px] mt-2 sm:mt-10 mb-2 sm:mb-8 border-t-[#DDE2EC]"></div>
-                  <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-                    <form action="#" method="POST" className="space-y-4" onSubmit={handleSubmit}>
-                      <div className="items-center max-w-sm mx-auto">
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-900">
-                          이메일 주소
-                        </label>
-                        <div className="flex mt-1">
-                          <div className="relative w-full">
-                            <TextBox
-                              id="email"
-                              name="email"
-                              mode="email"
-                              placeholder="이메일을 입력해주세요."
-                              defaultValue=""
-                              width="100%"
-                              height={48}
-                              className="rounded-2xl"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="items-center max-w-sm mx-auto">
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-900">
-                          비밀번호
-                        </label>
-                        <div className="flex mt-1">
-                          <div className="relative w-full">
-                            <TextBox
-                              id="password"
-                              name="password"
-                              showPasswordToggle
-                              placeholder="비밀번호를 입력해주세요."
-                              defaultValue=""
-                              width="100%"
-                              height={48}
-                              maxLength={72}
-                              className="rounded-2xl"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Button
-                          onClick={() => loginTypeChk("credentials")}
-                          useSubmitBehavior={true}
-                          disabled={loading}
-                          text="로그인"
-                          width="100%"
-                          height={48}
-                          stylingMode="contained"
-                          type="default"
-                          className="rounded-2xl bg-gradient-to-r from-[#2E3BD0] to-[#2C64F8] text-sm font-bold text-white"
-                        />
-                        <div className="bg-[#D6DAE4] w-full h-12 rounded-2xl shadow-sm mt-4 text-center font-medium text-[#6B7183] text-sm flex items-center justify-center">
-                          처음 방문이세요?
-                          <Link
-                            href="/signup/agree"
-                            className="font-medium text-sm text-[#2D5AEE] hover:text-blue-500 ml-1"
-                          >
-                            가입하기
-                          </Link>
-                        </div>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="auth-backdrop auth-backdrop--hero relative min-h-[100dvh] w-full">
+      {/* 상단 띠 — 시안(bench-shell)의 상태 바와 같은 자리·같은 말투. 로그인 전에도
+          「실제 주문이 나가지 않는다」를 먼저 말한다. 이 제품에서 그것이 가장 먼저 알아야 할 사실이다. */}
+      <header className="flex items-center gap-3 border-b border-hairline px-6 py-3.5 sm:px-10">
+        <span className="text-2xs font-semibold uppercase tracking-[0.22em] text-ink-strong">Trading Lab</span>
+        <span className="inline-flex items-center gap-1.5 rounded-badge border border-line px-2 py-0.5 text-2xs text-ink-muted">
+          <span aria-hidden className="size-1.5 rounded-full bg-signal-warn" />
+          모의
+        </span>
+        <span className="hidden text-2xs text-ink-muted sm:inline">실제 주문이 나가지 않습니다</span>
+        <div className="ml-auto">
+          <PolicyPopup buttonClassName="!text-2xs" additionalClassName="!text-ink-muted hover:!text-ink" />
         </div>
-      </div>
-    </>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 py-12 sm:px-10 lg:flex-row lg:items-center lg:gap-20 lg:py-20">
+        {/* 왼쪽 — 제품이 무엇인가. 스택 자랑이 아니라 이 도구가 하는 일을 적는다. */}
+        <section className="flex-1">
+          <h1 className="text-[clamp(1.6rem,1.1rem+2.2vw,2.25rem)] font-semibold leading-[1.15] tracking-tight text-ink-strong">
+            개인 투자 지휘소
+          </h1>
+          <p className="mt-3 max-w-[46ch] text-sm leading-relaxed text-ink">
+            트레이딩 봇을 만들고, 과거 데이터로 검증하고, 굴리면서 성과를 비교합니다.
+          </p>
+
+          <dl className="mt-9 max-w-[44ch] divide-y divide-hairline border-y border-hairline">
+            {[
+              ["전략은 파일로 남는다", "git 에 남아 「왜 이렇게 샀지」를 나중에 코드로 되짚습니다."],
+              ["장중에는 LLM 이 돌지 않는다", "봇은 결정론적으로 돌고, 연구는 저녁 배치에서만 돕니다."],
+              ["자기 컴퓨터에서 자기 계좌로", "오픈소스 로컬 배포판입니다. 데이터도 키도 밖으로 나가지 않습니다."],
+            ].map(([term, desc]) => (
+              <div key={term} className="py-3.5">
+                <dt className="text-sm font-medium text-ink-strong">{term}</dt>
+                <dd className="mt-1 text-2xs leading-relaxed text-ink-muted">{desc}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        {/* 오른쪽 — 폼. 흰 카드가 아니라 터미널과 같은 패널이다(로그인 직후 색이 뒤집히지 않게). */}
+        <section className="w-full shrink-0 lg:w-[26rem]">
+          <div className="rounded-panel border border-line bg-bg-panel/95 p-7 shadow-e1 sm:p-8">
+            <h2 className="text-base font-semibold tracking-tight text-ink-strong">로그인</h2>
+            <p className="mt-1 text-2xs text-ink-muted">계정으로 들어가면 실험대가 열립니다.</p>
+
+            <form action="#" method="POST" className="mt-7 flex flex-col gap-5" onSubmit={handleSubmit}>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="email" className="text-2xs font-medium uppercase tracking-[0.1em] text-ink-muted">
+                  이메일
+                </label>
+                <TextBox
+                  id="email"
+                  name="email"
+                  mode="email"
+                  placeholder="you@example.com"
+                  defaultValue=""
+                  width="100%"
+                  height="2.75rem"
+                  className="!bg-bg-raised !border-line !text-ink placeholder:!text-ink-faint focus:!ring-line-strong/30"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="password" className="text-2xs font-medium uppercase tracking-[0.1em] text-ink-muted">
+                  비밀번호
+                </label>
+                <TextBox
+                  id="password"
+                  name="password"
+                  showPasswordToggle
+                  placeholder="비밀번호"
+                  defaultValue=""
+                  width="100%"
+                  height="2.75rem"
+                  maxLength={72}
+                  className="!bg-bg-raised !border-line !text-ink placeholder:!text-ink-faint focus:!ring-line-strong/30"
+                />
+              </div>
+
+              <div className="mt-1 flex flex-col gap-3">
+                <Button
+                  onClick={() => loginTypeChk("credentials")}
+                  useSubmitBehavior={true}
+                  disabled={loading}
+                  text={loading ? "확인 중" : "로그인"}
+                  width="100%"
+                  height="2.75rem"
+                  stylingMode="contained"
+                  type="default"
+                  className="!border-btn-line !bg-gradient-to-b !from-btn-from !to-btn-to !text-ink-strong hover:!brightness-110"
+                />
+                <p className="text-center text-2xs text-ink-muted">
+                  처음 방문이세요?{" "}
+                  <Link
+                    href="/signup/agree"
+                    className="font-medium text-ink underline decoration-line-strong underline-offset-4 hover:text-ink-strong"
+                  >
+                    가입하기
+                  </Link>
+                </p>
+              </div>
+            </form>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 };
