@@ -98,6 +98,7 @@ jobs:
             multi-agent-service/**
             *-mcp-service/**
             backend-service/**
+            bot-agent-service/**
             */app/core/security.py
             */app/core/auth_context.py
             */app/core/config.py
@@ -153,6 +154,34 @@ jobs:
       - name: 계약 검증 스크립트 (scripts/verify_*.py, fail-closed)
         if: ${{ !cancelled() }}
         run: uv run python ../scripts/run_verify_scripts.py scripts
+
+      - name: Standalone tests (tests/test_*.py, fail-closed)
+        if: ${{ !cancelled() }}
+        run: uv run python ../scripts/run_standalone_tests.py tests
+
+  # ── bot-agent-service — 봇 만들기 대화 (#150 B2) ─────────────────────────
+  # DB 없음. 에이전트 도구 경계 단언이 여기서 돈다 — 「무엇을 허용하는가」가 글이 아니라
+  # 실행되는 검사로 남아야 코드가 조용히 넓어지지 않는다.
+  bot-agent:
+    name: "test: bot-agent"
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bot-agent-service
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Ruff
+        if: ${{ !cancelled() }}
+        run: uv run ruff check app/
 
       - name: Standalone tests (tests/test_*.py, fail-closed)
         if: ${{ !cancelled() }}

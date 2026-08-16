@@ -1,0 +1,42 @@
+[project]
+name = "app"
+version = "0.1.0"
+license = "MIT"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # 웹 프레임워크
+    "dependency-injector~=4.49.1",
+    "httpx~=0.28.1",
+    "uvicorn[standard]~=0.52.1",
+    "fastapi~=0.141.1",
+    "pydantic-settings~=2.15.0",
+    "pyjwt~=2.13.0",
+    # 공통 core 템플릿 의존 (exception_handler 가 sqlalchemy 예외 매핑)
+    "sqlalchemy~=2.0.52",
+]
+
+[dependency-groups]
+# 에이전트 — Claude Agent SDK. 이 레포에서 이 서비스만 Anthropic 경로를 쓴다
+# (다른 서비스는 OpenAI 호환 LLM_BASE_URL — 결정 로그 2026-08-15).
+main = ["claude-agent-sdk~=0.2.139"]
+dev = ["ruff~=0.16.2"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+default-groups = ["main", "dev"]
+package = false
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["F", "I", "FAST", "W", "E", "B", "UP"]
+ignore = [
+    "B008",    # FastAPI Depends 기본값 함수 호출 허용
+    "E501",    # 라인 길이 88자 초과 무시 (black 기준)
+    "E402",    # 동적 import 허용 (FastAPI lazy loading)
+    "FAST002", # 선택적 의존성 타입 어노테이션 무시
+]
