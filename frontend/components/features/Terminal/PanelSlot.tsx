@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, lazy, useMemo } from "react";
-import { resolveCapability } from "@/lib/terminal/capabilityMatrix";
+import { resolveCapability, resolveCapabilityWithoutRegion } from "@/lib/terminal/capabilityMatrix";
 import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
 import type { CapabilityVerdict } from "@/types/terminal/capability";
 import type { PanelInstance } from "@/types/terminal/layout";
@@ -74,6 +74,10 @@ export function PanelSlot({
     verdict = NEEDS_SYMBOL_VERDICT;
   } else if (definition.needsSymbol && symbol !== null && symbol.market === "") {
     verdict = MARKET_MISSING_VERDICT;
+  } else if (region === "UNKNOWN" && !definition.needsSymbol) {
+    // 시장을 모르는데 그 자리가 종목에 매이지도 않았다 — 시장을 물을 이유가 없다.
+    // 여기서 시장 판정을 태우면 종목을 고르기 전엔 봇 상태 패널이 늘 가려진다.
+    verdict = resolveCapabilityWithoutRegion(definition.capability);
   } else {
     verdict = resolveCapability(definition.capability, { region });
   }
