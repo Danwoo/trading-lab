@@ -5,6 +5,7 @@ import { SelectBox } from "@/components/shared/ui/SelectBox";
 import { TextArea } from "@/components/shared/ui/TextArea";
 import { TextBox } from "@/components/shared/ui/TextBox";
 import { StrategyFieldControl } from "./StrategyFieldControl";
+import { cn } from "@/components/shared/ui/primitives/cn";
 import {
   BOT_ROLE_ITEMS,
   COMBINE_RULE_ITEMS,
@@ -22,6 +23,8 @@ interface Props {
   catalogErrors: { source: string; message: string }[];
   onStrategyChange: (key: string) => void;
   onParamChange: (name: string, value: unknown) => void;
+  /** 372px 패널처럼 좁은 자리 — 라벨과 컨트롤을 나란히 두지 않고 위아래로 쌓는다. */
+  dense?: boolean;
 }
 
 /** 설정 한 줄이 어디서 왔는지 — 사람이 손댄 것과 선언 기본값이 섞이면 무엇을 정했는지 모른다. */
@@ -45,7 +48,7 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-1.5 sm:grid-cols-[minmax(9rem,14rem)_minmax(0,1fr)] sm:items-start sm:gap-3">
+    <div data-row className="grid gap-1.5 sm:grid-cols-[minmax(9rem,14rem)_minmax(0,1fr)] sm:items-start sm:gap-3">
       <div className="pt-1.5">
         <div className="flex items-baseline gap-2">
           <span className="text-sm text-ink-primary">{label}</span>
@@ -84,11 +87,19 @@ export function BotForm({
   catalogErrors,
   onStrategyChange,
   onParamChange,
+  dense = false,
 }: Props) {
   const selectedForm = strategyForms.find((form) => form.key === strategy?.strategyKey) ?? null;
 
   return (
-    <div className="flex min-h-0 flex-col gap-3 overflow-auto">
+    <div
+      className={cn(
+        "flex min-h-0 min-w-0 flex-col gap-3 overflow-auto",
+        // 미디어쿼리는 뷰포트를 본다 — 넓은 화면의 372px 패널 안에서도 `sm:` 이 켜져 라벨이
+        // 폭을 다 가져가고 컨트롤이 「관 ▼」처럼 잘린다. 좁은 자리에서는 라벨을 위로 올린다.
+        dense && "[&_[data-row]]:grid-cols-1",
+      )}
+    >
       <Section title="봇">
         <Row label="이름">
           <TextBox

@@ -16,11 +16,17 @@ import {
   type BotDraft,
   type StrategyDraft,
 } from "./botFormModel";
+import { cn } from "@/components/shared/ui/primitives/cn";
 import type { StrategyForm } from "@/schemas/bot/bot";
 
 interface Props {
   /** 없으면 새 봇, 있으면 저장된 봇을 열어 고친다. */
   botId?: number;
+  /**
+   * 372px 레일 패널 안에서 그린다. 패널이 이미 여백과 제목을 가지고 있어 그 둘을 겹치지
+   * 않게 접는다 — 같은 말이 두 번 서면 좁은 폭에서 내용이 밀린다.
+   */
+  inPanel?: boolean;
 }
 
 /**
@@ -28,7 +34,7 @@ interface Props {
  *
  * 폭 배분은 CSS 가 한다(`lg:grid-cols-…`) — JS 로 폭을 재서 가르면 첫 페인트가 튄다.
  */
-export function BotWorkbench({ botId }: Props) {
+export function BotWorkbench({ botId, inPanel = false }: Props) {
   const router = useRouter();
   const [draft, setDraft] = useState<BotDraft>(NEW_BOT_DRAFT);
   const [strategy, setStrategy] = useState<StrategyDraft | null>(null);
@@ -157,14 +163,20 @@ export function BotWorkbench({ botId }: Props) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 p-6">
+    <div className={cn("flex h-full min-h-0 flex-col gap-4", inPanel ? "p-0" : "p-6")}>
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-medium text-ink-primary">{botId === undefined ? "봇 만들기" : "봇 고치기"}</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            말로 정하거나 직접 정합니다. 저장하면 이 조건이 그대로 남고, 검증은 그다음입니다.
+        {inPanel ? (
+          <p className="min-w-0 break-keep text-sm text-ink-muted">
+            말로 정하거나 직접 정합니다. 저장하면 이 조건이 그대로 남습니다.
           </p>
-        </div>
+        ) : (
+          <div>
+            <h1 className="text-lg font-medium text-ink-primary">{botId === undefined ? "봇 만들기" : "봇 고치기"}</h1>
+            <p className="mt-1 text-sm text-ink-muted">
+              말로 정하거나 직접 정합니다. 저장하면 이 조건이 그대로 남고, 검증은 그다음입니다.
+            </p>
+          </div>
+        )}
         <div className="flex gap-2">
           <Button text="취소" onClick={() => router.push("/bench/bot")} />
           <Button text={isSaving ? "저장 중…" : "저장"} disabled={isSaving || isLoading} onClick={handleSave} />
@@ -180,12 +192,20 @@ export function BotWorkbench({ botId }: Props) {
       {isLoading ? (
         <p className="text-sm text-ink-muted">불러오는 중입니다…</p>
       ) : (
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,5fr)]">
+        <div
+          className={cn(
+            "grid min-h-0 min-w-0 flex-1 gap-4",
+            // 미디어쿼리는 **뷰포트**를 본다 — 넓은 화면에서 372px 패널 안에 있어도 `lg:` 가 켜져
+            // 두 단으로 갈리고 글자가 한 자씩 끊긴다. 패널 안에서는 항상 한 단으로 쌓는다.
+            inPanel ? "grid-cols-1" : "lg:grid-cols-[minmax(0,4fr)_minmax(0,5fr)]",
+          )}
+        >
           <BotConversation
             onProposal={handleProposal}
             formState={{ strategy_key: strategy?.strategyKey ?? null, params: strategy?.params ?? {} }}
           />
           <BotForm
+            dense={inPanel}
             draft={draft}
             onDraftChange={handleDraftChange}
             strategy={strategy}
