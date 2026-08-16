@@ -1,0 +1,243 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { ProvenanceBadge } from "@/components/features/Terminal/ProvenanceBadge";
+import { cn } from "@/components/shared/ui/primitives/cn";
+import { useBarGaps } from "@/hooks/terminal/useBarGaps";
+import { useIngestRuns } from "@/hooks/terminal/useIngestRuns";
+import { useMarketCapabilities } from "@/hooks/terminal/useMarketCapabilities";
+import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
+import { insertIngestRun } from "@/services/terminal/ingestService";
+import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
+import type { IngestRunOut } from "@/schemas/terminal/ingest";
+import type { MarketCapability } from "@/services/terminal/marketService";
+
+/**
+ * 시세 화면의 **적재 콘솔** — 마일스톤 2 가 이 화면에서 요구하는 두 줄이 여기서 보인다:
+ *
+ * - *"적재를 실행하면 **어디까지 받았고 무엇이 실패했는지** 화면에서 보인다"*
+ * - *"키가 없어도 기동되고, **어떤 패널이 왜 비어 있는지** 안내된다"*
+ *
+ * 패널이 아니라 **화면의 도구**로 둔다. 패널은 종목 문맥에 매인 자리인데 적재는 워크스페이스
+ * 단위 작업이라, 패널 격자에 넣으면 종목을 고르기 전에는 열 수 없는 것처럼 읽힌다.
+ */
+
+/** 상태별 표시 — 색은 토큰만 쓴다. `rate_limited` 는 실패가 아니라 이어받을 지점이 있는 상태다. */
+const STATUS_TONE: Record<string, string> = {
+  succeeded: "text-ink",
+  running: "text-ink",
+  queued: "text-ink-muted",
+  rate_limited: "text-signal-warn",
+  failed: "text-danger",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  succeeded: "받음",
+  running: "받는 중",
+  queued: "대기",
+  rate_limited: "한도에 걸려 멈춤",
+  failed: "실패",
+};
+
+/** 소스별로 어느 키가 있어야 하는지 — 「왜 비었나」에 답할 때 갈 곳까지 준다. */
+const KEY_HINT: Record<string, string> = {
+  data_go_kr: "MARKET_DATA_GOKR_SERVICE_KEY (data.go.kr 금융위 오픈API)",
+  alpaca: "MARKET_DATA_ALPACA_KEY (Alpaca)",
+  dart: "DART_API_KEY (OpenDART)",
+};
+
+function keyHintFor(source: string): string | null {
+  const key = Object.keys(KEY_HINT).find(
+    (k) => source.toLowerCase().includes(k.replace(/_/g, "")) || source.toLowerCase().includes(k),
+  );
+  return key ? KEY_HINT[key] : null;
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section aria-label={title} className="flex min-w-0 flex-col gap-1.5">
+      <h3 className="break-keep text-2xs font-ui uppercase tracking-wide text-ink-faint">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+/** 소스 가용성 — 무엇이 지금 되고, 안 되는 것은 왜 안 되는지. */
+function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; loading: boolean }) {
+  if (rows === null) {
+    return (
+      <p className="break-keep text-2xs text-ink-muted">
+        {loading ? "소스를 확인하고 있습니다…" : "소스 목록을 읽지 못했습니다."}
+      </p>
+    );
+  }
+  if (rows.length === 0) {
+    return <p className="break-keep text-2xs text-ink-muted">등록된 소스가 없습니다.</p>;
+  }
+
+  const blocked = rows.filter((row) => !row.available);
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <p className="break-keep text-2xs text-ink-muted">
+        {rows.length}건 중 <span className="text-ink">{rows.length - blocked.length}건</span> 사용 가능
+        {blocked.length > 0 && <> · {blocked.length}건은 아래 이유로 막혀 있습니다</>}
+      </p>
+      {blocked.length > 0 && (
+        <ul className="flex min-w-0 flex-col gap-0.5">
+          {blocked.map((row) => {
+            const hint = keyHintFor(row.source);
+            return (
+              <li
+                key={`${row.source}:${row.market}:${row.dataKind}`}
+                className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-2xs"
+              >
+                <span className="font-mono text-ink-muted">
+                  {row.market} · {row.dataKind}
+                </span>
+                <span className="min-w-0 break-keep text-danger">{row.reason ?? "사유가 기록되지 않았습니다"}</span>
+                {hint && <span className="break-keep text-ink-faint">키: {hint}</span>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** 적재 이력 — 어디까지 받았고 무엇이 실패했는지. */
+function Runs({ rows, loading }: { rows: IngestRunOut[] | null; loading: boolean }) {
+  if (rows === null) {
+    return (
+      <p className="break-keep text-2xs text-ink-muted">
+        {loading ? "이력을 불러오고 있습니다…" : "이력을 읽지 못했습니다."}
+      </p>
+    );
+  }
+  if (rows.length === 0) {
+    return <p className="break-keep text-2xs text-ink-muted">아직 한 번도 적재하지 않았습니다.</p>;
+  }
+
+  return (
+    <ul className="flex min-w-0 flex-col gap-0.5">
+      {rows.slice(0, 8).map((run) => (
+        <li key={run.run_id} className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-2xs">
+          <span className={cn("font-mono", STATUS_TONE[run.status] ?? "text-ink-muted")}>
+            {STATUS_LABEL[run.status] ?? run.status}
+          </span>
+          <span className="font-mono text-ink-muted">
+            {run.source} · {run.job_kind}
+            {run.scope ? ` · ${run.scope}` : ""}
+          </span>
+          {run.period_to && <span className="font-mono text-ink">~{run.period_to} 까지</span>}
+          {run.written_rows !== null && <span className="text-ink-faint">{run.written_rows}행</span>}
+          {run.failed_reason && <span className="min-w-0 break-keep text-danger">{run.failed_reason}</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function IngestConsole() {
+  const symbol = useTerminalSymbol();
+  const [reloadToken, setReloadToken] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ text: string; failed: boolean } | null>(null);
+
+  const capabilities = useMarketCapabilities(true);
+  const runs = useIngestRuns(reloadToken, true);
+  const gaps = useBarGaps(true);
+
+  const missing = gaps.data?.missingDates ?? [];
+  const runningNow = useMemo(
+    () => (runs.data ?? []).some((run) => run.status === "running" || run.status === "queued"),
+    [runs.data],
+  );
+
+  const start = async () => {
+    if (symbol === null) {
+      setMessage({ text: "종목을 먼저 고르시면 그 종목을 적재합니다.", failed: true });
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const created = await insertIngestRun({
+        source: "auto",
+        job_kind: "daily_bar",
+        scope: `${symbol.market}:${symbol.ticker}`,
+      });
+      if (created === null) {
+        setMessage({ text: "적재 요청이 받아들여지지 않았습니다.", failed: true });
+        return;
+      }
+      setMessage({ text: "적재를 큐에 넣었습니다. 아래 이력에서 진행을 볼 수 있습니다.", failed: false });
+      setReloadToken((n) => n + 1);
+    } catch (error) {
+      setMessage({ text: getApiErrorMessage(error), failed: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section aria-label="적재" className="flex min-w-0 flex-col gap-3 border-b border-line bg-bg-raised px-3 py-2.5">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <h2 className="break-keep text-sm font-ui text-ink">적재</h2>
+          <span className="text-2xs">
+            <ProvenanceBadge provenance={runs.provenance} />
+          </span>
+          {runningNow && <span className="break-keep text-2xs text-ink-muted">지금 돌고 있습니다.</span>}
+        </div>
+        <button
+          type="button"
+          onClick={start}
+          disabled={busy}
+          className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
+        >
+          {busy ? "요청 중…" : symbol === null ? "종목을 고르면 적재합니다" : `${symbol.ticker} 일봉 적재`}
+        </button>
+      </div>
+
+      {message && (
+        <p role="status" className={cn("break-keep text-2xs", message.failed ? "text-danger" : "text-ink-muted")}>
+          {message.text}
+        </p>
+      )}
+
+      <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+        <Section title="소스">
+          <Capabilities rows={capabilities.data} loading={capabilities.isLoading} />
+        </Section>
+
+        <Section title="이력">
+          <Runs rows={runs.data} loading={runs.isLoading} />
+        </Section>
+
+        <Section title="빠진 거래일">
+          {symbol === null ? (
+            <p className="break-keep text-2xs text-ink-muted">종목을 고르면 그 구간의 결측을 셉니다.</p>
+          ) : gaps.data === null ? (
+            <p className="break-keep text-2xs text-ink-muted">
+              {gaps.isLoading ? "결측을 세고 있습니다…" : "결측을 읽지 못했습니다."}
+            </p>
+          ) : missing.length === 0 ? (
+            <p className="break-keep text-2xs text-ink-muted">
+              {gaps.data.dateFrom} ~ {gaps.data.dateTo} 구간에 빠진 거래일이 없습니다.
+            </p>
+          ) : (
+            <p className="break-keep text-2xs">
+              <span className="text-danger">{missing.length}일</span>
+              <span className="text-ink-muted">
+                {" "}
+                빠져 있습니다 ({gaps.data.dateFrom} ~ {gaps.data.dateTo}) — 가장 이른 결측 {missing[0]}
+              </span>
+            </p>
+          )}
+        </Section>
+      </div>
+    </section>
+  );
+}

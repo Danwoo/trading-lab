@@ -13,6 +13,7 @@ import {
   readStoredMarketColorPreset,
 } from "@/lib/terminal/marketColorPreset";
 import { PanelSlot } from "./PanelSlot";
+import { IngestConsole } from "@/components/features/Terminal/IngestConsole";
 import { SymbolSidebar } from "./SymbolSidebar";
 
 /**
@@ -75,6 +76,8 @@ export function TerminalContainer() {
           </button>
         </div>
       )}
+
+      <IngestConsole />
 
       <div className="flex min-h-0 flex-1">
         <SymbolSidebar />
