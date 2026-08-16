@@ -68,7 +68,7 @@ def test_tool_is_allowed_and_scoped_out() -> str:
     assert PROPOSAL_TOOL_FULL_NAME not in PATH_ARGS
     assert check_tool_scope(PROPOSAL_TOOL_FULL_NAME, {"params": {"x": 1}}, Path(".")) is None
 
-    options = build_options(strategies_dir=Path("."), max_turns=2)
+    options = build_options(strategies_dir=Path("."), max_turns=2, api_key="sk-test-key")
     assert PROPOSAL_TOOL_FULL_NAME in options.allowed_tools, "허용 목록에 없으면 dontAsk 에서 거부된다"
     return "test_tool_is_allowed_and_scoped_out"
 
@@ -80,10 +80,13 @@ def test_server_is_wired_when_given() -> str:
 
     collected: list[dict] = []
     options = build_options(
-        strategies_dir=Path("."), max_turns=2, proposal_server=build_proposal_server(collected.append)
+        strategies_dir=Path("."),
+        max_turns=2,
+        api_key="sk-test-key",
+        proposal_server=build_proposal_server(collected.append),
     )
     assert "bot_form" in (options.mcp_servers or {}), "MCP 서버가 안 실렸다"
-    assert build_options(strategies_dir=Path("."), max_turns=2).mcp_servers == {}
+    assert build_options(strategies_dir=Path("."), max_turns=2, api_key="sk-test-key").mcp_servers == {}
     return "test_server_is_wired_when_given"
 
 

@@ -39,7 +39,8 @@ def _escapes(candidate: str, root: Path) -> bool:
         # 절대경로는 root 아래일 때만 허용한다 (root 자신도 허용).
         try:
             resolved = path.resolve()
-        except OSError:
+        except (OSError, ValueError):
+            # 널바이트가 섞이면 `ValueError` 다 — 모양을 모르면 거부한다 (fail-closed).
             return True
         return not _inside(resolved, root)
     if ".." in path.parts:
@@ -48,7 +49,7 @@ def _escapes(candidate: str, root: Path) -> bool:
         return True
     try:
         resolved = (root / path).resolve()
-    except OSError:
+    except (OSError, ValueError):
         return True
     # 심링크가 밖을 가리키면 resolve 결과가 root 밖으로 나간다 — 그때도 거부다.
     return not _inside(resolved, root)
@@ -70,7 +71,7 @@ def check_tool_scope(tool_name: str, tool_input: dict, root: Path) -> str | None
 
     try:
         root = Path(root).resolve()
-    except OSError:
+    except (OSError, ValueError):
         return "전략 디렉터리를 확인할 수 없습니다"
 
     if not isinstance(tool_input, dict):

@@ -63,7 +63,12 @@ SYSTEM_PROMPT = """\
 
 
 def build_options(
-    *, strategies_dir: Path | str, max_turns: int, proposal_server=None, resume: str | None = None
+    *,
+    strategies_dir: Path | str,
+    max_turns: int,
+    api_key: str,
+    proposal_server=None,
+    resume: str | None = None,
 ) -> ClaudeAgentOptions:
     """봇 만들기 대화 한 번에 쓸 옵션.
 
@@ -75,6 +80,12 @@ def build_options(
 
     `cwd` 는 3번의 기준점일 뿐이다. `cwd` 만으로는 접근 범위가 안 좁혀진다 — SDK 가
     *"Filesystem read restrictions: Use Read deny rules"* 라고 적는 이유다.
+
+    **인증**: `api_key` 를 `env` 로 명시해 자식 프로세스에 넘긴다. 안 넘기면 SDK 가 부모
+    프로세스의 환경을 통째로 상속하므로(`subprocess_cli.py` 의 `inherited_env`), 설정한 키가
+    실제로 쓰이는지 알 수 없다. 다만 **이것으로 다른 인증 경로가 막히지는 않는다** — 기계에
+    `~/.claude/.credentials.json` 이 있으면 CLI 가 그것으로 인증할 수 있고, 그 파일은 옵션으로
+    가릴 수 없다. 그 잔여 위험은 README 「인증 경계」에 적혀 있다.
     """
     root = Path(strategies_dir).resolve()
     return ClaudeAgentOptions(
@@ -86,6 +97,8 @@ def build_options(
         system_prompt=SYSTEM_PROMPT,
         cwd=str(root),
         max_turns=max_turns,
+        # 설정한 키를 자식에게 실제로 넘기는 유일한 자리.
+        env={"ANTHROPIC_API_KEY": api_key},
         hooks={"PreToolUse": [HookMatcher(hooks=[partial(scope_hook, root=root)])]},
         # 이어가기 — 없으면 새 대화다. 세션 id 의 소유는 서비스이고 클라이언트는 모른다.
         resume=resume,

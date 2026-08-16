@@ -10,7 +10,13 @@
 cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload --port 8011
 ```
 
-`ANTHROPIC_API_KEY` 는 **프로세스 환경변수**로 온다. SDK 는 `.env` 를 자동으로 읽지 않으므로 `.env.development` 에 넣고 기동 스크립트가 주입하거나, 셸에서 export 한다.
+`ANTHROPIC_API_KEY` 는 **프로세스 환경변수**로 온다. SDK 는 `.env` 를 자동으로 읽지 않으므로 `.env.development` 에 넣고 기동 스크립트가 주입하거나, 셸에서 export 한다. `build_options` 가 이 값을 `env` 로 자식 프로세스에 명시해 넘긴다.
+
+### 인증 경계 — 키 설정만으로 다른 경로가 닫히지는 않는다
+
+기계에 Claude Code 로그인(`~/.claude/.credentials.json`)이 있으면 CLI 가 **그 자격증명으로 인증할 수 있다.** SDK 는 부모 프로세스의 환경을 통째로 상속하고(`subprocess_cli.py` 의 `inherited_env`), 옵션으로 그 파일을 가리는 길은 없다 — 실측으로 확인했다(가짜 키로도 대화가 왕복했다).
+
+따라서 `readiness()` 의 `ready` 는 **「키가 설정돼 있다」이지 「그 키로 인증한다」가 아니다.** 이 서비스를 로컬 배포 모드에서만 띄우는 결정이 그 잔여 위험의 실질적 경계다 — 호스팅에서 띄우면 로그인한 누구든 기계 소유자의 자격증명을 소모시킬 수 있다.
 
 ## 엔드포인트
 
@@ -42,9 +48,9 @@ cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload
 ## 검증
 
 ```bash
-uv run python tests/test_agent_boundary.py     # 도구 경계 21건 (정적 구성)
+uv run python tests/test_agent_boundary.py     # 도구 경계 23건 (정적 구성)
 uv run python tests/test_tool_scope.py         # 경로 스코프 6건 — 탈출 시도 11개를 실제로 판정
-uv run python tests/test_http_contract.py      # HTTP 경계 3건 — 빈 메시지 422 · 키 없을 때 사유
+uv run python tests/test_http_contract.py      # HTTP 경계 5건 — 빈 메시지 422 · 키 없을 때 사유
 uv run ruff check app/
 ```
 

@@ -42,6 +42,12 @@ BLOCKED: list[tuple[str, dict]] = [
     ("Read", {"file_path": {"path": "/etc/passwd"}}),
     # 새 입력 — 루트 자체를 벗어나는 형제 디렉터리 (접두사만 같은 경로)
     ("Read", {"file_path": "../strategies-secret/key.txt"}),
+    # 새 입력 — embedded null byte. `Path.resolve()` 는 이때 `OSError` 가 아니라 `ValueError` 를
+    # 던진다. 안 잡으면 판정이 거부가 아니라 **예외로 훅 밖으로 새어** fail-closed 계약이 깨진다.
+    ("Read", {"file_path": "foo\x00bar"}),
+    ("Read", {"file_path": "/tmp/foo\x00bar"}),
+    ("Glob", {"pattern": "a\x00b"}),
+    ("Grep", {"pattern": "x", "path": "sub\x00/etc"}),
 ]
 
 ALLOWED: list[tuple[str, dict]] = [
@@ -117,7 +123,7 @@ def test_options_actually_install_the_hook() -> str:
 
     with tempfile.TemporaryDirectory() as tmp:
         root = _root(tmp)
-        options = build_options(strategies_dir=root, max_turns=2)
+        options = build_options(strategies_dir=root, max_turns=2, api_key="sk-test-key")
         matchers = (options.hooks or {}).get("PreToolUse") or []
         callbacks = [callback for matcher in matchers for callback in matcher.hooks]
         assert callbacks, "PreToolUse 훅이 하나도 안 걸려 있다"

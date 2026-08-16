@@ -81,7 +81,7 @@ def test_settings_sources_are_not_loaded() -> None:
 
 
 def test_built_options_carry_the_boundary() -> None:
-    options = build_options(strategies_dir="/tmp/strategies", max_turns=7)
+    options = build_options(strategies_dir="/tmp/strategies", max_turns=7, api_key="sk-test-key")
     # 자동승인은 **읽기 셋 + 폼 채우기 도구 하나**뿐이다. 목록을 그대로 적어 비교한다 —
     # 「포함」으로 느슨하게 보면 도구가 하나 더 붙어도 통과한다.
     check(
@@ -98,6 +98,13 @@ def test_built_options_carry_the_boundary() -> None:
     check(str(options.cwd) == "/tmp/strategies", f"cwd 가 전략 디렉터리로 못박힌다 ({options.cwd})")
     check(options.max_turns == 7, "max_turns 가 전달된다 — 폭주 시 비용 상한")
     check(bool(options.system_prompt), "시스템 프롬프트가 비어 있지 않다")
+    # 설정한 키가 자식 프로세스로 **실제로 넘어가는지**. 안 넘기면 SDK 가 부모 환경을 통째로
+    # 상속하므로(subprocess_cli 의 inherited_env), 문서가 말하는 인증 경로가 코드에 없게 된다 —
+    # 실제로 그렇게 어긋나 있었고 독립 리뷰가 잡았다.
+    check(
+        dict(options.env or {}).get("ANTHROPIC_API_KEY") == "sk-test-key",
+        f"설정한 키가 env 로 자식에게 넘어간다 (지금 {sorted((options.env or {}).keys())!r})",
+    )
 
 
 def test_option_names_match_installed_sdk() -> None:

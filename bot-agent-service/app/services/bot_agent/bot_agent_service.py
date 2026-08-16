@@ -91,6 +91,7 @@ class BotAgentService:
         options = build_options(
             strategies_dir=directory,
             max_turns=self.config.AGENT_MAX_TURNS,
+            api_key=self.config.ANTHROPIC_API_KEY,
             proposal_server=build_proposal_server(proposals.append),
             resume=self._sessions.get(key),
         )
