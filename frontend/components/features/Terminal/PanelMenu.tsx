@@ -4,8 +4,6 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 export interface PanelMenuProps {
   collapsed: boolean;
-  onMove: (direction: "up" | "down" | "left" | "right") => void;
-  onResize: (axis: "w" | "h", delta: number) => void;
   onToggleCollapse: () => void;
   onClose: () => void;
 }
@@ -16,24 +14,17 @@ interface MenuAction {
 }
 
 /**
- * 헤더 줄 끝의 패널 조작 메뉴 — RGL 은 키보드 핸들러·ARIA 가 0 이라(#242 O1 스파이크),
- * 이동·크기·접기·닫기의 유일한 키보드 경로가 여기다. WAI-ARIA Menu Button 패턴 (역할=menu).
+ * 헤더 줄 끝의 패널 조작 메뉴 — 접기·닫기의 키보드 경로다. WAI-ARIA Menu Button 패턴
+ * (역할=menu). 이동·크기 항목은 자유 배치와 함께 사라졌다(화면 결정 §20.2) — 이제 패널이
+ * 놓이는 자리와 크기는 화면이 정하고 사람이 옮기지 않는다.
  */
-export function PanelMenu({ collapsed, onMove, onResize, onToggleCollapse, onClose }: PanelMenuProps) {
+export function PanelMenu({ collapsed, onToggleCollapse, onClose }: PanelMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const actions: MenuAction[] = [
-    { label: "위로 이동", run: () => onMove("up") },
-    { label: "아래로 이동", run: () => onMove("down") },
-    { label: "왼쪽으로 이동", run: () => onMove("left") },
-    { label: "오른쪽으로 이동", run: () => onMove("right") },
-    { label: "너비 늘리기", run: () => onResize("w", 1) },
-    { label: "너비 줄이기", run: () => onResize("w", -1) },
-    { label: "높이 늘리기", run: () => onResize("h", 1) },
-    { label: "높이 줄이기", run: () => onResize("h", -1) },
     { label: collapsed ? "펼치기" : "접기", run: onToggleCollapse },
     { label: "닫기", run: onClose },
   ];
@@ -80,7 +71,7 @@ export function PanelMenu({ collapsed, onMove, onResize, onToggleCollapse, onClo
   };
 
   return (
-    <div className="relative panel-no-drag" ref={rootRef}>
+    <div className="relative" ref={rootRef}>
       <button
         ref={triggerRef}
         type="button"

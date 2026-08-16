@@ -1,6 +1,6 @@
 # 서드파티 라이선스 고지 (THIRD-PARTY-NOTICES)
 
-프론트엔드(`frontend/`) 프로덕션 의존성 567개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 567개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
+프론트엔드(`frontend/`) 프로덕션 의존성 556개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 556개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
 
 **2026-08-06 갱신(#341 완주 — DevExtreme 제거 반영)** — 상용 6종과 그 전이 의존이 빠져 623→599개가 됐다. 사라진 24개: 상용 6종(`devextreme`·`devextreme-react`·`@devexpress/utils`·`devexpress-diagram`·`devexpress-gantt`·`@devextreme/runtime`)과 그것들만 쓰던 18개(`inferno` 계열 5 · `devextreme-quill`·`parchment`·`quill-delta`·`fast-diff`·`rrule`·`core-js`·`@babel/runtime`·`es6-object-assign`·`eventemitter3`·`lodash.clonedeep`·`lodash.isequal`·`lodash.merge`·`opencollective-postinstall`). 갱신은 손으로 지우지 않고 **아래 재현 명령의 새 출력을 정본으로 삼아 문서의 패키지 목록과 대조**했다 — 그 결과 「문서에 있는데 지금 없음」 24개 = 위 목록, 「지금 있는데 문서에 없음」 0개. 남은 599개에 DevExpress 계열은 `devextreme-exceljs-fork`(MIT 포크) 하나뿐이다.
 
@@ -2850,9 +2850,9 @@ MIT 조건으로 사용(추가 의무 없음). GPL 조건은 선택하지 않았
 
 ---
 
-## 2. 그 외 permissive 라이선스 (515개)
+## 2. 그 외 permissive 라이선스 (504개)
 
-MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 515개 중 512개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
+MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 504개 중 501개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
 
 ### 예외 — 원문 파일 없이 선언만 있는 패키지 (3개)
 
@@ -2864,7 +2864,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `client-only` | 0.0.1 | MIT |
 | `fancy-canvas` | 2.1.0 | MIT |
 
-<details><summary>펼치기 — 나머지 512개: 패키지 · 버전 · 라이선스</summary>
+<details><summary>펼치기 — 나머지 501개: 패키지 · 버전 · 라이선스</summary>
 
 | 패키지 | 버전 | 라이선스 |
 |---|---|---|
@@ -3034,7 +3034,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `character-reference-invalid` | 2.0.1 | MIT |
 | `chart.js` | 4.5.1 | MIT |
 | `chokidar` | 5.0.0 | MIT |
-| `clsx` | 2.1.1 | MIT |
 | `combined-stream` | 1.0.8 | MIT |
 | `comma-separated-tokens` | 2.0.3 | MIT |
 | `commander` | 8.3.0 | MIT |
@@ -3084,7 +3083,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `fast-check` | 3.23.2 | MIT |
 | `fast-csv` | 5.0.5 | MIT |
 | `fast-deep-equal` | 3.1.3 | MIT |
-| `fast-equals` | 4.0.3 | MIT |
 | `fast-fifo` | 1.3.2 | MIT |
 | `fast-uri` | 3.1.5 | BSD-3-Clause |
 | `fdir` | 6.5.0 | MIT |
@@ -3139,7 +3137,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `isexe` | 2.0.0 | ISC |
 | `jiti` | 2.7.0 | MIT |
 | `jose` | 6.2.8 | MIT |
-| `js-tokens` | 4.0.0 | MIT |
 | `jsdom` | 30.0.1 | MIT |
 | `json-schema-traverse` | 1.0.0 | MIT |
 | `jsonfile` | 6.2.0 | MIT |
@@ -3165,7 +3162,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `lodash.once` | 4.1.1 | MIT |
 | `lodash.uniq` | 4.5.0 | MIT |
 | `longest-streak` | 3.1.0 | MIT |
-| `loose-envify` | 1.4.0 | MIT |
 | `lru-cache` | 11.5.2 | BlueOak-1.0.0 |
 | `lru.min` | 1.1.4 | MIT |
 | `magic-string` | 0.30.21 | MIT |
@@ -3228,7 +3224,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `node-int64` | 0.4.0 | MIT |
 | `nodemailer` | 9.0.5 | MIT-0 |
 | `normalize-path` | 3.0.0 | MIT |
-| `object-assign` | 4.1.1 | MIT |
 | `obug` | 2.1.4 | MIT |
 | `ohash` | 2.0.11 | MIT |
 | `parse-entities` | 4.0.2 | MIT |
@@ -3258,7 +3253,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `postgres-interval` | 1.2.0 | MIT |
 | `process-nextick-args` | 2.0.1 | MIT |
 | `process` | 0.11.10 | MIT |
-| `prop-types` | 15.8.1 | MIT |
 | `proper-lockfile` | 4.1.2 | MIT |
 | `property-information` | 7.1.0 | MIT |
 | `proxy-from-env` | 2.1.0 | MIT |
@@ -3267,15 +3261,11 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `radix-ui` | 1.6.7 | MIT |
 | `rc9` | 3.0.1 | MIT |
 | `react-dom` | 19.2.8 | MIT |
-| `react-draggable` | 4.7.1 | MIT |
-| `react-grid-layout` | 2.2.4 | MIT |
 | `react-icons` | 5.7.0 | MIT |
-| `react-is` | 16.13.1 | MIT |
 | `react-markdown` | 10.1.0 | MIT |
 | `react-remove-scroll-bar` | 2.3.8 | MIT |
 | `react-remove-scroll` | 2.7.2 | MIT |
 | `react-resizable-panels` | 4.12.2 | MIT |
-| `react-resizable` | 3.2.0 | MIT |
 | `react-style-singleton` | 2.2.3 | MIT |
 | `react-virtuoso` | 4.18.11 | MIT |
 | `react` | 19.2.8 | MIT |
@@ -3291,7 +3281,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `remark-stringify` | 11.0.0 | MIT |
 | `remeda` | 2.33.4 | MIT |
 | `require-from-string` | 2.0.2 | MIT |
-| `resize-observer-polyfill` | 1.5.1 | MIT |
 | `retry` | 0.12.0 | MIT |
 | `rolldown` | 1.1.5 | MIT |
 | `rou3` | 0.7.12 | MIT |

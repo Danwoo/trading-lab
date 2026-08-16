@@ -16,8 +16,6 @@ export const PANEL_REGISTRY: Record<string, PanelDefinition> = {
     title: "차트",
     capability: "candles",
     needsSymbol: true,
-    defaultSize: { w: 8, h: 12 },
-    minSize: { w: 4, h: 8 },
     load: () => import("@/components/features/ChartPanel/ChartPanel"),
   },
   "symbol-info": {
@@ -25,8 +23,6 @@ export const PANEL_REGISTRY: Record<string, PanelDefinition> = {
     title: "종목 정보",
     capability: "quote",
     needsSymbol: true,
-    defaultSize: { w: 4, h: 6 },
-    minSize: { w: 3, h: 4 },
     load: () => import("@/components/features/SymbolInfoPanel/SymbolInfoPanel"),
   },
 };

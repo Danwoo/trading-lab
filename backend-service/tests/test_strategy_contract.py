@@ -235,6 +235,31 @@ def test_unknown_timeframe_is_rejected() -> None:
     assert "timeframe" in result.errors[0].message
 
 
+def test_response_schema_keeps_int_boundaries() -> None:
+    """응답 스키마를 통과해도 정수 경계가 정수로 남는다.
+
+    로더가 int 로 내보내도 `StrategyFieldOut.min: float` 이면 pydantic 이 다시 float 으로
+    강제해 폼에 `5.0~120.0` 이 나간다 — 실측으로 잡힌 회귀라 스키마를 통과시켜 확인한다.
+    """
+    from schemas.bot.bot_schema import StrategyFormOut
+
+    result = load_strategies()
+    assert result.valid, "레포 전략이 0건이면 이 검사는 아무것도 안 본다"
+
+    checked = 0
+    for spec in result.valid:
+        rendered = StrategyFormOut.model_validate(to_form_schema(spec)).model_dump()
+        declared = {param.name: param for param in spec.params}
+        for field in rendered["fields"]:
+            param = declared[field["name"]]
+            if param.type != "int":
+                continue
+            checked += 1
+            for key in ("min", "max", "step"):
+                assert isinstance(field[key], int), f"{spec.key}.{field['name']}.{key} 가 {field[key]!r} 다"
+    assert checked > 0, "int 파라미터를 하나도 안 봤다 — 그물이 죽어 있다"
+
+
 def test_repo_strategies_satisfy_the_contract() -> None:
     """레포에 실제로 들어 있는 전략 파일이 규약을 통과한다 — 0건이면 실패다."""
     result = load_strategies()

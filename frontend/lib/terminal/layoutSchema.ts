@@ -1,26 +1,29 @@
-import type { GridCell, PanelInstance, TerminalLayout } from "@/types/terminal/layout";
+import type { PanelInstance, TerminalLayout } from "@/types/terminal/layout";
 import { DEFAULT_LAYOUT, cloneLayout } from "./layoutDefaults";
 
-export const LAYOUT_SCHEMA_VERSION = 1;
+export const LAYOUT_SCHEMA_VERSION = 2;
 
 export type LayoutMigration = (input: Record<string, unknown>) => Record<string, unknown>;
 
-/** 키는 "적용하면 도달하는 버전". v1 이 최초라 지금은 비어 있다 */
-export const LAYOUT_MIGRATIONS: Record<number, LayoutMigration> = {};
+/**
+ * v1 → v2 — 자유 배치를 걷어내며 좌표 배열(`grid`)이 사라졌다(화면 결정 §20.2).
+ *
+ * **떼어내기만 하고 나머지는 그대로 넘긴다.** 옛 저장본에서 살릴 것은 「무엇이 열려 있었는가」
+ * (`panels`)이고, 그것은 새 셸에서도 뜻이 같다. 좌표를 버린다고 저장본 전체를 폴백시키면
+ * 사람이 열어 둔 패널 구성이 조용히 사라진다.
+ */
+function dropGrid(input: Record<string, unknown>): Record<string, unknown> {
+  const { grid: _grid, ...rest } = input;
+  return { ...rest, schemaVersion: 2 };
+}
+
+/** 키는 "적용하면 도달하는 버전" */
+export const LAYOUT_MIGRATIONS: Record<number, LayoutMigration> = {
+  2: dropGrid,
+};
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isValidGridCell(value: unknown): value is GridCell {
-  return (
-    isPlainObject(value) &&
-    typeof value.i === "string" &&
-    typeof value.x === "number" &&
-    typeof value.y === "number" &&
-    typeof value.w === "number" &&
-    typeof value.h === "number"
-  );
 }
 
 function isValidPanelInstance(value: unknown): value is PanelInstance {
@@ -35,11 +38,7 @@ function isValidPanelInstance(value: unknown): value is PanelInstance {
 
 function isValidLayoutShape(value: Record<string, unknown>): value is Record<string, unknown> & TerminalLayout {
   return (
-    typeof value.schemaVersion === "number" &&
-    Array.isArray(value.panels) &&
-    value.panels.every(isValidPanelInstance) &&
-    Array.isArray(value.grid) &&
-    value.grid.every(isValidGridCell)
+    typeof value.schemaVersion === "number" && Array.isArray(value.panels) && value.panels.every(isValidPanelInstance)
   );
 }
 
@@ -83,7 +82,7 @@ export function migrateLayout(
     return { layout: cloneLayout(DEFAULT_LAYOUT), recovered: true };
   }
 
-  return { layout: current, recovered: false };
+  return { layout: { schemaVersion: current.schemaVersion, panels: current.panels }, recovered: false };
 }
 
 /**

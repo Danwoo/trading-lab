@@ -2,6 +2,7 @@ export { Header } from "./Header";
 export { Sidebar } from "./Sidebar";
 export { GlobalTabs } from "./GlobalTabs";
 export { ProductRail } from "./ProductRail"; // 제품 셸 46px 아이콘 레일 (화면 결정 §20)
+export { ProductPanel } from "./ProductPanel"; // 레일이 여는 372px 패널 (화면 결정 §20.2·§21.3·§21.6)
 
 export { TableGroup } from "./TableGroup"; // 폼 그룹
 export { TableRow } from "./TableRow"; // 폼 행

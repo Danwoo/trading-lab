@@ -79,9 +79,11 @@ class StrategyFieldOut(BaseModel):
     label: str
     control: Literal["number", "select", "toggle"]
     default: Any
-    min: float | None = None
-    max: float | None = None
-    step: float | None = None
+    # `int | float` 순서가 중요하다 — `float` 만 선언하면 로더가 int 로 내보낸 경계를 다시
+    # float 으로 강제해 폼에 `5.0~120.0` 이 나간다 (실측으로 잡힌 회귀).
+    min: int | float | None = None
+    max: int | float | None = None
+    step: int | float | None = None
     unit: str | None = None
     options: list[dict[str, str]] | None = None
     help: str | None = None

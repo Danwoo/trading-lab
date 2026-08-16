@@ -2,7 +2,6 @@
 
 import { Suspense, lazy, useMemo } from "react";
 import { resolveCapability } from "@/lib/terminal/capabilityMatrix";
-import type { MoveDirection, ResizeAxis } from "@/lib/terminal/gridMath";
 import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
 import type { CapabilityVerdict } from "@/types/terminal/capability";
 import type { PanelInstance } from "@/types/terminal/layout";
@@ -18,8 +17,6 @@ export interface PanelSlotProps {
   instance: PanelInstance;
   definition: PanelDefinition;
   region: Region;
-  onMove: (direction: MoveDirection) => void;
-  onResize: (axis: ResizeAxis, delta: number) => void;
   onToggleCollapse: () => void;
   onClose: () => void;
   onSettingsChange: (next: Record<string, unknown>) => void;
@@ -67,8 +64,6 @@ export function PanelSlot({
   instance,
   definition,
   region,
-  onMove,
-  onResize,
   onToggleCollapse,
   onClose,
   onSettingsChange,
@@ -96,8 +91,6 @@ export function PanelSlot({
       provenance={provenance}
       onToggleCollapse={onToggleCollapse}
       onClose={onClose}
-      onMove={onMove}
-      onResize={onResize}
     >
       {verdict.available && (
         <PanelErrorBoundary panelTitle={definition.title}>

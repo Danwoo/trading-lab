@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { showToast } from "@/components/shared/Feedback";
 import { Icon } from "@/components/shared/ui/primitives/icons";
 import { cn } from "@/components/shared/ui/primitives/cn";
-import { RAIL_ITEMS, RAIL_WIDTH_PX, type RailItem } from "@/constants/shell";
+import { RAIL_ITEMS, type RailItem } from "@/constants/shell";
 
 interface Props {
   /** 지금 열려 있는 패널 항목 id. 닫혀 있으면 null */
@@ -13,6 +14,13 @@ interface Props {
   onTogglePanel: (id: string) => void;
   /** 패널이 그려지는 영역의 DOM id (`aria-controls`) */
   panelRegionId: string;
+  /**
+   * 이 항목 버튼으로 포커스를 되돌린다 — 패널이 닫힐 때 호출자가 준다. 사라진 요소에 포커스가
+   * 남으면 브라우저가 `<body>` 로 떨어뜨려 키보드 위치를 잃는다.
+   */
+  focusItemId?: string | null;
+  /** 되돌리기를 처리했음을 알린다 — 호출자가 값을 비워야 다음 요청이 다시 걸린다 */
+  onFocusHandled?: () => void;
 }
 
 /**
@@ -29,9 +37,16 @@ interface Props {
  * 를 단다. 아직 없는 자리는 `disabled` 대신 `aria-disabled` 다 — `disabled` 는 포커스를 못 받아
  * 「왜 안 되는지」에 키보드로 도달할 방법이 사라진다.
  */
-export function ProductRail({ openPanelId, onTogglePanel, panelRegionId }: Props) {
+export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusItemId, onFocusHandled }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  useEffect(() => {
+    if (!focusItemId) return;
+    buttonRefs.current.get(focusItemId)?.focus();
+    onFocusHandled?.();
+  }, [focusItemId, onFocusHandled]);
 
   const isRouteActive = (item: RailItem) =>
     !!item.path && (pathname === item.path || pathname.startsWith(item.path + "/"));
@@ -57,6 +72,10 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId }: Props
     return (
       <li key={item.id}>
         <button
+          ref={(el) => {
+            if (el) buttonRefs.current.set(item.id, el);
+            else buttonRefs.current.delete(item.id);
+          }}
           type="button"
           aria-label={item.label}
           title={item.pending ? `${item.label} — ${item.pending}` : item.label}
@@ -96,11 +115,12 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId }: Props
     return rendered;
   };
 
+  // 레일은 어느 폭에서도 46px 이다 — 18px 아이콘 한 줄이라 늘려도 담을 것이 없고 줄이면
+  // 표적이 무너진다. 그래서 여기만 구간을 안 탄다(값은 globals.css 의 `--shell-rail`).
   return (
     <nav
       aria-label="제품 레일"
-      style={{ flex: `0 0 ${RAIL_WIDTH_PX}px` }}
-      className="flex h-full flex-col items-center gap-1 border-r border-slate-line bg-slate-panel py-2"
+      className="flex h-full w-shell-rail flex-none flex-col items-center gap-1 border-r border-slate-line bg-slate-panel py-2"
     >
       <ul className="flex flex-col items-center gap-1">{renderGroup(mainItems)}</ul>
       <ul className="mt-auto flex flex-col items-center gap-1">{renderGroup(footerItems)}</ul>

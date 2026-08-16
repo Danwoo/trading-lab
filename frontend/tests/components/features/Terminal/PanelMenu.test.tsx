@@ -11,9 +11,7 @@ import { PanelMenu } from "@/components/features/Terminal/PanelMenu";
 afterEach(() => cleanup());
 
 function setup() {
-  return render(
-    <PanelMenu collapsed={false} onMove={vi.fn()} onResize={vi.fn()} onToggleCollapse={vi.fn()} onClose={vi.fn()} />,
-  );
+  return render(<PanelMenu collapsed={false} onToggleCollapse={vi.fn()} onClose={vi.fn()} />);
 }
 
 describe("PanelMenu — 트리거 ArrowDown 오픈 (#314 갭 3)", () => {
@@ -28,7 +26,7 @@ describe("PanelMenu — 트리거 ArrowDown 오픈 (#314 갭 3)", () => {
     await user.keyboard("{ArrowDown}");
 
     expect(screen.getByRole("menu")).toBeTruthy();
-    expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: "위로 이동" }));
+    expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: "접기" }));
   });
 
   it("Enter/Space 로 여는 기존 경로는 그대로 동작한다 — 회귀 없음", async () => {

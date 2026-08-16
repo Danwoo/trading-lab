@@ -61,55 +61,57 @@ describe("layoutStore", () => {
     expect(store.getState().layout.panels.map((p) => p.type)).toEqual(["chart", "symbol-info"]);
   });
 
-  it("배치를 바꾸고 '새로고침'해도 그대로 열린다 (FR-005)", async () => {
+  it("패널 구성을 바꾸고 '새로고침'해도 그대로 열린다 (FR-005)", async () => {
     const store1 = await freshStore();
     store1.getState().setWorkspace("ws-a");
-    store1.getState().applyGrid([{ i: "chart-1", x: 3, y: 3, w: 6, h: 6 }]);
-    expect(store1.getState().layout.grid).toEqual([{ i: "chart-1", x: 3, y: 3, w: 6, h: 6 }]);
+    store1.getState().closePanel("chart-1");
+    expect(store1.getState().layout.panels.map((p) => p.instanceId)).toEqual(["symbol-info-1"]);
 
     // "새로고침" — 모듈을 새로 평가해 완전히 새 스토어 인스턴스를 만들고, 같은 워크스페이스로 연다
     const store2 = await freshStore();
     store2.getState().setWorkspace("ws-a");
 
-    expect(store2.getState().layout.grid).toEqual([{ i: "chart-1", x: 3, y: 3, w: 6, h: 6 }]);
+    expect(store2.getState().layout.panels.map((p) => p.instanceId)).toEqual(["symbol-info-1"]);
     expect(store2.getState().recovered).toBe(false);
   });
 
-  it("워크스페이스를 바꾸면 그 워크스페이스 배치가 나오고, 되돌아오면 원래 배치가 보존돼 있다 (FR-024)", async () => {
+  it("워크스페이스를 바꾸면 그 워크스페이스 구성이 나오고, 되돌아오면 원래 구성이 보존돼 있다 (FR-024)", async () => {
     const store = await freshStore();
 
     store.getState().setWorkspace("ws-a");
-    store.getState().applyGrid([{ i: "chart-1", x: 1, y: 1, w: 4, h: 4 }]);
+    store.getState().closePanel("chart-1");
 
     store.getState().setWorkspace("ws-b");
-    // ws-b 는 아직 저장본이 없다 — 기본 배치로 열려야 하고, ws-a 값이 새어 들어오면 안 된다
-    expect(store.getState().layout.grid).not.toEqual([{ i: "chart-1", x: 1, y: 1, w: 4, h: 4 }]);
-    store.getState().applyGrid([{ i: "chart-1", x: 9, y: 9, w: 2, h: 2 }]);
+    // ws-b 는 아직 저장본이 없다 — 기본 구성으로 열려야 하고, ws-a 값이 새어 들어오면 안 된다
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1"]);
+    store.getState().closePanel("symbol-info-1");
 
     store.getState().setWorkspace("ws-a");
-    expect(store.getState().layout.grid).toEqual([{ i: "chart-1", x: 1, y: 1, w: 4, h: 4 }]);
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["symbol-info-1"]);
 
     store.getState().setWorkspace("ws-b");
-    expect(store.getState().layout.grid).toEqual([{ i: "chart-1", x: 9, y: 9, w: 2, h: 2 }]);
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1"]);
   });
 
   it("한 워크스페이스의 localStorage 키가 다른 워크스페이스 키와 물리적으로 분리돼 있다", async () => {
     const store = await freshStore();
 
     store.getState().setWorkspace("ws-a");
-    store.getState().applyGrid([{ i: "chart-1", x: 1, y: 1, w: 4, h: 4 }]);
+    store.getState().closePanel("chart-1");
     store.getState().setWorkspace("ws-b");
-    store.getState().applyGrid([{ i: "chart-1", x: 9, y: 9, w: 2, h: 2 }]);
+    store.getState().closePanel("symbol-info-1");
 
     const rawA = sharedStorage.getItem("terminal-layout:ws-a");
     const rawB = sharedStorage.getItem("terminal-layout:ws-b");
     expect(rawA).not.toBeNull();
     expect(rawB).not.toBeNull();
-    expect(JSON.parse(rawA!).state.layout.grid).toEqual([{ i: "chart-1", x: 1, y: 1, w: 4, h: 4 }]);
-    expect(JSON.parse(rawB!).state.layout.grid).toEqual([{ i: "chart-1", x: 9, y: 9, w: 2, h: 2 }]);
+    expect(JSON.parse(rawA!).state.layout.panels.map((p: { instanceId: string }) => p.instanceId)).toEqual([
+      "symbol-info-1",
+    ]);
+    expect(JSON.parse(rawB!).state.layout.panels.map((p: { instanceId: string }) => p.instanceId)).toEqual(["chart-1"]);
   });
 
-  it("손상된 저장본을 만나면 기본 배치로 폴백하고 recovered:true 로 알린다", async () => {
+  it("손상된 저장본을 만나면 기본 구성으로 폴백하고 recovered:true 로 알린다", async () => {
     sharedStorage.setItem(
       "terminal-layout:ws-broken",
       JSON.stringify({ state: { layout: { panels: "not-an-array" } }, version: 0 }),
@@ -122,7 +124,7 @@ describe("layoutStore", () => {
     expect(store.getState().layout.panels.map((p) => p.type)).toEqual(["chart", "symbol-info"]);
   });
 
-  it("dismissRecovered 는 알림만 닫고 배치는 유지한다", async () => {
+  it("dismissRecovered 는 알림만 닫고 구성은 유지한다", async () => {
     sharedStorage.setItem(
       "terminal-layout:ws-broken",
       JSON.stringify({ state: { layout: { panels: "not-an-array" } }, version: 0 }),
@@ -137,42 +139,104 @@ describe("layoutStore", () => {
     expect(store.getState().layout.panels.map((p) => p.type)).toEqual(["chart", "symbol-info"]);
   });
 
-  it("openPanel·closePanel·toggleCollapsed·updateSettings 가 grid 와 panels 를 함께 유지한다", async () => {
+  it("closePanel·toggleCollapsed·updateSettings 가 panels 를 유지한다", async () => {
     const store = await freshStore();
     store.getState().setWorkspace("ws-a");
 
-    store
-      .getState()
-      .openPanel(
-        { instanceId: "news-1", type: "news", collapsed: false, settings: {} },
-        { i: "news-1", x: 0, y: 8, w: 4, h: 4 },
-      );
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).toContain("news-1");
-    expect(store.getState().layout.grid.map((c) => c.i)).toContain("news-1");
+    store.getState().toggleCollapsed("chart-1");
+    expect(store.getState().layout.panels.find((p) => p.instanceId === "chart-1")?.collapsed).toBe(true);
 
-    store.getState().toggleCollapsed("news-1");
-    expect(store.getState().layout.panels.find((p) => p.instanceId === "news-1")?.collapsed).toBe(true);
-
-    store.getState().updateSettings("news-1", { limit: 20 });
-    expect(store.getState().layout.panels.find((p) => p.instanceId === "news-1")?.settings).toEqual({
-      limit: 20,
+    store.getState().updateSettings("chart-1", { interval: "1h" });
+    expect(store.getState().layout.panels.find((p) => p.instanceId === "chart-1")?.settings).toEqual({
+      interval: "1h",
     });
 
-    store.getState().closePanel("news-1");
-    expect(store.getState().layout.panels.map((p) => p.instanceId)).not.toContain("news-1");
-    expect(store.getState().layout.grid.map((c) => c.i)).not.toContain("news-1");
+    store.getState().closePanel("chart-1");
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).not.toContain("chart-1");
   });
 
-  it("openPanel 은 같은 instanceId 를 중복으로 열지 않는다", async () => {
+  it("resetPanels 가 닫은 패널을 되돌린다 — 자유 배치와 함께 사라진 「패널 추가」의 대체 경로", async () => {
     const store = await freshStore();
     store.getState().setWorkspace("ws-a");
-    const instance = { instanceId: "news-1", type: "news", collapsed: false, settings: {} } as const;
-    const cell = { i: "news-1", x: 0, y: 8, w: 4, h: 4 };
 
-    store.getState().openPanel(instance, cell);
-    store.getState().openPanel(instance, cell);
+    store.getState().closePanel("chart-1");
+    store.getState().closePanel("symbol-info-1");
+    expect(store.getState().layout.panels).toEqual([]);
 
-    expect(store.getState().layout.panels.filter((p) => p.instanceId === "news-1")).toHaveLength(1);
-    expect(store.getState().layout.grid.filter((c) => c.i === "news-1")).toHaveLength(1);
+    store.getState().resetPanels();
+
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1"]);
+  });
+
+  it("resetPanels 는 기본 패널만 되살리고 레지스트리 밖 패널(FE-AD-8 preserved)은 지우지 않는다", async () => {
+    sharedStorage.setItem(
+      "terminal-layout:ws-ghost",
+      JSON.stringify({
+        state: {
+          layout: {
+            schemaVersion: 2,
+            panels: [{ instanceId: "ghost-1", type: "retired-panel-type", collapsed: false, settings: {} }],
+          },
+        },
+        version: 0,
+      }),
+    );
+    const store = await freshStore();
+    store.getState().setWorkspace("ws-ghost");
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["ghost-1"]);
+
+    store.getState().resetPanels();
+
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1", "ghost-1"]);
+  });
+
+  it("resetPanels 는 열려 있는 기본 패널의 설정·접힘을 건드리지 않는다 — 되살리기지 초기화가 아니다", async () => {
+    const store = await freshStore();
+    store.getState().setWorkspace("ws-settings");
+
+    store.getState().updateSettings("chart-1", { interval: "1h" });
+    store.getState().toggleCollapsed("chart-1");
+    store.getState().closePanel("symbol-info-1");
+
+    store.getState().resetPanels();
+
+    const chart = store.getState().layout.panels.find((p) => p.instanceId === "chart-1");
+    expect(chart?.settings).toEqual({ interval: "1h" });
+    expect(chart?.collapsed).toBe(true);
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1", "symbol-info-1"]);
+  });
+
+  it("되살릴 것이 없으면 resetPanels 는 아무것도 바꾸지 않는다", async () => {
+    const store = await freshStore();
+    store.getState().setWorkspace("ws-intact");
+    store.getState().updateSettings("chart-1", { interval: "1h" });
+    const before = store.getState().layout;
+
+    store.getState().resetPanels();
+
+    expect(store.getState().layout).toBe(before);
+  });
+
+  it("좌표(grid)가 들어 있는 옛 v1 저장본으로도 복원이 깨지지 않는다", async () => {
+    sharedStorage.setItem(
+      "terminal-layout:ws-legacy",
+      JSON.stringify({
+        state: {
+          layout: {
+            schemaVersion: 1,
+            panels: [{ instanceId: "chart-1", type: "chart", collapsed: false, settings: {} }],
+            grid: [{ i: "chart-1", x: 3, y: 3, w: 6, h: 6 }],
+          },
+        },
+        version: 0,
+      }),
+    );
+
+    const store = await freshStore();
+    store.getState().setWorkspace("ws-legacy");
+
+    expect(store.getState().recovered).toBe(false);
+    expect(store.getState().layout.panels.map((p) => p.instanceId)).toEqual(["chart-1"]);
+    expect(store.getState().layout).not.toHaveProperty("grid");
   });
 });

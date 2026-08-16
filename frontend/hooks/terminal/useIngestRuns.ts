@@ -21,7 +21,10 @@ export function useIngestRuns(reloadToken: number, enabled: boolean): PanelData<
     source: "적재 이력",
     fetcher: async () => {
       const result = await selectIngestRunList({ skip: 0, take: RUN_PAGE_SIZE });
-      const items = result?.items ?? [];
+      // 서버가 실패를 알리면 `null` 이다. 그것을 빈 목록으로 접으면 「한 번도 안 돌렸다」와
+      // 「못 읽었다」가 같은 화면이 된다 — 화면 결정 §21.5 가 금지한 조용한 뭉갬이다.
+      if (result === null) throw new Error("적재 이력을 불러오지 못했습니다");
+      const items = result.items;
       // 기준 시각은 가장 최근 기록의 시각이다. 목록이 비면 기준 시각이 없다 — 지어내지 않는다.
       const asOf = items[0]?.finished_dt ?? items[0]?.started_dt ?? items[0]?.reg_dt ?? null;
       return { items, asOf };
