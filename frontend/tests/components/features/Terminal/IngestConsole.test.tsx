@@ -50,6 +50,13 @@ function given({
   vi.mocked(useBarGaps).mockReturnValue(gaps as never);
 }
 
+/** 이 종목(KRX)의 캔들을 지금 받을 수 있는 상태. */
+function usableKrx() {
+  return panel<unknown[]>({
+    data: [{ source: "data_go_kr", market: "KRX", dataKind: "candles", available: true, reason: null }],
+  });
+}
+
 function section(name: string): HTMLElement {
   return screen.getByRole("region", { name });
 }
@@ -69,22 +76,59 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
     expect(text).not.toContain("등록된 소스가 없습니다");
   });
 
-  it("막힌 소스는 이유와 함께, 필요한 키까지 알려준다", () => {
+  it("막힌 소스는 서버가 준 사유를 **그대로** 보여준다 — 프론트가 안내를 다시 만들지 않는다", () => {
+    // 서버(`DataKeyService.unavailable_reason`)가 env 항목명과 발급 경로까지 완전한 문장으로 준다.
+    // 프론트가 같은 안내를 따로 만들면 서버가 아는 항목명과 갈린다 — 그 중복을 여기서 막는다.
+    const serverReason = ".env 의 MARKET_DATA_ALPACA_KEY 이 비어 있습니다. 발급 경로: Alpaca 계정(paper) → API Keys";
     given({
       capabilities: panel<unknown[]>({
         data: [
           { source: "sec", market: "US", dataKind: "financials", available: true, reason: null },
-          { source: "alpaca", market: "US", dataKind: "candles", available: false, reason: "키가 설정되지 않았습니다" },
+          { source: "alpaca", market: "US", dataKind: "candles", available: false, reason: serverReason },
         ],
       }),
     });
     render(<IngestConsole />);
 
     const text = section("소스").textContent ?? "";
-    expect(text).toContain("키가 설정되지 않았습니다");
-    expect(text).toContain("MARKET_DATA_ALPACA_KEY");
+    expect(text).toContain(serverReason);
     // 「2건 중 1건 사용 가능」 — 몇 건이 되는지 세어 말한다.
     expect(text).toContain("1건");
+    // 프론트가 만든 축약 안내가 덧붙지 않는다.
+    expect(text).not.toContain("키:");
+  });
+
+  it("적재 소스를 캐패빌리티에서 고른다 — 이름을 손으로 적지 않는다", async () => {
+    // 등록되지 않은 소스 이름을 보내면 큐잉은 성공하고 **워커에서 실패한다**.
+    // 그래서 「지금 이 시장의 캔들을 받을 수 있는 소스」를 데이터에서 골라 보낸다.
+    given({
+      capabilities: panel<unknown[]>({
+        data: [
+          { source: "alpaca", market: "US", dataKind: "candles", available: true, reason: null },
+          { source: "data_go_kr", market: "KRX", dataKind: "candles", available: true, reason: null },
+        ],
+      }),
+    });
+    vi.mocked(insertIngestRun).mockResolvedValue({ data: { run_id: 9 } } as never);
+    render(<IngestConsole />);
+
+    await userEvent.setup().click(within(section("적재")).getByRole("button"));
+
+    await waitFor(() => expect(vi.mocked(insertIngestRun)).toHaveBeenCalled());
+    expect(vi.mocked(insertIngestRun).mock.calls[0][0]).toMatchObject({ source: "data_go_kr" });
+  });
+
+  it("그 시장을 받을 소스가 없으면 누를 수 없고, 왜인지 말한다", () => {
+    given({
+      capabilities: panel<unknown[]>({
+        data: [{ source: "data_go_kr", market: "KRX", dataKind: "candles", available: false, reason: "키가 없습니다" }],
+      }),
+    });
+    render(<IngestConsole />);
+
+    const button = within(section("적재")).getByRole("button") as HTMLButtonElement;
+    expect(button.textContent).toContain("소스가 없습니다");
+    expect(button.disabled).toBe(true);
   });
 
   it("적재 이력이 어디까지 받았고 무엇이 실패했는지 보인다", () => {
@@ -160,7 +204,7 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
   });
 
   it("적재 요청이 거절되면 조용히 성공한 척하지 않는다", async () => {
-    given();
+    given({ capabilities: usableKrx() });
     vi.mocked(insertIngestRun).mockResolvedValue(null);
     render(<IngestConsole />);
 
@@ -172,7 +216,7 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
   });
 
   it("적재 요청이 받아들여지면 그 사실과 다음 자리를 말한다", async () => {
-    given();
+    given({ capabilities: usableKrx() });
     vi.mocked(insertIngestRun).mockResolvedValue({ data: { run_id: 9 } } as never);
     render(<IngestConsole />);
 

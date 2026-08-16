@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProvenanceBadge } from "@/components/features/Terminal/ProvenanceBadge";
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { useBarGaps } from "@/hooks/terminal/useBarGaps";
@@ -23,6 +23,9 @@ import type { MarketCapability } from "@/services/terminal/marketService";
  */
 
 /** 상태별 표시 — 색은 토큰만 쓴다. `rate_limited` 는 실패가 아니라 이어받을 지점이 있는 상태다. */
+/** 돌고 있는 잡이 있을 때만 다시 묻는 주기. */
+const POLL_MS = 4000;
+
 const STATUS_TONE: Record<string, string> = {
   succeeded: "text-ink",
   running: "text-ink",
@@ -38,20 +41,6 @@ const STATUS_LABEL: Record<string, string> = {
   rate_limited: "한도에 걸려 멈춤",
   failed: "실패",
 };
-
-/** 소스별로 어느 키가 있어야 하는지 — 「왜 비었나」에 답할 때 갈 곳까지 준다. */
-const KEY_HINT: Record<string, string> = {
-  data_go_kr: "MARKET_DATA_GOKR_SERVICE_KEY (data.go.kr 금융위 오픈API)",
-  alpaca: "MARKET_DATA_ALPACA_KEY (Alpaca)",
-  dart: "DART_API_KEY (OpenDART)",
-};
-
-function keyHintFor(source: string): string | null {
-  const key = Object.keys(KEY_HINT).find(
-    (k) => source.toLowerCase().includes(k.replace(/_/g, "")) || source.toLowerCase().includes(k),
-  );
-  return key ? KEY_HINT[key] : null;
-}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -85,21 +74,19 @@ function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; load
       </p>
       {blocked.length > 0 && (
         <ul className="flex min-w-0 flex-col gap-0.5">
-          {blocked.map((row) => {
-            const hint = keyHintFor(row.source);
-            return (
-              <li
-                key={`${row.source}:${row.market}:${row.dataKind}`}
-                className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-2xs"
-              >
-                <span className="font-mono text-ink-muted">
-                  {row.market} · {row.dataKind}
-                </span>
-                <span className="min-w-0 break-keep text-danger">{row.reason ?? "사유가 기록되지 않았습니다"}</span>
-                {hint && <span className="break-keep text-ink-faint">키: {hint}</span>}
-              </li>
-            );
-          })}
+          {/* 사유는 **서버가 정본**이다 — env 항목명과 발급 경로까지 완전한 문장으로 온다.
+              프론트가 같은 안내를 다시 만들면 서버가 아는 항목명과 갈린다. */}
+          {blocked.map((row) => (
+            <li
+              key={`${row.source}:${row.market}:${row.dataKind}`}
+              className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-2xs"
+            >
+              <span className="font-mono text-ink-muted">
+                {row.source} · {row.market} · {row.dataKind}
+              </span>
+              <span className="min-w-0 break-keep text-danger">{row.reason ?? "사유가 기록되지 않았습니다"}</span>
+            </li>
+          ))}
         </ul>
       )}
     </div>
@@ -139,6 +126,19 @@ function Runs({ rows, loading }: { rows: IngestRunOut[] | null; loading: boolean
   );
 }
 
+/**
+ * 이 종목을 적재할 소스 — **캐패빌리티에서 고른다.** 소스 이름을 화면이 손으로 적으면
+ * 백엔드 레지스트리와 갈린다: 등록되지 않은 이름은 큐잉이 성공하고 **워커에서 실패한다**.
+ * 시장→소스 매핑을 프론트가 복제하는 것도 두 벌이 되는 길이다.
+ *
+ * 규칙: 그 시장의 캔들을 다루면서 **지금 사용 가능한** 소스 중 첫째. 없으면 `null` —
+ * 그때는 버튼이 무엇이 없어서 못 하는지를 말한다.
+ */
+function pickSource(rows: MarketCapability[] | null, market: string): string | null {
+  if (rows === null) return null;
+  return rows.find((row) => row.market === market && row.dataKind === "candles" && row.available)?.source ?? null;
+}
+
 export function IngestConsole() {
   const symbol = useTerminalSymbol();
   const [reloadToken, setReloadToken] = useState(0);
@@ -149,22 +149,38 @@ export function IngestConsole() {
   const runs = useIngestRuns(reloadToken, true);
   const gaps = useBarGaps(true);
 
+  const source = symbol === null ? null : pickSource(capabilities.data, symbol.market);
   const missing = gaps.data?.missingDates ?? [];
   const runningNow = useMemo(
     () => (runs.data ?? []).some((run) => run.status === "running" || run.status === "queued"),
     [runs.data],
   );
 
+  // 돌고 있는 잡이 있으면 스스로 다시 본다 — 「queued → running → succeeded」를 보려면
+  // 화면이 물어봐야 한다. 멈춰 있으면 안 묻는다(조용한 폴링으로 서버를 계속 두드리지 않게).
+  useEffect(() => {
+    if (!runningNow) return;
+    const timer = setInterval(() => setReloadToken((n) => n + 1), POLL_MS);
+    return () => clearInterval(timer);
+  }, [runningNow]);
+
   const start = async () => {
     if (symbol === null) {
       setMessage({ text: "종목을 먼저 고르시면 그 종목을 적재합니다.", failed: true });
+      return;
+    }
+    if (source === null) {
+      setMessage({
+        text: `${symbol.market} 시장의 캔들을 지금 받을 수 있는 소스가 없습니다 — 위 「소스」의 사유를 보세요.`,
+        failed: true,
+      });
       return;
     }
     setBusy(true);
     setMessage(null);
     try {
       const created = await insertIngestRun({
-        source: "auto",
+        source,
         job_kind: "daily_bar",
         scope: `${symbol.market}:${symbol.ticker}`,
       });
@@ -194,10 +210,16 @@ export function IngestConsole() {
         <button
           type="button"
           onClick={start}
-          disabled={busy}
+          disabled={busy || (symbol !== null && source === null)}
           className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
         >
-          {busy ? "요청 중…" : symbol === null ? "종목을 고르면 적재합니다" : `${symbol.ticker} 일봉 적재`}
+          {busy
+            ? "요청 중…"
+            : symbol === null
+              ? "종목을 고르면 적재합니다"
+              : source === null
+                ? `${symbol.market} 를 받을 소스가 없습니다`
+                : `${symbol.ticker} 일봉 적재 (${source})`}
         </button>
       </div>
 
