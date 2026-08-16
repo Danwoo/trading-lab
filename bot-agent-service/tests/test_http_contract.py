@@ -126,6 +126,52 @@ def test_continuation_is_keyed_by_caller() -> str:
     return "test_continuation_is_keyed_by_caller"
 
 
+def test_session_survives_across_requests_through_the_container() -> str:
+    """이어가기는 **실제 요청 두 번**을 태워야 검증된다 — 딕셔너리 연산만 봐서는 못 잡는다.
+
+    서비스가 신원별 세션 id 를 인스턴스 상태로 들고 있어서, DI 등록이 `Factory` 면 요청마다
+    새 인스턴스가 생겨 그 기억이 매번 사라진다. 그때 `resume` 은 항상 `None` 이 되는데,
+    화면에는 폼 상태 주입 덕에 정답이 나와 **버그가 안 보인다.** 그래서 여기서 잡는다.
+
+    SDK 는 가짜로 갈아 끼운다 — 실제 호출은 소유자 자격증명을 소모한다.
+    """
+    import claude_agent_sdk
+
+    seen_resume: list = []
+
+    class _Result(claude_agent_sdk.ResultMessage):
+        def __init__(self):
+            self.subtype = "success"
+            self.session_id = "sess-1"
+
+    async def _fake_query(*, prompt, options):  # noqa: ARG001
+        seen_resume.append(options.resume)
+        yield _Result()
+
+    # 모듈을 통째로 갈면 `proposal_tool` 이 쓰는 다른 심볼까지 사라진다 — `query` 하나만 바꾼다.
+    from core.config import settings
+
+    original_key = settings.ANTHROPIC_API_KEY
+    original_query = claude_agent_sdk.query
+    settings.ANTHROPIC_API_KEY = "sk-test-key"
+    claude_agent_sdk.query = _fake_query
+    try:
+        client = _client()
+        for _ in range(2):
+            response = client.post("/bot-agent", json={"message": "눌림목 봇"})
+            assert response.status_code == 200, f"{response.status_code}"
+    finally:
+        settings.ANTHROPIC_API_KEY = original_key
+        claude_agent_sdk.query = original_query
+
+    assert len(seen_resume) == 2, f"두 번 호출되지 않았다: {seen_resume}"
+    assert seen_resume[0] is None, f"첫 턴은 새 대화여야 한다 ({seen_resume[0]!r})"
+    assert seen_resume[1] == "sess-1", (
+        f"둘째 턴이 첫 턴을 이어받지 못했다 ({seen_resume[1]!r}) — DI 가 요청마다 새 인스턴스를 만든다"
+    )
+    return "test_session_survives_across_requests_through_the_container"
+
+
 def test_read_only_guest_cannot_burn_the_owners_credentials() -> str:
     """대화 한 턴은 기계 소유자의 LLM 자격증명을 소모한다 — 읽기전용 게스트는 못 건드린다.
 
@@ -158,6 +204,7 @@ TESTS = [
     test_readiness_tells_why_not,
     test_read_only_guest_cannot_burn_the_owners_credentials,
     test_service_token_and_missing_workspace_are_refused,
+    test_session_survives_across_requests_through_the_container,
 ]
 
 
@@ -176,8 +223,8 @@ if __name__ == "__main__":
         print(f"  FAIL TESTS 목록에 없는 테스트: {', '.join(missing)}")
         raise SystemExit(1)
     # 검사 0건은 통과가 아니다 — `TESTS` 가 비면(나쁜 머지·실수) 조용히 exit 0 이 된다.
-    if len(TESTS) < 7:
-        print(f"  FAIL 검사가 {len(TESTS)}건뿐이다 — 그물이 죽어 있다 (하한 7)")
+    if len(TESTS) < 8:
+        print(f"  FAIL 검사가 {len(TESTS)}건뿐이다 — 그물이 죽어 있다 (하한 8)")
         raise SystemExit(1)
     failures = 0
     for test in TESTS:

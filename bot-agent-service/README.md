@@ -52,7 +52,7 @@ cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload
 ```bash
 uv run python tests/test_agent_boundary.py     # 도구 경계 23건 (정적 구성)
 uv run python tests/test_tool_scope.py         # 경로 스코프 6건 — 탈출 시도 11개를 실제로 판정
-uv run python tests/test_http_contract.py      # HTTP 경계 7건 — 빈 메시지 422 · 키 없을 때 사유 · 권한 게이트
+uv run python tests/test_http_contract.py      # HTTP 경계 8건 — 빈 메시지 422 · 키 없을 때 사유 · 권한 게이트
 uv run ruff check app/
 ```
 
