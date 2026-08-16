@@ -30,7 +30,10 @@ const STATUS_TONE: Record<string, string> = {
   succeeded: "text-ink",
   running: "text-ink",
   queued: "text-ink-muted",
-  rate_limited: "text-signal-warn",
+  // 실패가 아니라 이어받을 지점이 있는 상태다 — 실패색을 쓰면 거짓말이 된다.
+  // 뜻은 아래 라벨(「한도에 걸려 멈춤」)이 진다. 색이 유일한 전달자면 색을 못 보는 사람에게는
+  // 아무 정보도 아니다.
+  rate_limited: "text-ink",
   failed: "text-danger",
 };
 
@@ -45,7 +48,7 @@ const STATUS_LABEL: Record<string, string> = {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section aria-label={title} className="flex min-w-0 flex-col gap-1.5">
-      <h3 className="break-keep text-2xs font-ui uppercase tracking-wide text-ink-faint">{title}</h3>
+      <h3 className="break-keep text-2xs font-ui uppercase tracking-wide text-ink-muted">{title}</h3>
       {children}
     </section>
   );
@@ -118,7 +121,7 @@ function Runs({ rows, loading }: { rows: IngestRunOut[] | null; loading: boolean
             {run.scope ? ` · ${run.scope}` : ""}
           </span>
           {run.period_to && <span className="font-mono text-ink">~{run.period_to} 까지</span>}
-          {run.written_rows !== null && <span className="text-ink-faint">{run.written_rows}행</span>}
+          {run.written_rows !== null && <span className="text-ink-muted">{run.written_rows}행</span>}
           {run.failed_reason && <span className="min-w-0 break-keep text-danger">{run.failed_reason}</span>}
         </li>
       ))}
