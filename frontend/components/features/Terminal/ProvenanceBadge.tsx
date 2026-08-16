@@ -1,5 +1,6 @@
 import type * as React from "react";
 import type { Provenance } from "@/types/terminal/provenance";
+import type { StalenessNote } from "@/lib/terminal/staleness";
 import { formatDate } from "@/utils/common/formatters/date";
 
 interface IconProps {
@@ -63,11 +64,27 @@ function UnknownProvenanceIcon({ className }: IconProps) {
   );
 }
 
-function formatHeaderTimestamp(asOf: string): string | null {
+/** 기준 시각을 어디까지 보일 것인가. 일봉 적재본처럼 값 자체가 날짜뿐이면 분까지 붙이면 거짓말이 된다. */
+export type ProvenancePrecision = "datetime" | "day";
+
+function formatHeaderTimestamp(asOf: string, precision: ProvenancePrecision): string | null {
   const full = formatDate(asOf, "datetime");
   if (!full) return null;
   const [datePart, timePart] = full.split(" ");
-  return `${datePart.slice(5)} ${timePart.slice(0, 5)}`;
+  const day = datePart.slice(5);
+  return precision === "day" ? day : `${day} ${timePart.slice(0, 5)}`;
+}
+
+interface ProvenanceBadgeProps {
+  provenance: Provenance | null;
+  /**
+   * 적재본이 낡았다는 판정 (`lib/terminal/staleness.ts`). 주면 `loaded` 배지 끝에 「하루 낡음」이
+   * 경고색으로 붙는다 — 화면 결정 §21.5 「조용히 낡은 값으로 계속 굴리지 않는다」가 여기서 보인다.
+   * 낡음을 재려면 「지금」이 필요한데 그것은 렌더가 아니라 호출자가 아는 것이라 값으로 받는다.
+   */
+  staleness?: StalenessNote | null;
+  /** 기본은 분까지. 날짜 단위 적재본(일봉 `period_to` 등)은 `"day"` 로 준다 */
+  precision?: ProvenancePrecision;
 }
 
 /**
@@ -75,7 +92,11 @@ function formatHeaderTimestamp(asOf: string): string | null {
  * `provenance` 가 `null` 이면 패널이 아직 아무 출처도 보고하지 않은 것 — 조용히 통과시키지 않고
  * "출처 미상" 경고로 렌더한다.
  */
-export function ProvenanceBadge({ provenance }: { provenance: Provenance | null }): React.ReactElement {
+export function ProvenanceBadge({
+  provenance,
+  staleness = null,
+  precision = "datetime",
+}: ProvenanceBadgeProps): React.ReactElement {
   if (provenance === null) {
     return (
       <span className="inline-flex items-center gap-1 text-signal-warn" role="status">
@@ -87,7 +108,7 @@ export function ProvenanceBadge({ provenance }: { provenance: Provenance | null 
 
   switch (provenance.kind) {
     case "live": {
-      const timestamp = provenance.asOf ? formatHeaderTimestamp(provenance.asOf) : null;
+      const timestamp = provenance.asOf ? formatHeaderTimestamp(provenance.asOf, precision) : null;
       return (
         <span className="inline-flex items-center gap-1 text-ink-primary">
           <LiveIcon />
@@ -96,12 +117,13 @@ export function ProvenanceBadge({ provenance }: { provenance: Provenance | null 
       );
     }
     case "loaded": {
-      const timestamp = provenance.asOf ? formatHeaderTimestamp(provenance.asOf) : null;
+      const timestamp = provenance.asOf ? formatHeaderTimestamp(provenance.asOf, precision) : null;
       return (
-        <span className="inline-flex items-center gap-1 text-ink-muted">
+        <span className="inline-flex flex-wrap items-center gap-1 text-ink-muted">
           <LoadedIcon />
           {provenance.source}
           {timestamp ? ` · ${timestamp}` : ""}
+          {staleness && <span className="text-danger">· {staleness.label}</span>}
         </span>
       );
     }
