@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 //
 // 화면 결정 §20.2(패널은 보드를 덮지 않는다) · §21.3(에이전트만 620 토글) · §21.6(폭 구간).
-// 폭은 「보기 좋은 숫자」가 아니라 결정 문서가 못박은 값이라 수치로 단언한다.
+//
+// **폭은 이제 CSS 가 정한다** — jsdom 은 Tailwind 를 적용하지 않으므로 여기서 잴 수 있는 것은
+// 「어느 구간에 어떤 유틸리티가 붙었나」까지다. 실제로 그 폭으로 그려지는지는 브라우저 확인의
+// 몫이고, 그 대신 **폭이 JS 로 돌아오지 않았다**는 것(인라인 style 0)은 여기서 막는다.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { ProductPanel } from "@/components/shared/Layout/ProductPanel";
 import { useBenchSelectionStore } from "@/stores/shell/benchSelectionStore";
-import { PANEL_COMPACT_WIDTH_PX, PANEL_EXPANDED_WIDTH_PX, PANEL_WIDTH_PX, type RailItem } from "@/constants/shell";
-import type { ViewportBand } from "@/hooks/shared/useViewportBand";
+import { type RailItem } from "@/constants/shell";
 
 const BOT_ITEM: RailItem = {
   id: "bot",
@@ -27,14 +29,18 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-function setup(overrides: { item?: RailItem; band?: ViewportBand; expanded?: boolean } = {}) {
+/** 부분문자열로 보면 `xl:w-shell-panel` 이 `xl:w-shell-panel-expanded` 안에서도 참이 된다. */
+function classesOf(el: HTMLElement): Set<string> {
+  return new Set(el.className.split(/\s+/).filter(Boolean));
+}
+
+function setup(overrides: { item?: RailItem; expanded?: boolean } = {}) {
   const onClose = vi.fn();
   const onToggleExpanded = vi.fn();
   render(
     <ProductPanel
       id="product-panel"
       item={overrides.item ?? BOT_ITEM}
-      band={overrides.band ?? "wide"}
       expanded={overrides.expanded ?? false}
       onToggleExpanded={onToggleExpanded}
       onClose={onClose}
@@ -44,38 +50,61 @@ function setup(overrides: { item?: RailItem; band?: ViewportBand; expanded?: boo
   return { panel, onClose, onToggleExpanded };
 }
 
-describe("ProductPanel — 폭 (§21.3 · §21.6)", () => {
-  it("1280 이상에서는 372px 로 자리를 차지한다 — 덮지 않고 옆으로 민다", () => {
-    const { panel } = setup({ band: "wide" });
+describe("ProductPanel — 폭은 CSS 가 정한다 (§21.3 · §21.6)", () => {
+  it("폭을 인라인 style 로 쓰지 않는다 — 여기가 다시 채워지면 첫 페인트가 서버·클라이언트에서 갈린다", () => {
+    const { panel } = setup();
 
-    expect(panel.style.flex).toBe(`0 0 ${PANEL_WIDTH_PX}px`);
-    expect(PANEL_WIDTH_PX).toBe(372);
-    expect(panel.className).not.toContain("absolute");
-  });
-
-  it("에이전트를 넓히면 620px 이다", () => {
-    const { panel } = setup({ item: AGENT_ITEM, band: "wide", expanded: true });
-
-    expect(panel.style.flex).toBe(`0 0 ${PANEL_EXPANDED_WIDTH_PX}px`);
-    expect(PANEL_EXPANDED_WIDTH_PX).toBe(620);
-  });
-
-  it("1024~1280 에서는 300px 로 줄어든다", () => {
-    const { panel } = setup({ band: "compact" });
-
-    expect(panel.style.flex).toBe(`0 0 ${PANEL_COMPACT_WIDTH_PX}px`);
-    expect(PANEL_COMPACT_WIDTH_PX).toBe(300);
-  });
-
-  it("1024 미만에서만 보드를 덮는다 — 폭을 차지하지 않고 위에 얹힌다", () => {
-    const { panel } = setup({ band: "overlay" });
-
+    expect(panel.style.width).toBe("");
     expect(panel.style.flex).toBe("");
-    expect(panel.className).toContain("absolute");
+    expect(panel.style.maxWidth).toBe("");
+    expect(panel.getAttribute("style")).toBeNull();
+  });
+
+  it("기본(1024 미만)은 보드를 덮는다 — 자리를 차지하지 않고 위에 얹힌다", () => {
+    const { panel } = setup();
+    const classes = classesOf(panel);
+
+    expect(classes.has("absolute")).toBe(true);
+    expect(classes.has("inset-0")).toBe(true);
+    expect(classes.has("z-20")).toBe(true);
+  });
+
+  it("1024 이상에서는 형제로 돌아와 300 을 차지한다", () => {
+    const { panel } = setup();
+    const classes = classesOf(panel);
+
+    expect(classes.has("lg:static")).toBe(true);
+    expect(classes.has("lg:w-shell-panel-compact")).toBe(true);
+    // 폭을 줬으면 줄어들지 않아야 한다 — 안 그러면 보드가 밀 때 300 이 지켜지지 않는다.
+    expect(classes.has("lg:flex-none")).toBe(true);
+  });
+
+  it("1280 이상에서는 372 다", () => {
+    const { panel } = setup();
+    const classes = classesOf(panel);
+
+    expect(classes.has("xl:w-shell-panel")).toBe(true);
+    expect(classes.has("xl:w-shell-panel-expanded")).toBe(false);
+  });
+
+  it("에이전트를 넓히면 620 쪽 하나만 실린다 — 둘을 함께 실으면 CSS 순서가 승자를 정한다", () => {
+    const { panel } = setup({ item: AGENT_ITEM, expanded: true });
+    const classes = classesOf(panel);
+
+    expect(classes.has("xl:w-shell-panel-expanded")).toBe(true);
+    expect(classes.has("xl:w-shell-panel")).toBe(false);
+  });
+
+  it("넓힌 채로도 1024~1280 의 폭은 300 그대로다 — 620 은 `xl:` 에만 걸려 있다", () => {
+    const { panel } = setup({ item: AGENT_ITEM, expanded: true });
+    const classes = classesOf(panel);
+
+    expect(classes.has("lg:w-shell-panel-compact")).toBe(true);
+    expect([...classes].filter((c) => c.startsWith("lg:w-"))).toEqual(["lg:w-shell-panel-compact"]);
   });
 });
 
-describe("ProductPanel — 620 토글은 에이전트에만 있다 (§21.3)", () => {
+describe("ProductPanel — 620 토글은 에이전트에만, 1280 이상에만 (§21.3 · §21.6)", () => {
   it("에이전트 패널에는 넓히기 버튼이 있고 누르면 호출자에게 올라간다", async () => {
     const user = userEvent.setup();
     const { onToggleExpanded } = setup({ item: AGENT_ITEM });
@@ -91,24 +120,15 @@ describe("ProductPanel — 620 토글은 에이전트에만 있다 (§21.3)", ()
     expect(screen.queryByRole("button", { name: /넓히기/ })).toBeNull();
   });
 
-  it("덮는 폭(1024 미만)에서는 에이전트도 넓히기를 내지 않는다 — 이미 전부를 덮고 있다", () => {
-    setup({ item: AGENT_ITEM, band: "overlay" });
+  // §21.6 이 620 을 허용한 것은 1280 이상뿐이다. 그 아래에서 버튼을 보이면 눌러도 폭이 안 바뀌는데
+  // `aria-pressed` 만 눌림으로 바뀌어 스크린리더에게 거짓 상태를 알린다. `hidden` 은 `display:none`
+  // 이라 접근성 트리에서도 빠진다 — 「보이지만 안 먹는 버튼」이 생길 수 없다.
+  it("1280 미만에서는 숨는다 — `hidden` + `xl:block` 두 짝이 다 있어야 한다", () => {
+    setup({ item: AGENT_ITEM });
+    const classes = classesOf(screen.getByRole("button", { name: /넓히기/ }));
 
-    expect(screen.queryByRole("button", { name: /넓히기/ })).toBeNull();
-  });
-
-  // §21.6 이 620 을 허용한 것은 1280 이상뿐이다. 이 구간에서 버튼을 내면 눌러도 폭이 안 바뀌는데
-  // `aria-pressed` 만 눌림으로 바뀌어 스크린리더에게 거짓 상태를 알린다.
-  it("1024~1280 에서도 에이전트에게 넓히기를 내지 않는다 — 그 구간의 폭은 300 하나뿐이다", () => {
-    setup({ item: AGENT_ITEM, band: "compact" });
-
-    expect(screen.queryByRole("button", { name: /넓히기/ })).toBeNull();
-  });
-
-  it("expanded 가 켜진 채 1024~1280 으로 좁아져도 폭은 300 이다 — 상태가 폭을 앞지르지 않는다", () => {
-    const { panel } = setup({ item: AGENT_ITEM, band: "compact", expanded: true });
-
-    expect(panel.style.flex).toBe(`0 0 ${PANEL_COMPACT_WIDTH_PX}px`);
+    expect(classes.has("hidden")).toBe(true);
+    expect(classes.has("xl:block")).toBe(true);
   });
 });
 

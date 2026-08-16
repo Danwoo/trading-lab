@@ -121,6 +121,7 @@ NON_COLOR_PREFIXES = (
     "--leading-",
     "--space-",
     "--size-",
+    "--shell-",
     "--radius-",
     "--focus-",
     "--btn-inset-alpha",

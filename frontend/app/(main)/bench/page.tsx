@@ -130,13 +130,13 @@ export default function Page() {
       </section>
 
       {/* 1280 이상 — 격자·곡선이 나란히 (§21.6) */}
-      <div className="hidden gap-3 xl:grid xl:grid-cols-2">
+      <div className="hidden gap-3 xl:grid xl:min-h-[50svh] xl:grid-cols-2">
         {gridZone}
         {curveZone}
       </div>
 
       {/* 1280 미만 — 격자 / 곡선 탭으로 하나씩 (§21.6) */}
-      <div className="min-w-0 xl:hidden">
+      <div className="flex min-h-[50svh] min-w-0 flex-col xl:hidden">
         <div role="tablist" aria-label="보드 보기" onKeyDown={handleTabKeyDown} className="flex flex-wrap gap-1">
           {TABBED_ZONE_IDS.map((id) => (
             <button
@@ -165,14 +165,14 @@ export default function Page() {
           role="tabpanel"
           id={`board-panel-${activeTab}`}
           aria-labelledby={`board-tab-${activeTab}`}
-          className="mt-2 min-w-0"
+          className="mt-2 grid min-h-0 min-w-0 flex-1"
         >
           {activeTab === "grid" ? gridZone : curveZone}
         </div>
       </div>
 
       {/* 내 봇 · 오늘 할 일 — 어느 폭에서도 접지 않는다 (읽는 데 폭이 덜 든다) */}
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-2">
         <BoardZone
           title="내 봇"
           incoming="만든 봇과 지금 상태."
@@ -191,7 +191,9 @@ export default function Page() {
         >
           <SelectionLine selection={selection} kind="bot" />
           {bots !== null && bots.length > 0 && (
-            <ul className="flex flex-col gap-1">
+            // 목록이 길어져도 이 자리가 보드를 밀어내지 않게 자기 상자 안에서 스크롤한다.
+            // 높이는 뷰포트 비례라 화면이 커지면 더 많이 보인다.
+            <ul className="flex max-h-[22svh] flex-col gap-1 overflow-y-auto">
               {bots.map((bot) => (
                 <li key={bot.bot_id} className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
                   <span className="min-w-0 break-keep text-ink">{bot.bot_nm}</span>
