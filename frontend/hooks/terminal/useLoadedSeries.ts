@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { requestQueue } from "@/lib/terminal/requestQueue";
-import { classifyMarketDataError } from "@/lib/terminal/marketDataError";
+import { classifyMarketDataError, provenanceForUnavailable } from "@/lib/terminal/marketDataError";
 import { selectCandles } from "@/services/terminal/marketService";
 import type { Candle } from "@/services/terminal/marketService";
 import { useTerminalInterval, useTerminalRange, useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
@@ -53,7 +53,7 @@ export function useLoadedSeries(): PanelData<Candle[]> {
             data: null,
             isLoading: false,
             error: null,
-            provenance: { kind: "unavailable", reason: result.unavailableReason },
+            provenance: provenanceForUnavailable(result.unavailableReason, result.unavailableCode),
           });
           return;
         }

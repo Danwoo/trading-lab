@@ -52,8 +52,14 @@ export default function SymbolInfoPanel({ instanceId }: PanelProps) {
   const isPlaceholder = quoteState.provenance.kind === "placeholder" || isBenignGap;
 
   useEffect(() => {
+    // 실려 온 사유는 `hint` 로 그대로 넘긴다 — 떨어뜨리면 왜 임시인지가 화면에서 사라진다.
     const effective: Provenance = isPlaceholder
-      ? { kind: "placeholder", source: "임시 데이터", note: symbol?.ticker }
+      ? {
+          kind: "placeholder",
+          source: "임시 데이터",
+          note: symbol?.ticker,
+          hint: quoteState.provenance.kind === "placeholder" ? quoteState.provenance.hint : undefined,
+        }
       : quoteState.provenance;
     reportProvenance(effective);
     // quoteState.provenance 는 매 렌더 새 객체 리터럴이다(useRealtimeQuote 가 switch 로 매번

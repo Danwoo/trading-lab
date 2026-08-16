@@ -10,7 +10,7 @@
 """
 
 from providers import get_provider, list_sources
-from providers.base import CREDENTIAL_MISSING_HINT
+from providers.base import CREDENTIAL_MISSING_CODE, CREDENTIAL_MISSING_HINT
 from services.data_key.data_key_service import DataKeyService
 
 
@@ -29,7 +29,9 @@ class CapabilityService:
                 if market and capability.market.upper() != market.upper():
                     continue
                 reason = capability.reason
+                code = None
                 if reason and CREDENTIAL_MISSING_HINT in reason:
+                    code = CREDENTIAL_MISSING_CODE
                     # 어댑터는 "키가 없다"까지만 안다. **어디서 받아 어디에 넣는지**는 키를 아는
                     # 쪽이 붙인다 — 화면이 사유만 보고 다음 행동을 알 수 있게. 판단 근거를 상수로
                     # 두는 이유는 base.py 의 그 상수 주석에 적었다.
@@ -41,6 +43,7 @@ class CapabilityService:
                         "data_kind": capability.data_kind,
                         "available": capability.available,
                         "reason": reason,
+                        "code": code,
                     }
                 )
         return rows

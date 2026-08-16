@@ -33,6 +33,10 @@ class BarsOut(BaseModel):
     adj_policy: str | None = None
     asof: str | None = None
     unavailable_reason: str | None = None
+    # 사유의 **기계가 읽는 갈래**. `credential_missing` 은 「키가 아직 없다」 하나뿐일 때만 온다 —
+    # 화면은 이때만 임시 데이터로 골조를 보여준다(결정 로그 2026-07-28). 다른 사유가 섞이면
+    # `null` 이고, 화면은 이유를 그대로 보여준다(진짜 결손을 덮지 않는다).
+    unavailable_code: str | None = None
 
 
 class GapsOut(BaseModel):
