@@ -93,14 +93,14 @@ export default function Page() {
       </header>
 
       {/* 1280 이상 — 격자·곡선이 나란히 (§21.6) */}
-      <div className="hidden gap-3 xl:grid xl:grid-cols-2">
+      <div className="hidden min-h-0 gap-3 xl:grid xl:flex-[2] xl:grid-cols-2">
         {TABBED_ZONE_IDS.map((id) => (
           <Zone key={id} zone={zoneById(id)} />
         ))}
       </div>
 
       {/* 1280 미만 — 격자 / 곡선 탭으로 하나씩 (§21.6) */}
-      <div className="min-w-0 xl:hidden">
+      <div className="flex min-h-0 min-w-0 flex-[2] flex-col xl:hidden">
         <div role="tablist" aria-label="보드 보기" onKeyDown={handleTabKeyDown} className="flex flex-wrap gap-1">
           {TABBED_ZONE_IDS.map((id) => (
             <button
@@ -129,7 +129,7 @@ export default function Page() {
           role="tabpanel"
           id={`board-panel-${activeTab}`}
           aria-labelledby={`board-tab-${activeTab}`}
-          className="mt-2 min-w-0"
+          className="mt-2 grid min-h-0 min-w-0 flex-1"
         >
           <Zone zone={zoneById(activeTab)} />
         </div>
