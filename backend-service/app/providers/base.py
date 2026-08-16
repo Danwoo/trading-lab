@@ -51,6 +51,11 @@ class ProviderResponseInvalid(BadGatewayError):
 # 판단이 조용히 빗나가므로, 키가 필요한 어댑터는 이 상수를 사유에 포함시킨다.
 CREDENTIAL_MISSING_HINT = ".env 에 데이터 소스 키를 채우세요"
 
+# 위 사유를 **기계가 읽는 값**으로도 흘린다. 화면은 「키가 아직 없다」와 「진짜 장애」를 달리
+# 다뤄야 하는데(전자는 임시 데이터로 골조를 보여주고, 후자는 숨기면 안 된다 — 결정 로그
+# 2026-07-28), 문구로 가르면 문구만 바뀌어도 조용히 갈린다.
+CREDENTIAL_MISSING_CODE = "credential_missing"
+
 
 class ProviderKeyMissing(ServiceUnavailableError):
     """키가 있어야 하는 소스를 키 없이 호출했을 때 올린다.

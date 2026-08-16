@@ -301,13 +301,16 @@
 
 /* placeholder 시그니처 — 패널 전면 대각선 해칭(측량 테이프). prefers-reduced-motion 과 무관하게
    정적이다 — 임시 데이터가 편안해 보이면 사람이 그걸 믿는다. 배지 하나가 아니라 재질이다. */
+/* 임시 데이터 해칭 — 「이 값은 가짜다」를 질감으로 말한다. 값을 **읽을 수 있는 선**까지만
+   진하게 한다: 촘촘하고 진한 해칭은 경고가 아니라 그냥 못 읽는 화면이다(실측 — 종목 정보
+   패널의 숫자가 안 읽혔다). 위에 캔버스를 얹는 패널(차트)에서도 덮이지 않게 층을 올린다. */
 .terminal-placeholder-hatch {
-  background-color: color-mix(in srgb, rgb(var(--signal-warn)) 7%, transparent);
+  z-index: 1;
   background-image: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, rgb(var(--signal-warn)) 35%, transparent) 0,
-    color-mix(in srgb, rgb(var(--signal-warn)) 35%, transparent) 1px,
+    color-mix(in srgb, rgb(var(--signal-warn)) 14%, transparent) 0,
+    color-mix(in srgb, rgb(var(--signal-warn)) 14%, transparent) 1px,
     transparent 1px,
-    transparent 10px
+    transparent 14px
   );
 }

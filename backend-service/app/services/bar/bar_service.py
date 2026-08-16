@@ -23,6 +23,7 @@ import datetime as dt
 
 from core.calendar import sessions_between
 from core.exceptions import BadRequestError, NotFoundError
+from providers.base import CREDENTIAL_MISSING_CODE
 from repositories.bar.bar_repository import BarRepository
 from services.capability.capability_service import CapabilityService
 
@@ -39,18 +40,25 @@ class BarService:
         self.bar_repository = bar_repository
         self.capability_service = capability_service
 
-    def _unavailable_reason(self, workspace_id: int | None, market: str, data_kind: str) -> str | None:
-        """이 시장·데이터종류를 줄 수 있는 소스가 하나라도 있으면 `None`, 없으면 그 사유들."""
+    def _unavailable(self, workspace_id: int | None, market: str, data_kind: str) -> tuple[str | None, str | None]:
+        """이 시장·데이터종류를 줄 수 있는 소스가 하나라도 있으면 `(None, None)`, 없으면 `(사유, 코드)`.
+
+        코드는 **막은 이유가 전부 「키가 아직 없다」일 때만** `credential_missing` 이다. 하나라도
+        다른 사유(제공 범위 밖·장애)가 섞이면 코드를 안 준다 — 화면이 그 경우를 임시 데이터로
+        덮으면 진짜 결손이 조용히 숨는다.
+        """
         rows = [
             row
             for row in self.capability_service.list_capabilities(workspace_id, market)
             if row["data_kind"] == data_kind
         ]
         if not rows:
-            return f"{market} 시장의 {data_kind} 를 다루는 소스가 등록되어 있지 않습니다"
+            return f"{market} 시장의 {data_kind} 를 다루는 소스가 등록되어 있지 않습니다", None
         if any(row["available"] for row in rows):
-            return None
-        return " / ".join(f"{row['source']}: {row['reason']}" for row in rows if row["reason"])
+            return None, None
+        reason = " / ".join(f"{row['source']}: {row['reason']}" for row in rows if row["reason"])
+        codes = {row.get("code") for row in rows}
+        return reason, CREDENTIAL_MISSING_CODE if codes == {CREDENTIAL_MISSING_CODE} else None
 
     def _instrument(self, market: str, symbol: str) -> dict:
         instrument = self.bar_repository.select_instrument({"market": market, "symbol": symbol})
@@ -83,9 +91,9 @@ class BarService:
         if not instrument:
             # 종목 마스터가 비어 있는 이유를 먼저 답한다 — 국내는 키가 없어 마스터 적재 자체가
             # 안 됐고, 그건 "없는 종목"이 아니라 "아직 못 받은 종목"이다.
-            reason = self._unavailable_reason(args.get("workspace_id"), market, "instrument_master")
+            reason, code = self._unavailable(args.get("workspace_id"), market, "instrument_master")
             if reason:
-                return self._empty(market, symbol, "1d", reason)
+                return self._empty(market, symbol, "1d", reason, code)
             raise NotFoundError(f"종목 마스터에 없는 종목입니다: {market} {symbol}")
 
         rows, total = self.bar_repository.select_daily_bar_list(
@@ -106,7 +114,7 @@ class BarService:
             "source": source,
             "adj_policy": adj_policy,
             "asof": asof,
-            "unavailable_reason": None if rows else self._empty_reason(args, market, symbol, "daily_bar", "일봉"),
+            **_unavailable_fields(None if rows else self._empty_unavailable(args, market, symbol, "daily_bar", "일봉")),
         }
 
     def select_minute_bar_list(self, args: dict) -> dict:
@@ -122,9 +130,9 @@ class BarService:
 
         instrument = self.bar_repository.select_instrument({"market": market, "symbol": symbol})
         if not instrument:
-            reason = self._unavailable_reason(args.get("workspace_id"), market, "instrument_master")
+            reason, code = self._unavailable(args.get("workspace_id"), market, "instrument_master")
             if reason:
-                return self._empty(market, symbol, f"{interval_min}m", reason)
+                return self._empty(market, symbol, f"{interval_min}m", reason, code)
             raise NotFoundError(f"종목 마스터에 없는 종목입니다: {market} {symbol}")
 
         # 합성 주기는 1분봉 N개를 접어 1개를 만든다 — 상한도 그만큼 넉넉히 읽어야 한다.
@@ -150,7 +158,9 @@ class BarService:
             "source": source,
             "adj_policy": adj_policy,
             "asof": asof,
-            "unavailable_reason": None if items else self._empty_reason(args, market, symbol, "minute_bar", "분봉"),
+            **_unavailable_fields(
+                None if items else self._empty_unavailable(args, market, symbol, "minute_bar", "분봉")
+            ),
         }
 
     def find_gaps(self, args: dict) -> dict:
@@ -197,12 +207,14 @@ class BarService:
             "date_to": date_to.isoformat(),
         }
 
-    def _empty_reason(self, args: dict, market: str, symbol: str, data_kind: str, label: str) -> str:
+    def _empty_unavailable(
+        self, args: dict, market: str, symbol: str, data_kind: str, label: str
+    ) -> tuple[str, str | None]:
         """행이 0건일 때만 부르는 사유 조립 — "소스가 없다"가 "아직 안 받았다"보다 앞선다."""
-        reason = self._unavailable_reason(args.get("workspace_id"), market, data_kind)
+        reason, code = self._unavailable(args.get("workspace_id"), market, data_kind)
         if reason:
-            return reason
-        return f"{market} {symbol} 의 해당 기간 {label}이 아직 적재되지 않았습니다"
+            return reason, code
+        return f"{market} {symbol} 의 해당 기간 {label}이 아직 적재되지 않았습니다", None
 
     @staticmethod
     def _validated_limit(limit) -> int:
@@ -224,7 +236,7 @@ class BarService:
         }
 
     @staticmethod
-    def _empty(market: str, symbol: str, interval: str, reason: str) -> dict:
+    def _empty(market: str, symbol: str, interval: str, reason: str, code: str | None) -> dict:
         return {
             "items": [],
             "total_count": 0,
@@ -235,6 +247,7 @@ class BarService:
             "adj_policy": None,
             "asof": None,
             "unavailable_reason": reason,
+            "unavailable_code": code,
         }
 
 
@@ -262,3 +275,11 @@ def synthesize_bars(items: list[dict], interval_min: int) -> list[dict]:
         if item.get("trade_value") is not None:
             current["trade_value"] = (current.get("trade_value") or 0) + item["trade_value"]
     return [buckets[ts] for ts in order]
+
+
+def _unavailable_fields(pair: tuple[str, str | None] | None) -> dict:
+    """`(사유, 코드)` 또는 `None` 을 응답 필드 두 개로 편다 — 한쪽만 싣는 실수를 구조로 막는다."""
+    if pair is None:
+        return {"unavailable_reason": None, "unavailable_code": None}
+    reason, code = pair
+    return {"unavailable_reason": reason, "unavailable_code": code}
