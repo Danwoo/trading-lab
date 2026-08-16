@@ -165,3 +165,54 @@ describe("#2 ③ 샘플 캔들은 placeholder 분기에서만 쓰인다 (룰 17)
     expect(source, "isPlaceholder 가 unavailable 전체를 삼키면 사유가 사라진다").toContain("isNoContextYet");
   });
 });
+
+describe("#2 ④ 「키가 아직 없다」만 임시 데이터로 덮는다", () => {
+  it("credential_missing 은 임시 데이터가 되고 사유가 note 로 살아남는다", async () => {
+    const { provenanceForUnavailable, CREDENTIAL_MISSING_CODE } = await import("@/lib/terminal/marketDataError");
+    const reason = "data_go_kr: .env 에 데이터 소스 키를 채우세요";
+    expect(provenanceForUnavailable(reason, CREDENTIAL_MISSING_CODE)).toEqual({
+      kind: "placeholder",
+      source: "임시 데이터",
+      hint: reason,
+    });
+  });
+
+  it("코드 없는 사유는 덮이지 않는다 — 진짜 결손이 숨으면 안 된다", async () => {
+    const { provenanceForUnavailable } = await import("@/lib/terminal/marketDataError");
+    for (const code of [null, "upstream_error", "not_supported"]) {
+      expect(provenanceForUnavailable("상류가 응답하지 않습니다", code)).toEqual({
+        kind: "unavailable",
+        reason: "상류가 응답하지 않습니다",
+      });
+    }
+  });
+
+  it("코드 문자열이 백엔드 상수와 같다 — 한쪽만 바뀌면 조용히 갈린다", async () => {
+    const { CREDENTIAL_MISSING_CODE } = await import("@/lib/terminal/marketDataError");
+    const backend = fs.readFileSync(path.join(REPO_ROOT, "backend-service/app/providers/base.py"), "utf8");
+    const declared = /^CREDENTIAL_MISSING_CODE = "([^"]+)"$/m.exec(backend);
+    expect(declared, "백엔드 상수를 못 찾았다 — 이름이 바뀌었으면 이 그물부터 고쳐라").not.toBeNull();
+    expect(CREDENTIAL_MISSING_CODE).toBe(declared![1]);
+  });
+
+  it("사유가 화면까지 간다 — 패널이 hint 를 넘기고 틀이 그것을 낸다", () => {
+    for (const file of [
+      "components/features/ChartPanel/ChartPanel.tsx",
+      "components/features/SymbolInfoPanel/SymbolInfoPanel.tsx",
+    ]) {
+      const source = fs.readFileSync(path.join(FRONTEND_ROOT, file), "utf8");
+      expect(source, `${file} 가 hint 를 안 넘기면 사유가 그 자리에서 죽는다`).toMatch(
+        /hint:\s*\w+\.provenance\.kind === "placeholder"/,
+      );
+    }
+    const frame = fs.readFileSync(path.join(FRONTEND_ROOT, "components/features/Terminal/PanelFrame.tsx"), "utf8");
+    expect(frame, "틀이 hint 를 렌더하지 않으면 넘겨도 안 보인다").toContain("provenance.hint");
+  });
+
+  it("훅과 서비스가 실제로 그 판정을 쓴다 — 순수 함수만 통과하고 화면은 옛길일 수 있다", () => {
+    const hook = fs.readFileSync(path.join(FRONTEND_ROOT, "hooks/terminal/useLoadedSeries.ts"), "utf8");
+    expect(hook).toContain("provenanceForUnavailable(result.unavailableReason, result.unavailableCode)");
+    const service = fs.readFileSync(path.join(FRONTEND_ROOT, "services/terminal/marketService.ts"), "utf8");
+    expect(service, "코드를 안 실어 보내면 판정이 늘 unavailable 로 떨어진다").toContain("unavailable_code");
+  });
+});

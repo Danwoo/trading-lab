@@ -33,10 +33,13 @@ function readMovingAverages(settings: Record<string, unknown>): number[] {
  * |---|---|
  * | 적재본이 있다 | 실캔들 + `loaded` 출처(소스·수정주가 정책·기준시각) |
  * | 종목/기간을 아직 안 골랐다 (`NO_CONTEXT_REASON`) | `SAMPLE_CANDLES` + `placeholder` 배지 |
- * | 그 밖의 `unavailable` (소스 없음·키 없음·미적재) | **사유 문장** — 임시 캔들을 그리지 않는다 |
+ * | 키가 아직 없다 (`credential_missing`) | `SAMPLE_CANDLES` + 해칭 + **사유를 실은** `placeholder` 배지 |
+ * | 그 밖의 `unavailable` (소스 없음·제공 범위 밖·상류 장애) | **사유 문장** — 임시 캔들을 그리지 않는다 |
  *
- * 세 번째 줄이 요점이다. 키가 없어 비어 있는 차트에 그럴싸한 임시 캔들을 그리면 "데이터가
- * 들어왔다"로 읽힌다 — 그것이 NFR-001 이 막으려는 상태다.
+ * 마지막 두 줄의 경계가 요점이다. 임시 캔들은 **골조를 보여주려고** 그리는 것이고(결정 로그
+ * 2026-07-28), 그래서 「키가 아직 없다」일 때만 그린다 — 그 판정은 화면이 문구를 보고 하지 않고
+ * 백엔드가 준 `unavailable_code` 로 한다. 그리고 그릴 때는 해칭과 **사유**를 함께 낸다. 사유를
+ * 떨어뜨리면 "데이터가 들어왔다"로 읽히고, 그것이 NFR-001 이 막으려는 상태다.
  */
 export default function ChartPanel({ instanceId, settings, onSettingsChange }: PanelProps) {
   const symbol = useTerminalSymbol();
@@ -58,8 +61,15 @@ export default function ChartPanel({ instanceId, settings, onSettingsChange }: P
   const candles: Candle[] = isPlaceholder ? SAMPLE_CANDLES : (series.data ?? []);
 
   useEffect(() => {
+    // 실려 온 사유(키가 아직 없다)는 `hint` 로 그대로 넘긴다 — 떨어뜨리면
+    // 「키를 넣어야 진짜 값이 온다」가 화면에서 사라진다.
     const effective: Provenance = isPlaceholder
-      ? { kind: "placeholder", source: "임시 데이터", note: symbol?.ticker }
+      ? {
+          kind: "placeholder",
+          source: "임시 데이터",
+          note: symbol?.ticker,
+          hint: series.provenance.kind === "placeholder" ? series.provenance.hint : undefined,
+        }
       : series.provenance;
     reportProvenance(effective);
     // series.provenance 원본을 deps 에 두면(현재는 useState 기반이라 안전하지만) 나중에
