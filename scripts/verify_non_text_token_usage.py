@@ -70,7 +70,9 @@ def scan() -> tuple[int, list[str], set[str], list[str], re.Pattern[str]]:
     # 그 상태로 로그인 화면의 `placeholder:!text-ink-faint` 2곳이 통과했다(리뷰가 잡았다).
     # 변형 체인의 **각 마디 앞**과 유틸리티 앞 **양쪽**에 `!` 가 올 수 있다.
     pattern = re.compile(
-        r"(?:^|[\s\"'`])(?:!?[a-z0-9-]+:)*!?("
+        # 임의 변형(`data-[state=open]:` · `group-[&_p]:` · `supports-[grid]:`)도 마디로 인정한다 —
+        # 이 레포에 실재하는 패턴이고, 첫 판은 이것도 못 잡았다.
+        r"(?:^|[\s\"'`])(?:!?[a-z0-9-]+(?:\[[^\]]*\])?:)*!?("
         + "|".join(TEXT_PREFIXES)
         + r")([a-z0-9-]+)"
     )
@@ -103,6 +105,9 @@ SELF_CHECK_HITS = (
     'className="placeholder:!text-ink-faint"',
     'className="dark:hover:!text-ink-faint"',
     'className="text-ink-faint/60"',
+    'className="data-[state=open]:text-ink-faint"',
+    'className="group-[&_p]:text-ink-faint"',
+    'className="supports-[grid]:!text-ink-faint"',
     'className="hover:text-line-strong"',
 )
 SELF_CHECK_MISSES = (

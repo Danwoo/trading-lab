@@ -153,6 +153,25 @@ export function IngestConsole() {
   const gaps = useBarGaps(true);
 
   const source = symbol === null ? null : pickSource(capabilities.data, symbol.market);
+
+  /**
+   * 적재 버튼이 무엇을 말할까 — **모르는 것을 「없다」고 하지 않는다.**
+   *
+   * `pickSource` 는 「아직 못 읽음」과 「읽었는데 없음」을 둘 다 `null` 로 준다. 그 둘을 뭉치면
+   * 로딩 중에는 매번 잠깐 거짓말을 하고, 조회가 실패하면 **서버 장애를 키 문제로 오인시킨다** —
+   * 사용자가 키를 발급받으러 간다. 「소스」 섹션은 이미 셋을 가르고 있는데 버튼만 안 갈랐다.
+   */
+  const buttonState = (() => {
+    if (busy) return { label: "요청 중…", disabled: true };
+    if (symbol === null) return { label: "종목을 고르면 적재합니다", disabled: true };
+    if (capabilities.data === null) {
+      return capabilities.isLoading
+        ? { label: "소스를 확인하는 중입니다", disabled: true }
+        : { label: "소스 목록을 읽지 못해 적재할 수 없습니다", disabled: true };
+    }
+    if (source === null) return { label: `${symbol.market} 를 받을 소스가 없습니다`, disabled: true };
+    return { label: `${symbol.ticker} 일봉 적재 (${source})`, disabled: false };
+  })();
   const missing = gaps.data?.missingDates ?? [];
   const runningNow = useMemo(
     () => (runs.data ?? []).some((run) => run.status === "running" || run.status === "queued"),
@@ -213,16 +232,10 @@ export function IngestConsole() {
         <button
           type="button"
           onClick={start}
-          disabled={busy || (symbol !== null && source === null)}
+          disabled={buttonState.disabled}
           className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
         >
-          {busy
-            ? "요청 중…"
-            : symbol === null
-              ? "종목을 고르면 적재합니다"
-              : source === null
-                ? `${symbol.market} 를 받을 소스가 없습니다`
-                : `${symbol.ticker} 일봉 적재 (${source})`}
+          {buttonState.label}
         </button>
       </div>
 

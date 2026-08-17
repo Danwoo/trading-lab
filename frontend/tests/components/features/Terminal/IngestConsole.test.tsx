@@ -118,6 +118,28 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
     expect(vi.mocked(insertIngestRun).mock.calls[0][0]).toMatchObject({ source: "data_go_kr" });
   });
 
+  it("소스를 아직 확인하는 중이면 버튼도 「없다」고 하지 않는다", () => {
+    // 「소스」 섹션은 이미 셋을 가르는데 버튼만 뭉치면, 매 초기 로드마다 잠깐 거짓말을 한다.
+    given({ capabilities: panel<unknown[]>({ data: null, isLoading: true }) });
+    render(<IngestConsole />);
+
+    const button = within(section("적재")).getByRole("button") as HTMLButtonElement;
+    expect(button.textContent).toContain("확인하는 중");
+    expect(button.textContent).not.toContain("소스가 없습니다");
+    expect(button.disabled).toBe(true);
+  });
+
+  it("소스 목록 조회가 실패하면 원인을 소스 부재로 오인시키지 않는다", () => {
+    // 서버 장애인데 「소스가 없다」고 하면 사용자는 키를 발급받으러 간다.
+    given({ capabilities: panel<unknown[]>({ data: null, isLoading: false }) });
+    render(<IngestConsole />);
+
+    const button = within(section("적재")).getByRole("button") as HTMLButtonElement;
+    expect(button.textContent).toContain("읽지 못해");
+    expect(button.textContent).not.toContain("소스가 없습니다");
+    expect(button.disabled).toBe(true);
+  });
+
   it("그 시장을 받을 소스가 없으면 누를 수 없고, 왜인지 말한다", () => {
     given({
       capabilities: panel<unknown[]>({
