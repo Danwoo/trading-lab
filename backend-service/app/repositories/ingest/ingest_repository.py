@@ -277,6 +277,30 @@ class IngestRepository:
         with self.sql_client.connect() as conn:
             return conn.execute(text(sql), {"instrument_id": instrument_id}).scalar()
 
+    def select_minute_partition_range(self) -> tuple[dt.date, dt.date] | None:
+        """`tn_minute_bar` 파티션이 덮는 구간 — 없으면 `None`.
+
+        **날짜를 코드에 박지 않는 이유**: 파티션은 선행 생성이고 보존 회전(`DROP PARTITION`)으로
+        움직인다(AD-15). 상수로 두면 회전한 뒤 갈린다 — 그래서 카탈로그에 물어본다.
+        마이그레이션 주석이 적은 「적재 워커가 『파티션이 있는가』만 확인한다」의 그 확인이다.
+        """
+        sql = r"""
+            -- 경계 뒤에 **닫는 인용부호를 앵커로 두지 않는다.** `ts` 가 timestamp 라 Postgres 는
+            -- `FROM ('2026-08-01 00:00:00')` 처럼 시각까지 렌더링한다 — 날짜 뒤에 `'` 를 기대하면
+            -- 매치가 통째로 실패하고 NULL 이 나와, 파티션이 있어도 「없다」로 읽힌다(실측으로 겪었다).
+            SELECT MIN(SUBSTRING(pg_get_expr(c.relpartbound, c.oid) FROM 'FROM \(''([0-9-]+)'))
+                 , MAX(SUBSTRING(pg_get_expr(c.relpartbound, c.oid) FROM 'TO \(''([0-9-]+)'))
+              FROM pg_class c
+              JOIN pg_inherits i ON i.inhrelid = c.oid
+              JOIN pg_class p ON p.oid = i.inhparent
+             WHERE p.relname = 'tn_minute_bar'
+        """
+        with self.sql_client.connect() as conn:
+            low, high = conn.execute(text(sql)).one()
+        if low is None or high is None:
+            return None
+        return dt.date.fromisoformat(low), dt.date.fromisoformat(high)
+
     # ── 캔들 ─────────────────────────────────────────────────────────────────
     def upsert_daily_bars(self, rows: list[dict]) -> int:
         """일봉 벌크 upsert (MD-AD-16). 감사 컬럼 대신 `source`·`ingest_run_id`·`ingested_at`."""
