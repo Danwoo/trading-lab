@@ -16,7 +16,6 @@ import datetime as dt
 from contextlib import contextmanager
 from decimal import Decimal
 
-from core.calendar import last_completed_session
 from core.exceptions import BadRequestError
 from core.logger import logger
 from fastapi.concurrency import run_in_threadpool
@@ -216,7 +215,7 @@ class IngestService:
                 skipped += 1
                 last_done = symbol
                 continue
-            date_from = await self._daily_start_date(instrument_id, run, market)
+            date_from = await self._daily_start_date(instrument_id, run)
             with _resume_at(last_done):
                 bars = await provider.fetch_daily(symbol, market, date_from, date_to)
             skipped += len(getattr(provider, "last_skipped", []))
@@ -235,7 +234,7 @@ class IngestService:
             )
         return written, skipped
 
-    async def _daily_start_date(self, instrument_id: int, run: dict, market: str) -> dt.date:
+    async def _daily_start_date(self, instrument_id: int, run: dict) -> dt.date:
         """적재 시작일. **DB 상 마지막 저장 거래일을 항상 다시 포함한다**(MD-AD-22) — 장중에
         받은 반쪽 캔들이 정본에 영구히 남는 것을 upsert 로 덮어쓰기 위해서다.
 
@@ -246,16 +245,39 @@ class IngestService:
         last_saved = await run_in_threadpool(self.ingest_repository.select_last_trade_date, instrument_id)
         if last_saved is None:
             return period_from or dt.date.today() - dt.timedelta(days=365)
-        completed = last_completed_session(market, dt.datetime.now(dt.UTC))
-        if completed is not None and last_saved < completed:
-            return last_saved
+        if period_from is not None and period_from < last_saved:
+            # 요청이 저장분보다 앞이면 **소급 적재를 요청한 것**이다. 그것을 버리면 화면이
+            # `find_gaps` 로 보여준 결측을 메울 유일한 레버가 무음으로 죽는다 — 우회로도 없다.
+            # MD-AD-22(마지막 저장일을 다시 받는다)는 **위쪽 끝**의 규칙이라 여기서 안 깨진다:
+            # 시작이 더 앞이면 그 하루는 여전히 구간 안에 있다.
+            return period_from
         return last_saved
+
+    async def _require_minute_partition(self, date_from: dt.date, date_to: dt.date) -> None:
+        """분봉 파티션이 요청 구간을 덮는지 — 마이그레이션 주석이 적은 그 확인이다.
+
+        안 보면 psycopg 원문(`no partition of relation ... found for row`)이 그대로
+        `failed_reason` 에 박힌다. 사용자가 읽을 문장이 아니고, 무엇을 하면 되는지도 없다.
+        """
+        covered = await run_in_threadpool(self.ingest_repository.select_minute_partition_range)
+        if covered is None:
+            raise BadRequestError("분봉 파티션이 아직 없습니다 — 마이그레이션을 먼저 적용하세요.")
+        low, high = covered
+        # 파티션 상계는 배타적이다(`TO ('...')`) — 그 날짜 자체는 안 들어간다.
+        if date_from < low or date_to >= high:
+            raise BadRequestError(
+                f"분봉을 저장할 파티션이 없는 구간입니다 ({date_from} ~ {date_to}). "
+                f"지금 덮는 구간은 {low} ~ {high - dt.timedelta(days=1)} 입니다."
+            )
 
     async def _run_minute_bar(self, run: dict, provider) -> tuple[int, int]:
         market, symbols = parse_scope(run["job_kind"], run["scope"])
         id_map = await run_in_threadpool(self.ingest_repository.select_instrument_id_map, market, symbols)
-        ts_from = dt.datetime.combine(_as_date(run.get("period_from")) or dt.date.today(), dt.time.min)
-        ts_to = dt.datetime.combine(_as_date(run.get("period_to")) or dt.date.today(), dt.time.max)
+        date_from = _as_date(run.get("period_from")) or dt.date.today()
+        date_to = _as_date(run.get("period_to")) or dt.date.today()
+        await self._require_minute_partition(date_from, date_to)
+        ts_from = dt.datetime.combine(date_from, dt.time.min)
+        ts_to = dt.datetime.combine(date_to, dt.time.max)
 
         written = skipped = 0
         last_done = run.get("cursor") or ""

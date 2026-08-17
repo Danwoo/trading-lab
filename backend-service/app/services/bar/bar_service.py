@@ -141,7 +141,10 @@ class BarService:
                 "instrument_id": instrument["instrument_id"],
                 "ts_from": ts_from,
                 "ts_to": ts_to,
-                "limit": min(limit * interval_min, MAX_BARS * interval_min),
+                # `_validated_limit` 이 이미 limit <= MAX_BARS 를 강제한다 — 그래서 종전의
+                # min(limit*interval_min, MAX_BARS*interval_min) 은 항상 왼쪽이었다(죽은 min).
+                # 오른쪽을 MAX_BARS 로 줄이는 것은 틀린 고침이다: 60분봉 5000개를 83개로 자른다.
+                "limit": limit * interval_min,
             }
         )
         source, adj_policy, asof = self._provenance(rows)
