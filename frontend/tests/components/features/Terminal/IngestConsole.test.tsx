@@ -79,7 +79,10 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
   it("막힌 소스는 서버가 준 사유를 **그대로** 보여준다 — 프론트가 안내를 다시 만들지 않는다", () => {
     // 서버(`DataKeyService.unavailable_reason`)가 env 항목명과 발급 경로까지 완전한 문장으로 준다.
     // 프론트가 같은 안내를 따로 만들면 서버가 아는 항목명과 갈린다 — 그 중복을 여기서 막는다.
-    const serverReason = ".env 의 MARKET_DATA_ALPACA_KEY 이 비어 있습니다. 발급 경로: Alpaca 계정(paper) → API Keys";
+    // 키 이름을 여기 적지 않는다 — 「키 이름을 아는 자리는 services/data_key/ 하나」가
+    // 이 레포의 경계다(2026-08-07 리드 결정, verify_data_key_env_boundary 가 지킨다).
+    // 이 테스트가 지키는 것은 **서버 문장을 그대로 보여준다**는 것이라, 내용이 무엇이든 상관없다.
+    const serverReason = "서버가 조립한 사유 문장 — 항목명과 발급 경로까지";
     given({
       capabilities: panel<unknown[]>({
         data: [
