@@ -41,20 +41,29 @@ SCHEMA = "minute_partition_probe"
 
 
 def extract_sql() -> str:
-    """레포지토리에서 SQL 원문을 **그대로** 떼어 온다 — 여기 복제하면 두 벌이 되어 갈린다."""
-    source = REPOSITORY.read_text(encoding="utf-8")
-    marker = "def select_minute_partition_range"
-    body = source[source.index(marker) :]
-    sql = body[
-        body.index('sql = """') + len('sql = """') : body.index(
-            '"""', body.index('sql = """') + 10
-        )
-    ]
-    if "pg_inherits" not in sql:
-        raise SystemExit(
-            "::error::SQL 을 못 떼어 왔다 — 레포지토리 구조가 바뀌었는지 보라"
-        )
-    return sql
+    """레포지토리에서 SQL 원문을 **그대로** 떼어 온다 — 여기 복제하면 두 벌이 되어 갈린다.
+
+    파싱이 아니라 **AST 로 읽는다.** 문자열 접두(raw 등)나 포맷터의 줄바꿈에 흔들리지 않게 —
+    첫 판은 대입문을 문자열로 찾다가 ruff 가 raw 문자열로 바꾸자 바로 깨졌다.
+    """
+    import ast
+
+    tree = ast.parse(REPOSITORY.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if (
+            not isinstance(node, ast.FunctionDef)
+            or node.name != "select_minute_partition_range"
+        ):
+            continue
+        for stmt in ast.walk(node):
+            if (
+                isinstance(stmt, ast.Assign)
+                and isinstance(stmt.value, ast.Constant)
+                and isinstance(stmt.value.value, str)
+                and "pg_inherits" in stmt.value.value
+            ):
+                return stmt.value.value
+    raise SystemExit("::error::SQL 을 못 떼어 왔다 — 레포지토리 구조가 바뀌었는지 보라")
 
 
 def main() -> int:
