@@ -58,7 +58,7 @@ SCAN_ROOTS = ("components", "app")
 MIN_SCANNED_FILES = 100
 
 # allowlist 상한. **내려가기만 한다** — 머리 주석 「allowlist」 참조.
-ALLOWLIST_CAP = 53
+ALLOWLIST_CAP = 49
 
 # 위반 사유별 문구. 지금 등록분은 전부 「디자인 시스템 적용 전」이라 사유가 갈리지 않는다 —
 # 자리마다 다른 이유를 지어내기보다 무엇을 기다리는 등록인지 한 줄로 밝힌다.
@@ -82,10 +82,6 @@ ALLOWLIST: dict[str, str] = {
     "components/features/ResearchChat/SessionListPanel.tsx": FEATURE_SCREEN,
     "components/features/ResearchChat/SourceCards.tsx": FEATURE_SCREEN,
     "components/features/ResearchDocument/ResearchDocumentDetailView.tsx": FEATURE_SCREEN,
-    "components/shared/Dashboard/DataCards.tsx": SHARED_COMPONENT,
-    "components/shared/Dashboard/DataLog.tsx": SHARED_COMPONENT,
-    "components/shared/Dashboard/TimeRangePanel.tsx": SHARED_COMPONENT,
-    "components/shared/Dashboard/TimeSeriesChart.tsx": SHARED_COMPONENT,
     "components/shared/DataGrid/DetailGrid.tsx": SHARED_COMPONENT,
     "components/shared/DataGrid/DualSelectGrid.tsx": SHARED_COMPONENT,
     "components/shared/DataPanel/DetailPanel.tsx": SHARED_COMPONENT,
