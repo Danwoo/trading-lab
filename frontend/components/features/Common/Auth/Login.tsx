@@ -208,6 +208,7 @@ export const Login = () => {
                 <TextBox
                   id="email"
                   name="email"
+                  autoComplete="username"
                   mode="email"
                   placeholder="you@example.com"
                   defaultValue=""
@@ -224,6 +225,7 @@ export const Login = () => {
                 <TextBox
                   id="password"
                   name="password"
+                  autoComplete="current-password"
                   showPasswordToggle
                   placeholder="비밀번호"
                   defaultValue=""
