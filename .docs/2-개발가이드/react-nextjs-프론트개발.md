@@ -125,7 +125,7 @@ flowchart TD
 
 자체 구현 전에 **반드시 먼저 찾는다** (anti-pattern 1).
 
-**훅 (`hooks/shared/`)** — `useMasterGridData`(목록+선택+CRUD 핸들러), `useMasterGridActions`(툴바 버튼), `useDetailGridData`/`useDetailGridActions`(2-depth), `useFormState`(폼 상태+검증), `useExcelExport`, `useTreeGridData`, `useFileList`, `useFileGroups`, `useSelectGridData`, `useDetailModal`, `useSessionContext`, `useWebSocketService`.
+**훅 (`hooks/shared/`)** — `useMasterGridData`(목록+선택+CRUD 핸들러), `useMasterGridActions`(툴바 버튼), `useDetailGridData`/`useDetailGridActions`(2-depth), `useFormState`(폼 상태+검증), `useExcelExport`, `useTreeGridData`, `useFileList`, `useFileGroups`, `useSelectGridData`, `useDetailModal`, `useSessionContext`.
 
 **컴포넌트 (`components/shared/`)** — `DataGrid/`(MasterGrid·DetailGrid·SelectGrid·DualSelectGrid), `DataPanel/`(MasterPanel·DetailPanel·SelectGridPanel·TreeGridPanel), `ui/`(TextBox·DateBox·SelectBox·CheckBox — **DevExtreme 래퍼**, 직접 import 금지 anti-pattern 4), `Layout/FormModal`, `Feedback/MessagePopup`.
 

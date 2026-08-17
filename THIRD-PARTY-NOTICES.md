@@ -1,6 +1,6 @@
 # 서드파티 라이선스 고지 (THIRD-PARTY-NOTICES)
 
-프론트엔드(`frontend/`) 프로덕션 의존성 557개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 557개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
+프론트엔드(`frontend/`) 프로덕션 의존성 551개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 551개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
 
 **2026-08-06 갱신(#341 완주 — DevExtreme 제거 반영)** — 상용 6종과 그 전이 의존이 빠져 623→599개가 됐다. 사라진 24개: 상용 6종(`devextreme`·`devextreme-react`·`@devexpress/utils`·`devexpress-diagram`·`devexpress-gantt`·`@devextreme/runtime`)과 그것들만 쓰던 18개(`inferno` 계열 5 · `devextreme-quill`·`parchment`·`quill-delta`·`fast-diff`·`rrule`·`core-js`·`@babel/runtime`·`es6-object-assign`·`eventemitter3`·`lodash.clonedeep`·`lodash.isequal`·`lodash.merge`·`opencollective-postinstall`). 갱신은 손으로 지우지 않고 **아래 재현 명령의 새 출력을 정본으로 삼아 문서의 패키지 목록과 대조**했다 — 그 결과 「문서에 있는데 지금 없음」 24개 = 위 목록, 「지금 있는데 문서에 없음」 0개. 남은 599개에 DevExpress 계열은 `devextreme-exceljs-fork`(MIT 포크) 하나뿐이다.
 
@@ -49,9 +49,9 @@ permissive 로 흘려보내지 않고 멈춘다(사람이 판단할 자리다).
 
 ### Apache License 2.0
 
-44개 패키지. Apache-2.0 은 재배포 시 라이선스 사본 동봉 + NOTICE 고지 승계 의무가 있다 — echarts·lightweight-charts 는 클라이언트 번들에 실려 브라우저로 나간다.
+43개 패키지. Apache-2.0 은 재배포 시 라이선스 사본 동봉 + NOTICE 고지 승계 의무가 있다 — lightweight-charts 는 클라이언트 번들에 실려 브라우저로 나간다.
 
-본문 텍스트 변형 15종(대체로 표준 Apache-2.0 원문, 일부 패키지가 자체 저작권 줄을 덧붙임)으로 묶는다.
+본문 텍스트 변형 14종(대체로 표준 Apache-2.0 원문, 일부 패키지가 자체 저작권 줄을 덧붙임)으로 묶는다.
 
 <details><summary>변형 1 — 26개 패키지: `@opentelemetry/semantic-conventions@1.43.0`, `@prisma/adapter-pg@7.9.1`, `@prisma/client-runtime-utils@7.9.1`, `@prisma/client@7.9.1`, `@prisma/config@7.8.0`, `@prisma/debug@7.2.0`, `@prisma/debug@7.8.0`, `@prisma/debug@7.9.1`, `@prisma/driver-adapter-utils@7.9.1`, `@prisma/engines-version@7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a`, `@prisma/engines@7.8.0`, `@prisma/fetch-engine@7.8.0`, `@prisma/get-platform@7.2.0`, `@prisma/get-platform@7.8.0`, `@prisma/query-plan-executor@7.2.0`, `b4a@1.8.1`, `bare-events@2.9.1`, `bare-fs@4.8.0`, `bare-path@3.1.1`, `bare-stream@2.13.3`, `bare-url@2.5.2`, `baseline-browser-mapping@2.11.14`, `events-universal@1.0.1`, `long@5.3.2`, `prisma@7.8.0`, `text-decoder@1.2.7`</summary>
 
@@ -1892,234 +1892,7 @@ Apache License
 ```
 </details>
 
-<details><summary>변형 11 — 1개 패키지: `echarts@6.1.0`</summary>
-
-```
-Apache License
-                           Version 2.0, January 2004
-                        http://www.apache.org/licenses/
-
-   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
-
-   1. Definitions.
-
-      "License" shall mean the terms and conditions for use, reproduction,
-      and distribution as defined by Sections 1 through 9 of this document.
-
-      "Licensor" shall mean the copyright owner or entity authorized by
-      the copyright owner that is granting the License.
-
-      "Legal Entity" shall mean the union of the acting entity and all
-      other entities that control, are controlled by, or are under common
-      control with that entity. For the purposes of this definition,
-      "control" means (i) the power, direct or indirect, to cause the
-      direction or management of such entity, whether by contract or
-      otherwise, or (ii) ownership of fifty percent (50%) or more of the
-      outstanding shares, or (iii) beneficial ownership of such entity.
-
-      "You" (or "Your") shall mean an individual or Legal Entity
-      exercising permissions granted by this License.
-
-      "Source" form shall mean the preferred form for making modifications,
-      including but not limited to software source code, documentation
-      source, and configuration files.
-
-      "Object" form shall mean any form resulting from mechanical
-      transformation or translation of a Source form, including but
-      not limited to compiled object code, generated documentation,
-      and conversions to other media types.
-
-      "Work" shall mean the work of authorship, whether in Source or
-      Object form, made available under the License, as indicated by a
-      copyright notice that is included in or attached to the work
-      (an example is provided in the Appendix below).
-
-      "Derivative Works" shall mean any work, whether in Source or Object
-      form, that is based on (or derived from) the Work and for which the
-      editorial revisions, annotations, elaborations, or other modifications
-      represent, as a whole, an original work of authorship. For the purposes
-      of this License, Derivative Works shall not include works that remain
-      separable from, or merely link (or bind by name) to the interfaces of,
-      the Work and Derivative Works thereof.
-
-      "Contribution" shall mean any work of authorship, including
-      the original version of the Work and any modifications or additions
-      to that Work or Derivative Works thereof, that is intentionally
-      submitted to Licensor for inclusion in the Work by the copyright owner
-      or by an individual or Legal Entity authorized to submit on behalf of
-      the copyright owner. For the purposes of this definition, "submitted"
-      means any form of electronic, verbal, or written communication sent
-      to the Licensor or its representatives, including but not limited to
-      communication on electronic mailing lists, source code control systems,
-      and issue tracking systems that are managed by, or on behalf of, the
-      Licensor for the purpose of discussing and improving the Work, but
-      excluding communication that is conspicuously marked or otherwise
-      designated in writing by the copyright owner as "Not a Contribution."
-
-      "Contributor" shall mean Licensor and any individual or Legal Entity
-      on behalf of whom a Contribution has been received by Licensor and
-      subsequently incorporated within the Work.
-
-   2. Grant of Copyright License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      copyright license to reproduce, prepare Derivative Works of,
-      publicly display, publicly perform, sublicense, and distribute the
-      Work and such Derivative Works in Source or Object form.
-
-   3. Grant of Patent License. Subject to the terms and conditions of
-      this License, each Contributor hereby grants to You a perpetual,
-      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
-      (except as stated in this section) patent license to make, have made,
-      use, offer to sell, sell, import, and otherwise transfer the Work,
-      where such license applies only to those patent claims licensable
-      by such Contributor that are necessarily infringed by their
-      Contribution(s) alone or by combination of their Contribution(s)
-      with the Work to which such Contribution(s) was submitted. If You
-      institute patent litigation against any entity (including a
-      cross-claim or counterclaim in a lawsuit) alleging that the Work
-      or a Contribution incorporated within the Work constitutes direct
-      or contributory patent infringement, then any patent licenses
-      granted to You under this License for that Work shall terminate
-      as of the date such litigation is filed.
-
-   4. Redistribution. You may reproduce and distribute copies of the
-      Work or Derivative Works thereof in any medium, with or without
-      modifications, and in Source or Object form, provided that You
-      meet the following conditions:
-
-      (a) You must give any other recipients of the Work or
-          Derivative Works a copy of this License; and
-
-      (b) You must cause any modified files to carry prominent notices
-          stating that You changed the files; and
-
-      (c) You must retain, in the Source form of any Derivative Works
-          that You distribute, all copyright, patent, trademark, and
-          attribution notices from the Source form of the Work,
-          excluding those notices that do not pertain to any part of
-          the Derivative Works; and
-
-      (d) If the Work includes a "NOTICE" text file as part of its
-          distribution, then any Derivative Works that You distribute must
-          include a readable copy of the attribution notices contained
-          within such NOTICE file, excluding those notices that do not
-          pertain to any part of the Derivative Works, in at least one
-          of the following places: within a NOTICE text file distributed
-          as part of the Derivative Works; within the Source form or
-          documentation, if provided along with the Derivative Works; or,
-          within a display generated by the Derivative Works, if and
-          wherever such third-party notices normally appear. The contents
-          of the NOTICE file are for informational purposes only and
-          do not modify the License. You may add Your own attribution
-          notices within Derivative Works that You distribute, alongside
-          or as an addendum to the NOTICE text from the Work, provided
-          that such additional attribution notices cannot be construed
-          as modifying the License.
-
-      You may add Your own copyright statement to Your modifications and
-      may provide additional or different license terms and conditions
-      for use, reproduction, or distribution of Your modifications, or
-      for any such Derivative Works as a whole, provided Your use,
-      reproduction, and distribution of the Work otherwise complies with
-      the conditions stated in this License.
-
-   5. Submission of Contributions. Unless You explicitly state otherwise,
-      any Contribution intentionally submitted for inclusion in the Work
-      by You to the Licensor shall be under the terms and conditions of
-      this License, without any additional terms or conditions.
-      Notwithstanding the above, nothing herein shall supersede or modify
-      the terms of any separate license agreement you may have executed
-      with Licensor regarding such Contributions.
-
-   6. Trademarks. This License does not grant permission to use the trade
-      names, trademarks, service marks, or product names of the Licensor,
-      except as required for reasonable and customary use in describing the
-      origin of the Work and reproducing the content of the NOTICE file.
-
-   7. Disclaimer of Warranty. Unless required by applicable law or
-      agreed to in writing, Licensor provides the Work (and each
-      Contributor provides its Contributions) on an "AS IS" BASIS,
-      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-      implied, including, without limitation, any warranties or conditions
-      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
-      PARTICULAR PURPOSE. You are solely responsible for determining the
-      appropriateness of using or redistributing the Work and assume any
-      risks associated with Your exercise of permissions under this License.
-
-   8. Limitation of Liability. In no event and under no legal theory,
-      whether in tort (including negligence), contract, or otherwise,
-      unless required by applicable law (such as deliberate and grossly
-      negligent acts) or agreed to in writing, shall any Contributor be
-      liable to You for damages, including any direct, indirect, special,
-      incidental, or consequential damages of any character arising as a
-      result of this License or out of the use or inability to use the
-      Work (including but not limited to damages for loss of goodwill,
-      work stoppage, computer failure or malfunction, or any and all
-      other commercial damages or losses), even if such Contributor
-      has been advised of the possibility of such damages.
-
-   9. Accepting Warranty or Additional Liability. While redistributing
-      the Work or Derivative Works thereof, You may choose to offer,
-      and charge a fee for, acceptance of support, warranty, indemnity,
-      or other liability obligations and/or rights consistent with this
-      License. However, in accepting such obligations, You may act only
-      on Your own behalf and on Your sole responsibility, not on behalf
-      of any other Contributor, and only if You agree to indemnify,
-      defend, and hold each Contributor harmless for any liability
-      incurred by, or claims asserted against, such Contributor by reason
-      of your accepting any such warranty or additional liability.
-
-   END OF TERMS AND CONDITIONS
-
-   APPENDIX: How to apply the Apache License to your work.
-
-      To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "[]"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
-
-   Copyright [yyyy] [name of copyright owner]
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-
-
-
-
-
-========================================================================
-Apache ECharts Subcomponents:
-
-The Apache ECharts project contains subcomponents with separate copyright
-notices and license terms. Your use of the source code for these
-subcomponents is also subject to the terms and conditions of the following
-licenses.
-
-BSD 3-Clause (d3.js):
-The following files embed [d3.js](https://github.com/d3/d3) BSD 3-Clause:
-    `/src/chart/treemap/treemapLayout.ts`,
-    `/src/chart/tree/layoutHelper.ts`,
-    `/src/chart/graph/forceHelper.ts`,
-    `/src/util/number.ts`
-See `/licenses/LICENSE-d3` for details of the license.
-```
-</details>
-
-<details><summary>변형 12 — 1개 패키지: `expect-type@1.4.0`</summary>
+<details><summary>변형 11 — 1개 패키지: `expect-type@1.4.0`</summary>
 
 ```
 Copyright 2024 Misha Kaletsky
@@ -2316,7 +2089,7 @@ Copyright 2024 Misha Kaletsky
 ```
 </details>
 
-<details><summary>변형 13 — 1개 패키지: `lightweight-charts@5.2.1`</summary>
+<details><summary>변형 12 — 1개 패키지: `lightweight-charts@5.2.1`</summary>
 
 ```
 Apache License
@@ -2523,7 +2296,7 @@ Apache License
 ```
 </details>
 
-<details><summary>변형 14 — 1개 패키지: `readdir-glob@3.0.0`</summary>
+<details><summary>변형 13 — 1개 패키지: `readdir-glob@3.0.0`</summary>
 
 ```
 Apache License
@@ -2730,7 +2503,7 @@ Apache License
 ```
 </details>
 
-<details><summary>변형 15 — 1개 패키지: `typescript@6.0.3`</summary>
+<details><summary>변형 14 — 1개 패키지: `typescript@6.0.3`</summary>
 
 ```
 Apache License
@@ -2850,9 +2623,9 @@ MIT 조건으로 사용(추가 의무 없음). GPL 조건은 선택하지 않았
 
 ---
 
-## 2. 그 외 permissive 라이선스 (505개)
+## 2. 그 외 permissive 라이선스 (500개)
 
-MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 505개 중 502개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
+MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 500개 중 497개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
 
 ### 예외 — 원문 파일 없이 선언만 있는 패키지 (3개)
 
@@ -2864,7 +2637,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `client-only` | 0.0.1 | MIT |
 | `fancy-canvas` | 2.1.0 | MIT |
 
-<details><summary>펼치기 — 나머지 502개: 패키지 · 버전 · 라이선스</summary>
+<details><summary>펼치기 — 나머지 497개: 패키지 · 버전 · 라이선스</summary>
 
 | 패키지 | 버전 | 라이선스 |
 |---|---|---|
@@ -3063,7 +2836,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `dotenv` | 17.4.2 | BSD-2-Clause |
 | `dunder-proto` | 1.0.1 | MIT |
 | `duplexer2` | 0.1.4 | BSD-3-Clause |
-| `echarts-for-react` | 3.0.6 | MIT |
 | `effect` | 3.20.0 | MIT |
 | `empathic` | 2.0.0 | MIT |
 | `entities` | 6.0.1 | BSD-2-Clause |
@@ -3268,7 +3040,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `react-remove-scroll` | 2.7.2 | MIT |
 | `react-resizable-panels` | 4.12.2 | MIT |
 | `react-style-singleton` | 2.2.3 | MIT |
-| `react-virtuoso` | 4.18.11 | MIT |
 | `react` | 19.2.8 | MIT |
 | `readable-stream` | 2.3.8 | MIT |
 | `readable-stream` | 3.6.2 | MIT |
@@ -3300,7 +3071,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `siginfo` | 2.0.0 | ISC |
 | `signal-exit` | 3.0.7 | ISC |
 | `signal-exit` | 4.1.0 | ISC |
-| `size-sensor` | 1.0.3 | ISC |
 | `source-map-js` | 1.2.1 | BSD-3-Clause |
 | `space-separated-tokens` | 2.0.2 | MIT |
 | `split2` | 4.2.0 | ISC |
@@ -3329,7 +3099,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `tr46` | 6.0.0 | MIT |
 | `trim-lines` | 3.0.1 | MIT |
 | `trough` | 2.2.0 | MIT |
-| `tslib` | 2.3.0 | 0BSD |
 | `tslib` | 2.8.1 | 0BSD |
 | `undici-types` | 8.3.0 | MIT |
 | `undici` | 8.9.0 | MIT |
@@ -3367,7 +3136,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `zeptomatch` | 2.1.0 | MIT |
 | `zip-stream` | 7.0.5 | MIT |
 | `zod` | 4.4.3 | MIT |
-| `zrender` | 6.1.0 | BSD-3-Clause |
 | `zustand` | 5.0.15 | MIT |
 | `zwitch` | 2.0.4 | MIT |
 

@@ -8,7 +8,7 @@
 //   - DateBox: 앱 코드 소비자는 0이지만 .claude/docs/design-patterns-frontend.md 의
 //     스캐폴드 템플릿(신규 엔티티 date 필드 표준 매핑)이 이 이름을 가리킨다 — 지우면
 //     다음 스캐폴딩 산출물이 깨진다.
-//   - DateRangeBox: 실제 소비자 1곳(TimeRangePanel) — 삭제 후보
+//   - DateRangeBox: 소비자 0곳 (TimeRangePanel 이 PR #185 로 삭제됐다) — 삭제 후보
 //     정적 스캔(JSX 출현 기준)이 놓친 실사용 사례.
 
 // ========================================

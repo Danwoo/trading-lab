@@ -63,11 +63,9 @@ SCAN_SUFFIXES = ("*.tsx", "*.ts")
 MIN_SCANNED_FILES = 100
 
 # allowlist 상한. **내려가기만 한다** — 머리 주석 「allowlist」 참조.
-# 53 → 56. **새 위반이 아니라 스캔을 넓혀 원래 있던 것이 보인 것**이다 —
-# `lib` 이 스캔 밖이라 캔버스 차트·메일 템플릿의 색이 안 보였다. 늘린 3건은 전부
-# DOM 밖에서 색을 정하는 자리(NON_DOM_COLOR)이고, 상한을 안 올리면 스캔 확장 자체가
-# 불가능해진다. **이 인상은 리뷰에서 사람이 판단할 항목으로 PR 본문에 명시했다.**
-ALLOWLIST_CAP = 56
+# `lib` 스캔 확장(#166)이 56 으로 올렸고, 이 PR 이 Dashboard 4건을 지워 다시 내린다.
+# 실측으로 정한다 — 손으로 고르면 어긋난다.
+ALLOWLIST_CAP = 52
 
 # 위반 사유별 문구. 지금 등록분은 전부 「디자인 시스템 적용 전」이라 사유가 갈리지 않는다 —
 # 자리마다 다른 이유를 지어내기보다 무엇을 기다리는 등록인지 한 줄로 밝힌다.
@@ -96,10 +94,6 @@ ALLOWLIST: dict[str, str] = {
     "components/features/ResearchChat/SessionListPanel.tsx": FEATURE_SCREEN,
     "components/features/ResearchChat/SourceCards.tsx": FEATURE_SCREEN,
     "components/features/ResearchDocument/ResearchDocumentDetailView.tsx": FEATURE_SCREEN,
-    "components/shared/Dashboard/DataCards.tsx": SHARED_COMPONENT,
-    "components/shared/Dashboard/DataLog.tsx": SHARED_COMPONENT,
-    "components/shared/Dashboard/TimeRangePanel.tsx": SHARED_COMPONENT,
-    "components/shared/Dashboard/TimeSeriesChart.tsx": SHARED_COMPONENT,
     "components/shared/DataGrid/DetailGrid.tsx": SHARED_COMPONENT,
     "components/shared/DataGrid/DualSelectGrid.tsx": SHARED_COMPONENT,
     "components/shared/DataPanel/DetailPanel.tsx": SHARED_COMPONENT,
