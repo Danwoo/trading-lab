@@ -105,6 +105,9 @@ jobs:
             scripts/verify_auth_lockstep.py
             *-service/CLAUDE.md
             scripts/verify_backend_claude_md.py
+            backend-service/alembic/versions/**
+            backend-service/app/models/schema.py
+            scripts/verify_alembic_model_coverage.py
             */app/.env.example
             frontend/.env.example
             scripts/verify_env_example_coverage.py
@@ -416,6 +419,13 @@ jobs:
       - name: Backend CLAUDE.md common section check
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_backend_claude_md.py
+
+      # 마이그레이션이 만든 우리 테이블이 드리프트 검사 밖에 남는 것을 막는다 (#166) —
+      # alembic 의 include_object 가 「모델에 없으면 남의 것」으로 빼므로, 모델에 안 올린
+      # 우리 테이블은 컬럼이 사라져도 check 가 통과한다.
+      - name: alembic 모델 커버리지 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_alembic_model_coverage.py
 
       - name: Bootstrap env.example coverage check
         if: ${{ !cancelled() }}
