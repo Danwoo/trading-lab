@@ -87,6 +87,10 @@ INVENTORY_AXES: list[tuple[str, str, int]] = [
     ("frontend/scripts", "check-*.js", 3),  # frontend 정적 스캔
     ("frontend/scripts", "generate-*.js", 1),  # 생성물 재현 대조 (--check 모드, #361)
     ("scripts", "generate_*.py", 1),  # 루트 생성물 재현 대조 (--check 모드)
+    # 주입 프로브 — 「그 검사가 무엇을 막는지」를 증명하는 자리다. 이 축이 없던 동안
+    # `frontend/scripts/injection-probe-devextreme.sh` 는 배선돼 있었지만 **인벤토리에도
+    # 인식에도 없었다** — 그 스텝을 `echo skip` 으로 바꿔도 이 검사가 초록이었다(재현함).
+    ("frontend/scripts", "injection-probe-*.sh", 1),
 ]
 
 # 파일 하나로 환원되지 않는 검사. 워크플로 어딘가에 이 문자열이 있어야 한다.
@@ -248,7 +252,7 @@ def collect_coverage() -> tuple[Coverage, int]:
 
                 # 직접 호출 — 실재하는 파일 경로 토큰
                 for t in tokens:
-                    if not t.endswith((".py", ".mjs", ".js")):
+                    if not t.endswith((".py", ".mjs", ".js", ".sh")):
                         continue
                     resolved = _resolve(cwd, t)
                     if resolved is not None:

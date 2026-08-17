@@ -51,14 +51,21 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = REPO_ROOT / "frontend"
-SCAN_ROOTS = ("components", "app")
+# `lib` 이 늦게 들어온 이유: 색이 화면 파일에만 산다고 봤는데, **차트 색은 여기 산다**
+# (`lib/terminal/*.ts` 가 캔들·프리셋 색을 정한다). `.tsx` 만 훑으면 그 자리는 스캔 밖이라
+# 조용히 샌다 — 지금은 위반이 0이지만 「안 보는 자리」로 남겨 두는 것이 결함이다.
+SCAN_ROOTS = ("components", "app", "lib")
+# 확장자도 함께 넓힌다 — `lib` 은 `.ts` 다.
+SCAN_SUFFIXES = ("*.tsx", "*.ts")
 
 # 스캔 대상이 통째로 사라지면(경로 변경·리네임) 조용히 초록이 되지 않게 하는 하한.
 # 정당하게 줄였다면 하한도 함께 내린다.
 MIN_SCANNED_FILES = 100
 
 # allowlist 상한. **내려가기만 한다** — 머리 주석 「allowlist」 참조.
-ALLOWLIST_CAP = 49
+# `lib` 스캔 확장(#166)이 56 으로 올렸고, 이 PR 이 Dashboard 4건을 지워 다시 내린다.
+# 실측으로 정한다 — 손으로 고르면 어긋난다.
+ALLOWLIST_CAP = 52
 
 # 위반 사유별 문구. 지금 등록분은 전부 「디자인 시스템 적용 전」이라 사유가 갈리지 않는다 —
 # 자리마다 다른 이유를 지어내기보다 무엇을 기다리는 등록인지 한 줄로 밝힌다.
@@ -66,6 +73,11 @@ TEMPLATE_SCREEN = "디자인 시스템 이전의 템플릿 화면(회원가입·
 SYSTEM_SCREEN = "시스템관리 화면 — #73 S2~S5 가 토큰으로 옮긴다."
 FEATURE_SCREEN = "업무 화면 — #73 S2~S5 가 토큰으로 옮긴다."
 SHARED_COMPONENT = "공용 컴포넌트 — 토큰 전환이 이 컴포넌트를 쓰는 화면 전부에 걸리므로 #73 S2~S5 에서 한꺼번에 옮긴다."
+# `lib` 을 스캔에 넣자 드러난 것들. **스캔 밖이라 안 보였던 것이지 새로 생긴 위반이 아니다.**
+NON_DOM_COLOR = (
+    "DOM 밖에서 색을 정하는 자리(캔버스 차트·메일 템플릿) — Tailwind 클래스가 안 닿아 "
+    "토큰을 CSS 변수로 읽어 넘겨야 한다. #73 S2~S5 가 그 통로와 함께 옮긴다."
+)
 
 # 알고 남겨 둔 위반. 키는 `frontend/` 기준 상대 경로.
 ALLOWLIST: dict[str, str] = {
@@ -118,6 +130,9 @@ ALLOWLIST: dict[str, str] = {
     "components/shared/ui/primitives/FileTypeIcon.tsx": SHARED_COMPONENT,
     "components/shared/ui/primitives/SelectMenu.tsx": SHARED_COMPONENT,
     "components/shared/ui/primitives/dialog.tsx": SHARED_COMPONENT,
+    "app/api/common/email/route.ts": NON_DOM_COLOR,
+    "lib/auth/auth.ts": NON_DOM_COLOR,
+    "lib/terminal/candleChart.ts": NON_DOM_COLOR,
 }
 
 # Tailwind v3 기본 팔레트의 색 이름. 이 레포의 커스텀 색(slate.void·ink.primary 등)은 음영이
@@ -197,12 +212,15 @@ def main() -> int:
         return 1
 
     files = sorted(
-        path for root in SCAN_ROOTS for path in (FRONTEND / root).rglob("*.tsx")
+        path
+        for root in SCAN_ROOTS
+        for suffix in SCAN_SUFFIXES
+        for path in (FRONTEND / root).rglob(suffix)
     )
 
     if len(files) < MIN_SCANNED_FILES:
         _fail(
-            f"`.tsx` 를 {len(files)}건 수집했습니다 (하한 {MIN_SCANNED_FILES}) — fail-closed 종료"
+            f"소스 파일을 {len(files)}건 수집했습니다 (하한 {MIN_SCANNED_FILES}) — fail-closed 종료"
         )
         _fail(
             "파일이 이동·삭제됐거나 스캔 경로가 현실과 어긋났을 수 있습니다. "
