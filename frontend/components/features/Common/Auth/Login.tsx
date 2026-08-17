@@ -11,7 +11,6 @@ import PolicyPopup from "@/components/features/Common/Policy/PolicyPopup";
 import { Button } from "@/components/shared/ui/Button";
 import { TextBox } from "@/components/shared/ui/TextBox";
 import { showMessage } from "@/stores/shared/messageStore";
-import { fetchNavigation } from "@/services/common/menuService";
 import { useNavStore } from "@/stores/shared/navStore";
 import { POST_LOGIN_PATH } from "@/constants/routes";
 
@@ -74,8 +73,10 @@ export const Login = () => {
               router.replace(callbackUrl);
               return;
             }
-            const nav = await fetchNavigation();
-            const landingPath = resolveLandingPath(nav.items);
+            // **스토어를 태워 받는다.** 스토어 밖에서 받으면 그 결과가 캐시에 안 남아,
+            // 착지 화면의 셸이 같은 API 를 한 번 더 왕복한다 (`fetchNav` 는 `loaded` 면 건너뛴다).
+            await useNavStore.getState().fetchNav();
+            const landingPath = resolveLandingPath(useNavStore.getState().items);
             if (!landingPath) {
               // 접근 가능한 메뉴 없음 — 비정상 상태, 안내 후 admin 밖으로
               await showMessage(
