@@ -220,6 +220,25 @@ jobs:
                      --match-head-commit "$HEAD" \
                      --subject "$SUBJECT" --body-file merge-body.txt 2>&1); then
             echo "위임 머지 완료 (방식: $METHOD · 요청 @${ACTOR})"
+          elif printf '%s' "$OUT" | grep -q "base branch policy prohibits"; then
+            # **즉시 머지가 base 정책에 막히면 큐에 넣는다.** 이 레포의 ruleset 은
+            # `bypass_actors` 가 비어 있어 Actions 토큰도 예외가 아니고, 규칙이 다 충족돼도
+            # (실측: 필수 검사 4종 초록 · mergeable_state=clean · 승인 요구 0) 즉시 머지를
+            # 거부한다. GitHub 이 오류 문구로 직접 `--auto` 를 안내하는 자리다.
+            #
+            # 이 경로를 쓰는 것이 보호를 약화시키지 않는다 — 큐 머지도 **같은 규칙을 통과할
+            # 때만** 실행된다. 다른 것은 「지금 밀기」와 「조건 충족 시 밀기」의 차이뿐이다.
+            echo "::warning::즉시 머지가 base 정책에 막혔다 — 큐 머지(--auto)로 재시도한다"
+            if OUT2=$(gh pr merge "$PR" --repo "$REPO" --"$METHOD" --auto \
+                        --match-head-commit "$HEAD" \
+                        --subject "$SUBJECT" --body-file merge-body.txt 2>&1); then
+              echo "위임 머지 큐에 넣음 (방식: $METHOD · 요청 @${ACTOR}) — 조건 충족 시 GitHub 이 민다"
+              say "위임 머지를 **큐에 넣었다** (요청: @${ACTOR}). 즉시 머지가 base 정책에 막혀 \`--auto\` 로 걸었다 — 조건이 충족되면 GitHub 이 민다."
+            else
+              echo "::error::큐 머지도 실패 — ${OUT2}"
+              say "위임 머지 실패 — 즉시·큐 둘 다 거부됐다 (요청: @${ACTOR}). 즉시: \`${OUT}\` / 큐: \`${OUT2}\`"
+              exit 1
+            fi
           else
             echo "::error::위임 머지 실패 — ${OUT}"
             say "위임 머지 실패 — GitHub 이 거부했다 (요청: @${ACTOR}). 오류: \`${OUT}\`"
