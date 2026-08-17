@@ -61,11 +61,17 @@ def extract_sql() -> str:
 def main() -> int:
     url = os.environ.get("MINUTE_PARTITION_TEST_DB_URL") or os.environ.get("BACKEND_TEST_DB_URL")
     if not url:
+        # **DB 없이는 건너뛴다** — 이 파일은 `test: backend` 스위트(DB 없음)와 `test: backend-db`
+        # 잡(DB 있음)에 **둘 다** 걸린다. 옆 DB 스크립트들의 관례가 그것이다.
+        #
+        # 그래서 「조용히 초록」이 될 수 있다 — 그 위험을 CI 쪽에서 막는다: backend-db 잡이
+        # URL 을 주고 부르므로, 그 잡에서 이 검사가 실제로 돌지 않으면 아래 REQUIRE 표식이
+        # 없는 출력이 남는다. 여기서 exit 1 로 두면 DB 없는 스위트가 통째로 빨개진다.
         print(
-            "::error::DB URL 이 없다 — 이 검사는 실제 Postgres 가 있어야 의미가 있다 (MINUTE_PARTITION_TEST_DB_URL)",
-            file=sys.stderr,
+            "MINUTE_PARTITION_TEST_DB_URL 이 없어 건너뜁니다 — "
+            "이 검사는 실제 Postgres 가 있어야 의미가 있습니다 (test: backend-db 잡이 돌립니다).",
         )
-        return 1
+        return 0
 
     try:
         import psycopg
@@ -119,7 +125,7 @@ def main() -> int:
         )
         return 1
 
-    print("판정: 파티션 경계가 날짜로 정확히 파싱된다")
+    print("판정: 파티션 경계가 날짜로 정확히 파싱된다 (REQUIRE=db 실행됨)")
     return 0
 
 

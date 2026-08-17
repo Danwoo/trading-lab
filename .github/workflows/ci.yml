@@ -280,6 +280,24 @@ jobs:
         run: uv run python scripts/verify_no_orphan_personal_workspaces.py --i-know-this-drops-tables
 
       # frontend 스키마를 세우는 두 길(prisma db push / tables.sql)의 FK 참조 동작 계약 (#238)
+      # 분봉 파티션 커버리지 SQL — **진짜 Postgres 에 태운다.** 파이썬 단위 테스트는 레포지토리를
+      # 대역으로 갈아 끼우므로 이 SQL 이 DB 앞에 한 번도 서지 않는다. 실제로 그 틈으로 깨진
+      # 정규식이 새어 나가 「파티션이 있어도 없다」로 읽혔다(PR #182 리뷰).
+      # **실행 여부까지 확인한다.** 이 스크립트는 DB URL 이 없으면 사유를 적고 건너뛴다
+      # (`test: backend` 스위트에도 걸리므로 그 관례를 따른다). 그래서 여기서 URL 이 안 닿으면
+      # 「건너뜀」이 조용한 초록으로 굳는다 — 실행 표식을 grep 해 그 자리를 막는다.
+      - name: 분봉 파티션 조회 SQL 검증
+        if: ${{ !cancelled() }}
+        env:
+          MINUTE_PARTITION_TEST_DB_URL: postgresql://ci:ci@localhost:5432/ci
+        run: |
+          out=$(uv run python scripts/verify_minute_partition_query.py)
+          echo "$out"
+          case "$out" in
+            *"REQUIRE=db 실행됨"*) : ;;
+            *) echo "::error::검사가 실제로 돌지 않았다 (DB URL 이 안 닿았다) — 건너뜀은 통과가 아니다"; exit 1 ;;
+          esac
+
       - name: frontend FK 참조 동작 계약 검증
         if: ${{ !cancelled() }}
         run: uv run python scripts/verify_frontend_fk_referential_actions.py --i-know-this-drops-tables

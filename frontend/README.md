@@ -33,7 +33,7 @@ Plan-Execute 멀티에이전트가 금융 MCP 도구를 오케스트레이션한
 
 - `useMasterGridData({ fetchGrid, fetchData })` → `{ dataSource, selectedData, handleSelect, handleCreate, handleRefresh }` (관심종목·포트폴리오 목록)
 - `useDetailGridData` / `useDetailGridActions` → 2-depth 디테일 (포트폴리오 → 보유종목)
-- `useFormState` (폼 상태), `useExcelExport`, `useTreeGridData`, `useFileList`/`useFileGroups`, `useWebSocketService`(시세·체결 틱)
+- `useFormState` (폼 상태), `useExcelExport`, `useTreeGridData`, `useFileList`/`useFileGroups`
 - 공통: `components/shared/`(DataGrid/DataPanel/ui DevExtreme 래퍼) · `stores/shared/codeStore`(`getCode("그룹코드")`)
 
 ## 에러 처리
