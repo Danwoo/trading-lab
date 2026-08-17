@@ -59,13 +59,20 @@ def tailwind_names(
     return {t.lstrip("-") for t in tokens}, [p.lstrip("-") for p in prefixes]
 
 
-def scan() -> tuple[int, list[str]]:
+def scan() -> tuple[int, list[str], set[str], list[str], re.Pattern[str]]:
     exact_vars, prefix_vars = non_text_tokens()
     names, prefixes = tailwind_names(exact_vars, prefix_vars)
 
-    # `text-ink-faint`·`text-ink-faint/60`·`hover:text-line-strong` 를 다 잡는다.
+    # `text-ink-faint` · `text-ink-faint/60` · `hover:text-line-strong` ·
+    # **`!text-ink-faint`** · **`placeholder:!text-ink-faint`** · `dark:hover:!text-ink-faint` 를 다 잡는다.
+    #
+    # `!`(important 수식자)를 빼먹으면 그물이 조용히 새어 나간다 — 첫 판이 정확히 그랬고,
+    # 그 상태로 로그인 화면의 `placeholder:!text-ink-faint` 2곳이 통과했다(리뷰가 잡았다).
+    # 변형 체인의 **각 마디 앞**과 유틸리티 앞 **양쪽**에 `!` 가 올 수 있다.
     pattern = re.compile(
-        r"(?:^|[\s\"'`:])(?:[a-z-]+:)*(" + "|".join(TEXT_PREFIXES) + r")([a-z0-9-]+)"
+        r"(?:^|[\s\"'`])(?:!?[a-z0-9-]+:)*!?("
+        + "|".join(TEXT_PREFIXES)
+        + r")([a-z0-9-]+)"
     )
 
     problems: list[str] = []
@@ -84,14 +91,67 @@ def scan() -> tuple[int, list[str]]:
                         problems.append(
                             f"{rel}:{lineno} — 비텍스트 토큰을 글자에 썼습니다: --{base}"
                         )
-    return checked, problems
+    return checked, problems, names, prefixes, pattern
+
+
+# 스캐너 자신의 자기검사 — **이 목록이 그물의 구멍을 막는다.**
+# 첫 판은 `!`(important 수식자)를 못 잡아 실제 위반 2건이 통과했다. 파손 주입은
+# 수식자 없는 형태만 시도해 그 구멍을 못 봤다 — 그래서 형태를 목록으로 못박는다.
+SELF_CHECK_HITS = (
+    'className="text-ink-faint"',
+    'className="!text-ink-faint"',
+    'className="placeholder:!text-ink-faint"',
+    'className="dark:hover:!text-ink-faint"',
+    'className="text-ink-faint/60"',
+    'className="hover:text-line-strong"',
+)
+SELF_CHECK_MISSES = (
+    'className="border-line-strong"',  # 선 — 비텍스트 토큰의 제 자리다
+    'className="decoration-line-strong"',  # 밑줄도 선이다
+    'className="bg-ink-faint/10"',  # 바탕
+    'className="text-ink-muted"',  # 텍스트 토큰
+)
+
+
+def self_check(
+    names: set[str], prefixes: list[str], pattern: re.Pattern[str]
+) -> list[str]:
+    """그물이 잡아야 할 형태를 실제로 잡는지 — 그물의 그물."""
+    failures = []
+    for sample in SELF_CHECK_HITS:
+        if not any(
+            m[1].split("/")[0] in names
+            or any(m[1].split("/")[0].startswith(p) for p in prefixes)
+            for m in pattern.findall(sample)
+        ):
+            failures.append(f"잡아야 하는데 놓쳤다: {sample}")
+    for sample in SELF_CHECK_MISSES:
+        if any(
+            m[1].split("/")[0] in names
+            or any(m[1].split("/")[0].startswith(p) for p in prefixes)
+            for m in pattern.findall(sample)
+        ):
+            failures.append(f"잡으면 안 되는데 잡았다: {sample}")
+    return failures
 
 
 def main() -> int:
-    checked, problems = scan()
+    checked, problems, names, prefixes, pattern = scan()
+
+    # **그물의 그물부터 돌린다.** 스캐너가 잡아야 할 형태를 못 잡으면 아래 「위반 0건」은
+    # 「위반이 없다」가 아니라 「아무것도 못 봤다」다 — 실제로 그렇게 새어 나갔다.
+    self_failures = self_check(names, prefixes, pattern)
+    for failure in self_failures:
+        print(f"::error::스캐너 자기검사 실패 — {failure}", file=sys.stderr)
+
     print(
-        f"`.tsx` {checked}건 검사 ({' · '.join(f'frontend/{d}' for d in SCAN_DIRS)}) · 위반 {len(problems)}건"
+        f"`.tsx` {checked}건 검사 ({' · '.join(f'frontend/{d}' for d in SCAN_DIRS)}) · "
+        f"위반 {len(problems)}건 · 자기검사 {len(SELF_CHECK_HITS) + len(SELF_CHECK_MISSES)}건 "
+        f"중 실패 {len(self_failures)}건"
     )
+
+    if self_failures:
+        return 1
 
     if checked < MIN_FILES:
         print(
