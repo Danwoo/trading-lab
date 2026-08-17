@@ -238,8 +238,7 @@ class IngestService:
         """적재 시작일. **DB 상 마지막 저장 거래일을 항상 다시 포함한다**(MD-AD-22) — 장중에
         받은 반쪽 캔들이 정본에 영구히 남는 것을 upsert 로 덮어쓰기 위해서다.
 
-        마지막 저장일이 이미 "완료된 거래일"보다 앞서면 재요청이 낭비이므로 캘린더로 가른다 —
-        freqtrade `drop_incomplete` 의 무조건 재수집보다 정확하다.
+        요청 구간(`period_from`)이 저장분보다 앞이면 **소급 적재를 요청한 것**이라 그것을 따른다.
         """
         period_from = _as_date(run.get("period_from"))
         last_saved = await run_in_threadpool(self.ingest_repository.select_last_trade_date, instrument_id)
@@ -259,6 +258,9 @@ class IngestService:
         안 보면 psycopg 원문(`no partition of relation ... found for row`)이 그대로
         `failed_reason` 에 박힌다. 사용자가 읽을 문장이 아니고, 무엇을 하면 되는지도 없다.
         """
+        if date_from > date_to:
+            # 역전 구간은 파티션 판정 이전의 문제다 — 통과시키면 0건 적재가 「성공」으로 끝난다.
+            raise BadRequestError(f"구간이 뒤집혀 있습니다 ({date_from} ~ {date_to}).")
         covered = await run_in_threadpool(self.ingest_repository.select_minute_partition_range)
         if covered is None:
             raise BadRequestError("분봉 파티션이 아직 없습니다 — 마이그레이션을 먼저 적용하세요.")

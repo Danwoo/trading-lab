@@ -140,6 +140,18 @@ def test_partition_inside_range_passes() -> str:
     return "test_partition_inside_range_passes"
 
 
+def test_reversed_range_is_refused() -> str:
+    """역전 구간은 파티션 판정 이전의 문제다 — 통과시키면 0건 적재가 「성공」으로 끝난다."""
+    repo = _Repo(partition=(dt.date(2026, 8, 1), dt.date(2027, 8, 1)))
+    try:
+        _guard(repo, dt.date(2026, 9, 1), dt.date(2026, 8, 1))
+    except BadRequestError as exc:
+        assert "뒤집" in str(exc), f"사유가 역전을 말하지 않는다: {exc}"
+    else:  # pragma: no cover - 실패 경로
+        raise AssertionError("역전 구간이 통과했다")
+    return "test_reversed_range_is_refused"
+
+
 def test_no_partition_at_all_is_refused() -> str:
     """파티션이 하나도 없으면 무엇을 하면 되는지까지 말한다."""
     try:
@@ -187,6 +199,7 @@ TESTS = [
     test_partition_inside_range_passes,
     test_no_partition_at_all_is_refused,
     test_guard_is_actually_wired_into_the_run,
+    test_reversed_range_is_refused,
 ]
 
 
@@ -205,8 +218,8 @@ if __name__ == "__main__":
         print(f"  FAIL TESTS 목록에 없는 테스트: {', '.join(missing)}")
         raise SystemExit(1)
     # 검사 0건은 통과가 아니다 — TESTS 가 비면 조용히 exit 0 이 된다.
-    if len(TESTS) < 8:
-        print(f"  FAIL 검사가 {len(TESTS)}건뿐이다 — 그물이 죽어 있다 (하한 8)")
+    if len(TESTS) < 9:
+        print(f"  FAIL 검사가 {len(TESTS)}건뿐이다 — 그물이 죽어 있다 (하한 9)")
         raise SystemExit(1)
     failures = 0
     for test in TESTS:
