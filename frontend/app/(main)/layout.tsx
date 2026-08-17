@@ -1,7 +1,10 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { ProductPanel, ProductRail } from "@/components/shared/Layout";
+// 배럴(`@/components/shared/Layout`)로 들어오면 그 안의 모든 것이 딸려 온다 — 제품 셸은
+// 모든 화면이 지나가는 자리라 그 비용이 전 화면에 실린다. 직접 경로로 집는다 (#341 ②와 같은 사유).
+import { ProductPanel } from "@/components/shared/Layout/ProductPanel";
+import { ProductRail } from "@/components/shared/Layout/ProductRail";
 import { RAIL_PANEL_CONTENT } from "@/components/shared/Layout/railPanelContent";
 import { useMenuAccessGate } from "@/hooks/shared/useMenuAccessGate";
 import { usePanelOverlaysBoard } from "@/hooks/shared/usePanelOverlaysBoard";
@@ -36,7 +39,11 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
   // 폭·배분은 CSS 가 정한다. JS 가 아직 답해야 하는 것은 이 하나 — 덮는가(그래서 보드가 죽는가).
   const panelOverlaysBoard = usePanelOverlaysBoard();
 
-  if (!loaded || authorized === null) return null;
+  // **셸은 인가 응답을 기다리지 않는다.** 종전에는 이 자리에서 `return null` 이라 레일 46px
+  // 까지 화면 전체가 백지였다 — `loaded` 를 켜는 것은 클라이언트 이펙트의 메뉴 조회 하나뿐이라
+  // 그 왕복 내내 아무것도 안 보인다. 마일스톤 2 수용 첫 칸(기동→로그인→실험대가 열림)이 그
+  // 백지를 지난다. 골조를 먼저 세우고, 판정이 필요한 것은 `<main>` 안쪽에서만 가른다.
+  const settled = loaded && authorized !== null;
 
   const openPanel = RAIL_ITEMS.find((item) => item.id === openPanelId) ?? null;
   // 레지스트리에 없으면 `ProductPanel` 이 `item.pending` 을 대신 보여준다.
@@ -56,7 +63,7 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
       {/* 패널은 이 상자 안에서만 논다 — 덮을 때(§21.6)도 레일까지 덮지는 않는다 */}
       <div className="relative flex min-w-0 flex-1">
         <main className="min-w-0 flex-1 overflow-auto" inert={panelCoversBoard || undefined}>
-          {authorized ? children : null}
+          {settled && authorized ? children : null}
         </main>
 
         {openPanel && (
