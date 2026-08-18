@@ -30,6 +30,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from itertools import product
 
@@ -38,6 +39,10 @@ from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, 
 # 한 번에 도는 조합 수 상한. 스펙 §5 의 예산(실행·전체 재계산 >10s 는 완료 예상 표시)을
 # 넘지 않게 하는 안전핀이지, 성능 목표가 아니다. 넘으면 **조용히 자르지 않고** 던진다 —
 # 「전부 돌려봤다」고 말할 수 없는 결과를 그렇게 말하는 것이 §8.5.2 의 자기모순이다.
+#
+# **크기는 만들기 전에 센다.** 처음엔 곱집합을 다 만든 뒤에 길이를 봤는데, 그러면 2축×1000값
+# 만으로 상한의 500배(100만 칸)를 **실제로 만든 뒤에야** 거부했다(실측 1.11초). 이 앱은
+# `--workers=1` 이라 그동안 모든 HTTP 요청이 함께 멈춘다 — 안전핀이 안전핀 역할을 못 한 것이다.
 MAX_COMBOS = 2000
 
 
@@ -92,8 +97,28 @@ class Grid:
         return None
 
 
+def combo_count(axes: tuple[Axis, ...]) -> int:
+    """조합 수를 **만들지 않고** 센다.
+
+    곱셈 한 번이면 되는 것을 리스트를 다 만들어 `len()` 으로 재면, 상한을 넘는 입력일수록
+    거부가 늦어진다 — 정확히 막아야 할 그 입력에서 가장 오래 걸린다.
+    """
+    if not axes:
+        return 1
+    return math.prod(len(axis.values) for axis in axes)
+
+
 def combinations(axes: tuple[Axis, ...], base_params: dict) -> list[dict]:
-    """축들의 곱집합. 축이 없으면 기본 파라미터 한 칸이다 — **빈 격자는 없다.**"""
+    """축들의 곱집합. 축이 없으면 기본 파라미터 한 칸이다 — **빈 격자는 없다.**
+
+    **크기를 먼저 확인하고 만든다.** 상한을 넘으면 한 칸도 만들지 않고 던진다.
+    """
+    total = combo_count(axes)
+    if total > MAX_COMBOS:
+        raise ValueError(
+            f"조합이 {total:,}개다 — 한 번에 도는 상한은 {MAX_COMBOS:,}개다. "
+            "축을 줄이거나 나눠 돌려라 (잘라서 도는 것은 「전부 돌려봤다」가 아니다)."
+        )
     if not axes:
         return [dict(base_params)]
     out = []
@@ -122,12 +147,7 @@ def run_grid(
     파라미터 조합 중에 전략이 못 받는 값이 섞이는 것은 정상이고, 그때 격자 전체가
     사라지면 **어느 칸이 문제인지도 사라진다.**
     """
-    combos = combinations(axes, base_params)
-    if len(combos) > MAX_COMBOS:
-        raise ValueError(
-            f"조합이 {len(combos)}개다 — 한 번에 도는 상한은 {MAX_COMBOS}개다. "
-            "축을 줄이거나 나눠 돌려라 (잘라서 도는 것은 「전부 돌려봤다」가 아니다)."
-        )
+    combos = combinations(axes, base_params)  # 상한 초과는 여기서 **만들기 전에** 던진다
 
     rows = series.rows()  # ← 루프 밖. 이 한 줄이 이 모듈의 존재 이유다.
     cells: list[Cell] = []

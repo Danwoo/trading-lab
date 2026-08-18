@@ -240,6 +240,35 @@ def main() -> int:
         # 「매수 조건이 없으면 매매도 없다」의 반대편 — 조건이 있으면 실제로 매매가 난다.
         check("실전략이 거래를 만든다", real_out["trade_rows"] >= 0, True)
 
+    # ── 계보 diff (#202) — 「무엇이 달라졌나」가 조회로 답해지는가 ─────────
+    diff = service.diff_against_parent(second["run_id"])
+    check("부모를 안다", diff["parent_run_id"], run_id)
+    check("같은 조건이면 변경 0", len(diff["changes"]), 0)
+
+    changed = service.run(
+        {
+            "workspace_id": 4242,
+            "strategy_key": "fixture",
+            "market": "KR",
+            "symbol": "TEST",
+            "period_from": "2026-01-01",
+            "period_to": "2026-01-04",
+            "initial_cash": 2000,
+            "parent_run_id": run_id,
+            "params": {"threshold": 7},
+            "costs": {"fee_rate": 0.001, "slippage_rate": 0.0, "sell_tax_rate": 0.0},
+        }
+    )
+    d2 = service.diff_against_parent(changed["run_id"])
+    kinds = {c["name"] for c in d2["changes"]}
+    check("초기자금 변경을 잡는다", "initial_cash" in kinds, True)
+    check("파라미터 변경을 잡는다", "threshold" in kinds, True)
+    check("비용 변경을 잡는다", "fee_rate" in kinds, True)
+    check("변경이 여럿", len(d2["changes"]) >= 3, True)
+
+    root = service.diff_against_parent(run_id)
+    check("계보의 시작은 사유를 말한다", "계보의 시작" in (root["reason"] or ""), True)
+
     # ── 격자 (#202) — 실행 하나가 격자를 낳고, 칸마다 DB 에 남는가 ──────────
     grid_out = service.run_grid(
         {
@@ -274,7 +303,7 @@ def main() -> int:
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (REQUIRE=db 실행됨)")
 
-    if CHECKED < 30:
+    if CHECKED < 38:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:

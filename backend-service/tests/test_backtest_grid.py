@@ -19,6 +19,7 @@ from services.backtest.grid import (  # noqa: E402
     Axis,
     axes_from_spec,
     combinations,
+    combo_count,
     run_grid,
 )
 
@@ -218,11 +219,59 @@ def test_no_axes_is_one_cell() -> None:
     check("축 0개 → 조합 1개", len(combinations((), {"a": 1})), 1)
 
 
+def test_multi_axis_explosion_is_rejected_before_building() -> None:
+    """**다축 조합 폭발** — 리뷰가 잡은 반례다.
+
+    종전 검사는 단일 축에 `MAX_COMBOS+1` 만 넣어, 2축×1000값(100만 칸) 같은 입력을
+    전혀 태우지 못했다. 그 입력은 상한의 500배를 **실제로 만든 뒤에야** 거부됐다
+    (실측 1.11초). 이 앱은 `--workers=1` 이라 그동안 모든 요청이 함께 멈춘다.
+
+    이제 만들기 전에 세고 거부한다 — 시간으로도 확인한다.
+    """
+    import time
+
+    axes = (Axis("threshold", tuple(range(1000))), Axis("other", tuple(range(1000))))
+    check("세기만 100만", combo_count(axes), 1_000_000)
+
+    start = time.perf_counter()
+    raises("다축 폭발", lambda: combinations(axes, {}), "전부 돌려봤다")
+    elapsed = time.perf_counter() - start
+    # 만들고 거부하면 1초대였다. 세고 거부하면 순간이다 — 넉넉히 0.1초로 잡는다.
+    global CHECKED
+    CHECKED += 1
+    if elapsed > 0.1:
+        FAILURES.append(f"거부에 {elapsed:.3f}초 걸렸다 — 만든 뒤에 거부하는 것 아닌가")
+
+
+def test_count_without_building() -> None:
+    """조합 수는 **만들지 않고** 셀 수 있다."""
+    check("축 없음 → 1", combo_count(()), 1)
+    check("2×3", combo_count((Axis("a", (1, 2)), Axis("b", (3, 4, 5)))), 6)
+    check("3축", combo_count((Axis("a", (1, 2)), Axis("b", (1, 2)), Axis("c", (1, 2)))), 8)
+
+
+def test_run_grid_rejects_before_building() -> None:
+    """`run_grid` 도 같은 자리에서 막힌다 — 캔들을 올리기 전에."""
+    axes = (Axis("threshold", tuple(range(100))), Axis("other", tuple(range(100))))
+    raises(
+        "run_grid 다축 폭발",
+        lambda: run_grid(
+            strategy=strategy_using("threshold"),
+            axes=axes,
+            base_params={},
+            series=series(),
+            initial_cash=1000.0,
+            costs=FREE,
+        ),
+        "전부 돌려봤다",
+    )
+
+
 def main() -> int:
     for fn in [v for k, v in sorted(globals().items()) if k.startswith("test_")]:
         fn()
     print(f"검사한 케이스 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과, {len(FAILURES)}건 실패")
-    if CHECKED < 18:
+    if CHECKED < 25:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:
