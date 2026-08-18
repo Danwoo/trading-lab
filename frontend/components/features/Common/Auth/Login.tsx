@@ -162,7 +162,7 @@ export const Login = () => {
       <header className="flex items-center gap-3 border-b border-hairline px-6 py-3.5 sm:px-10">
         <span className="text-2xs font-semibold uppercase tracking-[0.22em] text-ink-strong">Trading Lab</span>
         <span className="inline-flex items-center gap-1.5 rounded-badge border border-line px-2 py-0.5 text-2xs text-ink-muted">
-          <span aria-hidden className="size-1.5 rounded-full bg-signal-warn" />
+          <span aria-hidden className="size-1.5 rounded-full bg-ink-muted" />
           모의
         </span>
         <span className="hidden text-2xs text-ink-muted sm:inline">실제 주문이 나가지 않습니다</span>

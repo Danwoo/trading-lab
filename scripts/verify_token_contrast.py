@@ -76,7 +76,8 @@ EXACT_ROLES: dict[str, str] = {
     "--primary": NON_TEXT,
     "--secondary": NON_TEXT,
     "--tertiary": NON_TEXT,
-    # 레거시 토큰(#242 O3) — #73 S5 가 지운다. 그때까지 실제 화면이 쓰는 조합이라 검사한다.
+    # 레거시 토큰(#242 O3) — #73 S5 가 Tailwind 팔레트에서 내렸고, 값은 `.auth-backdrop`
+    # (인증 배경)이 아직 소비해 남아 있다. 그 배경 위에 글자가 얹히므로 계속 검사한다.
     "--slate-void": SURFACE,
     "--slate-panel": SURFACE,
     "--slate-line": NON_TEXT,
@@ -91,7 +92,6 @@ EXACT_ROLES: dict[str, str] = {
     "--btn-inset": NON_TEXT,
     "--ink": INK_ANY,
     "--ink-strong": INK_ANY,
-    "--ink-primary": INK_ANY,
     # 라벨·표 헤더가 여기로 강등됐다(리드 결정 ㉡). 버튼 라벨은 --ink 계열이 받는다(§1.4).
     "--ink-muted": INK_CONTENT,
     # **비텍스트 전용** — 선·아이콘에만 쓴다. 글자에 쓰지 않기로 한 값이라 텍스트 대비
@@ -128,11 +128,12 @@ NON_COLOR_PREFIXES = (
     "--e1",
 )
 
-# 레거시 토큰(#242 O3). **다크 한 벌만 있다** — 라이트 값이 없고, 이것을 쓰는 화면은 모드와
-# 무관하게 어두운 팔레트로 그려진다. 그래서 라이트 벌의 곱집합에서는 뺀다. 빼는 것을 조용히
-# 하지 않으려고 벌마다 제외 건수를 출력한다. #73 S5 가 이 목록을 통째로 지운다.
+# 레거시 토큰(#242 O3). **다크 한 벌만 있다** — 라이트 값이 없고, 이것을 쓰는 화면
+# (`.auth-backdrop` 인증 배경)은 모드와 무관하게 어두운 팔레트로 그려진다. 그래서 라이트 벌의
+# 곱집합에서는 뺀다. 빼는 것을 조용히 하지 않으려고 벌마다 제외 건수를 출력한다.
+# `--ink-primary` 는 소비자가 사라져 #73 S5 가 지웠다 — 남은 셋은 그 배경이 아직 쓴다.
 LEGACY_TOKENS = frozenset(
-    {"--slate-void", "--slate-panel", "--slate-line", "--ink-primary", "--signal-warn"}
+    {"--slate-void", "--slate-panel", "--slate-line", "--signal-warn"}
 )
 
 # 화면이 실제로 띄우는 네 벌. 각 벌은 `:root` 위에 뒤 선택자를 순서대로 겹쳐 만든다

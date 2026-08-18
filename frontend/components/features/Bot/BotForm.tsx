@@ -51,7 +51,7 @@ function Row({
     <div data-row className="grid gap-1.5 sm:grid-cols-[minmax(9rem,14rem)_minmax(0,1fr)] sm:items-start sm:gap-3">
       <div className="pt-1.5">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm text-ink-primary">{label}</span>
+          <span className="text-sm text-ink">{label}</span>
           {sourced && <SourceTag source={source} />}
         </div>
         {help && <p className="mt-0.5 text-2xs leading-relaxed text-ink-muted">{help}</p>}
@@ -63,9 +63,9 @@ function Row({
 
 function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
-    <section className="border border-slate-line bg-slate-panel">
-      <header className="border-b border-slate-line px-3 py-2">
-        <h2 className="font-mono text-xs text-ink-primary">{title}</h2>
+    <section className="border border-line bg-bg-panel">
+      <header className="border-b border-line px-3 py-2">
+        <h2 className="font-mono text-xs text-ink">{title}</h2>
         {note && <p className="mt-0.5 text-2xs text-ink-muted">{note}</p>}
       </header>
       <div className="flex flex-col gap-4 p-3">{children}</div>
@@ -130,8 +130,8 @@ export function BotForm({
       >
         {catalogErrors.length > 0 && (
           // 「전략이 없다」와 「전략을 못 읽었다」는 다르다 — 후자를 빈 목록으로 뭉개지 않는다.
-          <div className="border border-slate-line px-3 py-2">
-            <p className="text-2xs text-ink-primary">읽지 못한 전략 파일이 {catalogErrors.length}개 있습니다.</p>
+          <div className="border border-line px-3 py-2">
+            <p className="text-2xs text-ink">읽지 못한 전략 파일이 {catalogErrors.length}개 있습니다.</p>
             <ul className="mt-1 flex flex-col gap-0.5">
               {catalogErrors.map((error) => (
                 <li key={error.source} className="font-mono text-2xs text-ink-muted">

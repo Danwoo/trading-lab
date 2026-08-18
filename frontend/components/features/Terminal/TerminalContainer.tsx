@@ -57,18 +57,18 @@ export function TerminalContainer() {
     <button
       type="button"
       onClick={resetPanels}
-      className="border border-slate-line px-2 py-1 font-mono text-xs text-ink-primary hover:bg-slate-line focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+      className="border border-line px-2 py-1 font-mono text-xs text-ink hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
     >
       기본 패널 되살리기
     </button>
   );
 
   return (
-    <div className="flex h-full flex-col bg-slate-void text-ink-primary">
+    <div className="flex h-full flex-col bg-bg-base text-ink">
       {recovered && (
         <div
           role="alert"
-          className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-signal-warn/40 bg-signal-warn/10 px-3 py-2 font-mono text-xs text-signal-warn"
+          className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-danger/40 bg-danger/10 px-3 py-2 font-mono text-xs text-danger"
         >
           <span>저장된 패널 구성을 읽지 못해 기본 구성으로 열었습니다.</span>
           <button type="button" onClick={dismissRecovered} className="underline hover:no-underline">
@@ -84,7 +84,7 @@ export function TerminalContainer() {
 
         <div className="flex min-h-0 flex-1 flex-col">
           {hasClosedDefaultPanel && (
-            <div className="flex flex-shrink-0 items-center justify-end border-b border-slate-line px-2 py-1.5">
+            <div className="flex flex-shrink-0 items-center justify-end border-b border-line px-2 py-1.5">
               {resetButton}
             </div>
           )}

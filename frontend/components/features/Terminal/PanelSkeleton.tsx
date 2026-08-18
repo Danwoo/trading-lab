@@ -5,8 +5,8 @@
 export function PanelSkeleton() {
   return (
     <div className="flex h-full flex-col gap-2 p-3" aria-busy="true" aria-label="패널을 불러오는 중">
-      <div className="h-3 w-2/5 rounded-sm bg-slate-line motion-safe:animate-pulse" />
-      <div className="h-full w-full rounded-sm bg-slate-line motion-safe:animate-pulse" />
+      <div className="h-3 w-2/5 rounded-sm bg-bg-raised motion-safe:animate-pulse" />
+      <div className="h-full w-full rounded-sm bg-bg-raised motion-safe:animate-pulse" />
     </div>
   );
 }

@@ -24,12 +24,12 @@ export function SidebarSymbolRow({ symbol, isActive, quote, onSelect }: SidebarS
         onClick={() => onSelect(symbol)}
         className={
           isActive
-            ? "flex w-full items-center justify-between gap-2 border-l-2 border-ink-primary bg-slate-line px-2 py-1.5 text-left"
-            : "flex w-full items-center justify-between gap-2 border-l-2 border-transparent px-2 py-1.5 text-left hover:bg-slate-line"
+            ? "flex w-full items-center justify-between gap-2 border-l-2 border-ink-strong bg-bg-raised px-2 py-1.5 text-left"
+            : "flex w-full items-center justify-between gap-2 border-l-2 border-transparent px-2 py-1.5 text-left hover:bg-bg-raised"
         }
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-ink-primary">{symbol.name ?? symbol.ticker}</span>
+          <span className="block truncate text-ink">{symbol.name ?? symbol.ticker}</span>
           <span className="block text-ink-muted">{symbol.ticker}</span>
         </span>
         {quote && (

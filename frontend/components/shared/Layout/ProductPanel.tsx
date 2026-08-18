@@ -71,13 +71,13 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
       aria-labelledby={headingId}
       onKeyDown={handleKeyDown}
       className={cn(
-        "flex h-full min-w-0 flex-col border-l border-slate-line bg-slate-panel focus:outline-none",
+        "flex h-full min-w-0 flex-col border-l border-line bg-bg-panel focus:outline-none",
         "absolute inset-0 z-20 lg:static lg:w-shell-panel-compact lg:flex-none",
         panelWidthClass(expanded),
       )}
     >
-      <div className="flex flex-none items-center gap-2 border-b border-slate-line px-3 py-2">
-        <h2 id={headingId} className="min-w-0 flex-1 truncate text-sm font-medium text-ink-primary">
+      <div className="flex flex-none items-center gap-2 border-b border-line px-3 py-2">
+        <h2 id={headingId} className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
           {item.label}
         </h2>
 
@@ -92,7 +92,7 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
             aria-pressed={expanded}
             aria-label={expanded ? `${item.label} 패널 좁히기` : `${item.label} 패널 넓히기`}
             onClick={onToggleExpanded}
-            className="hidden rounded p-1 text-ink-muted hover:bg-slate-line hover:text-ink-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted xl:block"
+            className="hidden rounded p-1 text-ink-muted hover:bg-bg-raised hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted xl:block"
           >
             <Icon name={expanded ? "arrowright" : "arrowleft"} size={14} />
           </button>
@@ -102,7 +102,7 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
           type="button"
           aria-label={`${item.label} 패널 닫기`}
           onClick={onClose}
-          className="rounded p-1 text-ink-muted hover:bg-slate-line hover:text-ink-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+          className="rounded p-1 text-ink-muted hover:bg-bg-raised hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
         >
           <Icon name="close" size={14} />
         </button>
@@ -110,16 +110,16 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
 
       {/* §20.2 「보드에서 고르기 = 열린 패널의 내용이 그 선택으로 좁혀짐」 */}
       {selection && (
-        <div className="flex flex-none items-center gap-2 border-b border-slate-line px-3 py-1.5 text-xs text-ink-muted">
+        <div className="flex flex-none items-center gap-2 border-b border-line px-3 py-1.5 text-xs text-ink-muted">
           <span className="min-w-0 flex-1 truncate">
             {selection.origin === "board" ? "보드에서 고른 " : "여기서 고른 "}
-            <span className="text-ink-primary">{selection.label}</span>
+            <span className="text-ink">{selection.label}</span>
             {selection.origin === "board" ? " 로 좁혀져 있습니다" : " 을 보드가 표시하고 있습니다"}
           </span>
           <button
             type="button"
             onClick={clearSelection}
-            className="flex-none rounded px-1 underline hover:text-ink-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            className="flex-none rounded px-1 underline hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
           >
             전체 보기
           </button>

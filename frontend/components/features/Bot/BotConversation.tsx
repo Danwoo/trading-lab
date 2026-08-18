@@ -117,15 +117,15 @@ export function BotConversation({
   const warned = ready === false;
 
   return (
-    <section className="flex min-h-[16rem] flex-col border border-slate-line bg-slate-panel">
-      <header className="flex items-baseline justify-between gap-2 border-b border-slate-line px-3 py-2">
-        <h2 className="font-mono text-xs text-ink-primary">대화</h2>
+    <section className="flex min-h-[16rem] flex-col border border-line bg-bg-panel">
+      <header className="flex items-baseline justify-between gap-2 border-b border-line px-3 py-2">
+        <h2 className="font-mono text-xs text-ink">대화</h2>
         <span className="font-mono text-2xs text-ink-muted">말하면 오른쪽 폼이 채워집니다</span>
       </header>
 
       {warned && (
-        <div role="status" className="border-b border-slate-line px-3 py-2">
-          <p className="text-2xs leading-relaxed text-ink-primary">
+        <div role="status" className="border-b border-line px-3 py-2">
+          <p className="text-2xs leading-relaxed text-ink">
             대화가 안 될 수 있습니다. 안 되면 오른쪽 폼으로 직접 정할 수 있고, 정한 것은 그대로 남습니다.
           </p>
           <ul className="mt-1 flex flex-col gap-0.5">
@@ -150,7 +150,7 @@ export function BotConversation({
                 <span className="mr-2 font-mono text-2xs text-ink-muted">{turn.role === "user" ? "나" : "봇"}</span>
                 <span
                   className={`whitespace-pre-wrap ${
-                    turn.failed ? "text-danger" : turn.role === "user" ? "text-ink-primary" : "text-ink-muted"
+                    turn.failed ? "text-danger" : turn.role === "user" ? "text-ink" : "text-ink-muted"
                   }`}
                 >
                   {turn.text || (isStreaming && index === turns.length - 1 ? "…" : "")}
@@ -167,7 +167,7 @@ export function BotConversation({
         )}
       </div>
 
-      <div className="flex items-end gap-2 border-t border-slate-line p-2">
+      <div className="flex items-end gap-2 border-t border-line p-2">
         <div className="min-w-0 flex-1">
           <TextArea
             fieldName="message"

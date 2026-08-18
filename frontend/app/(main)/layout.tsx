@@ -51,7 +51,7 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
   const panelCoversBoard = openPanel !== null && panelOverlaysBoard;
 
   return (
-    <div className="flex h-screen bg-slate-void text-ink-primary">
+    <div className="flex h-screen bg-bg-base text-ink">
       <ProductRail
         openPanelId={openPanelId}
         onTogglePanel={togglePanel}

@@ -85,11 +85,14 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
           aria-disabled={isPending || undefined}
           onClick={() => handleClick(item)}
           className={cn(
-            "flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-transparent transition-colors",
+            // 테두리 색은 **가지마다 정확히 하나씩** 준다. `border-transparent` 를 기본으로 깔면
+            // Tailwind 가 그것을 색 유틸리티 중 마지막에 내보내 뒤에 오는 조건부 색을 전부 덮는다
+            // (같은 명시도 → 소스 순서 승). 그렇게 두면 활성·열림 테두리가 코드엔 있고 화면엔 없다.
+            "flex h-[30px] w-[30px] items-center justify-center rounded-lg border transition-colors",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
-            isActive && "border-ink-primary/30 bg-slate-line text-ink-primary",
-            isOpen && "border-slate-line bg-slate-line text-signal-warn",
-            !isActive && !isOpen && "text-ink-muted hover:bg-slate-line hover:text-ink-primary",
+            isActive && "border-line-strong bg-bg-raised text-ink",
+            isOpen && "border-ink-strong bg-bg-raised text-ink-strong",
+            !isActive && !isOpen && "border-transparent text-ink-muted hover:bg-bg-raised hover:text-ink",
             isPending && "opacity-60",
           )}
         >
@@ -107,9 +110,7 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
     items.forEach((item) => {
       rendered.push(renderItem(item));
       if (item.dividerAfter) {
-        rendered.push(
-          <li key={`${item.id}-divider`} aria-hidden className="my-1 w-[22px] border-t border-slate-line" />,
-        );
+        rendered.push(<li key={`${item.id}-divider`} aria-hidden className="my-1 w-[22px] border-t border-line" />);
       }
     });
     return rendered;
@@ -120,7 +121,7 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
   return (
     <nav
       aria-label="제품 레일"
-      className="flex h-full w-shell-rail flex-none flex-col items-center gap-1 border-r border-slate-line bg-slate-panel py-2"
+      className="flex h-full w-shell-rail flex-none flex-col items-center gap-1 border-r border-line bg-bg-panel py-2"
     >
       <ul className="flex flex-col items-center gap-1">{renderGroup(mainItems)}</ul>
       <ul className="mt-auto flex flex-col items-center gap-1">{renderGroup(footerItems)}</ul>

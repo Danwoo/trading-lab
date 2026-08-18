@@ -193,7 +193,7 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
           </p>
         ) : (
           <div>
-            <h1 className="text-lg font-medium text-ink-primary">{botId === undefined ? "봇 만들기" : "봇 고치기"}</h1>
+            <h1 className="text-lg font-medium text-ink">{botId === undefined ? "봇 만들기" : "봇 고치기"}</h1>
             <p className="mt-1 text-sm text-ink-muted">
               말로 정하거나 직접 정합니다. 저장하면 이 조건이 그대로 남고, 검증은 그다음입니다.
             </p>
@@ -206,7 +206,7 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
       </header>
 
       {loadError && (
-        <p role="status" className="border border-slate-line px-3 py-2 text-sm text-ink-primary">
+        <p role="status" className="border border-line px-3 py-2 text-sm text-ink">
           {loadError}
         </p>
       )}

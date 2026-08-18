@@ -133,7 +133,7 @@ export default function ChartPanel({ instanceId, settings, onSettingsChange }: P
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="h-full w-full" />
         {unavailableReason !== null && (
-          <div className="absolute inset-0 bg-slate-panel">
+          <div className="absolute inset-0 bg-bg-panel">
             <PanelUnavailable reason={unavailableReason} />
           </div>
         )}

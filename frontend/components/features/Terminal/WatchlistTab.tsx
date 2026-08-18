@@ -52,7 +52,7 @@ export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
     <div className="flex h-full flex-col">
       {/* 이 배지는 **시세 칸**의 출처다 — 목록 자체는 우리 DB 에서 온 실물이다. 라벨 없이 두면
           「제공 안 됨」이 패널 전체를 가리키는 말로 읽힌다(종목이 버젓이 보이는데도). */}
-      <div className="flex flex-shrink-0 items-center gap-1.5 border-b border-slate-line px-2 py-1">
+      <div className="flex flex-shrink-0 items-center gap-1.5 border-b border-line px-2 py-1">
         <span className="text-ink-muted">시세</span>
         <ProvenanceBadge provenance={provenance} />
       </div>
@@ -68,7 +68,7 @@ export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
         ))}
       </ul>
       {isTruncated && (
-        <div role="status" className="flex-shrink-0 border-t border-slate-line px-2 py-1 text-ink-muted">
+        <div role="status" className="flex-shrink-0 border-t border-line px-2 py-1 text-ink-muted">
           {table.totalCount}건 중 {table.rows.length}건 표시
         </div>
       )}

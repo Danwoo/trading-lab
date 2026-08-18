@@ -83,7 +83,7 @@ export default function SymbolInfoPanel({ instanceId }: PanelProps) {
   return (
     <div className="flex h-full flex-col gap-4 p-3 font-mono text-xs">
       <div>
-        <p className="text-sm text-ink-primary">{symbol?.name ?? symbol?.ticker ?? "종목 미선택"}</p>
+        <p className="text-sm text-ink">{symbol?.name ?? symbol?.ticker ?? "종목 미선택"}</p>
         <p className="text-ink-muted">{symbol ? `${symbol.ticker} · ${symbol.market}` : "—"}</p>
       </div>
 
@@ -98,7 +98,7 @@ export default function SymbolInfoPanel({ instanceId }: PanelProps) {
 
       <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-ink-muted">
         <dt>거래량</dt>
-        <dd className="text-right text-ink-primary">{formatNumber(quote.volume, "number")}</dd>
+        <dd className="text-right text-ink">{formatNumber(quote.volume, "number")}</dd>
       </dl>
     </div>
   );
