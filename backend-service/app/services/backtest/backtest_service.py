@@ -11,10 +11,12 @@ N 번 호출한다 — 다시 읽지 않는다.
 """
 
 import json
+from types import SimpleNamespace
 
 from core.exceptions import BadRequestError, NotFoundError
 from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, quantize, run_single
 from services.backtest.grid import axes_from_spec, run_grid
+from services.backtest.metrics import compute
 
 # 스펙 §8.5.1 — 위탁수수료 0.15% 는 **10배 오차**였고 그 오차가 "연 비용 원금의 145%" 경고를
 # 만들었다. 첫 화면부터 뜨는 경고는 경고를 무시하는 법을 학습시킨다.
@@ -258,6 +260,8 @@ class BacktestService:
             # **화면이 「전부 돌려봤다」고 말하려면 이 수가 한계 계산에 들어가야 한다.**
             # 격자를 훑는 것도 시도이므로(스펙 §8.5.2), 칸 수가 곧 소비한 시도다.
             "attempts_used": grid.attempts_used,
+            # 칸의 수익률은 이 값 대비다 — 화면이 최종 평가액만 받으면 색을 정할 기준이 없다.
+            "initial_cash": float(args["initial_cash"]),
         }
 
     def _insert_run(self, args, strategy, params, costs_raw, parent_run_id) -> int:
@@ -292,4 +296,104 @@ class BacktestService:
             "run": run,
             "equity": self.backtest_repository.select_equity_curve(run_id),
             "trades": self.backtest_repository.select_trades(run_id),
+        }
+
+    def select_report(self, args: dict) -> dict:
+        """한 조합의 리포트 — 곡선·거래에 **지표를 붙여** 낸다 (#203).
+
+        격자 칸 클릭이 이 조회 하나로 끝나야 한다(스펙 §5 — 격자는 사전계산이므로 칸 클릭은
+        계산이 아니라 조회다). 지표는 저장하지 않고 여기서 만든다 — 정의(#201)가 바뀌면
+        저장된 값이 낡은 정의를 화면에 내는 것을 막는다.
+        """
+        run_id = int(args["run_id"])
+        run = self.backtest_repository.select_run(run_id)
+        # 남의 워크스페이스 run 은 「없는 것」과 같은 답을 준다 — 존재 여부도 정보다.
+        if not run or run["workspace_id"] != args["workspace_id"]:
+            raise NotFoundError(f"실행을 찾을 수 없습니다: {run_id}")
+
+        equity_rows = self.backtest_repository.select_equity_curve(run_id)
+        trade_rows = self.backtest_repository.select_trades(run_id)
+
+        costs = dict(run.get("cost_assumptions") or {})
+        # 왕복 비용률 — 수수료·슬리피지는 사고팔 때 두 번, 증권거래세는 매도에만 (engine.CostModel).
+        round_trip = (
+            2 * float(costs.get("fee_rate") or 0)
+            + 2 * float(costs.get("slippage_rate") or 0)
+            + float(costs.get("sell_tax_rate") or 0)
+        )
+
+        metrics = compute(
+            equity_dt=[str(row["dt"]) for row in equity_rows],
+            equity=[float(row["equity"]) for row in equity_rows],
+            # metrics.compute 는 engine.Trade 의 속성 계약만 요구한다 — DB 행을 그 모양으로 입힌다.
+            trades=[
+                SimpleNamespace(
+                    realized_pnl=float(row["realized_pnl"]) if row["realized_pnl"] is not None else None,
+                    entry_price=float(row["fill_price"]),
+                    qty=float(row["qty"]),
+                )
+                for row in trade_rows
+            ],
+            round_trip_cost_rate=round_trip,
+        )
+
+        return {
+            "run": {
+                "run_id": run["run_id"],
+                "bot_id": run["bot_id"],
+                "parent_run_id": run["parent_run_id"],
+                "attempt_no": run["attempt_no"],
+                "strategy_key": run["strategy_key"],
+                "strategy_version": run["strategy_version"],
+                "params": run["params"],
+                "universe_def": run["universe_def"],
+                "adj_policy": run["adj_policy"],
+                "cost_assumptions": costs,
+                "period_from": str(run["period_from"]),
+                "period_to": str(run["period_to"]),
+                "initial_cash": float(run["initial_cash"]),
+                "status": run["status"],
+                "failed_reason": run["failed_reason"],
+                "finished_dt": str(run["finished_dt"]) if run["finished_dt"] else None,
+            },
+            "equity": [
+                {
+                    "dt": str(row["dt"]),
+                    "equity": float(row["equity"]),
+                    "cash": float(row["cash"]),
+                    "position_count": int(row["position_count"]),
+                    "gross_exposure": float(row["gross_exposure"]),
+                }
+                for row in equity_rows
+            ],
+            "trades": [
+                {
+                    "trade_id": row["trade_id"],
+                    "instrument_id": row["instrument_id"],
+                    "side": row["side"],
+                    "entry_ts": str(row["entry_ts"]),
+                    "exit_ts": str(row["exit_ts"]) if row["exit_ts"] else None,
+                    "qty": float(row["qty"]),
+                    "fill_price": float(row["fill_price"]),
+                    "exit_price": float(row["exit_price"]) if row["exit_price"] is not None else None,
+                    "fee": float(row["fee"]),
+                    "slippage": float(row["slippage"]),
+                    "realized_pnl": float(row["realized_pnl"]) if row["realized_pnl"] is not None else None,
+                    "mae": float(row["mae"]) if row["mae"] is not None else None,
+                    "mfe": float(row["mfe"]) if row["mfe"] is not None else None,
+                }
+                for row in trade_rows
+            ],
+            "metrics": [
+                {
+                    "key": m.key,
+                    "label": m.label,
+                    "value": m.value,
+                    "unit": m.unit,
+                    "derived_from": m.derived_from,
+                    "absent_reason": m.absent_reason,
+                    "note": m.note,
+                }
+                for m in metrics
+            ],
         }
