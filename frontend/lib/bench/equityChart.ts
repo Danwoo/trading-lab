@@ -60,6 +60,8 @@ export function createEquityChart(container: HTMLElement): EquityChartHandle {
     color: `rgb(${inkChannels})`,
     lineWidth: 2,
     priceLineVisible: false,
+    // 기본 포맷은 "12000000.00" — 자산 금액은 소수점 없이 자릿수 구분으로 읽힌다.
+    priceFormat: { type: "custom", formatter: (v: number) => Math.round(v).toLocaleString("ko-KR") },
   });
 
   // 낙폭은 아래 20% 띠에 %로 그린다 — 거래량 서브차트와 같은 배치 기법(candleChart.ts).

@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/shared/ui/Button";
 import { CheckBox } from "@/components/shared/ui/CheckBox";
 import { DateBox } from "@/components/shared/ui/DateBox";
 import { NumberBox } from "@/components/shared/ui/NumberBox";
@@ -156,7 +155,15 @@ export function GridRunForm({
       )}
 
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        <Button text={isRunning ? "돌리는 중…" : "격자 실행"} useSubmitBehavior disabled={isRunning} />
+        {/* 공용 Button 은 아직 팔레트 직결(파랑 액센트)이라 여기선 §1.4 버튼 서피스 토큰으로
+            직접 그린다 — BenchPaths 와 같은 관례. 액센트 없는 시스템에서 버튼은 재질로 선다. */}
+        <button
+          type="submit"
+          disabled={isRunning}
+          className="rounded-control border border-btn-line bg-gradient-to-b from-btn-from to-btn-to px-3 py-1.5 text-sm font-ui text-ink disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-muted"
+        >
+          {isRunning ? "돌리는 중…" : "격자 실행"}
+        </button>
         {comboCount > 0 && (
           <span className="break-keep text-2xs text-ink-muted">
             {comboCount}칸 — 훑는 것도 시도라 시도 {comboCount}회를 씁니다.
