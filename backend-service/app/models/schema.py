@@ -441,6 +441,12 @@ class MinuteBar(Base):
 # check 가 통과한다 (`verify_alembic_model_coverage.py` 가 그 구멍을 막는다).
 class BacktestRun(Base):
     __tablename__ = "tn_backtest_run"
+    # 인덱스는 마이그레이션과 **양쪽에** 있어야 한다 — 모델에 없으면 alembic check 가
+    # 「지워야 할 인덱스」로 읽어 드리프트로 잡는다.
+    __table_args__ = (
+        Index("ix_backtest_run_workspace", "workspace_id", "run_id"),
+        Index("ix_backtest_run_parent", "parent_run_id"),
+    )
 
     run_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     workspace_id: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -485,6 +491,7 @@ class BacktestEquity(Base):
 
 class BacktestTrade(Base):
     __tablename__ = "tn_backtest_trade"
+    __table_args__ = (Index("ix_backtest_trade_run", "run_id", "entry_ts"),)
 
     trade_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(
@@ -507,6 +514,7 @@ class BacktestTrade(Base):
 
 class BacktestSignal(Base):
     __tablename__ = "tn_backtest_signal"
+    __table_args__ = (Index("ix_backtest_signal_run", "run_id", "dt"),)
 
     signal_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(
@@ -523,6 +531,7 @@ class BacktestSignal(Base):
 
 class BacktestCash(Base):
     __tablename__ = "tn_backtest_cash"
+    __table_args__ = (Index("ix_backtest_cash_run", "run_id", "dt"),)
 
     cash_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(

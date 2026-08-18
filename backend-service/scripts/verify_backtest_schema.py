@@ -82,6 +82,17 @@ EXPECTED: dict[str, set[str]] = {
 # 이 둘이 빠져도 테이블은 만들어진다 — 그래서 따로 단언한다.
 LINEAGE = {"parent_run_id", "attempt_no"}
 
+# 인덱스는 **마이그레이션과 ORM 모델 양쪽에** 있어야 한다.
+#
+# 한쪽에만 있으면 `alembic check` 가 「지워야 할 인덱스」로 읽어 드리프트로 잡는다 —
+# 실제로 그렇게 CI 가 빨개졌다. 컬럼만 대조하면 그 자리가 안 보이므로 여기서도 센다.
+EXPECTED_INDEXES: dict[str, set[str]] = {
+    "tn_backtest_run": {"ix_backtest_run_workspace", "ix_backtest_run_parent"},
+    "tn_backtest_trade": {"ix_backtest_trade_run"},
+    "tn_backtest_signal": {"ix_backtest_signal_run"},
+    "tn_backtest_cash": {"ix_backtest_cash_run"},
+}
+
 
 def load_migration():
     import importlib.util
@@ -142,6 +153,18 @@ def main() -> int:
                 checked += 1
                 if col not in actual:
                     problems.append(f"{table}.{col} 가 없다 (스펙 §6 표)")
+
+        for table, names in EXPECTED_INDEXES.items():
+            if table not in present:
+                continue
+            actual = {i["name"] for i in insp.get_indexes(table, schema=schema)}
+            for name in sorted(names):
+                checked += 1
+                if name not in actual:
+                    problems.append(
+                        f"{table} 에 인덱스 {name} 가 없다 — 마이그레이션과 ORM 모델 양쪽에 있어야 "
+                        "alembic check 가 드리프트로 잡지 않는다"
+                    )
 
         run_cols = (
             {c["name"] for c in insp.get_columns("tn_backtest_run", schema=schema)}
