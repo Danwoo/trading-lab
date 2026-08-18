@@ -14,6 +14,7 @@ import json
 
 from core.exceptions import BadRequestError, NotFoundError
 from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, quantize, run_single
+from services.backtest.grid import axes_from_spec, run_grid
 
 # 스펙 §8.5.1 — 위탁수수료 0.15% 는 **10배 오차**였고 그 오차가 "연 비용 원금의 145%" 경고를
 # 만들었다. 첫 화면부터 뜨는 경고는 경고를 무시하는 법을 학습시킨다.
@@ -186,7 +187,171 @@ class BacktestService:
             "cash_rows": self.backtest_repository.insert_cash_events(cash),
         }
 
+    # ── 격자 실행 (#202) ─────────────────────────────────────────────────────
+    def run_grid(self, args: dict) -> dict:
+        """**단일 점을 만들지 않는다** — 실행 하나가 격자를 낳는다 (스펙 D-Q1).
+
+        캔들을 **한 번** 올려 조합마다 재사용한다. 조합마다 DB 를 다시 읽으면 4.9분이
+        83분이 된다(스펙 §6 실측).
+
+        각 칸은 자기 `run_id` 를 갖고 `parent_run_id` 로 부모 실행에 매달린다 —
+        「무엇이 달라졌나」가 그 계보로 계산된다.
+        """
+        strategy_key = args["strategy_key"]
+        module = self.strategy_loader(strategy_key)
+        if module is None:
+            raise NotFoundError(f"전략을 찾을 수 없습니다: {strategy_key}")
+        strategy = Strategy(module)
+
+        sweep = args.get("sweep") or {}
+        if not sweep:
+            raise BadRequestError(
+                "훑을 파라미터가 없습니다 — 격자 실행은 축이 하나 이상 필요합니다. 한 조합만 보려면 단일 실행을 쓰세요."
+            )
+        param_specs = list(module.STRATEGY.get("params") or [])
+        axes = axes_from_spec(param_specs, sweep)
+
+        base_params = dict(args.get("params") or {})
+        costs_raw = {**DEFAULT_COSTS, **(args.get("costs") or {})}
+        costs = CostModel(
+            fee_rate=float(costs_raw["fee_rate"]),
+            slippage_rate=float(costs_raw["slippage_rate"]),
+            sell_tax_rate=float(costs_raw["sell_tax_rate"]),
+        )
+
+        series = self.load_series(args)  # ← 루프 밖. 한 번만 읽는다.
+        grid = run_grid(
+            strategy=strategy,
+            axes=axes,
+            base_params=base_params,
+            series=series,
+            initial_cash=float(args["initial_cash"]),
+            costs=costs,
+        )
+
+        parent_run_id = args.get("parent_run_id")
+        cells_out = []
+        for cell in grid.cells:
+            run_id = self._insert_run(args, strategy, cell.params, costs_raw, parent_run_id)
+            failed_reason = cell.failed_reason
+
+            # **저장 실패도 칸 하나만 죽인다.** 감싸지 않으면 DB 문제가 난 칸의 행이
+            # `running` 으로 영원히 멈추고, 이미 끝난 앞 칸들의 결과도 호출자에게 못 간다 —
+            # 「한 칸이 터져도 격자를 버리지 않는다」가 전략 실패에만 지켜지고 저장 실패에는
+            # 안 지켜지는 것이다. 단일 실행(`run`)은 이미 저장까지 한 묶음으로 감쌌다.
+            if cell.ok:
+                try:
+                    self._persist(run_id, cell.result)
+                except Exception as exc:  # noqa: BLE001
+                    failed_reason = f"결과를 저장하지 못했습니다: {str(exc)[:400]}"
+
+            try:
+                self.backtest_repository.finish_run(
+                    {
+                        "run_id": run_id,
+                        "status": "succeeded" if failed_reason is None else "failed",
+                        "failed_reason": failed_reason,
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001
+                # 마감조차 못 하면 그 행은 `running` 으로 남는다 — 숨기지 말고 결과에 적어,
+                # 화면이 「돌고 있음」과 「마감 못 함」을 구분할 수 있게 한다.
+                failed_reason = (failed_reason or "") + f" (마감 실패: {str(exc)[:200]})"
+
+            cells_out.append(
+                {
+                    "run_id": run_id,
+                    "params": cell.params,
+                    "status": "succeeded" if failed_reason is None else "failed",
+                    "failed_reason": failed_reason,
+                    "final_equity": cell.result.final_equity if failed_reason is None else None,
+                }
+            )
+
+        return {
+            "shape": list(grid.shape),
+            "axes": [{"name": a.name, "values": list(a.values)} for a in grid.axes],
+            "cells": cells_out,
+            # **화면이 「전부 돌려봤다」고 말하려면 이 수가 한계 계산에 들어가야 한다.**
+            # 격자를 훑는 것도 시도이므로(스펙 §8.5.2), 칸 수가 곧 소비한 시도다.
+            "attempts_used": grid.attempts_used,
+        }
+
+    def _insert_run(self, args, strategy, params, costs_raw, parent_run_id) -> int:
+        workspace_id = args["workspace_id"]
+        return self.backtest_repository.insert_run(
+            {
+                "workspace_id": workspace_id,
+                "parent_run_id": parent_run_id,
+                "attempt_no": self.backtest_repository.next_attempt_no(workspace_id, strategy.key),
+                "bot_id": args.get("bot_id"),
+                "strategy_key": strategy.key,
+                "strategy_version": strategy.version,
+                "params": json.dumps(params, ensure_ascii=False),
+                "universe_def": json.dumps({"market": args["market"], "symbols": [args["symbol"]]}, ensure_ascii=False),
+                "universe_as_of": args.get("universe_as_of"),
+                "data_snapshot_id": args.get("data_snapshot_id"),
+                "adj_policy": args.get("adj_policy") or "unadjusted",
+                "cost_assumptions": json.dumps(costs_raw, ensure_ascii=False),
+                "period_from": args["period_from"],
+                "period_to": args["period_to"],
+                "initial_cash": args["initial_cash"],
+                "reg_id": args.get("reg_id") or "system",
+            }
+        )
+
     # ── 조회 ─────────────────────────────────────────────────────────────────
+    def diff_against_parent(self, run_id: int) -> dict:
+        """이 실행이 **부모와 무엇이 달라졌나**.
+
+        완료 조건이 「`parent_run_id` 로 두 실행의 차이가 조회된다」인데, 값만 저장하고
+        비교를 클라이언트에 맡기면 그 조건은 절반만 닫힌다 — 리뷰가 짚은 자리다.
+
+        비교 대상은 **사람이 바꿀 수 있었던 것**이다: 파라미터·비용 가정·구간·유니버스.
+        전략 버전이 달라졌으면 그것부터 알려야 한다 — 파라미터가 같아도 결과가 달라진다.
+        """
+        run = self.backtest_repository.select_run(run_id)
+        if not run:
+            raise NotFoundError(f"실행을 찾을 수 없습니다: {run_id}")
+
+        parent_id = run.get("parent_run_id")
+        if parent_id is None:
+            return {
+                "run_id": run_id,
+                "parent_run_id": None,
+                "changes": [],
+                "reason": "부모 실행이 없습니다 — 이 실행이 계보의 시작입니다",
+            }
+
+        parent = self.backtest_repository.select_run(parent_id)
+        if not parent:
+            return {
+                "run_id": run_id,
+                "parent_run_id": parent_id,
+                "changes": [],
+                "reason": f"부모 실행({parent_id})을 찾을 수 없습니다 — 지워졌을 수 있습니다",
+            }
+
+        changes: list[dict] = []
+        for field in ("strategy_key", "strategy_version", "adj_policy", "period_from", "period_to", "initial_cash"):
+            before, after = parent.get(field), run.get(field)
+            if str(before) != str(after):
+                changes.append({"kind": "field", "name": field, "before": str(before), "after": str(after)})
+
+        for field in ("params", "cost_assumptions", "universe_def"):
+            before = parent.get(field) or {}
+            after = run.get(field) or {}
+            for key in sorted(set(before) | set(after)):
+                if before.get(key) != after.get(key):
+                    changes.append({"kind": field, "name": key, "before": before.get(key), "after": after.get(key)})
+
+        return {
+            "run_id": run_id,
+            "parent_run_id": parent_id,
+            "changes": changes,
+            "reason": None if changes else "부모와 같은 조건입니다",
+        }
+
     def select_result(self, run_id: int) -> dict:
         run = self.backtest_repository.select_run(run_id)
         if not run:
