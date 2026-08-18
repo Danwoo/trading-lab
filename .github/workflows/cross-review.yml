@@ -383,9 +383,19 @@ jobs:
           val() { sed -n "s/^$1=//p" route.env; }
           AUTHOR_TIER=$(val author_tier)
           case "$(val reviewer)" in
+            # **codex 를 모든 체인에 넣는다** (2026-08-18). 종전엔 고위험 + CROSS_REVIEW_CODEX=on
+            # 일 때만 배정돼, 그 변수를 안 켜면 codex 가 **체인에 들어가지도 못했다** — 한도가
+            # 남아 있어도 안 쓰였다(실측: 변수를 2026-08-08 에 끄고 10일간 아무도 안 켰다).
+            #
+            # 사전 프로브가 후보마다 2.5초에 한도를 걸러 주므로, 체인에 넣는 비용은 **쓸 수
+            # 있을 때만 쓰는 것**이다. codex 예산은 「1순위로 두지 않는 것」으로 아낀다 —
+            # 교차 리뷰어(kimi)가 살아 있으면 codex 차례는 오지 않는다.
+            #
+            # claude 를 맨 끝에 두는 이유: claude 작성분을 claude 가 보면 **자기 벤더**다.
+            # 교차가 가능한 후보를 먼저 다 태우고 그다음이 반대 티어 claude 다.
             codex)  CHAIN="codex kimi claude" ;;
-            kimi)   CHAIN="kimi claude" ;;
-            claude) CHAIN="claude" ;;
+            kimi)   CHAIN="kimi codex claude" ;;
+            claude) CHAIN="claude codex kimi" ;;
             *)      CHAIN="" ;;
           esac
           if [ -n "$AUTHOR_TIER" ]; then TIER_SOURCE=commit-email; else TIER_SOURCE=none; fi
@@ -749,6 +759,7 @@ jobs:
 
           # ── 튜너블 ────────────────────────────────────────────────────────────────────
           PROBE_TIMEOUT="${REVIEW_PROBE_TIMEOUT_SECS:-60}"   # 실측 2.5~2.7초 — 넉넉히
+          SEND_RETRY_SLEEP="${REVIEW_SEND_RETRY_SLEEP_SECS:-5}"  # send 명령 실패 시 재시도 간격
           # 판정 폴링 — 「첫 확인까지 한 번 길게 쉬고, 그다음은 짧게 자주」.
           # 종전엔 30초에서 시작해 2배씩 늘려 300초에 물렸다: 확인 시점이 30초·1분30초·3분30초·
           # 7분30초·12분30초·17분30초… 로 벌어져 **리뷰가 끝나고도 최대 5분을 더 기다렸다**(실측:
@@ -1077,12 +1088,32 @@ jobs:
           # 관측 실패(rc 2)는 경고만 남기고 **폴링을 계속한다** — 진짜 미전달이었다면 마커가
           # 영영 안 와 타임아웃(rc 20)으로 접히고, 리뷰어 전부 실패 시 종전대로 unable 이 된다.
           # `orca-ide send` **명령 자체의 실패**(rc 1)만 전달 실패로 확정한다.
+          # `orca-ide send` **명령 자체가 실패**하면 짧게 다시 보낸다.
+          #
+          # 이 실패는 브리지·네트워크 딸꾹질이지 리뷰어의 문제가 아닌데, 한 번 실패로 그 후보가
+          # 탈락했다 — 실측(PR #210): kimi 는 한도, claude 는 `terminal send 명령 실패` 로
+          # **체인이 통째로 소진**돼 판정이 unable 이 됐다. 리뷰어 둘이 멀쩡한데 리뷰가 없다.
+          #
+          # **중복 위험이 없다** — 명령이 실패하면 아무것도 안 갔다. 종전에 지운 재전송 루프는
+          # 「도착한 텍스트를 다시 보내는」 것이라 리뷰가 두 번 도는 위험이 있었지만, 이건
+          # 명령 실패(rc≠0)만 다시 부른다.
+          send_retry() {   # $@ = orca-ide terminal send 인자 → 0=성공
+            local i
+            for i in 1 2 3; do
+              orca-ide terminal send "$@" $ORCA_ENV >/dev/null 2>&1 && return 0
+              if [ "$i" -lt 3 ]; then
+                echo "::warning::[orca] terminal send 명령 실패 ($i/3) — ${SEND_RETRY_SLEEP}s 뒤 다시 보낸다"
+                sleep "$SEND_RETRY_SLEEP"
+              fi
+            done
+            return 1
+          }
           send_review_prompt() {   # $1=핸들 $2=프롬프트 $3=needle → 0=접수 확인 · 1=전달 실패(명령) · 2=접수 미확인(관측)
             local deadline
             # 준비 단계가 남긴 프로브 글자를 지운다 — 안 지우면 리뷰 지시 앞에 붙는다.
             orca-ide terminal send --terminal "$1" --interrupt $ORCA_ENV >/dev/null 2>&1
-            if ! orca-ide terminal send --terminal "$1" --text "$2" $ORCA_ENV >/dev/null 2>&1; then
-              echo "::warning::[orca] terminal send 실패 — 리뷰 지시를 전달하지 못했다"
+            if ! send_retry --terminal "$1" --text "$2"; then
+              echo "::warning::[orca] terminal send 실패 (3회) — 리뷰 지시를 전달하지 못했다"
               return 1
             fi
             deadline=$(( $(date +%s) + SEND_VERIFY_TIMEOUT ))
@@ -1097,8 +1128,8 @@ jobs:
               fi
               sleep "$READY_INTERVAL"
             done
-            if ! orca-ide terminal send --terminal "$1" --enter $ORCA_ENV >/dev/null 2>&1; then
-              echo "::warning::[orca] Enter 전송 실패 — 리뷰 지시가 입력 상자에 남았다"
+            if ! send_retry --terminal "$1" --enter; then
+              echo "::warning::[orca] Enter 전송 실패 (3회) — 리뷰 지시가 입력 상자에 남았다"
               return 1
             fi
             deadline=$(( $(date +%s) + SEND_VERIFY_TIMEOUT ))
@@ -1217,6 +1248,10 @@ jobs:
             #    agentTerminalHandle 우선, 없으면 startupTerminal.handle (older runtimes).
             #    둘 다 없을 때만 terminal list 로 재획득한다 — `--agent` 워크트리의 터미널은 1개다.
             WT_PATH=$(printf '%s' "$CREATE_JSON" | jq -r '.result.worktree.path // .result.path // empty' 2>/dev/null || true)
+            # 사람이 없는 자리에 「이 폴더를 신뢰합니까」를 띄우지 않는다 — 워커는 매번 새 경로에서
+            # 뜨고, 헤드리스에는 답할 사람이 없어 TUI 준비가 안 끝나고 기동 실패로 떨어진다.
+            # 실패해도 기동은 계속한다(fail-open) — 편의 장치이지 안전 장치가 아니다.
+            [ -n "$WT_PATH" ] && python3 "$GITHUB_WORKSPACE/scripts/seed_agent_trust.py" "$m" "$WT_PATH" || true
             if [ "$PROMPT_MODE" = yes ]; then
               # 오더를 워크트리 안 파일로 준다 — `--command` 안에 긴 문장을 넣으면 인용이 깨진다.
               # 경로에는 공백·따옴표가 없으므로(워크트리 이름 규칙) 홑따옴표 하나로 안전하다.
