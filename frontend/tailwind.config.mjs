@@ -9,9 +9,9 @@ export const theme = {
     },
     colors: {
       // 터미널 패널 시스템 — 값은 styles/globals.css 의 CSS 변수가 SoT (#242 O3 착수 코멘트).
-      // 변수는 "R G B" 채널 문자열(예: "217 164 65")로 저장하고 여기서 rgb() + <alpha-value>
+      // 변수는 "R G B" 채널 문자열(예: "230 228 224")로 저장하고 여기서 rgb() + <alpha-value>
       // 로 감싼다 — Tailwind v3 는 순수 var() 문자열엔 opacity modifier(`/40` 등)를 적용하지
-      // 못하고 그 유틸리티를 조용히 생략한다(#313). 이 패턴이라야 `bg-signal-warn/10` 같은
+      // 못하고 그 유틸리티를 조용히 생략한다(#313). 이 패턴이라야 `bg-bg-panel/60` 같은
       // 조합이 실제 CSS 로 생성된다. 채널을 직접 읽는 소비자는 이제 하나다 —
       // lib/terminal/candleChart.ts 의 getComputedStyle 이고, 그 폴백 채널도 같은 형식이어야
       // 한다. marketColorPreset.ts 는 속성만 싣고 값은 globals.css 가 소유한다(#73 S1).
@@ -41,17 +41,6 @@ export const theme = {
         strong: "rgb(var(--ink-strong) / <alpha-value>)",
         muted: "rgb(var(--ink-muted) / <alpha-value>)",
         faint: "rgb(var(--ink-faint) / <alpha-value>)",
-        // 레거시 (#242 O3) — 소비자가 살아 있어 #73 S5 가 지운다.
-        primary: "rgb(var(--ink-primary) / <alpha-value>)",
-      },
-      // 레거시 (#242 O3) — 위와 같다.
-      slate: {
-        void: "rgb(var(--slate-void) / <alpha-value>)",
-        panel: "rgb(var(--slate-panel) / <alpha-value>)",
-        line: "rgb(var(--slate-line) / <alpha-value>)",
-      },
-      signal: {
-        warn: "rgb(var(--signal-warn) / <alpha-value>)",
       },
     },
     // 타이포 — 크기 대역은 12–13px 로 좁고 위계는 굵기·잉크 명도가 만든다(디자인 시스템 §3).

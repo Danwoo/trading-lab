@@ -13,7 +13,7 @@
 ## 무엇을 위반으로 보나
 
 1. **Tailwind 기본 팔레트 유틸리티** — `bg-gray-500` · `text-blue-600` 류. 색 이름 + **숫자
-   음영**의 조합이라, 이 레포의 커스텀 토큰(`bg-slate-panel` · `text-ink-muted` — 음영이
+   음영**의 조합이라, 이 레포의 커스텀 토큰(`bg-bg-panel` · `text-ink-muted` — 음영이
    숫자가 아니다)과 구조적으로 갈린다.
 2. **`black` · `white` 유틸리티** — `text-white` · `bg-black`. 기본 팔레트의 일부이고,
    디자인 시스템은 순백·순흑을 쓰지 않는다(`--ink-strong` 은 `#F5F3EF` 로 일부러 살짝 눅였다).

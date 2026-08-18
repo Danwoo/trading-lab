@@ -1,12 +1,12 @@
 // tests/styles/tailwindOpacityModifier.test.ts
 //
-// #313 회귀 그물 — 팔레트 토큰(slate·ink·signal·market, `tailwind.config.mjs`)에 opacity
+// #313 회귀 그물 — 팔레트 토큰(bg·line·btn·ink·market·상태색, `tailwind.config.mjs`)에 opacity
 // modifier(`/40` 등)를 붙인 유틸리티가 실제 CSS 로 생성되는지 검사한다.
 //
 // var() 문자열 그대로 정의된 색은 Tailwind v3 가 modifier 유틸리티를 조용히 생략한다 — 빌드도
 // 린트도 통과하고 화면에서만 테두리·배경 틴트가 사라진다(이슈 원문 실측: TerminalContainer.tsx
-// 의 `border-signal-warn/40 bg-signal-warn/10`). 이 테스트가 없으면 같은 방식으로 다시 죽어도
-// 아무도 모른다.
+// 의 복구 알림 띠에서 테두리·배경 틴트가 통째로 사라졌다). 이 테스트가 없으면 같은 방식으로
+// 다시 죽어도 아무도 모른다.
 import { describe, expect, it } from "vitest";
 import postcss, { type Rule } from "postcss";
 import tailwindcss from "tailwindcss";
@@ -14,7 +14,7 @@ import * as tailwindConfig from "@/tailwind.config.mjs";
 
 // 팔레트 전량 x opacity modifier 1건씩 — 지금 화면이 실제로 쓰는 조합만이 아니라
 // "앞으로 쓸 수 있는" 조합 전체를 검사한다(클래스를 닫는다는 이슈의 취지).
-// 디자인 시스템 토큰(#73 S1)과 레거시 토큰(#242 O3)을 함께 담는다 — 레거시는 S5 가 지운다.
+// 디자인 시스템 토큰(#73 S1)이 전부다 — 레거시 토큰(#242 O3)은 S5 가 팔레트에서 지웠다.
 const COLOR_UTILITIES = [
   "bg-bg-base/40",
   "bg-bg-panel/60",
@@ -35,13 +35,6 @@ const COLOR_UTILITIES = [
   "bg-success/10",
   "text-market-up/50",
   "bg-market-down/25",
-  // 레거시
-  "bg-slate-void/40",
-  "border-slate-panel/60",
-  "text-slate-line/20",
-  "bg-ink-primary/70",
-  "border-signal-warn/40",
-  "bg-signal-warn/10",
 ];
 
 async function compileUtilities(classNames: string[]): Promise<Rule[]> {
@@ -61,7 +54,7 @@ async function compileUtilities(classNames: string[]): Promise<Rule[]> {
   return rules;
 }
 
-/** Tailwind 가 이스케이프한 셀렉터(`.bg-signal-warn\/10`)를 원래 클래스명으로 되돌린다. */
+/** Tailwind 가 이스케이프한 셀렉터(`.bg-bg-panel\/60`)를 원래 클래스명으로 되돌린다. */
 function unescapeSelector(selector: string): string {
   return selector.replace(/^\./, "").replace(/\\(.)/g, "$1");
 }
@@ -85,9 +78,9 @@ describe("Tailwind 색 토큰의 opacity modifier — CSS 생성 여부 (#313 �
   });
 
   it("생성된 선언이 rgb(var(...) / alpha) 형태다 — var() 단독 문자열로 되돌아가면 비어야 정상", async () => {
-    const rules = await compileUtilities(["bg-signal-warn/10"]);
-    const rule = rules.find((r) => unescapeSelector(r.selector) === "bg-signal-warn/10");
+    const rules = await compileUtilities(["bg-bg-panel/60"]);
+    const rule = rules.find((r) => unescapeSelector(r.selector) === "bg-bg-panel/60");
     expect(rule).toBeTruthy();
-    expect(rule!.toString()).toMatch(/rgb\(var\(--signal-warn\)\s*\/\s*0\.1\)/);
+    expect(rule!.toString()).toMatch(/rgb\(var\(--bg-panel\)\s*\/\s*0\.6\)/);
   });
 });

@@ -103,14 +103,19 @@
   /* ── 깊이 — 다크는 그림자로 띄운다 ── */
   --e1: 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 18px rgb(0 0 0 / 0.24);
 
-  /* ── 레거시 토큰 (#242 O3) ──
-     소비자가 살아 있어 이 단계에서 지우지 않는다. #73 S5 가 0 hit 를 확인하고 지운다.
+  /* ── 레거시 토큰 (#242 O3) — Tailwind 팔레트에서는 내려왔다 (#73 S5) ──
+     화면이 쓰던 slate·ink.primary·signal.warn 유틸리티는 0 hit 가 됐고 tailwind.config.mjs
+     의 그 세 항목도 지웠다 — 이 이름들로는 이제 유틸리티가 생성되지 않는다. 값이 남는 이유는
+     **이 파일 자신이 아직 소비자**이기 때문이다 — 지우면 로그인 배경과 임시 데이터 해칭이
+     깨진다:
+       --slate-void/--slate-panel/--slate-line → .auth-backdrop (격자 2장 + 대각선 베이스)
+       --signal-warn                           → .auth-backdrop--hero · .terminal-placeholder-hatch
+     `--ink-primary` 는 소비자가 남지 않아 이 단계에서 지웠다.
      `--ink-muted` 는 이름이 겹쳐 위 잉크 3단이 값을 가져갔다 — 옛 값(107 118 134)은
      --slate-panel 위 3.83:1 로 이미 AA 미달이었고, 새 값은 같은 바탕에서 4.92:1 이다. */
   --slate-void: 11 14 19;
   --slate-panel: 20 25 34;
   --slate-line: 35 42 54;
-  --ink-primary: 201 209 220;
   --signal-warn: 217 164 65;
 
   /* ── 타이포 ── 크기는 12–13px 좁은 대역에 묶고 위계는 굵기·잉크 명도가 만든다.
