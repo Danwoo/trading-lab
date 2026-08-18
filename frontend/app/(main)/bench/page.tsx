@@ -1,9 +1,19 @@
 "use client";
 
 import { useRef, useState, type KeyboardEvent } from "react";
-import { BenchPaths, BoardZone, ImpactNotice, QuoteFreshnessBanner } from "@/components/features/Bench";
+import {
+  BenchPaths,
+  BoardZone,
+  GridRunForm,
+  ImpactNotice,
+  ParamGrid,
+  QuoteFreshnessBanner,
+  RunReportView,
+} from "@/components/features/Bench";
 import { cn } from "@/components/shared/ui/primitives/cn";
+import { useBacktestBoard } from "@/hooks/bench/useBacktestBoard";
 import { useBotRoster } from "@/hooks/bench/useBotRoster";
+import { useGridRunForm } from "@/hooks/bench/useGridRunForm";
 import {
   useBenchSelectionStore,
   type BenchSelection,
@@ -16,12 +26,6 @@ const TABBED_ZONE_IDS = ["grid", "curve"] as const;
 type TabbedZoneId = (typeof TABBED_ZONE_IDS)[number];
 
 const TAB_TITLES: Record<TabbedZoneId, string> = { grid: "격자", curve: "곡선" };
-
-/**
- * 백테스트 엔진이 붙기 전까지 격자·곡선이 비어 있는 진짜 이유. 마일스톤 2 의 no-go 라
- * **「곧 나옵니다」가 아니라 「지금은 안 됩니다」**가 정확하다 — 화면 결정 §20.5·§21.4.
- */
-const NO_BACKTEST_ENGINE = "백테스트 엔진이 아직 없어 돌릴 수 없습니다";
 
 /**
  * 고른 지점을 자리 안에 적는다 — §20.2 「패널에서 고르기 = 보드가 그 지점 표시」.
@@ -44,6 +48,9 @@ function SelectionLine({ selection, kind }: { selection: BenchSelection | null; 
  * **빈 자리마다 무엇이 올 것인지 적고 길을 둘 준다**(§21.4). 그리고 데이터가 낡거나 없으면
  * 상단 띠가 그것을 말한다(§21.5) — 조용히 굴러가지 않는 것이 이 화면의 약속이다.
  *
+ * 백테스트 엔진(#200~#202)이 붙어 격자·곡선이 **실제 산출물로 찬다**(#203) — 봇이 0개거나
+ * 아직 안 돌렸으면 여전히 무엇이 올 자리인지 말한다. 채우는 것은 결과가 있을 때다.
+ *
  * **폭 구간은 CSS 가 가른다.** 1280 이상은 격자·곡선이 나란히, 그 아래는 탭 하나씩(§21.6)인데
  * 그 판정을 JS 상태로 하면 서버 스냅샷과 실제 폭이 달라 첫 페인트가 튄다. 그래서 두 배치를
  * 다 두고 Tailwind 브레이크포인트(`xl` = 1280)가 하나만 보이게 한다 — 안 보이는 쪽은
@@ -54,6 +61,9 @@ export default function Page() {
   const tabRefs = useRef(new Map<TabbedZoneId, HTMLButtonElement>());
   const selection = useBenchSelectionStore((s) => s.selection);
   const roster = useBotRoster();
+  const board = useBacktestBoard();
+  // 폼 상태는 페이지가 하나만 만든다 — 격자 자리가 두 배치에 두 벌 마운트돼도(§21.6) 입력은 하나다.
+  const runForm = useGridRunForm();
 
   const bots = roster.data;
   const botCount = bots?.length ?? 0;
@@ -69,16 +79,40 @@ export default function Page() {
     tabRefs.current.get(next)?.focus();
   };
 
-  // 격자·곡선이 비어 있는 이유는 봇이 있느냐에 따라 다르다. 「봇이 없다」와 「엔진이 없다」를
-  // 한 문장으로 뭉개면 사용자가 무엇을 하면 되는지가 사라진다.
-  const gridProvenance: Provenance = {
-    kind: "unavailable",
-    reason: botCount === 0 ? "돌릴 봇이 없습니다 — 봇을 하나 만들면 조합이 여기 깔립니다" : NO_BACKTEST_ENGINE,
-  };
-  const curveProvenance: Provenance = {
-    kind: "unavailable",
-    reason: botCount === 0 ? "거래가 0건이라 그릴 곡선이 없습니다" : NO_BACKTEST_ENGINE,
-  };
+  // 격자에서 고른 칸 — 같은 칸을 다시 누르면 선택이 풀리므로(스토어 규칙) 리포트도 함께 접는다.
+  const selectedRunId = selection?.kind === "grid-point" ? Number(selection.id) : null;
+  const activeReport = board.report !== null && board.report.run.run_id === selectedRunId ? board.report : null;
+
+  // 격자·곡선이 비어 있는 이유는 상태마다 다르다. 「봇이 없다」·「아직 안 돌렸다」·「칸을 아직
+  // 안 골랐다」를 한 문장으로 뭉개면 사용자가 무엇을 하면 되는지가 사라진다.
+  const gridProvenance: Provenance =
+    board.grid !== null
+      ? { kind: "loaded", source: "백테스트 격자", asOf: null }
+      : {
+          kind: "unavailable",
+          reason:
+            botCount === 0
+              ? "돌릴 봇이 없습니다 — 봇을 하나 만들면 조합이 여기 깔립니다"
+              : "아직 돌리지 않았습니다 — 봇·종목·구간을 골라 실행하면 조합이 칸으로 깔립니다",
+        };
+
+  const curveProvenance: Provenance = activeReport
+    ? {
+        kind: "loaded",
+        source: `실행 #${activeReport.run.run_id}`,
+        asOf: activeReport.run.finished_dt,
+      }
+    : {
+        kind: "unavailable",
+        reason: board.isReportLoading
+          ? "리포트를 불러오고 있습니다"
+          : (board.reportError ??
+            (board.grid !== null
+              ? "격자에서 칸을 누르면 그 조합의 곡선·지표·거래가 여기 그려집니다"
+              : botCount === 0
+                ? "거래가 0건이라 그릴 곡선이 없습니다"
+                : "아직 돌리지 않았습니다 — 격자를 실행하면 곡선이 그려집니다")),
+      };
 
   const rosterProvenance: Provenance =
     roster.isLoading && bots === null
@@ -90,22 +124,46 @@ export default function Page() {
   const gridZone = (
     <BoardZone
       title="격자"
-      incoming="파라미터 조합 100가지가 칸으로 깔립니다. 칸을 누르면 곡선이 그 조합으로 바뀝니다."
+      incoming="파라미터 조합이 칸으로 깔립니다. 칸을 누르면 곡선이 그 조합으로 바뀝니다."
       provenance={gridProvenance}
       marked={selection?.kind === "grid-point"}
     >
       <SelectionLine selection={selection} kind="grid-point" />
+      {botCount > 0 && (
+        <div className="flex min-w-0 flex-col gap-3">
+          <GridRunForm
+            bots={bots}
+            controller={runForm}
+            isRunning={board.isRunning}
+            runError={board.runError}
+            onRun={board.runGrid}
+          />
+          {board.grid !== null && (
+            <ParamGrid grid={board.grid} selectedRunId={selectedRunId} onSelect={board.selectCell} />
+          )}
+        </div>
+      )}
     </BoardZone>
   );
 
   const curveZone = (
     <BoardZone
       title="곡선"
-      incoming="자산 추이와 구간 브러시. 구간을 끌면 그 구간만 다시 계산합니다."
+      incoming="고른 조합의 자산 추이·낙폭과 판정 지표, 거래 목록."
       provenance={curveProvenance}
       marked={selection?.kind === "curve-point"}
     >
       <SelectionLine selection={selection} kind="curve-point" />
+      {activeReport !== null && (
+        <div className="flex min-w-0 flex-col gap-1">
+          <RunReportView report={activeReport} />
+          {board.lastReportMs !== null && (
+            <p className="break-keep text-2xs text-ink-muted">
+              칸 클릭 → 갱신 {board.lastReportMs}ms{board.lastReportMs === 0 ? " (캐시)" : ""} — 예산 500ms (스펙 §5)
+            </p>
+          )}
+        </div>
+      )}
     </BoardZone>
   );
 
