@@ -93,18 +93,19 @@ class FileService:
             atch_file_id = FileMetadataUtils.generate_file_id()
 
         # 첨부파일 메인 레코드 없으면 새로 삽입
-        existing = self.file_repository.select_file({"atch_file_id": atch_file_id})
+        existing = await run_in_threadpool(self.file_repository.select_file, {"atch_file_id": atch_file_id})
         if not existing:
-            self.file_repository.insert_file(
+            await run_in_threadpool(
+                self.file_repository.insert_file,
                 {
                     "atch_file_id": atch_file_id,
                     "reg_id": user_id,
                     "mod_id": user_id,
-                }
+                },
             )
 
         # 다음 파일 순번, 업로드 경로 지정 (base_path 는 SFTP_BASE_PATH 하위로 강제)
-        next_sn = self.file_repository.get_next_file_sn(atch_file_id)
+        next_sn = await run_in_threadpool(self.file_repository.get_next_file_sn, atch_file_id)
         try:
             upload_base = resolve_upload_base(args.get("base_path"), self.sftp_base_path)
         except ValueError as e:
@@ -147,7 +148,8 @@ class FileService:
             await session.write(remote_file, file.file)
 
             # 파일 상세정보 DB 저장
-            self.file_repository.insert_file_detail(
+            await run_in_threadpool(
+                self.file_repository.insert_file_detail,
                 {
                     "atch_file_id": atch_file_id,
                     "file_sn": file_sn,
@@ -159,7 +161,7 @@ class FileService:
                     "file_ty": FileMetadataUtils.get_file_type(file.filename),
                     "reg_id": user_id,
                     "mod_id": user_id,
-                }
+                },
             )
 
             return {
@@ -180,7 +182,7 @@ class FileService:
 
     async def stream_file_download(self, args: dict) -> AsyncGenerator[bytes, None]:
         """파일 스트리밍 다운로드 (비동기 Generator 리턴)"""
-        file_detail = self.file_repository.select_file_detail(args)
+        file_detail = await run_in_threadpool(self.file_repository.select_file_detail, args)
         if not file_detail:
             raise NotFoundError("파일을 찾을 수 없습니다.")
 
@@ -191,7 +193,7 @@ class FileService:
 
     async def read_file_content(self, args: dict) -> tuple[bytes, str]:
         """파일 전체 내용을 메모리로 읽어 반환 (bytes, 원본파일명)"""
-        file_detail = self.file_repository.select_file_detail(args)
+        file_detail = await run_in_threadpool(self.file_repository.select_file_detail, args)
         if not file_detail:
             raise NotFoundError("파일을 찾을 수 없습니다.")
 
@@ -205,7 +207,7 @@ class FileService:
         - SFTP에서 파일 다운로드
         - 크롭 / 축소 변환 수행 후 메모리로 반환
         """
-        file_detail = self.file_repository.select_file_detail(args)
+        file_detail = await run_in_threadpool(self.file_repository.select_file_detail, args)
         if not file_detail:
             raise NotFoundError("파일을 찾을 수 없습니다.")
         if file_detail.get("file_ty") != "IMAGE":
@@ -247,14 +249,14 @@ class FileService:
         """단일 파일 삭제 처리 (SFTP + DB)"""
         atch_file_id = args["atch_file_id"]
         file_sn = args["file_sn"]
-        file_detail = self.file_repository.select_file_detail(args)
+        file_detail = await run_in_threadpool(self.file_repository.select_file_detail, args)
         if not file_detail:
             logger.warning(f"삭제할 파일 없음: {atch_file_id}/{file_sn}")
             return
 
         remote_path = file_detail["file_stre_cours"]
         if not remote_path:
-            self.file_repository.delete_file_detail(args)
+            await run_in_threadpool(self.file_repository.delete_file_detail, args)
             return
 
         async with self.file_store.open_session() as session:
@@ -266,12 +268,14 @@ class FileService:
             except asyncssh.SFTPPermissionDenied as e:
                 raise ForbiddenError("파일 삭제 권한이 없습니다.") from e
 
-            self.file_repository.delete_file_detail(args)
+            await run_in_threadpool(self.file_repository.delete_file_detail, args)
 
     async def delete_file(self, args: dict) -> None:
         """첨부파일 전체 묶음 삭제"""
         atch_file_id = args["atch_file_id"]
-        file_details, _ = self.file_repository.select_file_detail_list({"atch_file_id": atch_file_id})
+        file_details, _ = await run_in_threadpool(
+            self.file_repository.select_file_detail_list, {"atch_file_id": atch_file_id}
+        )
         if not file_details:
             raise NotFoundError("삭제할 파일을 찾을 수 없습니다.")
 
@@ -279,4 +283,4 @@ class FileService:
             for detail in file_details:
                 if detail.get("file_stre_cours"):
                     await session.delete(detail["file_stre_cours"])
-            self.file_repository.delete_file(args)
+            await run_in_threadpool(self.file_repository.delete_file, args)
