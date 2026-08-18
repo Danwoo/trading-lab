@@ -42,8 +42,8 @@ export function SymbolSidebar() {
   };
 
   return (
-    <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r border-slate-line bg-slate-panel font-mono text-xs">
-      <div role="tablist" aria-label="종목 목록" className="flex flex-shrink-0 border-b border-slate-line">
+    <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r border-line bg-bg-panel font-mono text-xs">
+      <div role="tablist" aria-label="종목 목록" className="flex flex-shrink-0 border-b border-line">
         {TABS.map((tab, index) => (
           <button
             key={tab.id}
@@ -60,8 +60,8 @@ export function SymbolSidebar() {
             onKeyDown={handleTabKeyDown}
             className={
               activeTab === tab.id
-                ? "flex-1 border-b-2 border-ink-primary px-2 py-1.5 text-ink-primary"
-                : "flex-1 border-b-2 border-transparent px-2 py-1.5 text-ink-muted hover:text-ink-primary"
+                ? "flex-1 border-b-2 border-ink-strong px-2 py-1.5 text-ink"
+                : "flex-1 border-b-2 border-transparent px-2 py-1.5 text-ink-muted hover:text-ink"
             }
           >
             {tab.label}

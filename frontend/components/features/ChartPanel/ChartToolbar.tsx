@@ -62,7 +62,7 @@ export function ChartToolbar({ activeMovingAverages, onToggleMovingAverage }: Ch
   };
 
   return (
-    <div className="flex flex-shrink-0 flex-wrap items-center gap-3 border-b border-slate-line px-2 py-1 font-mono text-xs">
+    <div className="flex flex-shrink-0 flex-wrap items-center gap-3 border-b border-line px-2 py-1 font-mono text-xs">
       <div className="flex items-center gap-1" role="group" aria-label="주기">
         {INTERVAL_OPTIONS.map((option) => (
           <button
@@ -72,8 +72,8 @@ export function ChartToolbar({ activeMovingAverages, onToggleMovingAverage }: Ch
             onClick={() => handleIntervalClick(option.value)}
             className={
               interval === option.value
-                ? "rounded-sm bg-slate-line px-1.5 py-0.5 text-ink-primary"
-                : "rounded-sm px-1.5 py-0.5 text-ink-muted hover:text-ink-primary"
+                ? "rounded-sm bg-bg-raised px-1.5 py-0.5 text-ink"
+                : "rounded-sm px-1.5 py-0.5 text-ink-muted hover:text-ink"
             }
           >
             {option.label}
@@ -91,8 +91,8 @@ export function ChartToolbar({ activeMovingAverages, onToggleMovingAverage }: Ch
               onClick={() => onToggleMovingAverage(period)}
               className={
                 active
-                  ? "rounded-sm bg-slate-line px-1.5 py-0.5 text-signal-warn"
-                  : "rounded-sm px-1.5 py-0.5 text-ink-muted hover:text-ink-primary"
+                  ? "rounded-sm bg-bg-raised px-1.5 py-0.5 text-ink"
+                  : "rounded-sm px-1.5 py-0.5 text-ink-muted hover:text-ink"
               }
             >
               MA{period}

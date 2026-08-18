@@ -25,9 +25,9 @@ export function PanelFrame({ instance, definition, provenance, onToggleCollapse,
   const isPlaceholder = provenance?.kind === "placeholder";
 
   return (
-    <div className="flex h-full flex-col overflow-hidden border border-slate-line bg-slate-panel">
-      <div className="group flex flex-shrink-0 items-center justify-between gap-2 border-b border-slate-line px-2 py-1 font-mono text-xs">
-        <span className="min-w-0 flex-1 truncate text-ink-primary">{definition.title}</span>
+    <div className="flex h-full flex-col overflow-hidden border border-line bg-bg-panel">
+      <div className="group flex flex-shrink-0 items-center justify-between gap-2 border-b border-line px-2 py-1 font-mono text-xs">
+        <span className="min-w-0 flex-1 truncate text-ink">{definition.title}</span>
         <div className="flex flex-shrink-0 items-center gap-2">
           <ProvenanceBadge provenance={provenance} />
           <div className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none">
@@ -39,7 +39,7 @@ export function PanelFrame({ instance, definition, provenance, onToggleCollapse,
       {/* 왜 임시인지와 무엇을 하면 진짜 값이 오는지 — 헤더 배지에 넣으면 제목을 밀어내므로
           (실측) 폭 전체를 쓰는 안내줄로 낸다. 접힌 패널에서는 본문과 함께 감춘다. */}
       {isPlaceholder && provenance.hint && !instance.collapsed && (
-        <p className="flex-shrink-0 border-b border-slate-line px-2 py-1 font-mono text-2xs leading-relaxed text-ink-muted">
+        <p className="flex-shrink-0 border-b border-line px-2 py-1 font-mono text-2xs leading-relaxed text-ink-muted">
           {provenance.hint}
         </p>
       )}

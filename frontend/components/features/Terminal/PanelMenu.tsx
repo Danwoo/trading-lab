@@ -89,7 +89,7 @@ export function PanelMenu({ collapsed, onToggleCollapse, onClose }: PanelMenuPro
             setOpen(true);
           }
         }}
-        className="rounded-sm px-1 text-ink-muted hover:text-ink-primary focus-visible:text-ink-primary"
+        className="rounded-sm px-1 text-ink-muted hover:text-ink focus-visible:text-ink"
       >
         ⋮
       </button>
@@ -98,7 +98,7 @@ export function PanelMenu({ collapsed, onToggleCollapse, onClose }: PanelMenuPro
           role="menu"
           aria-label="패널 조작"
           onKeyDown={handleMenuKeyDown}
-          className="absolute right-0 z-10 mt-1 w-40 border border-slate-line bg-slate-panel py-1 text-xs shadow-lg"
+          className="absolute right-0 z-10 mt-1 w-40 border border-line bg-bg-panel py-1 text-xs shadow-lg"
         >
           {actions.map((action, index) => (
             <button
@@ -110,7 +110,7 @@ export function PanelMenu({ collapsed, onToggleCollapse, onClose }: PanelMenuPro
               type="button"
               tabIndex={-1}
               onClick={() => runAction(action)}
-              className="block w-full px-3 py-1.5 text-left text-ink-primary hover:bg-slate-line focus-visible:bg-slate-line"
+              className="block w-full px-3 py-1.5 text-left text-ink hover:bg-bg-raised focus-visible:bg-bg-raised"
             >
               {action.label}
             </button>

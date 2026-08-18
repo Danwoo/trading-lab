@@ -51,8 +51,8 @@ export default function BotStatePanel({ instanceId }: PanelProps) {
   if (bots.length === 0) {
     return (
       <div className="flex h-full flex-col justify-center gap-2 px-4 text-sm">
-        <p className="text-ink-primary">아직 만든 봇이 없습니다.</p>
-        <Link href="/bench/bot/new" className="text-ink-primary underline underline-offset-4">
+        <p className="text-ink">아직 만든 봇이 없습니다.</p>
+        <Link href="/bench/bot/new" className="text-ink underline underline-offset-4">
           봇 만들기
         </Link>
       </div>
@@ -60,14 +60,14 @@ export default function BotStatePanel({ instanceId }: PanelProps) {
   }
 
   return (
-    <ul className="divide-y divide-slate-line font-mono text-xs">
+    <ul className="divide-y divide-line font-mono text-xs">
       {bots.map((bot) => (
         <li key={bot.bot_id}>
           <Link
             href={`/bench/bot/${bot.bot_id}`}
-            className="flex items-baseline justify-between gap-2 px-3 py-2 hover:bg-slate-void focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            className="flex items-baseline justify-between gap-2 px-3 py-2 hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
           >
-            <span className="min-w-0 truncate text-ink-primary">{bot.bot_nm}</span>
+            <span className="min-w-0 truncate text-ink">{bot.bot_nm}</span>
             <span className="flex-shrink-0 text-ink-muted">
               {ROLE_LABEL[bot.bot_role] ?? bot.bot_role} · {bot.use_at === "Y" ? "켜짐" : "꺼짐"}
             </span>

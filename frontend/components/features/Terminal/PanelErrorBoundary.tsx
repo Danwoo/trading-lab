@@ -30,7 +30,7 @@ export class PanelErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div role="alert" className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
-          <p className="text-sm text-ink-primary">{this.props.panelTitle} 패널을 표시할 수 없습니다.</p>
+          <p className="text-sm text-ink">{this.props.panelTitle} 패널을 표시할 수 없습니다.</p>
           <p className="text-xs text-ink-muted">{this.state.error.message}</p>
         </div>
       );

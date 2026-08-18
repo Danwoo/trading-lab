@@ -98,7 +98,7 @@ export function HoldingTab({ activeTicker, onSelect }: HoldingTabProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-shrink-0 border-b border-slate-line px-2 py-1">
+      <div className="flex-shrink-0 border-b border-line px-2 py-1">
         <ProvenanceBadge provenance={provenance} />
       </div>
       <ul className="min-h-0 flex-1 overflow-auto">

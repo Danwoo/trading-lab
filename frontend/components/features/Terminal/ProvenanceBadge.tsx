@@ -99,7 +99,7 @@ export function ProvenanceBadge({
 }: ProvenanceBadgeProps): React.ReactElement {
   if (provenance === null) {
     return (
-      <span className="inline-flex items-center gap-1 text-signal-warn" role="status">
+      <span className="inline-flex items-center gap-1 text-danger" role="status">
         <UnknownProvenanceIcon />
         출처 미상
       </span>
@@ -110,7 +110,7 @@ export function ProvenanceBadge({
     case "live": {
       const timestamp = provenance.asOf ? formatHeaderTimestamp(provenance.asOf, precision) : null;
       return (
-        <span className="inline-flex items-center gap-1 text-ink-primary">
+        <span className="inline-flex items-center gap-1 text-ink">
           <LiveIcon />
           {provenance.source} · 실시간{timestamp ? ` · ${timestamp}` : ""}
         </span>
@@ -129,7 +129,7 @@ export function ProvenanceBadge({
     }
     case "placeholder":
       return (
-        <span className="inline-flex items-center gap-1 text-signal-warn" role="status">
+        <span className="inline-flex items-center gap-1 text-ink" role="status">
           <PlaceholderIcon />
           {provenance.source}
           {provenance.note ? ` · ${provenance.note}` : ""}
