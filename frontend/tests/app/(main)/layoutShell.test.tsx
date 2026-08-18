@@ -11,6 +11,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 import Layout from "@/app/(main)/layout";
+import { installViewport, type Viewport } from "@/tests/utils/viewport";
+import { VIEWPORT_COMPACT_MIN_PX } from "@/constants/shell";
+import { useProductPanelStore } from "@/stores/shell/productPanelStore";
 
 const gate = vi.hoisted(() => ({ value: { loaded: false, authorized: null as boolean | null } }));
 
@@ -19,18 +22,24 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 vi.mock("@/hooks/shared/useMenuAccessGate", () => ({ useMenuAccessGate: () => gate.value }));
-vi.mock("@/hooks/shared/usePanelOverlaysBoard", () => ({ usePanelOverlaysBoard: () => false }));
 
 function given(next: { loaded: boolean; authorized: boolean | null }) {
   gate.value = next;
+  // 폭을 안 세우면 `matchMedia` 가 없어 훅이 터진다 — 기본은 넓은 폭(덮지 않음)이다.
+  viewport ??= installViewport(1440);
 }
 
 const CHILD = <p data-testid="board">보드 내용</p>;
+
+let viewport: Viewport | null = null;
 
 describe("제품 셸 — 인가 응답 전에도 골조가 선다", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    viewport?.restore();
+    viewport = null;
+    useProductPanelStore.setState({ openPanelId: null });
   });
 
   it("아직 못 읽었을 때도 레일이 보인다 — 백지가 아니다", () => {
@@ -62,5 +71,33 @@ describe("제품 셸 — 인가 응답 전에도 골조가 선다", () => {
     render(<Layout>{CHILD}</Layout>);
 
     expect(screen.getByTestId("board")).toBeTruthy();
+  });
+
+  it("좁은 폭에서 패널을 열면 보드가 inert 가 된다 — 덮인 것을 조작하지 않는다", () => {
+    given({ loaded: true, authorized: true });
+    viewport!.resize(VIEWPORT_COMPACT_MIN_PX - 1);
+    useProductPanelStore.setState({ openPanelId: "bot" });
+
+    render(<Layout>{CHILD}</Layout>);
+
+    expect(screen.getByRole("main").hasAttribute("inert")).toBe(true);
+  });
+
+  it("넓은 폭에서는 패널을 열어도 보드가 살아 있다 — 옆에 붙는다", () => {
+    given({ loaded: true, authorized: true });
+    useProductPanelStore.setState({ openPanelId: "bot" });
+
+    render(<Layout>{CHILD}</Layout>);
+
+    expect(screen.getByRole("main").hasAttribute("inert")).toBe(false);
+  });
+
+  it("패널이 안 열렸으면 좁은 폭이어도 보드가 살아 있다 — 덮을 것이 없다", () => {
+    given({ loaded: true, authorized: true });
+    viewport!.resize(900);
+
+    render(<Layout>{CHILD}</Layout>);
+
+    expect(screen.getByRole("main").hasAttribute("inert")).toBe(false);
   });
 });
