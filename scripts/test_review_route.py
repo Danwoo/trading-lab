@@ -235,13 +235,64 @@ CASES = [
         False,
         {"risk": "high", "risk_source": "undeclared-fail-closed"},
     ),
+    # ── kimi 한도 소진 (2026-08-18) ──────────────────────────────────────────
+    # 폴백 체인이 어차피 claude 로 넘겨 주지만, 그 전에 매번 워크트리·터미널·TUI 준비에
+    # 60초 이상을 태우고 나서야 403 을 본다. 배정에서 빼면 그 시간이 사라진다.
+    (
+        "claude 저자 · kimi 정상 → kimi 가 리뷰 (기본 라우팅은 그대로다)",
+        ["claude-opus-agent@noreply.local"],
+        "fix-1-claude",
+        "",
+        False,
+        {"reviewer": "kimi", "routing_note": None},
+    ),
+    (
+        "claude 저자 · kimi 한도 → claude 가 리뷰 (교차 불가, 사유를 남긴다)",
+        ["claude-opus-agent@noreply.local"],
+        "fix-1-claude",
+        "",
+        False,
+        {"reviewer": "claude"},
+        True,
+    ),
+    (
+        "kimi 한도여도 사유가 코멘트에 남는다 — 조용한 자기리뷰가 되지 않게",
+        ["claude-opus-agent@noreply.local"],
+        "fix-1-claude",
+        "",
+        False,
+        {"routing_note": "kimi 는 한도 소진으로 배정에서 제외됨 (KIMI_OFF=on)"},
+        True,
+    ),
+    (
+        "kimi 저자는 원래 claude 가 리뷰 — 한도 스위치와 무관하다",
+        ["kimi-agent@noreply.local"],
+        "fix-1-kimi",
+        "",
+        False,
+        {"reviewer": "claude"},
+        True,
+    ),
+    (
+        "고위험 + codex 켜짐이면 kimi 한도와 무관하게 codex 다",
+        ["claude-opus-agent@noreply.local"],
+        "fix-1-claude",
+        "#1=high",
+        True,
+        {"reviewer": "codex"},
+        True,
+    ),
 ]
 
 
 def main() -> int:
     failures = 0
-    for desc, emails, head_ref, risks, codex_on, want in CASES:
-        got = rr.decide(emails, head_ref, risks, codex_on)
+    for case in CASES:
+        # 기존 케이스는 6-튜플, kimi 한도 케이스만 7번째로 kimi_off 를 싣는다 —
+        # 축이 늘었다고 20건을 전부 고치면 그 diff 에서 진짜 변경이 안 보인다.
+        desc, emails, head_ref, risks, codex_on, want = case[:6]
+        kimi_off = case[6] if len(case) > 6 else False
+        got = rr.decide(emails, head_ref, risks, codex_on, kimi_off)
         for k, v in want.items():
             if got[k] != v:
                 print(f"FAIL [{desc}] {k}: got {got[k]!r}, want {v!r}")

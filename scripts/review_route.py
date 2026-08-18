@@ -161,7 +161,7 @@ def identify_author(emails, head_ref):
     }
 
 
-def decide(emails, head_ref, issue_risks, codex_on):
+def decide(emails, head_ref, issue_risks, codex_on, kimi_off=False):
     identity = identify_author(emails, head_ref)
     author_kind = identity["author_kind"]
     author_vendor = identity["author_vendor"]
@@ -175,11 +175,24 @@ def decide(emails, head_ref, issue_risks, codex_on):
 
     risk, risk_source = _read_risk(issue_risks)
 
-    candidates = ["claude", "kimi"] + (["codex"] if codex_on else [])
+    # 한도가 소진된 벤더는 **배정에서 뺀다.** 폴백 체인이 자동으로 claude 로 넘겨 주지만,
+    # 그 전에 매번 워크트리·터미널·TUI 준비에 60초 이상을 태우고 나서야 403 을 본다 —
+    # 리뷰마다 그 시간이 그대로 붙는다. 한도가 돌아오면 변수를 지운다.
+    kimi_on = not kimi_off
+    candidates = (
+        ["claude"] + (["kimi"] if kimi_on else []) + (["codex"] if codex_on else [])
+    )
     if author_kind == "agent" and author_vendor == "kimi":
         reviewer = "claude"
     elif author_kind == "agent" and author_vendor == "claude":
-        reviewer = "codex" if (risk == "high" and codex_on) else "kimi"
+        if risk == "high" and codex_on:
+            reviewer = "codex"
+        elif kimi_on:
+            reviewer = "kimi"
+        else:
+            # 교차가 불가능하다 — **같은 벤더의 반대 티어**로 간다. 자기리뷰가 아니게
+            # 티어를 가르는 것이 §9 의 「교차 불가 시」 규약이고, 코멘트가 그 사실을 적는다.
+            reviewer = "claude"
     elif author_kind == "agent" and author_vendor == "codex":
         reviewer = "claude"
     elif author_kind == "human":
@@ -212,6 +225,10 @@ def decide(emails, head_ref, issue_risks, codex_on):
         ),
         "risk": risk,
         "risk_source": risk_source,
+        # 왜 이 리뷰어인지 — 한도로 후보에서 빠진 벤더가 있으면 코멘트가 그 사실을 적는다.
+        "routing_note": (
+            "kimi 는 한도 소진으로 배정에서 제외됨 (KIMI_OFF=on)" if kimi_off else None
+        ),
         "label_allowed": label_allowed,
     }
 
@@ -222,6 +239,7 @@ def main():
         os.environ.get("HEAD_REF", ""),
         os.environ.get("ISSUE_RISKS", "").splitlines(),
         os.environ.get("CODEX_ON", "") == "on",
+        os.environ.get("KIMI_OFF", "") == "on",
     )
     json.dump(result, sys.stdout)
     print()
