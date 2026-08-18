@@ -24,7 +24,7 @@ import { selectBotList } from "@/services/bot/botService";
 import { selectIngestRunList } from "@/services/terminal/ingestService";
 import type { IngestRunOut } from "@/schemas/terminal/ingest";
 
-vi.mock("@/services/bot/botService", () => ({ selectBotList: vi.fn() }));
+vi.mock("@/services/bot/botService", () => ({ selectBotList: vi.fn(), selectBot: vi.fn() }));
 vi.mock("@/services/terminal/ingestService", () => ({ selectIngestRunList: vi.fn() }));
 
 const TODAY = "2026-08-15";
@@ -83,8 +83,8 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
   it("빈 화면이 아니라 자리마다 무엇이 올 것인지가 적혀 있다", async () => {
     render(<BenchPage />);
 
-    expect(firstRegion("격자").textContent).toContain("파라미터 조합 100가지가 칸으로 깔립니다");
-    expect(firstRegion("곡선").textContent).toContain("자산 추이와 구간 브러시");
+    expect(firstRegion("격자").textContent).toContain("파라미터 조합이 칸으로 깔립니다");
+    expect(firstRegion("곡선").textContent).toContain("자산 추이·낙폭과 판정 지표");
     expect(firstRegion("내 봇").textContent).toContain("만든 봇과 지금 상태");
     expect(firstRegion("오늘 할 일").textContent).toContain("어젯밤에 리서치가 올린 것");
   });
@@ -98,13 +98,17 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
     expect(firstRegion("오늘 할 일").textContent).toContain("리서치 저녁 배치가 아직 없어");
   });
 
-  it("봇이 생기면 격자·곡선의 사유가 「엔진이 없다」로 바뀐다", async () => {
+  // 엔진(#200~#202)이 붙었다 — 「엔진이 없다」는 사유는 더 이상 참이 아니고, 봇이 있으면
+  // 이 자리가 실행으로 가는 길(격자 실행 폼)을 연다.
+  it("봇이 생기면 격자·곡선의 사유가 「아직 돌리지 않았다」로 바뀌고 실행 폼이 열린다", async () => {
     givenBackend({ bots: [{ bot_id: 1, bot_nm: "봇 알파", bot_role: "READONLY", use_at: "Y" }] });
     render(<BenchPage />);
 
     await waitFor(() => expect(firstRegion("내 봇").textContent).toContain("봇 알파"));
-    expect(firstRegion("격자").textContent).toContain("백테스트 엔진이 아직 없어");
+    expect(firstRegion("격자").textContent).toContain("아직 돌리지 않았습니다");
     expect(firstRegion("격자").textContent).not.toContain("돌릴 봇이 없습니다");
+    expect(firstRegion("곡선").textContent).toContain("아직 돌리지 않았습니다");
+    expect(within(firstRegion("격자")).getByRole("form", { name: "격자 실행" })).toBeTruthy();
   });
 
   it("길을 둘 준다 — 「봇 만들기」와 「에이전트에게 맡기기」 (§21.4)", () => {

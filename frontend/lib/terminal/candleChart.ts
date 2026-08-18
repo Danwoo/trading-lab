@@ -30,8 +30,9 @@ function toUtcTimestamp(time: string): UTCTimestamp {
 }
 
 /**
- * `lightweight-charts` 를 import 하는 유일한 파일이다(#242 O6 계약) — 라이브러리 타입은 이
- * 함수의 반환 형태(`CandleChartHandle`) 밖으로 나가지 않는다. 색은 호출 시점의 CSS 변수
+ * `lightweight-charts` 를 import 하는 곳은 이 파일과 `lib/bench/equityChart.ts` 둘뿐이다
+ * (#242 O6 계약 — 라이브러리 타입은 각 팩토리의 반환 형태(`CandleChartHandle`) 밖으로 나가지
+ * 않는다). 색은 호출 시점의 CSS 변수
  * (`--market-up`·`--market-down`·`--hairline`·`--ink-muted`·`--bg-panel`)를 읽어 시각 정체성을
  * 그대로 따른다 — `getComputedStyle` 이 캐스케이드 결과를 주므로 모드·프리셋 전환이 그대로
  * 반영된다. `layout.attributionLogo` 는 건드리지 않는다 — 기본값(표시)을 유지한다
