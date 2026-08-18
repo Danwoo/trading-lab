@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -18,6 +19,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -429,3 +431,105 @@ class MinuteBar(Base):
     adj_policy: Mapped[str] = mapped_column(String(20), nullable=False)
     ingest_run_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("tn_ingest_run.run_id"), nullable=True)
     ingested_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=func.now())
+
+
+# 12. Backtest (#200 M3 덩어리 1 — 스펙 §6 「엔진이 남겨야 할 것」)
+#
+# **이 모델들은 raw SQL 을 대신하지 않는다.** 런타임 조회는 종전대로 repository 의 raw SQL 이고,
+# 여기 있는 이유는 `alembic check` 가 마이그레이션과 대조할 대상을 갖게 하기 위해서다 —
+# 모델에 없는 테이블은 alembic 이 「남의 것」으로 보고 드리프트 비교에서 빼, 컬럼이 사라져도
+# check 가 통과한다 (`verify_alembic_model_coverage.py` 가 그 구멍을 막는다).
+class BacktestRun(Base):
+    __tablename__ = "tn_backtest_run"
+
+    run_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 계보와 시도 순번 — 「무엇이 달라졌나」·「몇 번째 시도인가」·「이력 복원」 셋을 떠받친다.
+    parent_run_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    attempt_no: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    bot_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    strategy_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    strategy_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    params: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    universe_def: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    universe_as_of: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    data_snapshot_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    adj_policy: Mapped[str] = mapped_column(String(30), nullable=False, server_default="unadjusted")
+    cost_assumptions: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    period_from: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    period_to: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    initial_cash: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="queued")
+    failed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+
+    reg_dt: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+
+class BacktestEquity(Base):
+    __tablename__ = "tn_backtest_equity"
+
+    run_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tn_backtest_run.run_id", ondelete="CASCADE"), primary_key=True
+    )
+    dt: Mapped[datetime.date] = mapped_column(Date, primary_key=True)
+    equity: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    cash: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    position_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    gross_exposure: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False, server_default="0")
+
+
+class BacktestTrade(Base):
+    __tablename__ = "tn_backtest_trade"
+
+    trade_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tn_backtest_run.run_id", ondelete="CASCADE"), nullable=False
+    )
+    instrument_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    side: Mapped[str] = mapped_column(String(10), nullable=False)
+    entry_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    exit_ts: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    qty: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    fill_price: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    exit_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
+    fee: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, server_default="0")
+    slippage: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, server_default="0")
+    realized_pnl: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
+    # 「얼마나 물렸다 살아났나」 — 평균만 보면 견딜 수 있는 전략인지 모른다.
+    mae: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
+    mfe: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
+
+
+class BacktestSignal(Base):
+    __tablename__ = "tn_backtest_signal"
+
+    signal_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tn_backtest_run.run_id", ondelete="CASCADE"), nullable=False
+    )
+    dt: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    instrument_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # 「왜 샀나」를 되짚는 유일한 근거. 없으면 사후에 신호를 재구성해야 하고,
+    # 재구성은 그때의 코드가 아니라 지금의 코드로 하게 된다.
+    conditions: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    factors: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    passed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+
+
+class BacktestCash(Base):
+    __tablename__ = "tn_backtest_cash"
+
+    cash_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tn_backtest_run.run_id", ondelete="CASCADE"), nullable=False
+    )
+    dt: Mapped[datetime.date] = mapped_column(Date, nullable=False)
+    # initial · deposit · withdraw · fee · trade — 현금이 왜 움직였는지.
+    event_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
