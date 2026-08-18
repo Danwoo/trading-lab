@@ -161,6 +161,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: uv run python ../scripts/run_verify_scripts.py scripts
 
+      # async 경로의 동기 DB 호출 (#189) — 이 앱은 --workers=1 이라 그 호출이 전 요청을 멈춘다.
+      # 같은 파일의 나머지가 전부 감싸져 있으면 사람 눈엔 안 보인다(실측으로 그렇게 샜다).
+      - name: async 경로 블로킹 DB 호출 검사
+        if: ${{ !cancelled() }}
+        run: uv run python scripts/verify_no_blocking_db_in_async.py
+
       - name: Standalone tests (tests/test_*.py, fail-closed)
         if: ${{ !cancelled() }}
         run: uv run python ../scripts/run_standalone_tests.py tests
