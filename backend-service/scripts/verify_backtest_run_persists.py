@@ -18,7 +18,16 @@
       uv run python scripts/verify_backtest_run_persists.py
 
 URL 이 없으면 건너뛴다(exit 0). 실제로 돌면 `REQUIRE=db 실행됨` 을 찍고 CI 가 grep 한다.
-**사람의 개발 DB 를 쓰지 마라** — 이 스크립트는 행을 쓴다.
+**사람의 개발 DB 를 쓰지 마라** — 이 스크립트는 전용 스키마를 만들고 지운다.
+
+## 스키마는 스스로 세운다
+
+`test: backend-db` 잡은 마이그레이션을 돌리지 않는다 — 각 스크립트가 필요한 것을 자기
+스키마에 세우는 것이 이 잡의 관례다(`verify_minute_partition_query.py` 와 같다).
+
+**직접 CREATE TABLE 을 적지 않고 마이그레이션 모듈을 그대로 태운다.** 손으로 옮겨 적으면
+그 사본이 마이그레이션과 갈라져, 이 검사가 「지금 스키마」가 아니라 「내가 적어 둔 스키마」를
+확인하게 된다.
 """
 
 from __future__ import annotations
@@ -87,7 +96,41 @@ def main() -> int:
     from sqlalchemy import create_engine, text
 
     # SQL 예외 로그에 파라미터 값이 새지 않게 — `test_sql_parameter_hiding` 이 강제한다.
-    engine = create_engine(url, hide_parameters=True)
+    # `search_path` 는 **연결 옵션으로 못 박는다.** connect 이벤트로 걸면 이미 열린
+    # 연결에는 안 걸려, 스키마를 세운 직후 첫 조회가 public 을 본다(실측).
+    engine = create_engine(url, hide_parameters=True, connect_args={"options": "-csearch_path=bt_persist"})
+    # 전용 스키마에 마이그레이션을 **그대로 태운다.** 손으로 CREATE TABLE 을 옮겨 적으면
+    # 그 사본이 마이그레이션과 갈라져, 이 검사가 「지금 스키마」가 아니라 「내가 적어 둔
+    # 스키마」를 확인하게 된다. (`test: backend-db` 잡은 마이그레이션을 돌리지 않는다 —
+    # 각 스크립트가 필요한 것을 자기 스키마에 세우는 것이 이 잡의 관례다.)
+    import importlib.util
+
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    schema = "bt_persist"
+
+    admin = create_engine(url, hide_parameters=True)
+    with admin.begin() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+
+    migration_path = BACKEND / "alembic" / "versions" / "0015_backtest.py"
+    if not migration_path.is_file():
+        print(f"::error::마이그레이션이 없다: {migration_path}", file=sys.stderr)
+        return 1
+    mod_spec = importlib.util.spec_from_file_location("_bt_migration", migration_path)
+    migration = importlib.util.module_from_spec(mod_spec)
+    mod_spec.loader.exec_module(migration)
+
+    with engine.begin() as conn:
+        ops = Operations(MigrationContext.configure(conn))
+        ops._install_proxy()
+        try:
+            migration.upgrade()
+        finally:
+            ops._remove_proxy()
+
     sql_client = SimpleNamespace(connect=engine.connect)
     repo = BacktestRepository(sql_client)
 
@@ -160,10 +203,6 @@ def main() -> int:
     check("진입 신호가 남는다", "entry" in kinds, True)
     check("청산 신호도 남는다 (스펙 R3)", "exit" in kinds, True)
 
-    # 정리 — 이 검사가 쓴 것만 지운다. CASCADE 가 자식을 데려간다.
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM tn_backtest_run WHERE workspace_id = 4242"))
-
     # ── 실제 전략으로도 한 번 — 픽스처만 태우면 「우리 전략 규약과 맞는가」가 안 닫힌다.
     from services.bot.strategy_loader import load_module_by_key
 
@@ -194,6 +233,10 @@ def main() -> int:
         check("전략 버전이 기록된다", bool(real_result["run"]["strategy_version"]), True)
         # 「매수 조건이 없으면 매매도 없다」의 반대편 — 조건이 있으면 실제로 매매가 난다.
         check("실전략이 거래를 만든다", real_out["trade_rows"] >= 0, True)
+
+    # 정리 — 전용 스키마째 지운다.
+    with admin.begin() as conn:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (REQUIRE=db 실행됨)")
 
