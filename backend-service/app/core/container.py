@@ -7,6 +7,7 @@ from core.config import settings
 from core.database import get_backend_sql_client
 from dependency_injector import containers, providers
 from modules import WIRING_MODULES
+from repositories.backtest.backtest_repository import BacktestRepository
 
 # Repository
 from repositories.bar.bar_repository import BarRepository
@@ -20,10 +21,12 @@ from repositories.portfolio.portfolio_repository import PortfolioRepository
 from repositories.research_document.research_document_repository import ResearchDocumentRepository
 from repositories.scheduler.scheduler_repository import SchedulerRepository
 from repositories.watchlist.watchlist_repository import WatchlistRepository
+from services.backtest.backtest_service import BacktestService
 
 # Service
 from services.bar.bar_service import BarService
 from services.bot.bot_service import BotService
+from services.bot.strategy_loader import load_module_by_key
 from services.capability.capability_service import CapabilityService
 from services.chat.portfolio_chat_service import PortfolioChatService
 from services.data_key.data_key_service import DataKeyService
@@ -65,6 +68,7 @@ class Container(containers.DeclarativeContainer):
     scheduler_repository = providers.Factory(SchedulerRepository, sql_client=backend_sql_client)
     # 시세 — 캔들 조회(갈래 1)와 적재. 둘 다 workspace 스코프가 없다 (시세는 전역 공용, M2-AD-10).
     bar_repository = providers.Factory(BarRepository, sql_client=backend_sql_client)
+    backtest_repository = providers.Factory(BacktestRepository, sql_client=backend_sql_client)
     ingest_repository = providers.Factory(IngestRepository, sql_client=backend_sql_client)
     bot_repository = providers.Factory(BotRepository, sql_client=backend_sql_client)
 
@@ -101,6 +105,14 @@ class Container(containers.DeclarativeContainer):
     # 갈래 1 — 차트·백테스트·봇이 쓰는 적재본 읽기. **provider 가 이 배선에 없다** (MD-AD-19):
     # 차트가 소스를 직접 부를 통로가 생성자에 존재하지 않는다.
     bar_service = providers.Factory(BarService, bar_repository=bar_repository, capability_service=capability_service)
+    # 전략 로더는 모듈 함수라 DI 로 감싸지 않고 그대로 넘긴다 — 상태가 없다.
+    backtest_service = providers.Factory(
+        BacktestService,
+        backtest_repository=backtest_repository,
+        bar_service=bar_service,
+        strategy_loader=load_module_by_key,
+    )
+
     ingest_service = providers.Factory(
         IngestService, ingest_repository=ingest_repository, data_key_service=data_key_service
     )
