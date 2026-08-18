@@ -77,11 +77,11 @@ class IngestService:
                 raise BadRequestError(f"모르는 job_kind 입니다: {job_kind}")
         except RateLimitExhausted as exc:
             # 받은 것은 이미 커밋돼 있다 — 여기서는 재개 지점만 남긴다.
-            self._finish(run_id, "rate_limited", cursor=exc.cursor, failed_reason=str(exc))
+            await self._finish(run_id, "rate_limited", cursor=exc.cursor, failed_reason=str(exc))
             logger.warning(f"적재 잡 {run_id} 한도 소진 — 재개 지점 {exc.cursor}")
             return {"status": "rate_limited", "cursor": exc.cursor}
         except (ProviderKeyMissing, ProviderResponseInvalid, BadRequestError) as exc:
-            self._finish(run_id, "failed", failed_reason=str(exc)[:1000])
+            await self._finish(run_id, "failed", failed_reason=str(exc)[:1000])
             logger.warning(f"적재 잡 {run_id} 실패: {exc}")
             return {"status": "failed", "failed_reason": str(exc)}
         except Exception as exc:  # noqa: BLE001 — 잡 하나의 실패가 워커를 죽이지 않게 한다
@@ -89,16 +89,23 @@ class IngestService:
             # 어댑터가 변환하지 못하고 그대로 올라온 예외다 — `httpx.HTTPStatusError` 라면 문자열에
             # 요청 URL 이 통째로 들어 있고, data.go.kr 은 인증키를 쿼리로 받는다.
             reason = redact_secrets(f"{type(exc).__name__}: {exc}")[:1000]
-            self._finish(run_id, "failed", failed_reason=reason)
+            await self._finish(run_id, "failed", failed_reason=reason)
             return {"status": "failed", "failed_reason": reason}
 
-        self._finish(run_id, "succeeded", written_rows=written, skipped_rows=skipped, cursor="")
+        await self._finish(run_id, "succeeded", written_rows=written, skipped_rows=skipped, cursor="")
         logger.info(f"적재 잡 {run_id} 완료 — 기록 {written}행, 건너뜀 {skipped}행")
         return {"status": "succeeded", "written_rows": written, "skipped_rows": skipped}
 
-    def _finish(self, run_id: int, status: str, **fields) -> None:
-        self.ingest_repository.update_ingest_run_status(
-            {"run_id": run_id, "status": status, "finished_dt": dt.datetime.now(), **fields}
+    async def _finish(self, run_id: int, status: str, **fields) -> None:
+        """잡의 마지막 상태를 남긴다.
+
+        **스레드풀로 넘긴다.** 이 매니저는 앱 안에서 도는 백그라운드 워커(`--workers=1`)라,
+        동기 DB 호출이 이벤트 루프를 막으면 **그 순간 이 앱의 모든 HTTP 요청이 함께 멈춘다** —
+        적재는 장중에 돌고 그때 화면이 응답을 기다린다.
+        """
+        await run_in_threadpool(
+            self.ingest_repository.update_ingest_run_status,
+            {"run_id": run_id, "status": status, "finished_dt": dt.datetime.now(), **fields},
         )
 
     async def _run_instrument_master(self, run: dict, provider) -> tuple[int, int]:
@@ -111,8 +118,9 @@ class IngestService:
             run["source"],
         )
         # 종목 마스터를 먼저 확정해 둔다 — 뒤이은 별칭 단계가 실패해도 "몇 건 썼는지"가 남는다.
-        self.ingest_repository.update_ingest_run_status(
-            {"run_id": run["run_id"], "status": "running", "written_rows": written, "skipped_rows": skipped}
+        await run_in_threadpool(
+            self.ingest_repository.update_ingest_run_status,
+            {"run_id": run["run_id"], "status": "running", "written_rows": written, "skipped_rows": skipped},
         )
         skipped += await self._write_aliases(run, market, instruments)
         return written, skipped
@@ -223,14 +231,15 @@ class IngestService:
             written += await run_in_threadpool(self.ingest_repository.upsert_daily_bars, rows)
             last_done = symbol
             # 심볼 하나가 끝날 때마다 진행을 남긴다 — 한도에 걸려도 어디까지 왔는지가 남는다.
-            self.ingest_repository.update_ingest_run_status(
+            await run_in_threadpool(
+                self.ingest_repository.update_ingest_run_status,
                 {
                     "run_id": run["run_id"],
                     "status": "running",
                     "cursor": symbol,
                     "written_rows": written,
                     "skipped_rows": skipped,
-                }
+                },
             )
         return written, skipped
 
@@ -296,14 +305,15 @@ class IngestService:
             rows = [_minute_row(bar, instrument_id, run) for bar in bars]
             written += await run_in_threadpool(self.ingest_repository.upsert_minute_bars, rows)
             last_done = symbol
-            self.ingest_repository.update_ingest_run_status(
+            await run_in_threadpool(
+                self.ingest_repository.update_ingest_run_status,
                 {
                     "run_id": run["run_id"],
                     "status": "running",
                     "cursor": symbol,
                     "written_rows": written,
                     "skipped_rows": skipped,
-                }
+                },
             )
         return written, skipped
 
