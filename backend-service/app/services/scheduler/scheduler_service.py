@@ -2,6 +2,7 @@ from clients.mcp.mcp_client import call_mcp_tool
 from core.auth_context import require_workspace_id, set_auth_context
 from core.exceptions import ConflictError, NotFoundError, ServiceUnavailableError
 from core.logger import logger
+from fastapi.concurrency import run_in_threadpool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from repositories.scheduler.scheduler_repository import SchedulerRepository
 from services.report.activity_report_service import ActivityReportService
@@ -56,15 +57,15 @@ class SchedulerService:
     async def insert_member(self, args: dict) -> None:
         args["workspace_id"] = require_workspace_id()
         # 멤버는 소유한 스케줄러에만 등록 — 타 테넌트 스케줄러로의 멤버 주입 차단
-        if not self.scheduler_repository.select_scheduler(args):
+        if not await run_in_threadpool(self.scheduler_repository.select_scheduler, args):
             raise NotFoundError("스케줄러를 찾을 수 없습니다.")
-        if self.scheduler_repository.select_member(args):
+        if await run_in_threadpool(self.scheduler_repository.select_member, args):
             raise ConflictError("이미 등록된 멤버입니다.")
         # 계좌 소유·존재 검증 (#115) — 미소유·미존재 account_id 를 등록하면 발송 시점에 portfolio-mcp 가
         # 영구 found=False 를 돌려 무음 실패로 남고, 타 테넌트 계좌가 스케줄러에 박힌다. 등록 시점에
         # 요청자 테넌트 소유를 확인해 즉시 거절한다.
         await self._assert_account_owned(args["account_id"])
-        self.scheduler_repository.insert_member(args)
+        await run_in_threadpool(self.scheduler_repository.insert_member, args)
 
     async def _assert_account_owned(self, account_id: str) -> None:
         """account_id 가 요청자 테넌트 소유·존재 계좌인지 portfolio-mcp 로 확인 (fail-closed).
@@ -104,10 +105,10 @@ class SchedulerService:
 
     async def run(self, scheduler_id: str) -> None:
         try:
-            scheduler = self.scheduler_repository.select_scheduler_for_job(scheduler_id)
+            scheduler = await run_in_threadpool(self.scheduler_repository.select_scheduler_for_job, scheduler_id)
             if not scheduler:
                 return
-            members = self.scheduler_repository.select_members_for_job(scheduler_id)
+            members = await run_in_threadpool(self.scheduler_repository.select_members_for_job, scheduler_id)
             if not members:
                 return
             # cron 은 요청 밖이라 신원 컨텍스트가 비어 있다 — 하류 MCP on-behalf 토큰이 스케줄러 소속
