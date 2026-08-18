@@ -1,0 +1,373 @@
+"""판정 지표 — 최장 미회복 기간이 1급이고, 모든 숫자가 유도 경로를 갖는다 (#201).
+
+## 순서가 뒤집혀 있다 — 의도한 것이다 (스펙 D-Q2)
+
+**트레이더가 계좌를 닫는 이유는 샤프가 낮아서가 아니라 낙폭을 못 견뎌서다.**
+
+    1  최장 미회복 기간   몇 달을 물려 있어야 하나
+    2  MDD + Calmar       내가 견딜 수 있는 크기인가
+    3  거래당 평균 vs 비용 비용 먹고도 남나
+    4  연환산 수익률       얼마 버나
+    5  샤프                참고용
+
+**MDD 와 최장 미회복 기간은 다른 정보다.** MDD −22% 는 견딜 만해 보이지만 그것이 14개월
+지속됐다면 대부분 중간에 끊는다. 조사한 도구 대다수가 MDD 만 크게 보여주고 지속 기간은
+표 안에 묻어 둔다 — 우리는 반대로 놓는다.
+
+## 계산 정의는 검산으로 잡은 실제 버그다 (스펙 §8.5.1)
+
+추측이 아니라 프로토타입을 떼어 실행해 찾은 것이다:
+
+| 항목 | 잘못된 구현 | 올바른 정의 |
+|---|---|---|
+| 낙폭 금액 | `원금 × MDD` | **`그때의 고점 평가액 × MDD`** — 원금에 곱하면 체계적 과소(실측 36%) |
+| 언더워터 기간 | 「원금 회복까지」 | **「전 고점 아래에 머문 최장」.** 원금과 무관 |
+| CAGR | 구간과 무관하게 환산 | **표본이 짧으면 환산하지 않는다** — 26일을 환산하면 57.8%가 나온다 |
+| 구간 낙폭 | 브러시 시작을 고점으로 리셋 | **구간 밖의 직전 고점을 이어받는다** |
+
+## 유도 경로 없는 숫자 금지 (스펙 §8.5.3)
+
+프로토타입의 `수수료 여유 3.4배`·`3종목 48%` 는 **전부 격자 품질값의 1차식**이었다.
+거래도 곡선도 계산에 안 들어갔다.
+
+> *"근거 없이 정밀한 숫자는 근거 없이 뭉뚱그린 숫자보다 나쁩니다."*
+
+그래서 이 모듈은 **값만 반환하지 않는다.** 모든 지표가 `derived_from`(무엇에서 나왔나)을
+달고 나오고, 계산할 수 없으면 `0` 을 지어내는 대신 `absent_reason` 을 단다.
+
+거래가 0건이면 승률은 `0%` 가 아니라 **「거래 없음」**이다.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+
+# 이보다 짧은 구간은 연환산하지 않는다.
+#
+# 스펙이 "26일 구간을 연환산하면 57.8%" 를 문제로 지목했다. 경계를 어디 둘지는 스펙에
+# 없으므로 **1년**으로 잡는다 — 1년 미만을 연환산하는 것은 관측하지 않은 기간을 외삽하는
+# 것이고, 그 외삽분이 관측분보다 크면 그 숫자는 측정이 아니라 추측이다.
+MIN_ANNUALIZE_DAYS = 365
+
+TRADING_DAYS_PER_YEAR = 252
+
+
+@dataclass(frozen=True)
+class Metric:
+    """지표 하나. **값과 유도 경로가 항상 함께 간다.**
+
+    `value` 가 `None` 이면 계산하지 못한 것이고 `absent_reason` 이 왜인지 말한다 —
+    화면은 그 문구를 그대로 쓴다. 0 으로 채우지 마라.
+    """
+
+    key: str
+    label: str
+    value: float | None
+    unit: str
+    derived_from: str
+    absent_reason: str | None = None
+    note: str | None = None
+
+    @property
+    def is_absent(self) -> bool:
+        return self.value is None
+
+
+def _peak_series(equity: list[float]) -> list[float]:
+    """각 시점까지의 누적 고점."""
+    peaks: list[float] = []
+    running = float("-inf")
+    for value in equity:
+        running = max(running, value)
+        peaks.append(running)
+    return peaks
+
+
+def max_drawdown(equity: list[float]) -> tuple[float, int, int]:
+    """MDD 비율과 (고점 index, 저점 index).
+
+    비율은 **그때의 고점 대비**다 — 원금 대비가 아니다.
+    """
+    if not equity:
+        return 0.0, 0, 0
+    peaks = _peak_series(equity)
+    worst, peak_i, trough_i = 0.0, 0, 0
+    current_peak_i = 0
+    for i, (value, peak) in enumerate(zip(equity, peaks, strict=True)):
+        if value >= peak:
+            current_peak_i = i
+        if peak > 0:
+            dd = (value - peak) / peak
+            if dd < worst:
+                worst, peak_i, trough_i = dd, current_peak_i, i
+    return worst, peak_i, trough_i
+
+
+def drawdown_amount(equity: list[float]) -> float:
+    """낙폭 **금액**.
+
+    **`원금 × MDD` 가 아니다.** 그때의 고점 평가액에 곱해야 한다 — 원금에 곱하면 자산이
+    불어난 뒤의 낙폭을 원금 기준으로 축소해 재고, 실측에서 36% 과소로 나왔다.
+    """
+    if not equity:
+        return 0.0
+    ratio, peak_i, _ = max_drawdown(equity)
+    return equity[peak_i] * ratio
+
+
+def longest_underwater(equity: list[float]) -> tuple[int, bool]:
+    """전 고점 아래에 머문 **최장** 구간 길이와, 끝에서 미회복인지.
+
+    **「원금 회복까지」가 아니다** — 원금과 무관하다. 자산이 원금의 3배가 된 뒤 30% 빠졌으면
+    원금은 한참 위지만 그 트레이더는 물려 있는 것이다.
+    """
+    if not equity:
+        return 0, False
+    peak = equity[0]
+    longest = 0
+    current = 0
+    for value in equity:
+        if value >= peak:
+            peak = value
+            longest = max(longest, current)
+            current = 0
+        else:
+            current += 1
+    longest = max(longest, current)
+    still_under = current > 0
+    return longest, still_under
+
+
+def _span_days(first: str, last: str) -> int:
+    return (date.fromisoformat(last) - date.fromisoformat(first)).days
+
+
+def compute(
+    *,
+    equity_dt: list[str],
+    equity: list[float],
+    trades: list,
+    round_trip_cost_rate: float,
+) -> list[Metric]:
+    """스펙 D-Q2 의 순서대로 지표를 낸다.
+
+    `trades` 는 `engine.Trade` 목록. `round_trip_cost_rate` 는 왕복 비용률(수수료 왕복 +
+    슬리피지 + 증권거래세)로, 「거래당 평균 수익이 비용을 먹고도 남나」를 답하는 데 쓴다.
+    """
+    out: list[Metric] = []
+
+    if not equity:
+        reason = "자산곡선이 없습니다 — 아직 돌리지 않았습니다"
+        for key, label, unit in (
+            ("longest_underwater", "최장 미회복 기간", "일"),
+            ("mdd", "최대 낙폭", "%"),
+            ("calmar", "Calmar", "배"),
+            ("avg_trade_vs_cost", "거래당 평균 수익 − 왕복 비용", "%"),
+            ("cagr", "연환산 수익률", "%"),
+            ("sharpe", "샤프", ""),
+        ):
+            out.append(
+                Metric(key=key, label=label, value=None, unit=unit, derived_from="자산곡선", absent_reason=reason)
+            )
+        return out
+
+    span = _span_days(equity_dt[0], equity_dt[-1]) if len(equity_dt) > 1 else 0
+
+    # ── 1급: 최장 미회복 기간 ──────────────────────────────────────────
+    underwater, still_under = longest_underwater(equity)
+    out.append(
+        Metric(
+            key="longest_underwater",
+            label="최장 미회복 기간",
+            value=float(underwater),
+            unit="봉",
+            derived_from="자산곡선 — 전 고점 아래에 머문 최장 구간",
+            note="아직 회복 중" if still_under else None,
+        )
+    )
+
+    # ── 2급: MDD + 낙폭 금액 + Calmar ─────────────────────────────────
+    mdd, _, _ = max_drawdown(equity)
+    out.append(
+        Metric(
+            key="mdd",
+            label="최대 낙폭",
+            value=mdd * 100,
+            unit="%",
+            derived_from="자산곡선 — 그때의 고점 대비 하락률",
+        )
+    )
+    out.append(
+        Metric(
+            key="drawdown_amount",
+            label="최대 낙폭 금액",
+            value=drawdown_amount(equity),
+            unit="원",
+            derived_from="그때의 고점 평가액 × 최대 낙폭률 (원금 × MDD 가 아니다)",
+        )
+    )
+
+    total_return = (equity[-1] - equity[0]) / equity[0] if equity[0] else 0.0
+
+    # CAGR — 표본이 짧으면 환산하지 않는다.
+    if span >= MIN_ANNUALIZE_DAYS and equity[0] > 0 and equity[-1] > 0:
+        years = span / 365.0
+        cagr = ((equity[-1] / equity[0]) ** (1 / years) - 1) * 100
+        cagr_metric = Metric(
+            key="cagr", label="연환산 수익률", value=cagr, unit="%", derived_from=f"자산곡선 시작·끝과 구간 {span}일"
+        )
+    else:
+        cagr = None
+        cagr_metric = Metric(
+            key="cagr",
+            label="연환산 수익률",
+            value=None,
+            unit="%",
+            derived_from=f"자산곡선 — 구간 {span}일",
+            absent_reason=(
+                f"구간이 {span}일이라 연환산하지 않습니다 "
+                f"({MIN_ANNUALIZE_DAYS}일 미만은 외삽입니다). 구간 총수익률로 봅니다"
+            ),
+        )
+        out.append(
+            Metric(
+                key="total_return",
+                label="구간 총수익률",
+                value=total_return * 100,
+                unit="%",
+                derived_from="자산곡선 시작·끝",
+            )
+        )
+
+    if cagr is not None and mdd < 0:
+        out.append(
+            Metric(
+                key="calmar",
+                label="Calmar",
+                value=cagr / abs(mdd * 100),
+                unit="배",
+                derived_from="연환산 수익률 ÷ 최대 낙폭",
+            )
+        )
+    else:
+        out.append(
+            Metric(
+                key="calmar",
+                label="Calmar",
+                value=None,
+                unit="배",
+                derived_from="연환산 수익률 ÷ 최대 낙폭",
+                absent_reason=(
+                    "연환산 수익률이 없어 계산할 수 없습니다" if cagr is None else "낙폭이 0이라 나눌 수 없습니다"
+                ),
+            )
+        )
+
+    # ── 3급: 거래당 평균 수익 vs 왕복 비용 ────────────────────────────
+    closed = [t for t in trades if getattr(t, "realized_pnl", None) is not None]
+    if closed:
+        avg_pnl = sum(t.realized_pnl for t in closed) / len(closed)
+        avg_notional = sum(t.entry_price * t.qty for t in closed) / len(closed)
+        avg_pct = (avg_pnl / avg_notional * 100) if avg_notional else 0.0
+        out.append(
+            Metric(
+                key="avg_trade_vs_cost",
+                label="거래당 평균 수익 − 왕복 비용",
+                value=avg_pct - round_trip_cost_rate * 100,
+                unit="%",
+                derived_from=f"청산된 거래 {len(closed)}건의 실현손익 평균 − 왕복 비용률",
+            )
+        )
+        wins = sum(1 for t in closed if t.realized_pnl > 0)
+        out.append(
+            Metric(
+                key="win_rate",
+                label="승률",
+                value=wins / len(closed) * 100,
+                unit="%",
+                derived_from=f"청산된 거래 {len(closed)}건",
+            )
+        )
+    else:
+        # **0% 가 아니다.** 거래가 없으면 승률이라는 값 자체가 존재하지 않는다.
+        for key, label in (("avg_trade_vs_cost", "거래당 평균 수익 − 왕복 비용"), ("win_rate", "승률")):
+            out.append(
+                Metric(
+                    key=key,
+                    label=label,
+                    value=None,
+                    unit="%",
+                    derived_from="청산된 거래",
+                    absent_reason="거래 없음 — 청산된 거래가 0건입니다",
+                )
+            )
+
+    out.append(cagr_metric)
+
+    # ── 5급: 샤프 (참고용) ────────────────────────────────────────────
+    # 무위험수익률은 0 고정이고 화면이 그 사실을 밝힌다 (스펙 D-Q2).
+    returns = [(equity[i] - equity[i - 1]) / equity[i - 1] for i in range(1, len(equity)) if equity[i - 1]]
+    if len(returns) >= 2:
+        mean = sum(returns) / len(returns)
+        var = sum((r - mean) ** 2 for r in returns) / (len(returns) - 1)
+        std = var**0.5
+        if std > 0:
+            sharpe = mean / std * (TRADING_DAYS_PER_YEAR**0.5)
+            out.append(
+                Metric(
+                    key="sharpe",
+                    label="샤프",
+                    value=sharpe,
+                    unit="",
+                    derived_from=f"일별 수익률 {len(returns)}개 · 무위험수익률 0 가정",
+                )
+            )
+        else:
+            out.append(
+                Metric(
+                    key="sharpe",
+                    label="샤프",
+                    value=None,
+                    unit="",
+                    derived_from="일별 수익률",
+                    absent_reason="수익률 변동이 0이라 나눌 수 없습니다",
+                )
+            )
+    else:
+        out.append(
+            Metric(
+                key="sharpe",
+                label="샤프",
+                value=None,
+                unit="",
+                derived_from="일별 수익률",
+                absent_reason=f"수익률 표본이 {len(returns)}개뿐입니다",
+            )
+        )
+
+    return out
+
+
+def window(equity_dt: list[str], equity: list[float], start: str, end: str) -> tuple[list[str], list[float], float]:
+    """구간을 잘라 낸다 — **구간 밖의 직전 고점을 이어받는다.**
+
+    브러시 시작을 고점으로 리셋하면 구간 낙폭이 실제보다 작게 나온다. 이미 물려 있는 상태로
+    구간이 시작됐을 수 있고, 그 사실이 사라지면 「여기서부터는 괜찮았다」로 읽힌다.
+
+    세 번째 반환값이 이어받은 고점이다.
+    """
+    inherited = float("-inf")
+    dts: list[str] = []
+    values: list[float] = []
+    for dt, value in zip(equity_dt, equity, strict=True):
+        if dt < start:
+            inherited = max(inherited, value)
+            continue
+        if dt > end:
+            break
+        dts.append(dt)
+        values.append(value)
+    if inherited == float("-inf"):
+        inherited = values[0] if values else 0.0
+    return dts, values, inherited
