@@ -191,12 +191,24 @@ const BACKEND = "http://backend.test/portfolio";
 const WATCHLIST = "http://backend.test/watchlist";
 const DOC = "http://backend.test/research-document";
 const SCHED = "http://devactivity.test/scheduler";
+const BACKTEST_RUN = "http://backend.test/backtest-run";
 const BOT = "http://backend.test/bot";
 
 // app/api/external/** 안에서 params 를 백엔드 URL 템플릿에 꽂는 자리 전부(services/common/* 는
 // 브라우저→자체 API 호출이라 이 표 밖, N3 로 별도 처리). 건수는 손으로 적지 않는다 —
 // `EXPECTED_CALL_SITE_COUNT` 가 파일시스템을 실측해 이 표와 대조한다.
 const CALL_SITES: CallSite[] = [
+  // 백테스트 리포트 — #203. `backtest-run/route`(POST 실행)·`grid/route`(POST 격자)는
+  // params 를 URL 에 안 꽂아 콜사이트가 아니다. `[run_id]` 만 경로에 값을 넣는다.
+  {
+    file: "@/app/api/external/backend/backtest-run/[run_id]/route",
+    label: "backtest-run/[run_id] GET",
+    method: "GET" as const,
+    opName: "GET",
+    needsBody: false,
+    paramKeys: ["run_id"],
+    buildUrl: (p: Record<string, string>) => `${BACKTEST_RUN}/${p.run_id}`,
+  },
   // 봇 — #150 B1. `bot/route` 와 `bot/strategy-catalog/route` 는 params 를 URL 에 안 꽂아
   // 콜사이트가 아니다(정적 카운트에도 안 잡힌다).
   ...(["GET", "PUT", "DELETE"] as const).map((method) => ({

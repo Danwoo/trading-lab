@@ -64,8 +64,9 @@ export function CheckBox<T = any>({
           isInvalid ? "border-[#d9534f]" : "border-gray-300",
         )}
       />
+      {/* 라벨은 잉크 토큰 — gray-900 은 다크 패널 위에서 1.01:1 로 글자가 사라진다 (#203 실측). */}
       {text && (
-        <label htmlFor={inputId} className={cn("text-sm text-gray-900", readOnly ? "" : "cursor-pointer")}>
+        <label htmlFor={inputId} className={cn("text-sm text-ink", readOnly ? "" : "cursor-pointer")}>
           {text}
         </label>
       )}
