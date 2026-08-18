@@ -333,6 +333,13 @@ const PUBLIC_FIXTURES: Record<
   (typeof WORKSPACE_SCOPED_PUBLIC_TABLES)[number],
   (ws: number, key: string) => Prisma.Sql
 > = {
+  // 백테스트 실행은 개인 실험 결과라 워크스페이스와 함께 지운다. 자산곡선·거래·신호·현금원장
+  // 넷은 `run_id` FK 의 ON DELETE CASCADE 로 따라 지워지므로 여기서 따로 심지 않는다 —
+  // 실제 Postgres 에서 확인했다(run 1건을 지우니 자식 넷이 1→0).
+  tn_backtest_run: (ws, key) =>
+    Prisma.sql`INSERT INTO public.tn_backtest_run
+                 (workspace_id, strategy_key, strategy_version, period_from, period_to, initial_cash)
+               VALUES (${ws}, ${`k-${key}`}, '1', '2026-01-01', '2026-02-01', 1000)`,
   // 봇은 워크스페이스 자산이라 워크스페이스와 함께 지운다. 실린 전략(`tn_bot_strategy`)은
   // `bot_id` FK 의 ON DELETE CASCADE 로 따라 지워지므로 여기서 따로 심지 않는다 (#150 B0).
   tn_bot: (ws, key) =>

@@ -58,6 +58,10 @@ export async function invalidateUserSessions(email: string): Promise<void> {
  * 보유 테이블은 아래 두 목록 중 하나에 있어야 한다"를 대조한다.
  */
 export const WORKSPACE_SCOPED_PUBLIC_TABLES = [
+  // 백테스트 실행과 그 산출물(자산곡선·거래·신호·현금원장)은 개인 실험 결과다 — 탈퇴하면
+  // 서버가 계속 들고 있지 않는다(#280 리드 결정). 자식 넷은 run_id 에 ON DELETE CASCADE 가
+  // 걸려 있어 `tn_backtest_run` 만 지우면 함께 사라진다.
+  "tn_backtest_run",
   "tn_bot",
   "tn_holding",
   "tn_nav",
@@ -150,6 +154,7 @@ export const AUDIT_ANONYMIZED_TABLES = [
   "frontend.tn_workspace_domain",
   "frontend.tn_workspace_member",
   "frontend.tn_workspace_menu",
+  "public.tn_backtest_run",
   "public.tn_board",
   "public.tn_bot",
   "public.tn_bot_strategy",
