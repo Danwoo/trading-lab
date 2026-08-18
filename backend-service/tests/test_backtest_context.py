@@ -179,6 +179,34 @@ def test_threshold_is_visible() -> None:
     check("임계값이 보인다", str(CLUSTER_THRESHOLD) in conc.derived_from, True)
 
 
+def test_partial_weights_are_rejected() -> None:
+    """부분 비중을 **조용히 섞지 않는다.**
+
+    종전엔 분모를 `sum(weights.values())`, 분자를 `weights.get(iid, 1.0)` 로 계산해
+    일부만 든 딕셔너리에서 **집중도가 100% 를 넘었다.** 두 축이 같은 집합을 세야 한다.
+    """
+    n = MIN_CORRELATION_SAMPLES + 10
+    wave = [100.0 + (i % 4) * 5 for i in range(n)]
+    lst = [make(1, wave), make(2, wave), make(3, wave)]
+
+    global CHECKED
+    CHECKED += 1
+    try:
+        cluster_concentration(lst, weights={1: 0.5})
+    except ValueError as exc:
+        if "비중이 빠진" not in str(exc):
+            FAILURES.append(f"부분 비중 사유가 다르다: {exc}")
+    else:
+        FAILURES.append("부분 비중이 통과했다 — 집중도가 100%% 를 넘을 수 있다")
+
+    # 전부 주면 정상
+    full = cluster_concentration(lst, weights={1: 0.5, 2: 0.3, 3: 0.2})
+    check("전부 주면 100%", full.top_share_pct, 100.0, tol=1e-9)
+    # 아예 안 주면 동일 비중
+    none = cluster_concentration(lst)
+    check("안 주면 동일 비중으로 100%", none.top_share_pct, 100.0, tol=1e-9)
+
+
 def main() -> int:
     # **케이스가 터져도 나머지를 돈다.** 크래시로 멈추면 빨간불은 뜨지만 무엇이 왜 틀렸는지
     # 한 건밖에 안 나온다 — 파손 주입으로 확인하다 실제로 그렇게 겪었다.

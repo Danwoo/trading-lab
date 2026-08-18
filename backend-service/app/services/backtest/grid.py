@@ -56,6 +56,15 @@ class Axis:
     def __post_init__(self) -> None:
         if not self.values:
             raise ValueError(f"축 {self.name} 에 값이 없다 — 훑을 것이 없으면 축이 아니다")
+        # **중복은 조합이 아니다.** 같은 값을 두 번 훑으면 계산은 같은데 칸 수만 늘어,
+        # `attempts_used` 가 실제 distinct 조합보다 부풀고 「100가지를 돌려봤다 / 45번이
+        # 한계」류의 자기모순이 그대로 재발한다(스펙 §8.5.2 — 이 모듈이 막으려던 바로 그것).
+        seen = []
+        for v in self.values:
+            if v not in seen:
+                seen.append(v)
+        if len(seen) != len(self.values):
+            object.__setattr__(self, "values", tuple(seen))
 
 
 @dataclass

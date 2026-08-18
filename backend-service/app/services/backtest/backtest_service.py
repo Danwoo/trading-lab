@@ -13,6 +13,7 @@ N 번 호출한다 — 다시 읽지 않는다.
 import json
 
 from core.exceptions import BadRequestError, NotFoundError
+from services.backtest.context import cluster_concentration, equal_weight_universe
 from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, quantize, run_single
 from services.backtest.grid import axes_from_spec, run_grid
 
@@ -21,6 +22,22 @@ from services.backtest.grid import axes_from_spec, run_grid
 #
 # 기본값을 두되 실행마다 `cost_assumptions` 로 남겨, 나중에 「무엇을 가정했나」가 복원된다.
 DEFAULT_COSTS = {"fee_rate": 0.00015, "slippage_rate": 0.0005, "sell_tax_rate": 0.0018}
+
+
+class _TradeRow:
+    """DB 행을 지표 계산이 읽는 모양으로 감싼다.
+
+    `metrics.compute` 는 `engine.Trade` 의 속성(`realized_pnl`·`entry_price`·`qty`)을 읽는데
+    저장소는 dict 를 낸다. 지표 쪽을 dict 로 바꾸지 않는 이유: 그러면 **엔진 산출물을 바로
+    넣어 계산하는 경로**(저장 전 검증·격자 내부)가 막힌다.
+    """
+
+    __slots__ = ("realized_pnl", "entry_price", "qty")
+
+    def __init__(self, row: dict) -> None:
+        self.realized_pnl = None if row.get("realized_pnl") is None else float(row["realized_pnl"])
+        self.entry_price = float(row.get("fill_price") or 0)
+        self.qty = float(row.get("qty") or 0)
 
 
 class BacktestService:
@@ -350,6 +367,86 @@ class BacktestService:
             "parent_run_id": parent_id,
             "changes": changes,
             "reason": None if changes else "부모와 같은 조건입니다",
+        }
+
+    def select_report(self, run_id: int, args: dict | None = None) -> dict:
+        """실행 하나의 **리포트** — 곡선·거래에 지표와 맥락을 얹는다.
+
+        `select_result` 는 저장된 것을 그대로 낸다. 이 함수는 거기에 **판정 지표(#201)** 와
+        **맥락(#204)** 을 계산해 붙인다 — 그 둘이 계산만 되고 아무 데도 안 실리면
+        「결과」에 곡선·집중도가 없다(리뷰 지적).
+
+        벤치마크·집중도는 캔들이 있어야 계산된다. 없으면 **지어내지 않고 사유를 남긴다.**
+        """
+        from services.backtest import metrics as metrics_mod
+
+        base = self.select_result(run_id)
+        run = base["run"]
+
+        equity_rows = base["equity"]
+        equity_dt = [str(r["dt"]) for r in equity_rows]
+        equity = [float(r["equity"]) for r in equity_rows]
+
+        costs = run.get("cost_assumptions") or {}
+        round_trip = (
+            float(costs.get("fee_rate", 0)) * 2
+            + float(costs.get("slippage_rate", 0)) * 2
+            + float(costs.get("sell_tax_rate", 0))
+        )
+        computed = metrics_mod.compute(
+            equity_dt=equity_dt,
+            equity=equity,
+            trades=[_TradeRow(r) for r in base["trades"]],
+            round_trip_cost_rate=round_trip,
+        )
+
+        context: dict = {"benchmarks": [], "concentration": None, "absent_reason": "유니버스 캔들을 싣지 않았습니다"}
+        universe = (args or {}).get("universe_series")
+        if universe:
+            bench = equal_weight_universe(universe, float(run["initial_cash"]))
+            conc = cluster_concentration(universe)
+            context = {
+                "benchmarks": [
+                    {
+                        "key": bench.key,
+                        "label": bench.label,
+                        "dt": bench.dt,
+                        "equity": bench.equity,
+                        "total_return": bench.total_return,
+                        "derived_from": bench.derived_from,
+                    }
+                ],
+                "concentration": {
+                    "clusters": [
+                        {
+                            "instrument_ids": c.instrument_ids,
+                            "representative": c.representative,
+                            "weight_pct": c.weight_pct,
+                        }
+                        for c in conc.clusters
+                    ],
+                    "top_share_pct": conc.top_share_pct,
+                    "derived_from": conc.derived_from,
+                    "absent_reason": conc.absent_reason,
+                },
+                "absent_reason": None,
+            }
+
+        return {
+            **base,
+            "metrics": [
+                {
+                    "key": m.key,
+                    "label": m.label,
+                    "value": m.value,
+                    "unit": m.unit,
+                    "derived_from": m.derived_from,
+                    "absent_reason": m.absent_reason,
+                    "note": m.note,
+                }
+                for m in computed
+            ],
+            "context": context,
         }
 
     def select_result(self, run_id: int) -> dict:

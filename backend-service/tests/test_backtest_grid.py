@@ -267,11 +267,78 @@ def test_run_grid_rejects_before_building() -> None:
     )
 
 
+def test_duplicate_axis_values_are_folded() -> None:
+    """**중복은 조합이 아니다** — 같은 값을 두 번 훑어도 칸이 늘지 않는다.
+
+    늘어나면 `attempts_used` 가 실제 distinct 조합보다 부풀어, 「100가지를 돌려봤다 /
+    45번이 한계」류의 자기모순이 그대로 재발한다(스펙 §8.5.2 — 이 모듈이 막으려던 그것).
+    """
+    a = Axis("threshold", (1, 2, 2, 3, 1))
+    check("중복이 접힌다", a.values, (1, 2, 3))
+    check("조합 수도 접힌 값 기준", combo_count((a,)), 3)
+
+    g = run_grid(
+        strategy=strategy_using("threshold"),
+        axes=(Axis("threshold", (0, 1, 1, 0)),),
+        base_params={},
+        series=series(),
+        initial_cash=1000.0,
+        costs=FREE,
+    )
+    check("격자 칸 2개", len(g.cells), 2)
+    check("소비 시도도 2", g.attempts_used, 2)
+
+
+def test_400_combinations_within_budget() -> None:
+    """**#202 완료 조건** — 합성 데이터로 400조합을 돌려 걸린 시간을 적는다.
+
+    스펙 §5 의 예산은 「실행·전체 재계산 >1s 진행 표시, >10s 완료 예상」이다. 400조합이
+    10초를 넘으면 「완료 예상」을 띄워야 하는 구간이므로, 그 경계를 그물로 못박는다.
+
+    실측(2026-08-18, 실전략 ma_pullback · 1500봉 · 20×20): **1.4초 · 칸당 3.5ms**.
+    상한을 8초로 두는 이유 — 실측의 5배 여유. 이보다 느려지면 「로드 1회 + 인메모리 N회」가
+    깨졌는지 먼저 의심할 자리다(조합마다 DB 를 다시 읽으면 16배가 된다).
+    """
+    import datetime as _dt
+    import time
+
+    n = 1500
+    start = _dt.date(2020, 1, 1)
+    closes = [100.0 + 20 * ((i % 61) / 61 - 0.5) + i * 0.01 for i in range(n)]
+    s = BarSeries(
+        instrument_id=1,
+        dt=[(start + _dt.timedelta(days=i)).isoformat() for i in range(n)],
+        open=list(closes),
+        high=list(closes),
+        low=list(closes),
+        close=list(closes),
+        volume=[1000.0] * n,
+    )
+    axes = (Axis("threshold", tuple(range(20))), Axis("other", tuple(range(20))))
+
+    t0 = time.perf_counter()
+    g = run_grid(
+        strategy=strategy_using("threshold"), axes=axes, base_params={}, series=s, initial_cash=10_000_000, costs=FREE
+    )
+    elapsed = time.perf_counter() - t0
+
+    check("400조합", len(g.cells), 400)
+    check("소비 시도 400", g.attempts_used, 400)
+    check("전부 성공", all(c.ok for c in g.cells), True)
+
+    global CHECKED
+    CHECKED += 1
+    if elapsed > 8.0:
+        FAILURES.append(
+            f"400조합에 {elapsed:.1f}초 걸렸다 (상한 8초) — 「로드 1회 + 인메모리 N회」가 깨졌는지 확인하라"
+        )
+
+
 def main() -> int:
     for fn in [v for k, v in sorted(globals().items()) if k.startswith("test_")]:
         fn()
     print(f"검사한 케이스 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과, {len(FAILURES)}건 실패")
-    if CHECKED < 25:
+    if CHECKED < 32:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:

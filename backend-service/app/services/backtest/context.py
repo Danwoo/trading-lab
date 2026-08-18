@@ -216,11 +216,27 @@ def cluster_concentration(series_list: list[BarSeries], weights: dict[int, float
     for i in range(n):
         groups.setdefault(find(i), []).append(i)
 
-    total_weight = sum((weights or {}).values()) or float(n)
+    # **부분 weights 를 조용히 섞지 않는다.** 종전엔 분모를 `sum(weights.values())` 로,
+    # 분자를 `weights.get(iid, 1.0)` 로 계산해 — 일부 종목만 든 딕셔너리를 넘기면
+    # 분자에는 기본값 1.0 이 더해지는데 분모에는 안 들어가 **집중도가 100% 를 넘거나**
+    # (반대 조합이면) 실제보다 작게 나왔다. 두 축이 같은 집합을 세야 한다.
+    all_ids = [s.instrument_id for s in series_list]
+    if weights:
+        missing = [i for i in all_ids if i not in weights]
+        if missing:
+            raise ValueError(
+                f"비중이 빠진 종목이 있다: {missing} — 일부만 주면 분자·분모가 다른 집합을 "
+                "세어 집중도가 틀린다. 전부 주거나 아예 주지 마라(동일 비중으로 본다)."
+            )
+        weight_of = dict(weights)
+    else:
+        weight_of = {i: 1.0 for i in all_ids}
+    total_weight = sum(weight_of.values())
+
     clusters: list[Cluster] = []
     for members in groups.values():
         ids = [series_list[i].instrument_id for i in members]
-        weight = sum((weights or {}).get(iid, 1.0) for iid in ids)
+        weight = sum(weight_of[iid] for iid in ids)
         clusters.append(
             Cluster(
                 instrument_ids=sorted(ids),

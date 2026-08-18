@@ -269,6 +269,45 @@ def main() -> int:
     root = service.diff_against_parent(run_id)
     check("계보의 시작은 사유를 말한다", "계보의 시작" in (root["reason"] or ""), True)
 
+    # ── 리포트 (#201·#204 배선) — 지표와 맥락이 실제로 실리는가 ─────────────
+    # 계산만 되고 아무 데도 안 실리면 「결과」에 곡선·집중도가 없다(리뷰 지적).
+    report = service.select_report(run_id)
+    keys = {m["key"] for m in report["metrics"]}
+    check("최장 미회복 기간이 있다", "longest_underwater" in keys, True)
+    check("MDD 가 있다", "mdd" in keys, True)
+    check("1급이 맨 앞", report["metrics"][0]["key"], "longest_underwater")
+    check("모든 지표가 유도 경로를 갖는다", all(m["derived_from"] for m in report["metrics"]), True)
+    check("값이 없으면 사유가 있다", all(m["value"] is not None or m["absent_reason"] for m in report["metrics"]), True)
+
+    # 유니버스를 안 실으면 맥락은 **지어내지 않고 사유를 남긴다**
+    check("맥락 부재 사유", bool(report["context"]["absent_reason"]), True)
+
+    # 유니버스를 실으면 벤치마크·집중도가 온다
+    import datetime as _dt
+
+    start = _dt.date(2026, 1, 1)
+
+    def mk(iid, closes):
+        from services.backtest.engine import BarSeries
+
+        return BarSeries(
+            instrument_id=iid,
+            dt=[(start + _dt.timedelta(days=i)).isoformat() for i in range(len(closes))],
+            open=list(closes),
+            high=list(closes),
+            low=list(closes),
+            close=list(closes),
+            volume=[1000.0] * len(closes),
+        )
+
+    wave = [100.0 + (i % 4) * 5 for i in range(40)]
+    with_ctx = service.select_report(run_id, {"universe_series": [mk(1, wave), mk(2, wave)]})
+    check("벤치마크가 온다", len(with_ctx["context"]["benchmarks"]), 1)
+    check("동일가중 라벨", with_ctx["context"]["benchmarks"][0]["label"], "내 유니버스 동일가중")
+    check("벤치마크 유도 경로", bool(with_ctx["context"]["benchmarks"][0]["derived_from"]), True)
+    check("집중도가 온다", with_ctx["context"]["concentration"] is not None, True)
+    check("집중도 100% 이하", with_ctx["context"]["concentration"]["top_share_pct"] <= 100.0, True)
+
     # ── 격자 (#202) — 실행 하나가 격자를 낳고, 칸마다 DB 에 남는가 ──────────
     grid_out = service.run_grid(
         {
@@ -303,7 +342,7 @@ def main() -> int:
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (REQUIRE=db 실행됨)")
 
-    if CHECKED < 38:
+    if CHECKED < 48:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:
