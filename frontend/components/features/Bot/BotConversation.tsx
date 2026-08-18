@@ -120,7 +120,7 @@ export function BotConversation({
     <section className="flex min-h-[16rem] flex-col border border-slate-line bg-slate-panel">
       <header className="flex items-baseline justify-between gap-2 border-b border-slate-line px-3 py-2">
         <h2 className="font-mono text-xs text-ink-primary">대화</h2>
-        <span className="font-mono text-2xs text-ink-faint">말하면 오른쪽 폼이 채워집니다</span>
+        <span className="font-mono text-2xs text-ink-muted">말하면 오른쪽 폼이 채워집니다</span>
       </header>
 
       {warned && (
@@ -147,7 +147,7 @@ export function BotConversation({
           <ul className="flex flex-col gap-3">
             {turns.map((turn, index) => (
               <li key={index} className="text-sm leading-relaxed">
-                <span className="mr-2 font-mono text-2xs text-ink-faint">{turn.role === "user" ? "나" : "봇"}</span>
+                <span className="mr-2 font-mono text-2xs text-ink-muted">{turn.role === "user" ? "나" : "봇"}</span>
                 <span
                   className={`whitespace-pre-wrap ${
                     turn.failed ? "text-danger" : turn.role === "user" ? "text-ink-primary" : "text-ink-muted"
@@ -156,7 +156,7 @@ export function BotConversation({
                   {turn.text || (isStreaming && index === turns.length - 1 ? "…" : "")}
                 </span>
                 {turn.tools && turn.tools.length > 0 && (
-                  <p className="mt-1 font-mono text-2xs text-ink-faint">읽음: {turn.tools.join(" · ")}</p>
+                  <p className="mt-1 font-mono text-2xs text-ink-muted">읽음: {turn.tools.join(" · ")}</p>
                 )}
                 {turn.filled && turn.filled.length > 0 && (
                   <p className="mt-1 font-mono text-2xs text-ink-muted">폼에 채움: {turn.filled.join(" · ")}</p>

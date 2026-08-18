@@ -30,7 +30,7 @@ interface Props {
 /** 설정 한 줄이 어디서 왔는지 — 사람이 손댄 것과 선언 기본값이 섞이면 무엇을 정했는지 모른다. */
 function SourceTag({ source }: { source?: "USER" | "AI_SUGGESTED" }) {
   const label = source === "AI_SUGGESTED" ? "AI 제안 수락" : source === "USER" ? "내가 정함" : "선언 기본값";
-  return <span className="font-mono text-2xs text-ink-faint">{label}</span>;
+  return <span className="font-mono text-2xs text-ink-muted">{label}</span>;
 }
 
 /** `sourced` 는 **전략 파라미터 줄에만** 준다 — 봇 자체 설정에는 「선언」이 없어서 꼬리표가 거짓말이 된다. */

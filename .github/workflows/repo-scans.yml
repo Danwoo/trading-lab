@@ -400,6 +400,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_color_token_usage.py
 
+      # 비텍스트 토큰을 글자에 쓰는 것 (#73 리드 결정 ㉡) — 위 두 그물 **사이**에 난 구멍이다.
+      # 대비 검사는 「비텍스트니 검사 안 함」으로, 색 사용 검사는 「등록된 토큰이니 위반 아님」으로
+      # 넘겨, 규격상 못 읽는 값이 글자로 새어 나간다(실측: PR #161). 검사 0건이면 실패.
+      - name: 비텍스트 토큰의 텍스트 오용 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_non_text_token_usage.py
+
       # 프록시 라우트 ↔ 서비스 소비자 (#2) — `frontend/app/api/external/**` 를 스스로 순회해
       # 대상을 찾는 stdlib 스캔이라 이 잡의 클래스다. 경로 필터가 있는 워크플로에 두면 이
       # 그물이 존재해야 할 바로 그 PR 클래스(고아 라우트 추가·소비자 삭제·체커만 수정)에서

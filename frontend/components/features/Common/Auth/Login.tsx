@@ -215,7 +215,7 @@ export const Login = () => {
                   defaultValue=""
                   width="100%"
                   height="2.75rem"
-                  className="!bg-bg-raised !border-line !text-ink placeholder:!text-ink-faint focus:!ring-line-strong/30"
+                  className="!bg-bg-raised !border-line !text-ink placeholder:!text-ink-muted focus:!ring-line-strong/30"
                 />
               </div>
 
@@ -233,7 +233,7 @@ export const Login = () => {
                   width="100%"
                   height="2.75rem"
                   maxLength={72}
-                  className="!bg-bg-raised !border-line !text-ink placeholder:!text-ink-faint focus:!ring-line-strong/30"
+                  className="!bg-bg-raised !border-line !text-ink placeholder:!text-ink-muted focus:!ring-line-strong/30"
                 />
               </div>
 
