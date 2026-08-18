@@ -646,6 +646,38 @@ def decide_arm(payload) -> dict:
             "arm": True,
             "reason": f"risk: low ({evidence}) + 봇 승인 — arm",
         }
+    # **미선언은 저위험으로 본다** (리드 결정 2026-08-18).
+    #
+    # 종전엔 미선언을 사람 경로로 보냈다(fail-closed). 그 결과 선언을 빠뜨린 저위험 PR 이
+    # 전부 리드 대기열에 쌓여, 「고위험만 사람이 본다」는 원래 의도와 반대로 **리드가 사소한
+    # 것까지 다 눌러야** 했다.
+    #
+    # **명시적 고위험은 그대로 사람 경로다** — 바뀐 것은 「모르겠으면 어느 쪽인가」뿐이다.
+    # 선언 자체를 그만두는 것이 아니라(에이전트는 PR 마다 `gate declare` 를 계속 한다),
+    # 빠뜨렸을 때 멈추지 않게 하는 것이다.
+    #
+    # **대가**: 선언을 빠뜨린 고위험이 자동으로 들어간다. 그래서 사유에 「미선언」을 남겨
+    # 머지 기록에서 그 사실이 보이게 한다 — 조용히 저위험인 척하지 않는다.
+    # 봇 PR 은 이 완화의 대상이 아니다 — 상승 종류(major/minor/patch)로 가르는 별도 규칙이
+    # 아래에 있고, major 는 사람 경로다. 미선언을 이유로 그 규칙을 건너뛰면 major 의존성
+    # 상승이 자동으로 들어간다(기존 그물이 실제로 잡았다).
+    # **「못 읽음」과 「안 적음」은 다르다.** 이슈 조회가 실패한 것은 위험도를 *모르는* 것이지
+    # *낮은* 것이 아니다 — 그 자리는 fail-closed 로 남긴다. 완화의 대상은 「선언을 빠뜨렸다」
+    # 뿐이고, 「알 수 없다」는 종전대로 사람 경로다.
+    lookup_failed = "조회 실패" in (evidence or "")
+    if (
+        risk == "undeclared"
+        and not lookup_failed
+        and not payload.get("pr_author_is_bot")
+    ):
+        return {
+            **base,
+            "arm": True,
+            "reason": (
+                f"위험도 미선언 ({evidence}) + 봇 승인 — arm "
+                "(미선언은 저위험으로 본다 · 리드 결정 2026-08-18)"
+            ),
+        }
     if payload.get("pr_author_is_bot"):
         if bump is None:
             return {

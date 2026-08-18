@@ -392,20 +392,20 @@ ARM_CASES = [
         {"arm": False, "risk": "high"},
     ),
     (
-        "참조 이슈에 risk 라벨 없음 → 미선언 = 사람 경로",
+        "참조 이슈에 risk 라벨 없음 → 미선언 = 저위험(리드 결정 2026-08-18)",
         {"issue_refs": [{"number": 7, "labels": ["bug"]}]},
-        {"arm": False, "risk": "undeclared"},
+        {"arm": True, "risk": "undeclared"},
     ),
     (
-        "이슈 참조 없음 → 미선언 = 사람 경로",
+        "이슈 참조 없음 → 미선언 = 저위험(리드 결정 2026-08-18)",
         {"issue_refs": []},
-        {"arm": False, "risk": "undeclared"},
+        {"arm": True, "risk": "undeclared"},
     ),
     # ── ② `Refs #N` 의 N 이 PR 인 경우 — PR 의 risk 라벨은 가시화 미러다 ──────────
     (
-        "Refs 가 PR 번호뿐 → 배제되어 미선언 = 사람 경로  (공격 ⑧)",
+        "Refs 가 PR 번호뿐 → 배제되어 미선언 = 저위험(리드 결정 2026-08-18)  (공격 ⑧)",
         {"issue_refs": [{"number": 13, "is_pr": True, "labels": ["risk: low"]}]},
-        {"arm": False, "risk": "undeclared", "excluded_pr_refs": [13]},
+        {"arm": True, "risk": "undeclared", "excluded_pr_refs": [13]},
     ),
     (
         "PR 미러(low) + 고위험 이슈 → 고위험을 취한다  (공격 ⑧)",
@@ -430,7 +430,7 @@ ARM_CASES = [
     (
         "코드·인용에서 버린 참조 후보가 있으면 low 를 미선언으로 접는다  (공격 ⑪)",
         {"issue_refs": [{"number": 1, "labels": ["risk: low"]}], "dropped_refs": [23]},
-        {"arm": False, "risk": "undeclared"},
+        {"arm": True, "risk": "undeclared"},
     ),
     (
         "버린 후보가 있어도 high 는 그대로 (위험도를 올리는 쪽으로만 쓴다)",
@@ -443,9 +443,9 @@ ARM_CASES = [
         {"arm": True, "risk": "low"},
     ),
     (
-        "참조 0건 + 버린 후보 있음 → 미선언 (근거에 남는다)",
+        "참조 0건 + 버린 후보 있음 → 미선언 → arm (근거는 그대로 남는다)",
         {"issue_refs": [], "dropped_refs": [1]},
-        {"arm": False, "risk": "undeclared"},
+        {"arm": True, "risk": "undeclared"},
     ),
     (
         "이슈 조회 실패 → 미선언 = 사람 경로 (fail-closed)",
@@ -677,12 +677,12 @@ ARM_CASES = [
         {"arm": False, "bot_bump": None},
     ),
     (
-        "사람 저자 + major 꼴 제목 → 봇 경로 미적용 (미선언 = 사람 경로)",
+        "사람 저자 + major 꼴 제목 → 봇 경로 미적용 (미선언 = 저위험(리드 결정 2026-08-18))",
         {
             "pr_title": "build(deps): bump x from 1.0 to 2.0",
             "issue_refs": [],
         },
-        {"arm": False},
+        {"arm": True},
     ),
     (
         "판정 needs_changes → arm 금지",
