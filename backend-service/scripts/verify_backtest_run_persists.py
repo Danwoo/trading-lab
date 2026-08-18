@@ -78,7 +78,13 @@ def fake_bar_service(closes: list[float]):
 
 def fake_strategy(entry_days: set[int], exit_days: set[int]):
     return SimpleNamespace(
-        STRATEGY={"key": "fixture", "name": "고정", "timeframe": "1d", "params": [], "version": "1"},
+        STRATEGY={
+            "key": "fixture",
+            "name": "고정",
+            "timeframe": "1d",
+            "params": [{"name": "threshold"}],
+            "version": "1",
+        },
         indicators=lambda bars, params: {},
         entry=lambda ctx: ctx["index"] in entry_days,
         exit=lambda ctx: ctx["index"] in exit_days,
@@ -234,13 +240,41 @@ def main() -> int:
         # 「매수 조건이 없으면 매매도 없다」의 반대편 — 조건이 있으면 실제로 매매가 난다.
         check("실전략이 거래를 만든다", real_out["trade_rows"] >= 0, True)
 
+    # ── 격자 (#202) — 실행 하나가 격자를 낳고, 칸마다 DB 에 남는가 ──────────
+    grid_out = service.run_grid(
+        {
+            "workspace_id": 4242,
+            "strategy_key": "fixture",
+            "market": "KR",
+            "symbol": "TEST",
+            "period_from": "2026-01-01",
+            "period_to": "2026-01-04",
+            "initial_cash": 1000,
+            "sweep": {"threshold": [0, 1, 2]},
+            "costs": {"fee_rate": 0.0, "slippage_rate": 0.0, "sell_tax_rate": 0.0},
+        }
+    )
+    check("격자가 3칸", len(grid_out["cells"]), 3)
+    check("shape", grid_out["shape"], [3])
+    # **훑는 것도 시도다** — 화면이 「전부 돌려봤다」고 말하려면 이 수가 한계 계산에 들어가야 한다.
+    check("소비 시도 = 칸 수", grid_out["attempts_used"], 3)
+
+    for cell in grid_out["cells"]:
+        detail = service.select_result(cell["run_id"])
+        check(f"칸 {cell['params']['threshold']} 이 DB 에 남는다", detail["run"]["run_id"], cell["run_id"])
+        check(f"칸 {cell['params']['threshold']} 곡선 길이", len(detail["equity"]), 4)
+
+    # 칸마다 attempt_no 가 다르다 — 같은 번호를 N 개 쓰면 시도 계수가 거짓이 된다.
+    attempts = [service.select_result(c["run_id"])["run"]["attempt_no"] for c in grid_out["cells"]]
+    check("칸마다 시도 번호가 다르다", len(set(attempts)), 3)
+
     # 정리 — 전용 스키마째 지운다.
     with admin.begin() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (REQUIRE=db 실행됨)")
 
-    if CHECKED < 20:
+    if CHECKED < 30:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:

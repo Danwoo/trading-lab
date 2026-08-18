@@ -45,7 +45,7 @@ ENGINE_DIR = BACKEND / "app" / "services" / "backtest"
 # 목록으로 두는 이유: 글롭(`*_service.py` 제외)으로 하면 새 계산 파일이 이름을 어떻게 짓느냐에
 # 따라 조용히 검사에서 빠진다. **여기 없는 파일이 폴더에 생기면 실패**시켜, 새 파일마다 어느
 # 쪽인지 사람이 정하게 한다.
-PURE_FILES = ("engine.py", "metrics.py")
+PURE_FILES = ("engine.py", "metrics.py", "grid.py")
 
 # 이 아래로 내려가면 파일이 사라졌거나 이름이 바뀐 것이다.
 MIN_FILES = 1
@@ -100,6 +100,16 @@ def scan(path: Path) -> list[str]:
                 out.append(f"{rel}:{node.lineno} — `{name}` 금지: {FORBIDDEN_MODULES[root]}")
             if root.endswith("_repository") or "repositories" in name.split("."):
                 out.append(f"{rel}:{node.lineno} — `{name}` 금지: 엔진은 저장소를 모른다")
+            # **계산 층끼리는 서로 알아도 된다** — `grid` 가 `engine` 을 부르는 것이
+            # 이 설계의 핵심이다. 금지하는 것은 「계산 층이 앱의 **다른** 층을 아는 것」이다.
+            if any(
+                name == f"services.backtest.{pure[:-3]}"
+                or name.startswith(f"services.backtest.{pure[:-3]}.")
+                or name == f"app.services.backtest.{pure[:-3]}"
+                for pure in PURE_FILES
+            ):
+                continue
+
             # 전체 경로 — 첫 세그먼트만 보면 `app.core.database` 같은 우회가 통과한다.
             for prefix in FORBIDDEN_PREFIXES:
                 if name == prefix or name.startswith(prefix + "."):
