@@ -49,6 +49,16 @@ class BarSeries:
         if len(lengths) != 1:
             raise ValueError(f"캔들 컬럼 길이가 어긋난다: {lengths}")
 
+        # **시간 순서를 계약으로 못 박는다.** 전략의 `indicators`·`entry`·`exit` 는 전부
+        # 「오래된 것부터」를 전제로 index 를 읽는다 — 역순이나 중복이 섞이면 예외 없이
+        # 틀린 곡선이 그려진다. 공급자(`bar_service`)에게 암묵적으로 맡기면 그 계약은
+        # 코드 어디에도 없는 것이다.
+        for i in range(1, len(self.dt)):
+            if self.dt[i] <= self.dt[i - 1]:
+                raise ValueError(
+                    f"캔들이 오래된 것부터 정렬돼 있지 않다 (index {i}: {self.dt[i - 1]!r} 다음에 {self.dt[i]!r})"
+                )
+
     def __len__(self) -> int:
         return len(self.dt)
 
@@ -217,7 +227,15 @@ def run_single(
             open_trade.mae = min(open_trade.mae or 0.0, move)
             open_trade.mfe = max(open_trade.mfe or 0.0, move)
 
-            if bool(strategy.module.exit(ctx)):
+            # **청산 평가도 남긴다.** 스펙 R3 는 거래 목록의 한 행에서 「진입/청산 봉으로
+            # 스크롤해 그 시점 신호 근거 표시」를 요구한다 — 진입만 남기면 R3 의 절반이
+            # 영구히 빈다. 청산이 안 일어난 봉도 「왜 안 팔았나」의 근거다.
+            exited = bool(strategy.module.exit(ctx))
+            result.signals.append(
+                {"dt": today, "instrument_id": series.instrument_id, "conditions": {"exit": exited}, "passed": exited}
+            )
+
+            if exited:
                 notional = price * open_trade.qty
                 cost = costs.sell_cost(notional)
                 cash += notional - cost

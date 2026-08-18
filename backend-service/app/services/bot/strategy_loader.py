@@ -262,8 +262,36 @@ def _coerce(param: StrategyParam, value: Any) -> Any:
 
 
 def _load_one(path: Path) -> StrategySpec:
-    module = _import_module(path)
+    return _load_one_from_module(_import_module(path))
 
+
+def load_module_by_key(key: str, directory: Path | str | None = None) -> ModuleType | None:
+    """`key` 로 전략 **모듈 자체**를 내준다 — 백테스트 엔진이 판정 함수를 부르려면 필요하다.
+
+    `load_strategies` 는 폼을 그리기 위한 `StrategySpec`(선언부)만 낸다. 엔진은 그 위에
+    `indicators`·`entry`·`exit` 를 실제로 불러야 하므로 모듈이 필요하다.
+
+    **규약은 그대로다** — 이 함수도 `_load_one` 과 같은 검증(선언·판정 함수 존재)을 거친 뒤에만
+    모듈을 내주므로, 규약을 통과하지 못한 파일이 엔진으로 새지 않는다.
+    """
+    base = Path(directory) if directory else default_strategies_dir()
+    if not base.is_dir():
+        return None
+    for path in sorted(base.glob("*.py")):
+        if path.name.startswith("_"):
+            continue
+        try:
+            module = _import_module(path)
+            spec = _load_one_from_module(module)
+        except _StrategyFileError:
+            continue
+        if spec.key == key:
+            return module
+    return None
+
+
+def _load_one_from_module(module: ModuleType) -> StrategySpec:
+    """`_load_one` 의 검증부 — 파일을 다시 읽지 않고 이미 가진 모듈을 검사한다."""
     declaration = getattr(module, "STRATEGY", None)
     if declaration is None:
         raise _StrategyFileError("STRATEGY 선언이 없습니다")

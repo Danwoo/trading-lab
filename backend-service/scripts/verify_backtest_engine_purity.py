@@ -37,8 +37,39 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 ENGINE_DIR = BACKEND / "app" / "services" / "backtest"
 
-# 이 아래로 내려가면 폴더가 사라졌거나 글롭이 어긋난 것이다.
+# **순수해야 하는 것은 계산 층뿐이다.**
+#
+# 같은 폴더의 `*_service.py` 는 반대로 저장소를 알아야 한다 — 캔들을 읽어 넘기고 결과를
+# 쓰는 것이 그 층의 일이다. 폴더 전체를 막으면 배선할 자리가 없어진다.
+#
+# 목록으로 두는 이유: 글롭(`*_service.py` 제외)으로 하면 새 계산 파일이 이름을 어떻게 짓느냐에
+# 따라 조용히 검사에서 빠진다. **여기 없는 파일이 폴더에 생기면 실패**시켜, 새 파일마다 어느
+# 쪽인지 사람이 정하게 한다.
+PURE_FILES = ("engine.py",)
+
+# 이 아래로 내려가면 파일이 사라졌거나 이름이 바뀐 것이다.
 MIN_FILES = 1
+
+# **첫 세그먼트만 보면 뚫린다.** 리뷰가 짚은 자리다 —
+# `from app.core.database import SessionLocal` 은 루트가 `app` 이고
+# `from services.bar.bar_service import BarService` 는 `services` 라, 아래 목록에도
+# `_repository` 패턴에도 안 걸려 그물이 초록으로 통과했다.
+#
+# 그래서 **전체 경로**로도 본다. 이 층은 앱의 다른 어느 층도 알면 안 된다.
+FORBIDDEN_PREFIXES = (
+    "app.core.database",
+    "app.core.container",
+    "core.database",
+    "core.container",
+    "app.repositories",
+    "repositories",
+    "app.services",
+    "services",
+    "app.routers",
+    "routers",
+    "app.models",
+    "models",
+)
 
 FORBIDDEN_MODULES = {
     "sqlalchemy": "저장소 접근 — 캔들은 호출자가 메모리에 올려서 넘긴다",
@@ -69,6 +100,13 @@ def scan(path: Path) -> list[str]:
                 out.append(f"{rel}:{node.lineno} — `{name}` 금지: {FORBIDDEN_MODULES[root]}")
             if root.endswith("_repository") or "repositories" in name.split("."):
                 out.append(f"{rel}:{node.lineno} — `{name}` 금지: 엔진은 저장소를 모른다")
+            # 전체 경로 — 첫 세그먼트만 보면 `app.core.database` 같은 우회가 통과한다.
+            for prefix in FORBIDDEN_PREFIXES:
+                if name == prefix or name.startswith(prefix + "."):
+                    out.append(
+                        f"{rel}:{node.lineno} — `{name}` 금지: 엔진은 앱의 다른 층을 모른다 (캔들은 호출자가 넘긴다)"
+                    )
+                    break
 
         # self.*_repository 속성 접근
         if isinstance(node, ast.Attribute) and node.attr.endswith("_repository"):
@@ -82,12 +120,29 @@ def main() -> int:
         print(f"::error::엔진 폴더가 없다: {ENGINE_DIR} — 경로가 바뀌었으면 이 검사도 고쳐라", file=sys.stderr)
         return 1
 
-    files = sorted(p for p in ENGINE_DIR.rglob("*.py") if p.name != "__init__.py")
+    present = {p.name for p in ENGINE_DIR.rglob("*.py") if p.name != "__init__.py"}
+    files = sorted(ENGINE_DIR / name for name in PURE_FILES if (ENGINE_DIR / name).is_file())
     problems: list[str] = []
     for path in files:
         problems.extend(scan(path))
 
-    print(f"`{ENGINE_DIR.relative_to(BACKEND)}` 아래 {len(files)}개 파일 검사 · 위반 {len(problems)}건")
+    # 분류되지 않은 파일 — 새 파일이 생기면 어느 쪽인지 사람이 정한다.
+    unclassified = sorted(present - set(PURE_FILES) - {p.name for p in ENGINE_DIR.glob("*_service.py")})
+    for name in unclassified:
+        problems.append(
+            f"app/services/backtest/{name} 이 분류되지 않았다 — 계산 층이면 PURE_FILES 에 넣고, "
+            "저장소를 아는 층이면 `*_service.py` 로 이름 지어라"
+        )
+
+    missing = [name for name in PURE_FILES if not (ENGINE_DIR / name).is_file()]
+    for name in missing:
+        problems.append(f"PURE_FILES 의 {name} 가 없다 — 지웠거나 옮겼으면 목록에서도 빼라")
+
+    print(
+        f"`{ENGINE_DIR.relative_to(BACKEND)}` 의 계산 층 {len(files)}개 파일 검사 "
+        f"(서비스 층 {len(list(ENGINE_DIR.glob('*_service.py')))}개는 저장소를 알아도 된다) · "
+        f"위반 {len(problems)}건"
+    )
 
     if len(files) < MIN_FILES:
         print(f"::error::검사 대상이 {len(files)}건뿐이다 — 그물이 죽어 있다 (하한 {MIN_FILES})", file=sys.stderr)
