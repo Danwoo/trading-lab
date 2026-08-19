@@ -33,12 +33,32 @@ export interface GridAxisOut {
   values: (number | string | boolean)[];
 }
 
+/**
+ * 칸이 갖는 지표 — **격자는 조합을 고르는 자리라 1급이 여기 있어야 한다** (#220).
+ *
+ * 스펙 D-Q2: *"트레이더가 계좌를 닫는 이유는 샤프가 낮아서가 아니라 낙폭을 못 견뎌서다."*
+ * 4급(수익률)로만 칠하면 「가장 많이 번 칸」이 가장 진해 보이고, 리포트를 열어 1급을 볼
+ * 때는 이미 고른 뒤다.
+ */
+export interface GridCellMetrics {
+  /** 1급 — 전 고점 아래에 머문 최장 (봉). */
+  longest_underwater: number;
+  /** 끝에서 미회복인가 — 「아직 회복 중」을 화면이 밝힌다. */
+  still_underwater: boolean;
+  /** 2급 — 그때의 고점 대비 최대 하락률 (%, 음수). */
+  mdd_pct: number;
+  /** 4급 — 구간 총수익률 (%). 버리지 않되 기본 채색이 아니다. */
+  total_return_pct: number | null;
+}
+
 export interface GridCellOut {
   run_id: number;
   params: Record<string, unknown>;
   status: "succeeded" | "failed";
   failed_reason: string | null;
   final_equity: number | null;
+  /** 실패한 칸은 null — 계산할 곡선이 없다. */
+  metrics: GridCellMetrics | null;
 }
 
 export interface GridOut {
