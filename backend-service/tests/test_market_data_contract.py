@@ -55,6 +55,7 @@ from core.exceptions import BadRequestError  # noqa: E402
 from providers import get_provider, list_sources  # noqa: E402
 from providers.base import (  # noqa: E402
     CREDENTIAL_MISSING_CODE,
+    CREDENTIAL_MISSING_HINT,
     NOT_CANONICAL_CODE,
     not_canonical_reason,
 )
@@ -280,44 +281,47 @@ def test_malformed_scope_is_rejected_not_silently_empty() -> str:
 
 
 def test_not_canonical_row_is_guidance_not_a_deficiency() -> str:
-    """「이 시장의 정본은 내가 아니다」가 섞였다고 「키가 아직 없다」 판정이 사라지면 안 된다.
+    """「이 시장의 정본은 내가 아니다」는 **결손이 아니라 안내**다 — 섞였다고 「키가 아직 없다」
+    판정이 사라지면 안 된다.
 
-    실측으로 겪은 회귀다 — 국내 시세 소스를 하나 더 붙이자(그 소스가 마스터의 정본이 아니라고
-    정직하게 선언했다) `credential_missing` 이 사라져, 빈 보드가 이유를 잃었다. 소스가 늘 때마다
-    화면이 조용히 나빠지는 자리라 클래스로 잠근다.
+    실측으로 겪었다: 국내 마스터에 정본 안내를 다는 순간 국내 일봉의 `credential_missing` 이
+    사라져 빈 보드가 이유를 잃었다. 그 배선은 되돌렸지만(제품 정의 §7 — 시세는 토스 단일),
+    **규칙 자체는 소스가 늘 때마다 다시 만날 자리**라 여기서 잠근다. 배선에 기대지 않고 행을
+    직접 만들어 판정만 본다.
     """
-    service = _bar_service()
-    rows = [
-        row
-        for row in service.capability_service.list_capabilities(1, "KOSPI")
-        if row["data_kind"] == "instrument_master"
-    ]
-    assert rows, "국내 마스터 capability 행이 0건 — 검사 대상 없음"
-    guidance = [row for row in rows if row["code"] == NOT_CANONICAL_CODE]
-    assert guidance, "정본 아님을 코드로 내는 행이 없다 — 이 테스트가 검사할 대상이 사라졌다"
 
-    reason, code = service._unavailable(1, "KOSPI", "instrument_master")
+    def service_with(rows):
+        class _Caps:
+            def list_capabilities(self, workspace_id, market=None):
+                return rows
+
+        return BarService(bar_repository=_StubBarRepository(), capability_service=_Caps())
+
+    def row(source, code, reason):
+        return {
+            "source": source,
+            "market": "KOSPI",
+            "data_kind": "instrument_master",
+            "available": False,
+            "reason": reason,
+            "code": code,
+        }
+
+    guidance = row("toss", NOT_CANONICAL_CODE, not_canonical_reason("국내 종목 마스터", "data_go_kr"))
+    no_key = row("data_go_kr", CREDENTIAL_MISSING_CODE, f"인증키가 없습니다 — {CREDENTIAL_MISSING_HINT}")
+    broken = row("other", None, "상류가 500 을 냈습니다")
+
+    reason, code = service_with([no_key, guidance])._unavailable(1, "KOSPI", "instrument_master")
     assert reason, "사유가 비었다"
     assert code == CREDENTIAL_MISSING_CODE, f"안내가 섞였다고 코드를 잃었다: {code!r}"
 
-    # 반대 방향 — 막은 이유가 **전부** 안내뿐이면 코드를 주지 않는다 (보수적으로).
-    class _OnlyGuidance:
-        def list_capabilities(self, workspace_id, market=None):
-            return [
-                {
-                    "source": "toss",
-                    "market": "KOSPI",
-                    "data_kind": "instrument_master",
-                    "available": False,
-                    "reason": not_canonical_reason("국내 종목 마스터", "data_go_kr"),
-                    "code": NOT_CANONICAL_CODE,
-                }
-            ]
+    # 반대 방향 둘 — 안내만 있으면 코드를 주지 않고, 진짜 결손이 섞이면 코드를 주지 않는다
+    _, only_guidance = service_with([guidance])._unavailable(1, "KOSPI", "instrument_master")
+    assert only_guidance is None, f"안내만 있는데 키 없음으로 단정했다: {only_guidance!r}"
 
-    only = BarService(bar_repository=_StubBarRepository(), capability_service=_OnlyGuidance())
-    _, only_code = only._unavailable(1, "KOSPI", "instrument_master")
-    assert only_code is None, f"안내만 있는데 키 없음으로 단정했다: {only_code!r}"
-    return f"test_not_canonical_row_is_guidance_not_a_deficiency (행 {len(rows)}개 중 안내 {len(guidance)}개)"
+    _, mixed = service_with([no_key, guidance, broken])._unavailable(1, "KOSPI", "instrument_master")
+    assert mixed is None, f"진짜 결손이 섞였는데 키 없음으로 단정했다: {mixed!r}"
+    return "test_not_canonical_row_is_guidance_not_a_deficiency (판정 3종)"
 
 
 TESTS = [
