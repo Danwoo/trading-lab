@@ -16,6 +16,7 @@ standalone 실행 겸용:
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -50,9 +51,15 @@ SECRET = "dummy-service-key-CANARY-a+b/c=="
 URL = f"https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService?serviceKey={SECRET}"
 
 
+#: URL 판정은 **스킴 패턴**으로 한다. 호스트 부분문자열(`"tossinvest.com" in text`)로 보면
+#: 판정이 위치를 안 따져 URL 소독기의 전형적 결함 모양이 되고, 정적 분석이 그것을 잡는다
+#: (CodeQL `py/incomplete-url-substring-sanitization` — 실제로 이 파일에서 잡혔다).
+URL_SCHEME = re.compile(r"[a-zA-Z][a-zA-Z0-9+.-]*://")
+
+
 def has_url(text: str) -> bool:
-    """URL 이 실렸는가 — 스킴·호스트로 본다. 「HTTP 404」 같은 상태 표기는 URL 이 아니다."""
-    return "://" in text or "data.go.kr" in text or "tossinvest.com" in text
+    """URL 이 실렸는가. 「HTTP 404」 같은 상태 표기는 URL 이 아니다."""
+    return URL_SCHEME.search(text) is not None
 
 
 def check(name: str, actual, expected) -> None:
