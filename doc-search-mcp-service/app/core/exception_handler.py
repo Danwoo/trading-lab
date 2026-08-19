@@ -12,6 +12,7 @@ from core.exceptions import (
 )
 from core.logger import logger
 from fastapi import HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DataError, IntegrityError, OperationalError
 
@@ -146,8 +147,53 @@ async def handle_unexpected_exception(request: Request, exc: Exception):
     return await handle_http_error(request, InternalServerError())
 
 
+def _body_field_hints(request: Request) -> dict[str, str]:
+    """이 요청이 받는 본문 모델의 `필드명 → 설명`. 못 찾으면 빈 dict (fail-open).
+
+    설명은 **모델에 이미 적혀 있다** — 그것을 422 응답까지 들고 나오는 것이 이 함수의 전부다.
+    실패해도 기본 메시지로 떨어질 뿐이라, 여기서 예외를 밖으로 내보내지 않는다.
+    """
+    try:
+        route = request.scope.get("route")
+        params = getattr(getattr(route, "dependant", None), "body_params", None) or []
+        hints: dict[str, str] = {}
+        for param in params:
+            # pydantic v2 를 쓰는 FastAPI 에서 `ModelField.type_` 는 비어 있다 —
+            # 실제 타입은 `field_info.annotation` 에 있다 (0.141 실측).
+            model = getattr(getattr(param, "field_info", None), "annotation", None)
+            fields = getattr(model, "model_fields", None) or {}
+            for name, field in fields.items():
+                if field.description:
+                    hints.setdefault(name, field.description)
+        return hints
+    except Exception:  # noqa: BLE001 — 안내를 못 붙이는 것이 요청을 죽일 이유는 아니다
+        return {}
+
+
+async def handle_request_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """422 에 **무엇을 넣어야 하는지**를 함께 낸다.
+
+    기본 응답은 「scope: Field required」로 끝나서, 형식이 자연스러운 추측과 다른 필드
+    (`"KOSPI:005930,000660"` 처럼 두 축을 한 문자열에 합친 것)에서는 읽어도 다음 수를 모른다.
+    모델의 `description` 을 그대로 실어, 스키마와 오류 메시지가 두 벌이 되지 않게 한다.
+    """
+    hints = _body_field_hints(request)
+    details = []
+    for error in exc.errors():
+        item = {"loc": list(error.get("loc", ())), "msg": error.get("msg", ""), "type": error.get("type", "")}
+        location = item["loc"]
+        if len(location) >= 2 and location[0] == "body":
+            hint = hints.get(str(location[1]))
+            if hint:
+                item["hint"] = hint
+        details.append(item)
+    logger.info(f"요청 형식 오류 — path={request.url.path} fields={[d['loc'] for d in details]}")
+    return JSONResponse(status_code=422, content={"detail": details})
+
+
 def get_exception_handlers():
     return {
+        RequestValidationError: handle_request_validation_error,
         HTTPError: handle_http_error,
         ValueError: handle_value_error,
         PermissionError: handle_permission_error,

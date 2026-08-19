@@ -9,6 +9,15 @@ import * as en from "@/utils/common/locale/en/apierrors";
 // 언어별 메시지 테이블 (locale/ko.ts, locale/en.ts) — 로직만 여기에.
 const LOCALES: Record<AppLocale, typeof ko> = { ko, en };
 
+/** 프레임워크가 만든 영문 메시지("Field required")를 가른다 — 화면에 내보내지 않는 것이 이 파일의 정책이다. */
+const HAS_LATIN_WORDS = /[A-Za-z]{3,}/;
+
+/** 어느 필드 얘기인지 — `loc: ["body","scope"]` 의 마지막 칸이 필드 이름이다. */
+function fieldOf(item: any): string {
+  const location = Array.isArray(item?.loc) ? item.loc : [];
+  return String(location[location.length - 1] ?? "요청");
+}
+
 /**
  * detail 배열의 Prisma 에러를 type(실제 코드 P#### / prisma_*)으로 번역. 첫 매칭 반환, 없으면 null.
  * Zod/Pydantic 검증 에러는 type 이 PRISMA_ERROR_MAP 에 없어 null → 호출자가 msg(구체 메시지) 사용.
@@ -64,10 +73,20 @@ export function getApiErrorMessage(error: any): string {
         const prismaMessage = translatePrismaErrors(errorData.detail, L);
         if (prismaMessage) return prismaMessage;
 
-        // detail 배열의 첫 번째 에러 메시지 처리 (서버 제공)
+        // detail 배열의 에러 메시지 처리 (서버 제공)
         if (errorData.detail.length > 0) {
+          // `hint` 는 서버가 그 필드의 설명을 실어 준 것이다 — **행동을 말하는 쪽은 이것**이다.
+          // 필드를 둘 이상 빠뜨리면 pydantic 이 여러 건을 내므로 **전부** 모은다: 첫 건만 보여
+          // 주면 나머지를 고치러 한 번 더 왕복해야 한다.
+          const hints = errorData.detail
+            .filter((item: any) => item?.hint)
+            .map((item: any) => `${fieldOf(item)}: ${item.hint}`);
+          if (hints.length > 0) return hints.join("\n");
+
+          // 안내가 없으면 서버 메시지로. 다만 프레임워크가 만든 영문("Field required")은
+          // 내보내지 않는다 — 이 파일이 이미 세운 정책이다(401·5xx 와 같은 이유).
           const firstError = errorData.detail[0];
-          if (firstError.msg) return firstError.msg;
+          if (firstError.msg && !HAS_LATIN_WORDS.test(firstError.msg)) return firstError.msg;
         }
 
         // 상태 코드에 따른 기본 메시지

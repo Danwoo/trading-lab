@@ -80,4 +80,59 @@ describe("#224 화면에 나가는 API 에러 문구", () => {
   it("우리가 쓴 한국어 예외 문구는 그대로 나온다", () => {
     expect(getApiErrorMessage(new Error("봇 목록을 불러오지 못했습니다"))).toBe("봇 목록을 불러오지 못했습니다");
   });
+
+  // 422 의 `hint` 는 서버가 그 필드의 설명을 실어 준 것이다 — 행동을 말하는 쪽이 이것이라,
+  // `msg`("Field required")만 보여 주면 무엇을 넣어야 하는지 여전히 알 수 없다 (#253).
+  it("형식 오류의 안내(hint)가 화면 문구에 실린다", () => {
+    const message = getApiErrorMessage({
+      response: {
+        status: 422,
+        data: {
+          detail: [
+            {
+              loc: ["body", "scope"],
+              msg: "Field required",
+              type: "missing",
+              hint: "적재 범위. instrument_master 는 시장 하나('KOSPI'), daily_bar 는 'KOSPI:005930,000660'.",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(message).toContain("KOSPI:005930,000660");
+  });
+
+  it("여러 필드를 빠뜨리면 안내를 전부 낸다 — 한 번에 고칠 수 있게", () => {
+    const message = getApiErrorMessage({
+      response: {
+        status: 422,
+        data: {
+          detail: [
+            { loc: ["body", "source"], msg: "Field required", type: "missing", hint: "소스 id 를 넣으세요." },
+            { loc: ["body", "scope"], msg: "Field required", type: "missing", hint: "적재 범위를 넣으세요." },
+          ],
+        },
+      },
+    });
+
+    expect(message).toContain("source: 소스 id 를 넣으세요.");
+    expect(message).toContain("scope: 적재 범위를 넣으세요.");
+  });
+
+  it("안내가 없으면 프레임워크 영문을 내보내지 않는다", () => {
+    const message = getApiErrorMessage({
+      response: { status: 422, data: { detail: [{ loc: ["body", "x"], msg: "Field required", type: "missing" }] } },
+    });
+
+    expect(message).not.toMatch(HAS_LATIN_WORDS);
+  });
+
+  it("안내가 없으면 종전대로 서버 메시지를 낸다", () => {
+    const message = getApiErrorMessage({
+      response: { status: 422, data: { detail: [{ loc: ["body", "x"], msg: "값이 필요합니다", type: "missing" }] } },
+    });
+
+    expect(message).toBe("값이 필요합니다");
+  });
 });
