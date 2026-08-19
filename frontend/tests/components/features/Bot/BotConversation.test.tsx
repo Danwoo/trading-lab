@@ -13,6 +13,22 @@ import userEvent from "@testing-library/user-event";
 
 import { BotConversation } from "@/components/features/Bot/BotConversation";
 
+/**
+ * **준비 조회만** 결정론적으로 세운다 — 스트림 경로는 실제 `fetch` 를 그대로 태운다.
+ *
+ * 준비 조회는 `apiCall`(axios) 이라 jsdom 에서 XHR 어댑터를 타므로 `fetch` 스텁이 못 잡는다.
+ * 그래서 그 호출이 **진짜로 실패할 때까지** 기다린 뒤에야 `ready` 가 정해졌고, 그 사이 입력창은
+ * `readOnly` 라 타이핑이 통째로 삼켜졌다 — 병렬 실행에서 무작위로 빨개진 원인이 이것이다.
+ * (버튼을 기다리는 것으로는 못 막는다: 입력이 삼켜지면 `draft` 가 비어 버튼이 끝내 안 열린다.)
+ */
+vi.mock("@/services/bot/botAgentService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/bot/botAgentService")>();
+  return {
+    ...actual,
+    selectBotAgentReadiness: vi.fn(async () => ({ ready: true, reasons: [], strategies_dir: "/s" })),
+  };
+});
+
 beforeAll(() => {
   Element.prototype.scrollTo = () => {};
 });
@@ -30,28 +46,22 @@ function sseResponse(lines: string[]): Response {
 }
 
 function givenServer(streamLines: string[]) {
+  // 준비 조회는 위에서 모킹했다 — 여기 `fetch` 는 스트림 경로 전용이다.
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input).includes("readiness")) {
-        return new Response(JSON.stringify({ ready: true, reasons: [], strategies_dir: "/s" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return sseResponse(streamLines);
-    }),
+    vi.fn(async () => sseResponse(streamLines)),
   );
 }
 
 async function send(text: string) {
   const user = userEvent.setup();
-  await user.type(screen.getByRole("textbox"), text);
-  // **준비 조회가 끝나기 전에는 보내기가 비활성이다.** 그것을 안 기다리고 누르면 클릭이
-  // 아무 일도 안 하고, 테스트는 부하에 따라 붙었다 떨어졌다 한다(병렬 실행에서 실측).
-  const button = screen.getByRole("button", { name: /보내기/ }) as HTMLButtonElement;
-  await waitFor(() => expect(button.disabled).toBe(false));
-  await user.click(button);
+  const textbox = screen.getByRole("textbox") as HTMLTextAreaElement;
+  // 준비 조회가 끝나기 전에는 입력창이 `readOnly` 라 타이핑이 통째로 삼켜진다 — 게이트는
+  // 버튼이 아니라 **입력창**이다. 여기서 단언해 두면 그 실패가 자기 이름을 갖는다.
+  await waitFor(() => expect(textbox.readOnly).toBe(false));
+  await user.type(textbox, text);
+  expect(textbox.value).toBe(text);
+  await user.click(screen.getByRole("button", { name: /보내기/ }));
 }
 
 describe("BotConversation — 스트림 중 실패가 사라지지 않는다 (실제 SSE 경로)", () => {

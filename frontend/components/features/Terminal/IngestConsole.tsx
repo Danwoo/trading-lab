@@ -100,15 +100,23 @@ const KIND_LABEL: Record<string, string> = {
  * 미국 마스터만 SEC 에 양보하는데, 화면에는 미국 3행만 떠서 정반대로 읽혔다(#252).
  */
 export function groupAvailableByMarket(rows: MarketCapability[]) {
-  const groups = new Map<string, { market: string; sources: Set<string>; kinds: string[] }>();
+  // **종류마다 소스를 붙인다.** 시장별로 종류와 소스를 따로 합집합하면 곱집합으로 읽혀
+  // 「토스가 미국 종목 마스터를 준다」가 된다 — 그 반대가 이 화면이 바로잡으려던 사실이다.
+  const groups = new Map<string, Map<string, Set<string>>>();
   for (const row of rows) {
-    const group = groups.get(row.market) ?? { market: row.market, sources: new Set<string>(), kinds: [] };
-    group.sources.add(row.source);
+    const byKind = groups.get(row.market) ?? new Map<string, Set<string>>();
     const label = KIND_LABEL[row.dataKind] ?? row.dataKind;
-    if (!group.kinds.includes(label)) group.kinds.push(label);
-    groups.set(row.market, group);
+    const sources = byKind.get(label) ?? new Set<string>();
+    sources.add(row.source);
+    byKind.set(label, sources);
+    groups.set(row.market, byKind);
   }
-  return [...groups.values()].sort((a, b) => a.market.localeCompare(b.market));
+  return [...groups.entries()]
+    .map(([market, byKind]) => ({
+      market,
+      offers: [...byKind.entries()].map(([kind, sources]) => `${kind}(${[...sources].sort().join(", ")})`),
+    }))
+    .sort((a, b) => a.market.localeCompare(b.market));
 }
 
 /** 소스 가용성 — 무엇이 지금 되고, 안 되는 것은 왜 안 되는지. */
@@ -143,29 +151,34 @@ function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; load
         )}
       </p>
       {open.length > 0 && (
-        <ul aria-label="지금 받을 수 있는 것" className="flex min-w-0 flex-col gap-0.5">
-          {open.map((row) => (
-            <li key={row.market} className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-2xs">
-              <span className="font-mono text-ink">{row.market}</span>
-              <span className="text-ink-muted">{row.kinds.join(" · ")}</span>
-              <span className="font-mono text-ink-muted">— {[...row.sources].sort().join(", ")}</span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="break-keep text-2xs text-ink">지금 받을 수 있는 것</p>
+          <ul aria-label="지금 받을 수 있는 것" className="flex min-w-0 flex-col gap-0.5">
+            {open.map((row) => (
+              <li key={row.market} className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-2xs">
+                <span className="font-mono text-ink">{row.market}</span>
+                <span className="min-w-0 break-keep text-ink-muted">{row.offers.join(" · ")}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       {groups.length > 0 && (
-        <ul aria-label="막힌 이유" className="flex min-w-0 flex-col gap-1.5">
-          {/* 사유는 **서버가 정본**이다 — env 항목명과 발급 경로까지 완전한 문장으로 온다.
+        <>
+          <p className="break-keep text-2xs text-ink-muted">막혀 있는 것</p>
+          <ul aria-label="막힌 이유" className="flex min-w-0 flex-col gap-1.5">
+            {/* 사유는 **서버가 정본**이다 — env 항목명과 발급 경로까지 완전한 문장으로 온다.
               프론트가 같은 안내를 다시 만들면 서버가 아는 항목명과 갈린다. */}
-          {groups.map((group) => (
-            <li key={group.reason} className="flex min-w-0 flex-col gap-0.5 text-2xs">
-              <p className={cn("min-w-0 break-keep", group.fixable ? "text-danger" : "text-ink-muted")}>
-                {group.reason} <span className="text-ink-muted">({group.targets.length}건)</span>
-              </p>
-              <p className="min-w-0 break-words font-mono text-2xs text-ink-muted">{group.targets.join(", ")}</p>
-            </li>
-          ))}
-        </ul>
+            {groups.map((group) => (
+              <li key={group.reason} className="flex min-w-0 flex-col gap-0.5 text-2xs">
+                <p className={cn("min-w-0 break-keep", group.fixable ? "text-danger" : "text-ink-muted")}>
+                  {group.reason} <span className="text-ink-muted">({group.targets.length}건)</span>
+                </p>
+                <p className="min-w-0 break-words font-mono text-2xs text-ink-muted">{group.targets.join(", ")}</p>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );
