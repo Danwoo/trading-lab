@@ -11,9 +11,14 @@
    눈으로 읽는 것이 아니다), 추적 중인 `.env` 파일이 `.env.example` 말고는 없으며,
    `.env.example` 의 키 항목은 **빈 값**이다.
 2. **단일 로더 축** — 키 설정 이름이 정의처(`core/config.py`)·로더(`services/data_key/`)·
-   예시(`.env.example`) 밖의 코드에 나오지 않는다. 다른 데서 `settings.MARKET_DATA_..._KEY` 를
-   직접 읽으면 그 값은 가림 등록을 거치지 않아 **로그·응답 관문 밖으로 흘러나간다** — 로드와
-   가림 등록이 한 자리라는 전제가 거기서 깨진다.
+   예시(`.env.example`) 밖의 코드에 나오지 않는다. 다른 데서 `settings.<키>` 를 직접 읽으면
+   그 값은 가림 등록을 거치지 않아 **로그·응답 관문 밖으로 흘러나간다** — 로드와 가림 등록이
+   한 자리라는 전제가 거기서 깨진다.
+
+**검사 대상 이름은 로더의 표에서 도출한다** — 이름 규칙(`MARKET_DATA_*KEY`)으로 긁으면 그
+규칙을 안 따르는 새 자격이 조용히 사정권 밖에 남는다. 실제로 그 일이 있었다(합성 자격
+`TOSS_CLIENT_ID`/`_SECRET` 이 규칙 밖이라 그물 셋이 초록인 채 커버리지만 안 늘었다). 표가
+정본이면 소스를 늘리는 것만으로 그물이 따라온다.
 
 **fail-closed**: 검사할 설정 이름이 0건이거나, 스캔한 파일이 0건이거나, git 을 못 부르면 실패한다.
 검사한 개수를 항상 출력한다 — 통과가 "위반 없음"인지 "아무것도 안 봤음"인지 구분되도록.
@@ -23,6 +28,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 import subprocess
 import sys
@@ -55,20 +61,56 @@ MUST_BE_IGNORED = (
 )
 MUST_NOT_BE_IGNORED = (ENV_EXAMPLE,)
 
-SETTING_NAME = re.compile(r"^\s*(MARKET_DATA_[A-Z0-9_]*KEY)\s*:", re.MULTILINE)
+#: `core/config.py` 가 선언한 설정 이름 — 표가 가리키는 이름이 실제로 있는지 대조한다.
+CONFIG_FIELD = re.compile(r"^\s*([A-Z][A-Z0-9_]*)\s*:\s*(?:str|bool|int)", re.MULTILINE)
 
 
 def _git(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], cwd=REPO_ROOT, capture_output=True, text=True, check=False)
 
 
-def key_setting_names() -> list[str]:
-    """`core/config.py` 가 선언한 데이터 소스 키 설정 이름 — 목록의 정본은 코드다."""
+def _string_leaves(node: ast.AST) -> list[str]:
+    """dict/tuple/str 리터럴 안의 문자열을 전부 꺼낸다 — 표의 모양이 무엇이든."""
+    out: list[str] = []
+    for child in ast.walk(node):
+        if isinstance(child, ast.Constant) and isinstance(child.value, str):
+            out.append(child.value)
+    return out
+
+
+def loader_tables() -> tuple[list[str], list[str]]:
+    """로더가 선언한 (**비밀** 설정 이름, 비밀이 아닌 설정 이름).
+
+    `ast` 로 읽는다 — 앱을 import 하지 않으므로 stdlib 전용이고 설정·DB 가 필요 없다.
+    표 이름이 바뀌면 아래 `if not secret` 에서 fail-closed 로 걸린다.
+    """
+    tree = ast.parse((REPO_ROOT / LOADER_FILE).read_text(encoding="utf-8"))
+    secret: list[str] = []
+    plain: list[str] = []
+    for node in tree.body:
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        names = [t.id for t in targets if isinstance(t, ast.Name)]
+        if not names or node.value is None:
+            continue
+        if "SOURCE_KEY_SETTINGS" in names or "COMPOSITE_KEY_SETTINGS" in names:
+            # 표는 {소스: 설정이름} 또는 {소스: (앞, 뒤)} — 소스 id 는 키 자리, 설정 이름은 값 자리다.
+            values = node.value.values if isinstance(node.value, ast.Dict) else []
+            for value in values:
+                secret.extend(_string_leaves(value))
+        elif "CONTACT_SETTING" in names:
+            plain.extend(_string_leaves(node.value))
+    return sorted(dict.fromkeys(secret)), sorted(dict.fromkeys(plain))
+
+
+def config_declared_names() -> set[str]:
+    """`core/config.py` 가 선언한 설정 이름 전부."""
     text = (REPO_ROOT / CONFIG_FILE).read_text(encoding="utf-8")
-    return sorted(set(SETTING_NAME.findall(text)))
+    return set(CONFIG_FIELD.findall(text))
 
 
-def check_commit_axis(settings_names: list[str]) -> list[str]:
+def check_commit_axis(settings_names: list[str], plain_names: list[str]) -> list[str]:
     failures: list[str] = []
 
     for path in MUST_BE_IGNORED:
@@ -84,12 +126,16 @@ def check_commit_axis(settings_names: list[str]) -> list[str]:
         failures.append(f"추적 중인 env 파일이 있습니다: {', '.join(stray)}")
 
     example = (REPO_ROOT / ENV_EXAMPLE).read_text(encoding="utf-8")
-    for name in settings_names:
+    declared = config_declared_names()
+    for name in settings_names + plain_names:
         match = re.search(rf"^{re.escape(name)}=(.*)$", example, re.MULTILINE)
         if match is None:
             failures.append(f"{ENV_EXAMPLE} 에 {name} 항목이 없습니다 — 무엇을 채워야 하는지 알 수 없습니다")
-        elif match.group(1).strip():
+        elif name in settings_names and match.group(1).strip():
+            # 비밀만 빈 값이어야 한다 — 연락처는 「우리가 누구인지」라 예시 문자열이 안내다.
             failures.append(f"{ENV_EXAMPLE} 의 {name} 에 값이 들어 있습니다 — 예시는 빈 값이어야 합니다")
+        if name not in declared:
+            failures.append(f"{CONFIG_FILE} 에 {name} 선언이 없습니다 — 표가 없는 설정을 가리킵니다")
     return failures
 
 
@@ -125,19 +171,23 @@ def main() -> int:
             print(f"::error::필수 파일이 없습니다: {relative} — fail-closed 종료")
             return 1
 
-    settings_names = key_setting_names()
+    settings_names, plain_names = loader_tables()
     if not settings_names:
-        print(f"::error::{CONFIG_FILE} 에서 데이터 소스 키 설정을 0건 수집했습니다 — fail-closed 종료")
-        print("::error::설정이 사라졌거나 이름 규칙(MARKET_DATA_*KEY)이 바뀌었을 수 있습니다. 확인하세요.")
+        print(f"::error::{LOADER_FILE} 에서 비밀 키 설정을 0건 수집했습니다 — fail-closed 종료")
+        print("::error::표 이름(SOURCE_KEY_SETTINGS·COMPOSITE_KEY_SETTINGS)이 바뀌었을 수 있습니다. 확인하세요.")
+        return 1
+    if not config_declared_names():
+        print(f"::error::{CONFIG_FILE} 에서 설정 선언을 0건 읽었습니다 — fail-closed 종료")
         return 1
 
-    commit_failures = check_commit_axis(settings_names)
+    commit_failures = check_commit_axis(settings_names, plain_names)
     loader_failures, scanned = check_single_loader_axis(settings_names)
     if scanned == 0:
         print("::error::단일 로더 축에서 코드 파일을 0건 스캔했습니다 — fail-closed 종료")
         return 1
 
-    print(f"키 설정 {len(settings_names)}개: {', '.join(settings_names)}")
+    print(f"비밀 키 설정 {len(settings_names)}개: {', '.join(settings_names)}")
+    print(f"비밀 아닌 설정 {len(plain_names)}개: {', '.join(plain_names) or '없음'}")
     print(
         f"커밋 축: gitignore 대상 {len(MUST_BE_IGNORED)}건 · 예외 {len(MUST_NOT_BE_IGNORED)}건 · .env.example 항목 대조"
     )

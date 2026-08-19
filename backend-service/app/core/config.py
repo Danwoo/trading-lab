@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     MARKET_DATA_ALPACA_KEY: str = ""
     # 없어도 동작한다 — 있으면 OpenFIGI 배치 한도만 올라간다.
     MARKET_DATA_OPENFIGI_KEY: str = ""
+    # 토스증권 Open API — OAuth2 Client Credentials 쌍 (data_key_service 가 합성 주입)
+    TOSS_CLIENT_ID: str = ""
+    TOSS_CLIENT_SECRET: str = ""
 
     # doc-search-mcp-service (리서치 문서 인제스트·청크 회수 — 내부 서비스 토큰 호출)
     DOC_SEARCH_SERVICE_URL: str = "http://localhost:8008"

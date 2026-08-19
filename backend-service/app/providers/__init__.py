@@ -47,6 +47,7 @@ _SOURCE_MODULES: tuple[str, ...] = (
     "providers.openfigi.resolver",
     "providers.data_go_kr.adapter",
     "providers.alpaca.adapter",
+    "providers.toss.adapter",
 )
 
 _loaded = False

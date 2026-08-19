@@ -23,6 +23,7 @@ from providers.base import (
     ProviderKeyMissing,
     ProviderResponseInvalid,
     RateLimitExhausted,
+    not_canonical_reason,
 )
 from providers.merge import merge_duplicate_bars
 from providers.models import Capability, NormalizedBar, NormalizedInstrument, NormalizedQuote
@@ -30,7 +31,7 @@ from providers.models import Capability, NormalizedBar, NormalizedInstrument, No
 _MARKETS = ("NASDAQ", "NYSE", "AMEX")
 _ENV_HINT = "Alpaca API Key ID 와 Secret 을 'KEYID:SECRET' 형식으로"
 _NO_KEY_REASON = f"Alpaca API 키가 등록되지 않았습니다 — {CREDENTIAL_MISSING_HINT}"
-_MASTER_REASON = "미국 종목 마스터의 정본 소스는 SEC 입니다 (MD-AD-17 — 시장마다 정본 소스 하나)"
+_MASTER_REASON = not_canonical_reason("미국 종목 마스터", "SEC")
 _NO_ORDERBOOK_REASON = "Alpaca 무료 플랜은 심층 호가를 제공하지 않습니다"
 _TIMEFRAME_BY_INTERVAL = {1: "1Min", 5: "5Min", 15: "15Min", 30: "30Min", 60: "1Hour"}
 

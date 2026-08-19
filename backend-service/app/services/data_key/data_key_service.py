@@ -51,14 +51,33 @@ KEY_ACQUISITION_HINT: dict[str, str] = {
     "data_go_kr": "공공데이터포털(data.go.kr) 금융위원회 주식시세정보 활용신청 → 일반 인증키(Encoding)",
     "alpaca": "Alpaca 계정(paper) → API Keys → 'KEYID:SECRET' 형식으로 한 줄",
     "openfigi": "OpenFIGI(openfigi.com) → Request an API Key. 없어도 동작하며 배치 한도만 낮다",
+    "toss": "developers.tossinvest.com → 앱 등록 → client_id 와 client_secret 두 값",
 }
 
 # 비밀이 아니라 "우리가 누구인지"인 소스 — settings 의 연락처 문자열을 그대로 넘긴다.
 #: 「연결 확인」이 물어보는 구간 — 짧게 잡는다. 키가 통하는지만 보는 호출이다.
 PROBE_WINDOW_DAYS = 7
 
+# 자격이 **두 값의 합성**인 소스 — 어댑터에는 `"<앞>:<뒤>"` 한 줄로 넘긴다 (alpaca 관례).
+COMPOSITE_KEY_SETTINGS: dict[str, tuple[str, str]] = {
+    "toss": ("TOSS_CLIENT_ID", "TOSS_CLIENT_SECRET"),
+}
+
 NON_SECRET_CONTACT_SOURCES = ("sec",)
 CONTACT_SETTING = "MARKET_DATA_CONTACT"
+
+
+def secret_setting_names() -> tuple[str, ...]:
+    """**비밀값을 담는** 설정 이름 전부 — 단일·합성 두 표에서 꺼낸다.
+
+    가림 등록·누출 그물·경계 스캐너가 다 이 함수를 부른다. 소스를 늘릴 때 고칠 자리를
+    표 하나로 묶어, 「등록을 빠뜨린 키」가 구조적으로 안 생기게 한다 (`CONTACT_SETTING` 은
+    비밀이 아니므로 여기 없다).
+    """
+    names = list(SOURCE_KEY_SETTINGS.values())
+    for pair in COMPOSITE_KEY_SETTINGS.values():
+        names.extend(pair)
+    return tuple(dict.fromkeys(names))
 
 
 class DataKeyService:
@@ -71,14 +90,41 @@ class DataKeyService:
         self._register_secrets()
 
     def _register_secrets(self) -> None:
-        """설정에 채워진 키를 전부 가림 대상으로 올린다 — 호출 한 번이라도 나가기 전에."""
-        for setting in SOURCE_KEY_SETTINGS.values():
+        """설정에 채워진 키를 전부 가림 대상으로 올린다 — 호출 한 번이라도 나가기 전에.
+
+        **표를 하나 늘리면 이 순회도 늘어야 한다** — `secret_setting_names()` 한 곳에서
+        꺼내므로 표가 늘면 자동으로 따라온다. 손으로 열거하면 새 자격이 조용히 샌다.
+        """
+        for setting in secret_setting_names():
             register_secret(getattr(self.config, setting, ""))
+
+    def _composite_value(self, source: str, *, override: dict[str, str] | None = None) -> str | None:
+        """합성 자격을 어댑터가 받는 한 줄(`"<앞>:<뒤>"`)로 잇는다 — **잇는 규칙은 여기 하나다.**
+
+        `override` 는 「저장 전에 확인」용이다 — 방금 화면에 친 값은 재기동 전까지 설정에
+        안 들어오므로, 그 자리만 갈아끼우고 나머지는 설정에서 읽는다.
+        """
+        names = COMPOSITE_KEY_SETTINGS[source]
+        parts: list[str] = []
+        for name in names:
+            given = (override or {}).get(name)
+            parts.append((given if given is not None else getattr(self.config, name, "") or "").strip())
+        if not all(parts):
+            return None
+        for part in parts[1:]:
+            register_secret(part)
+        return ":".join(parts)
 
     def get_key(self, workspace_id: int | None, source: str) -> str | None:
         """어댑터에 넘길 자격 문자열. 비어 있으면 `None` — 어댑터가 사유를 들고 스스로 막는다."""
         if source in NON_SECRET_CONTACT_SOURCES:
             return (getattr(self.config, CONTACT_SETTING, "") or "").strip() or None
+
+        if source in COMPOSITE_KEY_SETTINGS:
+            value = self._composite_value(source)
+            if value is None:
+                logger.debug(f"데이터 소스 키 조회 — workspace={workspace_id} source={source}: 합성 자격 미완성")
+            return value
 
         setting = SOURCE_KEY_SETTINGS.get(source)
         if setting is None:
@@ -115,6 +161,17 @@ class DataKeyService:
         rows.extend(
             {
                 "source": source,
+                "setting": name,
+                "filled": bool((getattr(self.config, name, "") or "").strip()),
+                "secret": True,
+                "guidance": KEY_ACQUISITION_HINT.get(source),
+            }
+            for source, names in COMPOSITE_KEY_SETTINGS.items()
+            for name in names
+        )
+        rows.extend(
+            {
+                "source": source,
                 "setting": CONTACT_SETTING,
                 "filled": bool((getattr(self.config, CONTACT_SETTING, "") or "").strip()),
                 # 비밀이 아니라 「우리가 누구인지」다 — 화면이 마스킹으로 감출 값이 아니다.
@@ -141,7 +198,7 @@ class DataKeyService:
         """
         return Path.cwd() / f".env.{self.WRITABLE_APP_ENV}"
 
-    def save_key(self, source: str, value: str) -> dict:
+    def save_key(self, source: str, value: str, setting: str | None = None) -> dict:
         """소스의 키를 이 서비스의 `.env` 에 쓴다 — **변수 이름은 표에서 꺼낸다.**
 
         요청은 소스 id 와 값만 준다. 파일 경로도 변수 이름도 요청이 정하지 못하므로, 경로
@@ -153,7 +210,7 @@ class DataKeyService:
         if not self.can_write_keys():
             raise ForbiddenError("이 설치에서는 화면으로 키를 넣을 수 없습니다 — 로컬 개발에서만 열립니다")
 
-        setting = self._writable_setting(source)
+        setting = self._writable_setting(source, setting)
         cleaned = value.strip()
         if not cleaned:
             raise BadRequestError("값이 비어 있습니다 — 지우려면 .env 에서 직접 지우세요")
@@ -168,14 +225,30 @@ class DataKeyService:
         logger.info(f"데이터 소스 키 저장 — source={source} setting={setting} action={action}")
         return {"source": source, "setting": setting, "action": action, "restart_required": True}
 
-    def _writable_setting(self, source: str) -> str:
-        """쓸 수 있는 변수 이름. **표에 없으면 거부한다** — 요청이 이름을 정하지 못한다."""
+    def _writable_setting(self, source: str, requested: str | None = None) -> str:
+        """쓸 수 있는 변수 이름. **표에 없으면 거부한다** — 요청이 이름을 정하지 못한다.
+
+        합성 자격(값이 둘)은 어느 자리인지 요청이 지목해야 한다. 다만 지목할 수 있는 것은
+        **그 소스의 표에 적힌 이름뿐**이라, 임의 변수 덮어쓰기는 여전히 도달할 수 없다.
+        """
+        composite = COMPOSITE_KEY_SETTINGS.get(source)
+        if composite is not None:
+            if requested is None:
+                raise BadRequestError(f"{source} 는 값이 둘입니다 — 어느 항목인지 지정하세요 ({' · '.join(composite)})")
+            if requested not in composite:
+                raise BadRequestError(f"{source} 에 없는 항목입니다 ({' · '.join(composite)} 중 하나여야 합니다)")
+            return requested
+
         if source in NON_SECRET_CONTACT_SOURCES:
-            return CONTACT_SETTING
-        setting = SOURCE_KEY_SETTINGS.get(source)
-        if setting is None:
-            raise BadRequestError(f"{source} 는 화면에서 키를 넣을 수 있는 소스가 아닙니다")
-        return setting
+            settled = CONTACT_SETTING
+        else:
+            found = SOURCE_KEY_SETTINGS.get(source)
+            if found is None:
+                raise BadRequestError(f"{source} 는 화면에서 키를 넣을 수 있는 소스가 아닙니다")
+            settled = found
+        if requested is not None and requested != settled:
+            raise BadRequestError(f"{source} 의 항목은 {settled} 하나입니다")
+        return settled
 
     # 「연결 확인」이 무엇으로 물어볼지. **시장마다 확실히 상장돼 있는 종목** 하나면 된다 —
     # 값이 맞는지가 아니라 **키가 통하는지**만 보는 호출이다.
@@ -191,7 +264,7 @@ class DataKeyService:
     #: 소스당 확인 호출 간격 하한 — 외부 소스에 우리가 폭주하지 않게. 연타는 답을 바꾸지 않는다.
     PROBE_COOLDOWN_S = 5.0
 
-    async def probe_key(self, source: str, value: str) -> dict:
+    async def probe_key(self, source: str, value: str, setting: str | None = None) -> dict:
         """**넣으려는 값으로** 소스에 한 번 물어본다 — 저장 전에 확인할 수 있게.
 
         설정에서 읽지 않고 인자로 받는 이유: 방금 `.env` 에 쓴 값은 재기동 전까지 설정에
@@ -202,16 +275,32 @@ class DataKeyService:
         if not self.can_write_keys():
             raise ForbiddenError("이 설치에서는 화면으로 키를 확인할 수 없습니다 — 로컬 개발에서만 열립니다")
 
-        self._writable_setting(source)  # 표에 없는 소스를 먼저 거부한다
+        target_setting = self._writable_setting(source, setting)  # 표에 없는 소스·항목을 먼저 거부한다
         cleaned = value.strip()
         if not cleaned:
             raise BadRequestError("확인할 값이 없습니다")
+
+        if source in COMPOSITE_KEY_SETTINGS:
+            # 값이 둘인 자격은 한쪽만으로 물어볼 수 없다. 나머지는 이미 저장된 것을 쓰고,
+            # 그것마저 없으면 「확인 못 함」을 사유와 함께 낸다 — 통했다고 하지 않는다.
+            paired = self._composite_value(source, override={target_setting: cleaned})
+            if paired is None:
+                missing = [n for n in COMPOSITE_KEY_SETTINGS[source] if n != target_setting]
+                register_secret(cleaned)
+                return {
+                    "ok": False,
+                    "checked": False,
+                    "detail": f"{' · '.join(missing)} 이(가) 아직 없습니다 — 둘 다 채운 뒤 확인할 수 있습니다",
+                }
+            cleaned = paired
 
         # 소스당 쿨다운 — 이 호출은 밖으로 나간다. 저장·조회와 달리 연타가 외부 한도를 갉아먹는다.
         now = time.monotonic()
         last = self._last_probe_at.get(source)
         if last is not None and now - last < self.PROBE_COOLDOWN_S:
-            raise TooManyRequestsError(f"확인 호출은 소스당 {self.PROBE_COOLDOWN_S:.0f}초에 한 번입니다 — 잠시 후 다시 시도하세요")
+            raise TooManyRequestsError(
+                f"확인 호출은 소스당 {self.PROBE_COOLDOWN_S:.0f}초에 한 번입니다 — 잠시 후 다시 시도하세요"
+            )
         self._last_probe_at[source] = now
         register_secret(cleaned)
 
@@ -258,6 +347,12 @@ class DataKeyService:
         """
         if source in NON_SECRET_CONTACT_SOURCES:
             return f".env 의 {CONTACT_SETTING} 에 연락처를 채우세요 (비밀값이 아닙니다 — 소스가 우리를 식별하는 문자열)"
+
+        composite = COMPOSITE_KEY_SETTINGS.get(source)
+        if composite is not None:
+            hint = KEY_ACQUISITION_HINT.get(source)
+            reason = f".env 의 {composite[0]}·{composite[1]} 이 다 있어야 합니다"
+            return f"{reason}. 발급 경로: {hint}" if hint else reason
 
         setting = SOURCE_KEY_SETTINGS.get(source)
         if setting is None:

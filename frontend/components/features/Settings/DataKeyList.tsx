@@ -41,7 +41,7 @@ export function DataKeyList() {
   return (
     <ul className="flex min-w-0 flex-col">
       {rows.map((row) => (
-        <DataKeyRow key={row.source} row={row} onSaved={load} />
+        <DataKeyRow key={`${row.source}:${row.setting}`} row={row} onSaved={load} />
       ))}
     </ul>
   );

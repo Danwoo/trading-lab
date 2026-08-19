@@ -57,6 +57,18 @@ CREDENTIAL_MISSING_HINT = ".env 에 데이터 소스 키를 채우세요"
 CREDENTIAL_MISSING_CODE = "credential_missing"
 
 
+# 「이 시장·종류의 정본은 내가 아니다」(MD-AD-17)를 말하는 사유. **결손이 아니라 안내**다 —
+# 이 줄이 섞였다고 화면이 「키 없음」 판정을 잃으면, 소스를 하나 더 붙일 때마다 빈 보드가
+# 이유를 잃는다 (실측: 토스 어댑터를 붙이자 국내 일봉의 `credential_missing` 이 사라졌다).
+NOT_CANONICAL_HINT = "MD-AD-17 — 시장마다 정본 소스 하나"
+NOT_CANONICAL_CODE = "not_canonical"
+
+
+def not_canonical_reason(what: str, canonical_source: str) -> str:
+    """정본이 아닌 소스가 다는 표준 사유 — 문구를 어댑터마다 새로 쓰지 않게."""
+    return f"{what}의 정본 소스는 {canonical_source} 입니다 ({NOT_CANONICAL_HINT})"
+
+
 class ProviderKeyMissing(ServiceUnavailableError):
     """키가 있어야 하는 소스를 키 없이 호출했을 때 올린다.
 

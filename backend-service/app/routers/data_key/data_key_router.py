@@ -50,7 +50,7 @@ async def probe_data_key(
     저장 뒤에 확인하려면 재기동이 필요하다(설정은 기동 시 읽는다). 그래서 값을 그대로
     태워 저장 전에 답을 준다.
     """
-    return DataKeyProbeOut(**await data_key_service.probe_key(body.source, body.value))
+    return DataKeyProbeOut(**await data_key_service.probe_key(body.source, body.value, body.setting))
 
 
 @router.put(
@@ -68,4 +68,4 @@ def save_data_key(
 
     `PUT` 인 이유: 같은 소스에 두 번 보내면 결과가 같다(그 변수 한 줄이 그 값이 된다).
     """
-    return DataKeySaveOut(**data_key_service.save_key(body.source, body.value))
+    return DataKeySaveOut(**data_key_service.save_key(body.source, body.value, body.setting))

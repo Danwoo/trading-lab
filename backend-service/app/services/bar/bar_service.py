@@ -23,7 +23,7 @@ import datetime as dt
 
 from core.calendar import sessions_between
 from core.exceptions import BadRequestError, NotFoundError
-from providers.base import CREDENTIAL_MISSING_CODE
+from providers.base import CREDENTIAL_MISSING_CODE, NOT_CANONICAL_CODE
 from repositories.bar.bar_repository import BarRepository
 from services.capability.capability_service import CapabilityService
 
@@ -57,7 +57,9 @@ class BarService:
         if any(row["available"] for row in rows):
             return None, None
         reason = " / ".join(f"{row['source']}: {row['reason']}" for row in rows if row["reason"])
-        codes = {row.get("code") for row in rows}
+        # 「정본이 아니다」는 막은 이유가 아니다 — 그 시장의 정본이 따로 있다는 안내이므로
+        # 결손 집계에서 뺀다. 넣고 세면 소스를 하나 붙일 때마다 코드가 사라진다.
+        codes = {row.get("code") for row in rows if row.get("code") != NOT_CANONICAL_CODE}
         return reason, CREDENTIAL_MISSING_CODE if codes == {CREDENTIAL_MISSING_CODE} else None
 
     def _missing_instrument_error(self, market: str, symbol: str) -> NotFoundError:

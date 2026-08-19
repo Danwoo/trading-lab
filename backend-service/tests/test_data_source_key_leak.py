@@ -28,6 +28,7 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import io
 import logging
@@ -36,12 +37,39 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
+
 # 가짜 키 — 값에 `+ / = :` 를 섞는다. httpx 가 쿼리 파라미터를 퍼센트 인코딩하므로 원문 그대로는
 # URL 안에서 발견되지 않는다. 인코딩 변형까지 가려지는지가 이 그물의 핵심 축이다.
-FAKE_GOKR_KEY = "dummy-gokr-service-key-DO-NOT-USE-a+b/c=="
-FAKE_ALPACA_KEY = "dummy-alpaca-keyid-DO-NOT-USE:dummy-alpaca-secret-DO-NOT-USE"
-FAKE_OPENFIGI_KEY = "dummy-openfigi-key-DO-NOT-USE"
-FAKE_KEYS = (FAKE_GOKR_KEY, FAKE_ALPACA_KEY, FAKE_OPENFIGI_KEY)
+#
+# **이름을 손으로 열거하지 않는다.** 로더의 표를 `ast` 로 읽어(설정을 세우기 전이라 import 는
+# 아직 못 한다) 설정 이름마다 가짜 값을 만든다. 소스를 하나 늘리면 이 그물이 자동으로 따라온다 —
+# 손으로 적던 시절, 새로 들어온 합성 자격이 네 축 어디에도 안 태워진 채 초록이 났다.
+def _secret_setting_names() -> tuple[str, ...]:
+    loader = Path(__file__).resolve().parents[1] / "app" / "services" / "data_key" / "data_key_service.py"
+    tree = ast.parse(loader.read_text(encoding="utf-8"))
+    names: list[str] = []
+    for node in tree.body:
+        targets = (
+            node.targets if isinstance(node, ast.Assign) else ([node.target] if isinstance(node, ast.AnnAssign) else [])
+        )
+        declared = {t.id for t in targets if isinstance(t, ast.Name)}
+        if not declared & {"SOURCE_KEY_SETTINGS", "COMPOSITE_KEY_SETTINGS"} or node.value is None:
+            continue
+        for value in getattr(node.value, "values", []):
+            names.extend(c.value for c in ast.walk(value) if isinstance(c, ast.Constant) and isinstance(c.value, str))
+    return tuple(dict.fromkeys(names))
+
+
+SECRET_SETTING_NAMES = _secret_setting_names()
+if not SECRET_SETTING_NAMES:
+    raise SystemExit("::error::로더 표에서 키 설정 이름을 0건 읽었다 — 그물이 죽어 있다 (fail-closed)")
+
+#: 설정 이름 → 가짜 값. 값마다 `+ / = :` 를 섞어 인코딩 변형까지 가리는지 본다.
+FAKE_BY_SETTING = {name: f"dummy-{name.lower().replace('_', '-')}-DO-NOT-USE-a+b/c=:z" for name in SECRET_SETTING_NAMES}
+FAKE_KEYS = tuple(FAKE_BY_SETTING.values())
+
+#: 실제 HTTP 경로를 태우는 축이 쓰는 값 — 그 소스의 설정 이름으로 표에서 꺼낸다.
+FAKE_GOKR_KEY = FAKE_BY_SETTING["MARKET_DATA_GOKR_SERVICE_KEY"]
 
 os.environ["APP_ENV"] = "key-leak-test"
 for _key, _value in {
@@ -57,9 +85,7 @@ for _key, _value in {
     "SFTP_PASSWORD": "test",
     "JWT_SECRET": "test-secret",
     "MARKET_DATA_CONTACT": "trading-lab/test (contact: leak-test@example.com)",
-    "MARKET_DATA_GOKR_SERVICE_KEY": FAKE_GOKR_KEY,
-    "MARKET_DATA_ALPACA_KEY": FAKE_ALPACA_KEY,
-    "MARKET_DATA_OPENFIGI_KEY": FAKE_OPENFIGI_KEY,
+    **FAKE_BY_SETTING,
 }.items():
     os.environ.setdefault(_key, _value)
 
@@ -79,12 +105,21 @@ from fastapi import Request  # noqa: E402
 from providers import get_provider, list_sources, register_provider  # noqa: E402
 from providers.base import ProviderResponseInvalid  # noqa: E402
 from services.capability.capability_service import CapabilityService  # noqa: E402
-from services.data_key.data_key_service import SOURCE_KEY_SETTINGS, DataKeyService  # noqa: E402
+from services.data_key.data_key_service import (  # noqa: E402
+    COMPOSITE_KEY_SETTINGS,
+    SOURCE_KEY_SETTINGS,
+    DataKeyService,
+)
 from services.ingest.ingest_service import IngestService  # noqa: E402
 from utils.redaction.redactor import RedactingFormatter, redact_secrets, registered_count  # noqa: E402
 
-# 키로 여는 소스 — 이 목록이 비면 아무것도 검사하지 않은 것이므로 fail-closed 로 실패한다.
-KEY_REQUIRED_SOURCES = ("data_go_kr", "alpaca")
+#: 키로 여는 소스 전부 — 표에서 도출한다. 어댑터가 없는 소스(마스터 보조용 `openfigi`)는
+#: 태울 코드 경로가 없으므로 뺀다. 목록이 비면 아무것도 검사하지 않은 것이라 fail-closed 다.
+KEY_SOURCE_SETTINGS: dict[str, tuple[str, ...]] = {
+    **{source: (setting,) for source, setting in SOURCE_KEY_SETTINGS.items()},
+    **{source: tuple(names) for source, names in COMPOSITE_KEY_SETTINGS.items()},
+}
+KEY_REQUIRED_SOURCES = tuple(source for source in KEY_SOURCE_SETTINGS if source in list_sources())
 
 # 키 앞뒤 몇 글자도 새면 안 된다 — "힌트"라며 앞자리를 흘리는 API 가 흔하다.
 FRAGMENT_LENGTH = 8
@@ -251,9 +286,9 @@ def test_reason_text_never_carries_the_value_even_when_the_key_is_set():
     회귀는 가정이 아니라 실제로 돌아올 수 있는 모양이다.
     """
     service = DataKeyService(config=settings)
-    reasons = [service.unavailable_reason(source) for source in (*SOURCE_KEY_SETTINGS, "sec")]
+    reasons = [service.unavailable_reason(source) for source in (*KEY_SOURCE_SETTINGS, "sec")]
     assert len(reasons) > len(KEY_REQUIRED_SOURCES), "사유를 물어본 소스가 너무 적다 — 검사 대상 부족"
-    for source, reason in zip((*SOURCE_KEY_SETTINGS, "sec"), reasons, strict=True):
+    for source, reason in zip((*KEY_SOURCE_SETTINGS, "sec"), reasons, strict=True):
         assert reason, f"{source} 의 사유가 비었다"
         assert_no_key(reason, f"{source} unavailable_reason (키가 채워진 상태)")
     _burn(f"응답: 키가 채워진 상태의 사유 {len(reasons)}건")
@@ -266,8 +301,8 @@ def test_missing_key_reason_names_the_env_slot_not_the_value():
     reasons = [row["reason"] or "" for row in rows]
     assert reasons, "사유 0건"
     for source in KEY_REQUIRED_SOURCES:
-        setting = SOURCE_KEY_SETTINGS[source]
-        assert any(setting in reason for reason in reasons), f"{source} 사유에 {setting} 이름이 없다"
+        for setting in KEY_SOURCE_SETTINGS[source]:
+            assert any(setting in reason for reason in reasons), f"{source} 사유에 {setting} 이름이 없다"
     assert_no_key(json.dumps(rows, ensure_ascii=False), "키 없음 사유")
     _burn("응답: 키 없음 사유가 .env 슬롯 이름을 지목")
 

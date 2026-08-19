@@ -47,6 +47,7 @@ if str(_APP_DIR) not in sys.path:
 
 from schemas.data_key.data_key_schema import DataKeyStatusOut  # noqa: E402
 from services.data_key.data_key_service import (  # noqa: E402
+    COMPOSITE_KEY_SETTINGS,
     CONTACT_SETTING,
     NON_SECRET_CONTACT_SOURCES,
     SOURCE_KEY_SETTINGS,
@@ -72,6 +73,9 @@ class FakeConfig:
     def __init__(self) -> None:
         for setting in SOURCE_KEY_SETTINGS.values():
             setattr(self, setting, SECRET)
+        for names in COMPOSITE_KEY_SETTINGS.values():
+            for name in names:
+                setattr(self, name, SECRET)
         setattr(self, CONTACT_SETTING, "lead@example.com")
 
 
@@ -96,7 +100,7 @@ def main() -> int:
     check("값을 담을 이름의 필드가 없다", leaky, set())
 
     # ④ 표의 소스가 전부 나온다 — 빠지면 화면이 그 키를 영영 안 보여준다
-    expected_sources = set(SOURCE_KEY_SETTINGS) | set(NON_SECRET_CONTACT_SOURCES)
+    expected_sources = set(SOURCE_KEY_SETTINGS) | set(COMPOSITE_KEY_SETTINGS) | set(NON_SECRET_CONTACT_SOURCES)
     check("표의 소스가 전부 나온다", {row["source"] for row in rows}, expected_sources)
     check("연락처는 비밀이 아니라고 표시된다", [r["secret"] for r in rows if r["source"] == "sec"], [False])
 

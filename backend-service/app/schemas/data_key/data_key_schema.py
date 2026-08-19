@@ -26,14 +26,15 @@ class DataKeyStatusListOut(BaseModel):
 
 
 class DataKeySaveIn(BaseModel):
-    """키 저장 요청 — **소스 id 와 값만** 받는다.
+    """키 저장 요청 — **소스 id 와 값**, 그리고 값이 둘인 소스면 어느 항목인지.
 
-    파일 경로도 변수 이름도 요청이 정하지 못한다. 서버가 소스 id 로 표를 조회해 꺼내므로,
-    경로 조작이나 임의 변수 덮어쓰기가 도달할 수 없다 (#225).
+    파일 경로는 요청이 정하지 못하고, 변수 이름도 **그 소스의 표에 적힌 것만** 지목할 수
+    있다. 경로 조작이나 임의 변수 덮어쓰기는 여전히 도달할 수 없다 (#225).
     """
 
     source: str = Field(..., max_length=40)
     value: str = Field(..., max_length=500)
+    setting: str | None = Field(default=None, max_length=60)
 
 
 class DataKeySaveOut(BaseModel):
