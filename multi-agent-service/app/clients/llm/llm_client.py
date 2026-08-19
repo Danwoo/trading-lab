@@ -48,6 +48,21 @@ def _role(config, role: str) -> tuple[LlmProvider, str, str, str]:
     return provider, resolved, model, api_key
 
 
+def role_extra_kwargs(config, role: str) -> dict:
+    """이 역할이 **실제로 싣는** 추가 kwargs — 팩토리·상태·probe 가 이 함수 하나를 쓴다.
+
+    갈라지면 화면이 실제와 다른 것을 말한다: generator 계열 팩토리는 `extra_body` 를 아예
+    안 붙이는데 상태가 「보낸다」고 말하면, reasoning 이 섞여 나오는 것을 디버깅하는 사람이
+    그 칸을 보고 「이미 억제돼 있다」고 결론낸다. probe 도 같은 이유로 **없는 실패**를 만든다.
+    """
+    if role != "router":
+        # Generator·Evaluator 는 vLLM 전용 파라미터를 쓰지 않는다 (대형 모델은 reasoning 억제
+        # 대상이 아니다 — 이 배선은 #188 Phase C 에서 정해졌다).
+        return {}
+    provider, _, _, _ = _role(config, role)
+    return _vllm_compat_kwargs(config, provider)
+
+
 def describe_roles(config) -> list[dict]:
     """지금 어떤 제공자·모델로 답하는지, 못 부르면 왜인지. **키는 담지 않는다.**
 
@@ -66,7 +81,8 @@ def describe_roles(config) -> list[dict]:
                 # 주소는 비밀이 아니다 — 키는 담지 않는다.
                 "base_url": base_url or None,
                 "model": model or None,
-                "sends_vllm_extra_body": sends_vllm_extra_body(provider, bool(config.ROUTER_LLM_VLLM_COMPAT)),
+                # **팩토리가 실제로 싣는 것**을 그대로 본다 — 규칙을 다시 계산하면 갈라진다.
+                "sends_vllm_extra_body": "extra_body" in role_extra_kwargs(config, role),
                 "reason": unavailable_reason(provider, base_url, model, api_key),
                 # 「부를 수는 있는데 이상한」 상태 — 막지는 않되 조용하지도 않게 한다.
                 "warning": address_mismatch(provider, base_url),
@@ -103,7 +119,8 @@ async def probe_role(config, role: str) -> dict:
         max_tokens=PROBE_MAX_TOKENS,
         timeout=PROBE_TIMEOUT_S,
         max_retries=0,
-        **_vllm_compat_kwargs(config, provider),
+        # probe 는 **그 역할의 팩토리와 같은 kwargs** 로 부른다 — 다르면 없는 실패를 만든다.
+        **role_extra_kwargs(config, role),
     )
     try:
         # `run_name` 을 붙인다 — usage tracker 가 이 토큰을 **관측 사각으로 두지 않게**.
@@ -207,7 +224,7 @@ def _build(config, role: str, **kwargs) -> ChatOpenAI:
 
 def get_router_llm(config) -> ChatOpenAI:
     return _with_fallbacks(
-        _build(config, "router", temperature=0.0, **_vllm_compat_kwargs(config, _role(config, "router")[0])),
+        _build(config, "router", temperature=0.0, **role_extra_kwargs(config, "router")),
         config,
         temperature=0.0,
         max_tokens=4096,
@@ -216,7 +233,7 @@ def get_router_llm(config) -> ChatOpenAI:
 
 def get_planner_llm(config) -> ChatOpenAI:
     return _with_fallbacks(
-        _build(config, "router", temperature=0.0, **_vllm_compat_kwargs(config, _role(config, "router")[0])),
+        _build(config, "router", temperature=0.0, **role_extra_kwargs(config, "router")),
         config,
         temperature=0.0,
         max_tokens=4096,

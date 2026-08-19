@@ -15,6 +15,7 @@
   ⑦ **폴백 사유에도** 키가 안 실린다 — 칸 순서를 바꿔 적으면 첫 칸이 키다
   ⑧ 제공자가 vLLM 토글을 이긴다 — Groq 를 고른 사람이 400 으로 죽지 않게
   ⑨ 고른 제공자와 실제 주소가 어긋나면 조용하지 않다
+  ⑩ **상태·probe 가 팩토리와 같은 것을 말한다** — generator 는 extra_body 를 안 싣는다
 
 standalone 실행 겸용:
     cd multi-agent-service && uv run python tests/test_llm_provider.py
@@ -163,6 +164,24 @@ def main() -> int:
 
     check("팩토리가 Groq 에 extra_body 를 안 싣는다", _vllm_compat_kwargs(GroqWithToggleOn(), groq_provider), {})
 
+    # ⑩ **상태·probe 가 팩토리와 같은 것을 말한다.** generator 계열은 extra_body 를 아예 안
+    #    싣는데 상태가 「보낸다」고 하면, reasoning 을 디버깅하는 사람이 그 칸을 보고 「이미
+    #    억제돼 있다」고 결론낸다. probe 도 같은 이유로 없는 실패를 만든다.
+    from clients.llm.llm_client import role_extra_kwargs  # noqa: PLC0415
+
+    class CustomWithToggleOn(Config):
+        ROUTER_LLM_PROVIDER = ""  # custom — 토글을 따른다
+        GENERATOR_LLM_PROVIDER = ""
+        ROUTER_LLM_VLLM_COMPAT = True
+
+    custom_config = CustomWithToggleOn()
+    check("router 는 토글대로 싣는다", "extra_body" in role_extra_kwargs(custom_config, "router"), True)
+    check("generator 는 절대 안 싣는다", role_extra_kwargs(custom_config, "generator"), {})
+    rows_custom = describe_roles(custom_config)
+    by_role_custom = {row["role"]: row for row in rows_custom}
+    check("상태가 generator 에 대해 거짓말하지 않는다", by_role_custom["generator"]["sends_vllm_extra_body"], False)
+    check("상태가 router 에 대해서는 참을 말한다", by_role_custom["router"]["sends_vllm_extra_body"], True)
+
     # ⑨ **주소가 어긋나면 조용하지 않다** — 제공자만 고르고 BASE_URL 을 안 비운 상태
     check("표의 주소면 경고 없음", address_mismatch(groq_provider, "https://api.groq.com/openai/v1"), None)
     mismatch = address_mismatch(groq_provider, "http://198.51.100.35:18080/router/v1")
@@ -175,7 +194,7 @@ def main() -> int:
     check("상태에 경고 칸이 있다", all("warning" in row for row in rows), True)
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (제공자 {len(PROVIDERS)}종)")
-    if CHECKED < 60:
+    if CHECKED < 66:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:
