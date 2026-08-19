@@ -5,6 +5,18 @@ import { StrRange, Optional, Field, enums, object } from "@/lib/zod/helpers";
 /** 백엔드 `ingest_schema.py` 의 `JobKind` 와 값이 같아야 한다 (backend 가 SoT). */
 export const JOB_KINDS = ["instrument_master", "daily_bar", "minute_bar"] as const;
 
+/**
+ * capability 표가 내는 `data_kind` 어휘 — **백엔드 어댑터가 SoT** 다
+ * (각 소스 어댑터의 `Capability(data_kind=...)`).
+ *
+ * 값을 프론트가 지어내면 조용히 어긋난다: 실제로 `"candles"` 라는 없는 값으로 소스를 고르고
+ * 있었고, 테스트가 같은 가짜 값을 픽스처로 써서 **그물이 초록인 채** 적재 버튼이 영영 안 열렸다.
+ * `scripts/verify_capability_kind_lockstep.py` 가 이 목록과 어댑터를 대조한다.
+ */
+export const DATA_KINDS = ["instrument_master", "daily_bar", "minute_bar", "quote", "orderbook"] as const;
+
+export type DataKind = (typeof DATA_KINDS)[number];
+
 /** 백엔드 `ingest_schema.py` 의 `RunStatus`. `rate_limited` 는 실패가 아니라 이어받을 지점이 있는 상태다(설계 §7.2). */
 export const RUN_STATUSES = ["queued", "running", "succeeded", "failed", "rate_limited"] as const;
 
