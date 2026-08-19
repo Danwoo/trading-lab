@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     # MCP 서버 (비면 도구 0개로 기동 — sub-agent 는 LLM 지식 전용)
     MCP_SERVERS: list[McpServer] = []
 
+    # LLM 제공자 — 받는 사람마다 가진 키가 다르다 (#226). 표는 `clients/llm/providers.py`.
+    # 비우면 `custom` 이라 종전대로 BASE_URL 을 직접 읽는다 (뒤로 호환).
+    ROUTER_LLM_PROVIDER: str = ""
+    GENERATOR_LLM_PROVIDER: str = ""
+    # 주 제공자가 죽었을 때 넘어갈 자리. `<provider>|<model>|<key>` 형식을 쉼표로 잇는다
+    # (예: `groq|llama-3.3-70b-versatile|gsk_…`). 비우면 폴백 없음 — 실패가 그대로 드러난다.
+    LLM_FALLBACKS: str = ""
+
     # LLM — Router(소형: ReAct/plan/가드레일) / Generator(대형: 답변 생성·평가) 2계층
     ROUTER_LLM_BASE_URL: str = ""
     ROUTER_LLM_API_KEY: str = "EMPTY"
