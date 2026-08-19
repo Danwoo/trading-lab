@@ -50,7 +50,7 @@ export function useRealtimeQuote(): PanelData<Quote> {
         data: null,
         isLoading: false,
         error: null,
-        provenance: { kind: "unavailable", reason: "선택된 종목이 없습니다" },
+        provenance: { kind: "unavailable", reason: "선택된 종목이 없습니다", because: "not-chosen" },
       };
   }
 }

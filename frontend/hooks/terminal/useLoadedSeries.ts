@@ -19,7 +19,7 @@ const NO_CONTEXT_STATE: PanelData<Candle[]> = {
   data: null,
   isLoading: false,
   error: null,
-  provenance: { kind: "unavailable", reason: NO_CONTEXT_REASON },
+  provenance: { kind: "unavailable", reason: NO_CONTEXT_REASON, because: "not-chosen" },
 };
 
 /** ① 적재본 갈래 — 과거 캔들. 문맥(종목·주기·기간)을 스스로 읽는다 (§3.6). */

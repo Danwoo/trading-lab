@@ -15,6 +15,7 @@ import {
 import { PanelSlot } from "./PanelSlot";
 import { IngestConsole } from "@/components/features/Terminal/IngestConsole";
 import { SymbolSidebar } from "./SymbolSidebar";
+import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
 
 /**
  * 「시세」 화면의 셸 — 문맥·레이아웃 스토어를 여는 유일한 곳(다른 컴포넌트는 `contextActions`/
@@ -26,6 +27,7 @@ import { SymbolSidebar } from "./SymbolSidebar";
  */
 export function TerminalContainer() {
   const { workspaceId: sessionWorkspaceId, isLoaded } = useSessionContext();
+  const symbol = useTerminalSymbol();
   const setWorkspace = useLayoutStore((s) => s.setWorkspace);
   const layout = useLayoutStore((s) => s.layout);
   const recovered = useLayoutStore((s) => s.recovered);
@@ -75,6 +77,15 @@ export function TerminalContainer() {
             닫기
           </button>
         </div>
+      )}
+
+      {symbol === null && (
+        // 첫 진입은 종목이 없어 대부분의 패널이 빈다 — 「고르면 채워집니다」가 자리마다 있어도
+        // 무엇부터 하면 되는지는 한 번 말해 줘야 한다 (실험대의 「시작하는 길」과 같은 자리).
+        <p role="status" className="flex-shrink-0 border-b border-line px-3 py-1.5 text-2xs text-ink-muted">
+          왼쪽에서 종목을 하나 고르면 차트·종목 정보·호가가 그 종목으로 채워집니다. 적재를 아직 안 했다면 위의
+          「적재」에서 먼저 받아 오세요.
+        </p>
       )}
 
       <IngestConsole />
