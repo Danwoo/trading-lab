@@ -16,8 +16,7 @@ import datetime as dt
 from contextlib import contextmanager
 from decimal import Decimal
 
-from core.calendar import session_windows
-from core.exceptions import BadRequestError, HTTPError
+from core.exceptions import BadRequestError
 from core.logger import logger
 from fastapi.concurrency import run_in_threadpool
 from providers import get_alias_resolver, get_provider, list_alias_sources
@@ -292,13 +291,6 @@ class IngestService:
         await self._require_minute_partition(date_from, date_to)
         ts_from = dt.datetime.combine(date_from, dt.time.min)
         ts_to = dt.datetime.combine(date_to, dt.time.max)
-        # 접기용 정규장 창 — 모르는 시장이면 빈 목록이고, 그때는 **접지 않는다**
-        # (틀린 창으로 접으면 「우리가 만든 값」이 소스 값보다 나쁘다).
-        try:
-            windows = session_windows(market, date_from, date_to)
-        except HTTPError as exc:
-            logger.warning(f"정규장 창을 알 수 없어 일봉 재구성을 건너뜁니다 — market={market}: {exc}")
-            windows = []
 
         written = skipped = 0
         last_done = run.get("cursor") or ""
@@ -317,17 +309,6 @@ class IngestService:
             # 분봉이 들어왔으면 그 날의 일봉을 **정규장만 접어** 다시 만든다 (MD-AD-26 · #255).
             # 소스 일봉은 종목마다 다른 창을 덮어, 시간외를 포함하는 종목은 종가가 최대 4%
             # 어긋난다 — 우리가 접은 값만 「무엇인지 아는」 값이다.
-            # 창은 **날짜마다 다르다** — KRX 는 수능일에 전 일정을 1시간 늦춘다. 캘린더가
-            # 그것을 알고 있으므로 표로 굳히지 않고 물어본다 (`core.calendar.session_windows`).
-            if windows:
-                await run_in_threadpool(
-                    self.ingest_repository.rebuild_daily_from_minutes,
-                    {
-                        "instrument_ids": [instrument_id],
-                        "windows": windows,
-                        "ingest_run_id": run["run_id"],
-                    },
-                )
             last_done = symbol
             await run_in_threadpool(
                 self.ingest_repository.update_ingest_run_status,

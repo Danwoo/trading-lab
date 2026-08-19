@@ -9,7 +9,6 @@
 """
 
 import datetime as dt
-import json
 
 from sqlalchemy import text
 from utils.common.devextreme_utils import build_filter_params, parse_sort
@@ -303,78 +302,6 @@ class IngestRepository:
         return dt.date.fromisoformat(low), dt.date.fromisoformat(high)
 
     # ── 캔들 ─────────────────────────────────────────────────────────────────
-    def rebuild_daily_from_minutes(self, args: dict) -> int:
-        """분봉이 있는 날의 일봉을 **그 날의 정규장 창만 접어** 다시 만든다 (MD-AD-26 · #255).
-
-        소스 일봉은 종목마다 다른 창을 덮는다 — 시간외를 포함하는 종목의 종가는 정규장 종가와
-        최대 4% 어긋났다(실측). 분봉이 있으면 우리가 직접 접는 편이 **무엇인지 아는** 값이다.
-
-        **창은 날짜마다 다르다.** KRX 는 수능일에 전 일정을 1시간 늦추므로(10:00~16:30), 고정
-        창으로 접으면 그날 종가가 장중 가격이 된다. `windows` 는 `core.calendar.session_windows`
-        가 캘린더에서 뽑아 준 `(날짜, 시작, 끝)` 목록이다.
-
-        분봉이 없는 날은 건드리지 않는다 — 그 행은 `session_scope='unknown'` 으로 남아, 화면과
-        엔진이 「모르는 값」인 것을 알 수 있다.
-        """
-        windows = args.get("windows") or []
-        if not windows or not args.get("instrument_ids"):
-            return 0
-        sql = """
-            WITH win(trade_date, open_at, close_at) AS (
-                SELECT (w->>0)::date, (w->>1)::time, (w->>2)::time
-                  FROM jsonb_array_elements(CAST(:windows AS jsonb)) AS w
-            ),
-            folded AS (
-                SELECT m.instrument_id
-                     , m.ts::date                                              AS trade_date
-                     , (ARRAY_AGG(m.open  ORDER BY m.ts))[1]                   AS open
-                     , MAX(m.high)                                             AS high
-                     , MIN(m.low)                                              AS low
-                     , (ARRAY_AGG(m.close ORDER BY m.ts DESC))[1]              AS close
-                     , SUM(m.volume)                                           AS volume
-                     , MIN(m.source)                                           AS source
-                     , MIN(m.adj_policy)                                       AS adj_policy
-                  FROM tn_minute_bar m
-                  JOIN win ON win.trade_date = m.ts::date
-                 WHERE m.instrument_id = ANY(:instrument_ids)
-                   AND m.ts::time BETWEEN win.open_at AND win.close_at
-                 GROUP BY m.instrument_id, m.ts::date
-            )
-            INSERT INTO tn_daily_bar (
-                 instrument_id, trade_date, open, high, low, close, volume, trade_value
-               , source, adj_policy, session_scope, ingest_run_id, ingested_at
-            )
-            SELECT instrument_id, trade_date, open, high, low, close, volume, NULL
-                 , source, adj_policy, 'regular', :ingest_run_id, CURRENT_TIMESTAMP
-              FROM folded
-            ON CONFLICT (instrument_id, trade_date) DO UPDATE
-               SET open          = EXCLUDED.open
-                 , high          = EXCLUDED.high
-                 , low           = EXCLUDED.low
-                 , close         = EXCLUDED.close
-                 , volume        = EXCLUDED.volume
-                 -- **함께 갈아야 한다.** 안 갈면 `volume` 은 정규장 합인데 `trade_value` 만
-                 -- 시간외 포함 값으로 남아, 한 행 안에서 두 컬럼이 다른 구간을 뜻하게 된다 —
-                 -- 이 변경이 없애려던 바로 그 상태다. 분봉엔 거래대금이 없으므로 NULL 이다.
-                 , trade_value   = EXCLUDED.trade_value
-                 , source        = EXCLUDED.source
-                 , adj_policy    = EXCLUDED.adj_policy
-                 , session_scope = EXCLUDED.session_scope
-                 , ingest_run_id = EXCLUDED.ingest_run_id
-                 , ingested_at   = CURRENT_TIMESTAMP
-        """
-        payload = json.dumps([[str(day), start.isoformat(), end.isoformat()] for day, start, end in windows])
-        with self.sql_client.engine.begin() as conn:
-            result = conn.execute(
-                text(sql),
-                {
-                    "instrument_ids": args["instrument_ids"],
-                    "windows": payload,
-                    "ingest_run_id": args.get("ingest_run_id"),
-                },
-            )
-            return result.rowcount or 0
-
     def upsert_daily_bars(self, rows: list[dict]) -> int:
         """일봉 벌크 upsert (MD-AD-16). 감사 컬럼 대신 `source`·`ingest_run_id`·`ingested_at`."""
         if not rows:
@@ -399,11 +326,6 @@ class IngestRepository:
                  , session_scope = EXCLUDED.session_scope
                  , ingest_run_id = EXCLUDED.ingest_run_id
                  , ingested_at   = CURRENT_TIMESTAMP
-             -- **접어 둔 행은 소스 일봉이 덮지 않는다.** MD-AD-22 가 마지막 저장 거래일을
-             -- 항상 다시 요청하므로, 이 조건이 없으면 분봉으로 접은 값이 **일봉 적재를 한 번
-             -- 더 돌릴 때마다** 시간외 포함 값으로 조용히 되돌아간다 (되돌아간 사실을 알리는
-             -- 것도 없다). 접은 값은 분봉에서 다시 만들어지므로 낡지 않는다.
-             WHERE tn_daily_bar.session_scope IS DISTINCT FROM 'regular'
         """
         with self.sql_client.connect() as conn:
             conn.execute(text(sql), rows)

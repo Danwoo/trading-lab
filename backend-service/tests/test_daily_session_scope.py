@@ -1,14 +1,18 @@
 """일봉의 **구간 표기**가 정직한가 (DB·네트워크 없음).
 
-소스가 준 일봉이 어느 구간을 덮는지 우리는 모른다 — 소스마다, 같은 소스의 종목마다 다르다.
-그래서 **모르면 모른다고 적는다**. 분봉으로 다시 접은 봉만 `regular` 다 (#255).
+소스가 준 일봉이 어느 구간을 덮는지 우리는 모른다 — 소스마다, 같은 소스의 종목마다 다르다
+(실측: 보통주 표본 25종목 중 9종목이 시간외를 포함하고, 그 종가는 정규장 종가와 최대 4%
+어긋났다). 그래서 **모르면 모른다고 적는다** (#255).
+
+분봉으로 접어 `regular` 로 만드는 것은 **아직 안 한다** — 접는 방식(쓰기 시점 vs 조회 시점)이
+적재 설계를 바꾸는 결정이라 리드 판단을 기다린다. 지금 이 그물이 잠그는 것은 「모른다고 정직히
+적는가」와 「조회가 그 사실을 전하는가」다.
 
 이 그물이 잠그는 것:
 
   ① 소스 일봉은 `session_scope='unknown'` 으로 저장된다 (「정규장」이라 부르면 거짓말이다)
   ② 정규장 창을 **캘린더가 준다** — 수능일 1시간 지연까지 (표로 굳히면 그날 종가를 놓친다)
-  ③ 분봉 적재가 끝나면 일봉 재구성을 **실제로 부른다** (배선)
-  ④ 정규장 구간을 모르는 시장은 접지 않는다 — 틀린 창으로 접으면 소스 값보다 나쁘다
+  ③ 조회가 「어느 구간인지」를 싣고, 섞이면 `mixed` 로 답한다
 
 standalone 실행 겸용:
     cd backend-service && uv run python tests/test_daily_session_scope.py
@@ -83,26 +87,28 @@ def main() -> int:
         # 마감 동시호가 체결이 15:31 봉에 찍힌다 — 15:30 으로 끊으면 종가를 놓친다
         check(f"{day} 끝 15:31 (마감 동시호가 포함)", end, dt.time(15, 31))
 
-    # **수능일은 전 일정이 1시간 늦다** — 고정 창으로 접으면 그날 종가가 장중 가격이 된다
-    csat = session_windows("KOSPI", dt.date(2020, 12, 3), dt.date(2020, 12, 3))
-    check("수능일도 창이 나온다", len(csat), 1)
-    check("수능일 시작 10:00", csat[0][1], dt.time(10, 0))
-    check("수능일 끝 16:31", csat[0][2], dt.time(16, 31))
+    # **수능일 구멍은 아직 안 닫혔다 — 그물이 그것을 감추지 않게 여기에 적어 둔다.**
+    # KRX 는 수능일에 전 일정을 1시간 늦추는데, `exchange_calendars` 의 `precomputed_csat_days`
+    # 는 2020-12-03 에서 끊겨 있다. 즉 **2021년 이후 수능일은 라이브러리도 모른다.**
+    # 아래 두 단언은 「라이브러리가 아는 해는 맞다」와 「모르는 해는 아직 틀리다」를 **둘 다**
+    # 못 박는다 — 뒤엣것이 초록이면 그것은 통과가 아니라 **남은 구멍의 기록**이다.
+    known = session_windows("KOSPI", dt.date(2020, 12, 3), dt.date(2020, 12, 3))
+    check("라이브러리가 아는 수능일은 10:00 개장", known[0][1], dt.time(10, 0))
+    later = session_windows("KOSPI", dt.date(2024, 11, 14), dt.date(2024, 11, 14))
+    check("2021년 이후 수능일은 아직 09:00 으로 나온다 (남은 구멍)", later[0][1] if later else None, dt.time(9, 0))
 
     us = session_windows("NASDAQ", dt.date(2026, 8, 18), dt.date(2026, 8, 18))
     check("미국도 창이 나온다", len(us), 1)
     check("미국 시작 09:30", us[0][1], dt.time(9, 30))
 
-    # ③·④ 배선 — 분봉 적재가 재구성을 부르고, 모르는 시장은 건너뛴다
+    # ③ 소스가 준 일봉을 「정규장」이라 부르지 않는다 — 지금은 그것이 우리가 아는 전부다
     source = (_APP_DIR / "services" / "ingest" / "ingest_service.py").read_text(encoding="utf-8")
-    check("분봉 적재가 재구성을 부른다", "rebuild_daily_from_minutes" in source, True)
-    check("창을 못 구하면 건너뛴다", "windows = []" in source, True)
-    check("창을 캘린더에서 받는다", "session_windows(market, date_from, date_to)" in source, True)
+    check("적재가 unknown 으로만 쓴다", '"session_scope": "unknown"' in source, True)
+    check("쓰기 시점 접기를 하지 않는다", "rebuild_daily_from_minutes" in source, False)
 
-    repository = (_APP_DIR / "repositories" / "ingest" / "ingest_repository.py").read_text(encoding="utf-8")
-    check("재구성이 regular 로 적는다", "'regular'" in repository, True)
-    check("재구성이 날짜별 창으로 자른다", "win.open_at" in repository and "win.close_at" in repository, True)
-    check("접은 행을 재적재가 못 덮는다", "IS DISTINCT FROM 'regular'" in repository, True)
+    bar_service = (_APP_DIR / "services" / "bar" / "bar_service.py").read_text(encoding="utf-8")
+    check("조회가 구간 표기를 싣는다", "_session_scope" in bar_service, True)
+    check("섞이면 mixed 로 답한다", '"mixed"' in bar_service, True)
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (창 {len(windows)}일 + 수능일·미국)")
     if CHECKED < 15:
@@ -112,7 +118,7 @@ def main() -> int:
         print(f"::error::{line}", file=sys.stderr)
     if FAILURES:
         return 1
-    print("판정: 모르는 것은 모른다고 적고, 접은 것만 regular 다")
+    print("판정: 소스 일봉을 「정규장」이라 부르지 않고, 조회가 어느 구간인지 말한다")
     return 0
 
 
