@@ -85,6 +85,13 @@ export const theme = {
       "shell-panel": "var(--shell-panel)",
       "shell-panel-compact": "var(--shell-panel-compact)",
       "shell-panel-expanded": "var(--shell-panel-expanded)",
+      // 누를 수 있는 영역 — 셸 폭과 다른 축(손가락)이다. #230
+      "touch-rail-target": "var(--touch-rail-target)",
+      "touch-min": "var(--touch-min)",
+    },
+    minHeight: {
+      // 좁은 화면·터치 기기에서 촘촘한 표적이 갖는 하한 (#230). spacing 과 별개 스케일이다.
+      "touch-min": "var(--touch-min)",
     },
     boxShadow: {
       e1: "var(--e1)",

@@ -11,7 +11,7 @@ function GoLoadLink() {
   return (
     <Link
       href={MARKET_PATH}
-      className="rounded-control border border-line px-2 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+      className="inline-flex min-h-touch-min items-center rounded-control border border-line px-2 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
     >
       시세로 가서 적재하기
     </Link>
