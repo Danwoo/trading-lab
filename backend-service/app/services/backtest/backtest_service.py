@@ -300,6 +300,28 @@ class BacktestService:
                 # 화면이 「돌고 있음」과 「마감 못 함」을 구분할 수 있게 한다.
                 failed_reason = (failed_reason or "") + f" (마감 실패: {str(exc)[:200]})"
 
+            # **격자 칸이 1급 지표를 갖는다** (#220). 격자는 사용자가 조합을 **고르는** 자리라,
+            # 여기서 4급 지표(수익률)만 보이면 「가장 많이 번 칸」이 가장 진해 보이고 사용자는 그
+            # 칸을 고른다 — 스펙 D-Q2 가 *"트레이더가 계좌를 닫는 이유는 샤프가 낮아서가 아니라
+            # 낙폭을 못 견뎌서다"* 라며 뒤집어 놓은 순서와 정면으로 어긋난다.
+            #
+            # 리포트를 열면 그제야 1급이 보이는데, **고른 뒤에 보이는 것은 선택을 못 바꾼다.**
+            #
+            # 저장하지 않고 여기서 만든다 — 정의(#201)가 바뀌면 저장된 값이 낡은 정의를 낸다.
+            cell_metrics = None
+            if failed_reason is None and cell.result.equity:
+                from services.backtest.metrics import longest_underwater, max_drawdown
+
+                _eq = [p.equity for p in cell.result.equity]
+                _under, _still = longest_underwater(_eq)
+                _mdd, _, _ = max_drawdown(_eq)
+                cell_metrics = {
+                    "longest_underwater": float(_under),
+                    "still_underwater": _still,
+                    "mdd_pct": _mdd * 100,
+                    "total_return_pct": ((_eq[-1] - _eq[0]) / _eq[0] * 100 if _eq[0] else None),
+                }
+
             cells_out.append(
                 {
                     "run_id": run_id,
@@ -307,6 +329,8 @@ class BacktestService:
                     "status": "succeeded" if failed_reason is None else "failed",
                     "failed_reason": failed_reason,
                     "final_equity": cell.result.final_equity if failed_reason is None else None,
+                    # 색을 만드는 값 — 화면이 무엇으로 칠했는지 함께 적을 수 있게 이름을 그대로 준다.
+                    "metrics": cell_metrics,
                 }
             )
 

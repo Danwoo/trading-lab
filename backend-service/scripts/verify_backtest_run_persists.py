@@ -338,13 +338,25 @@ def main() -> int:
     attempts = [service.select_result(c["run_id"])["run"]["attempt_no"] for c in grid_out["cells"]]
     check("칸마다 시도 번호가 다르다", len(set(attempts)), 3)
 
+    # ── 격자 칸이 1급 지표를 갖는가 (#220) ─────────────────────────────────
+    # 격자는 조합을 **고르는** 자리다 — 4급 지표(수익률)만 있으면 「가장 많이 번 칸」이
+    # 가장 진해 보이고, 스펙 D-Q2 가 뒤집어 놓은 순서와 정면으로 어긋난다.
+    first = grid_out["cells"][0]
+    check("칸에 지표가 실린다", first.get("metrics") is not None, True)
+    cm = first["metrics"]
+    check("1급 — 최장 미회복 기간", "longest_underwater" in cm, True)
+    check("2급 — MDD", "mdd_pct" in cm, True)
+    check("아직 회복 중인지도 온다", "still_underwater" in cm, True)
+    check("수익률도 함께 (4급이지만 버리지 않는다)", "total_return_pct" in cm, True)
+    check("최장 미회복 기간이 숫자다", isinstance(cm["longest_underwater"], float), True)
+
     # 정리 — 전용 스키마째 지운다.
     with admin.begin() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (REQUIRE=db 실행됨)")
 
-    if CHECKED < 48:
+    if CHECKED < 54:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:
