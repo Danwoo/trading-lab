@@ -107,6 +107,9 @@ class Trade:
     exit_price: float | None = None
     fee: float = 0.0
     slippage: float = 0.0
+    #: 증권거래세 — **매도에만** 붙는다. `sell_cost` 안에서만 차감되면 「얼마를 세금으로
+    #: 냈는지」를 아무도 못 세어, 화면이 비용 격차를 말할 수 없다 (#271).
+    tax: float = 0.0
     realized_pnl: float | None = None
     mae: float | None = None  # 보유 중 최대 미실현 손실
     mfe: float | None = None  # 보유 중 최대 미실현 이익
@@ -243,6 +246,7 @@ def run_single(
                 open_trade.exit_price = price
                 open_trade.fee += notional * costs.fee_rate
                 open_trade.slippage += notional * costs.slippage_rate
+                open_trade.tax += notional * costs.sell_tax_rate
                 entry_notional = open_trade.entry_price * open_trade.qty
                 open_trade.realized_pnl = (notional - cost) - (entry_notional + costs.buy_cost(entry_notional))
                 result.trades.append(open_trade)

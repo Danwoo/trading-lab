@@ -305,6 +305,50 @@ def compute(
 
     out.append(cagr_metric)
 
+    # ── 비용 — **이 성과가 무엇을 치르고 남은 것인가** (#271) ────────────────
+    #
+    # 제품 정의 §5 W4 가 「현실 조건 반영 성과 … **미반영 대비 격차가 함께 표시**」를 완료
+    # 조건으로 세웠다. 엔진은 이미 거래마다 비용을 치르고 기록한다 — 계산이 없는 게 아니라
+    # 말을 안 했던 것이다.
+    paid = sum(
+        (getattr(t, "fee", 0.0) or 0.0) + (getattr(t, "slippage", 0.0) or 0.0) + (getattr(t, "tax", 0.0) or 0.0)
+        for t in trades
+    )
+    start_equity = equity[0] if equity else 0.0
+    out.append(
+        Metric(
+            key="cost_paid",
+            label="치른 비용",
+            value=paid,
+            unit="원",
+            derived_from=f"거래 {len(trades)}건의 수수료 + 슬리피지 + 증권거래세 합",
+        )
+    )
+    if start_equity > 0:
+        out.append(
+            Metric(
+                key="cost_drag_pct",
+                label="비용이 먹은 수익률",
+                value=paid / start_equity * 100,
+                unit="p",
+                # **재실행이 아니다.** 비용을 0 으로 두고 다시 돌리면 현금 제약이 달라져 체결
+                # 수량이 달라질 수 있다. 이 값은 「치른 비용」이지 「비용 없는 세계의 성과」가
+                # 아니다 — 그 경계를 여기 적어 화면이 그대로 읽게 한다.
+                derived_from="치른 비용 ÷ 시작 자금 (비용 0으로 다시 돌린 값이 아니다 — 체결 수량이 달라질 수 있다)",
+            )
+        )
+    else:
+        out.append(
+            Metric(
+                key="cost_drag_pct",
+                label="비용이 먹은 수익률",
+                value=None,
+                unit="p",
+                derived_from="치른 비용 ÷ 시작 자금",
+                absent_reason="시작 자금이 0이라 나눌 수 없습니다",
+            )
+        )
+
     # ── 5급: 샤프 (참고용) ────────────────────────────────────────────
     # 무위험수익률은 0 고정이고 화면이 그 사실을 밝힌다 (스펙 D-Q2).
     returns = [(equity[i] - equity[i - 1]) / equity[i - 1] for i in range(1, len(equity)) if equity[i - 1]]

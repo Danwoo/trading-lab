@@ -198,6 +198,7 @@ class BacktestService:
                 "fill_price": quantize(t.entry_price, 6),
                 "exit_price": quantize(t.exit_price, 6) if t.exit_price is not None else None,
                 "fee": quantize(t.fee, 6),
+                "tax": quantize(getattr(t, "tax", 0.0) or 0.0, 6),
                 "slippage": quantize(t.slippage, 6),
                 "realized_pnl": quantize(t.realized_pnl, 6) if t.realized_pnl is not None else None,
                 "mae": quantize(t.mae, 6) if t.mae is not None else None,
@@ -487,6 +488,11 @@ class BacktestService:
                     realized_pnl=float(row["realized_pnl"]) if row["realized_pnl"] is not None else None,
                     entry_price=float(row["fill_price"]),
                     qty=float(row["qty"]),
+                    # **비용 3종을 함께 넘긴다.** 안 넘기면 「치른 비용」이 조용히 0원이 된다 —
+                    # `getattr` 기본값이 그것을 감춘다(실측: 25거래에 0원으로 나왔다).
+                    fee=float(row["fee"] or 0),
+                    slippage=float(row["slippage"] or 0),
+                    tax=float(row.get("tax") or 0) if hasattr(row, "get") else float(row["tax"] or 0),
                 )
                 for row in trade_rows
             ],

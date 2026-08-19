@@ -96,6 +96,18 @@ def test_metrics_ride_along_and_longest_underwater_is_first() -> None:
     keys = [m["key"] for m in report["metrics"]]
     check("샤프는 맨 뒤다", keys[-1], "sharpe")
 
+    # **이 성과가 무엇을 치르고 남은 것인지** 말한다 (#271 — 제품 정의 §5 W4 완료 조건).
+    check("치른 비용이 있다", "cost_paid" in keys, True)
+    check("비용이 먹은 수익률이 있다", "cost_drag_pct" in keys, True)
+    by_key = {m["key"]: m for m in report["metrics"]}
+    # 재실행이 아니라는 것을 **유도 문구가** 밝힌다 — 비용 0 으로 다시 돌리면 체결 수량이 달라진다
+    check(
+        "재실행이 아님을 밝힌다",
+        "다시 돌린 값이 아니다" in (by_key["cost_drag_pct"]["derived_from"] or ""),
+        True,
+    )
+    check("치른 비용의 유도가 세 항목을 말한다", "증권거래세" in (by_key["cost_paid"]["derived_from"] or ""), True)
+
 
 def test_zero_trades_is_absent_not_zero() -> None:
     repo = FakeRepository(run_row(), equity_rows([100.0, 101.0, 102.0]), [])
