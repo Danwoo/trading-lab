@@ -31,6 +31,7 @@ export interface PanelSlotProps {
 const NEEDS_SYMBOL_VERDICT: CapabilityVerdict = {
   available: false,
   reason: "브리핑 — 아직 선택된 종목이 없습니다. 사이드바에서 관심종목·보유·스크리너 중 하나를 골라보세요.",
+  because: "not-chosen",
 };
 
 /**
@@ -84,7 +85,7 @@ export function PanelSlot({
   const reportedProvenance = usePanelProvenanceValue(instance.instanceId);
   const provenance: Provenance | null = verdict.available
     ? reportedProvenance
-    : { kind: "unavailable", reason: verdict.reason };
+    : { kind: "unavailable", reason: verdict.reason, because: verdict.because };
 
   const LazyPanel = useMemo(() => lazy(definition.load), [definition]);
 

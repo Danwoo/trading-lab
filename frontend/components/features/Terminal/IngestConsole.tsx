@@ -11,6 +11,7 @@ import { insertIngestRun } from "@/services/terminal/ingestService";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import type { IngestRunOut } from "@/schemas/terminal/ingest";
 import type { MarketCapability } from "@/services/terminal/marketService";
+import { CREDENTIAL_MISSING_CODE } from "@/lib/terminal/marketDataError";
 
 /**
  * 시세 화면의 **적재 콘솔** — 마일스톤 2 가 이 화면에서 요구하는 두 줄이 여기서 보인다:
@@ -54,13 +55,42 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+/**
+ * 막힌 조합을 **사유로 묶는다.**
+ *
+ * 조합은 소스 × 시장 × 데이터종류라 같은 사유가 수십 번 되풀이된다 — 실측으로 46건이 9종이었다.
+ * 되풀이된 벽은 읽히지 않고, 첫 화면이 통째로 회색으로 보이게 만든다.
+ *
+ * 키가 없어 막힌 것(`credential_missing`)을 앞에 세운다 — 그것만이 사용자가 오늘 풀 수 있는
+ * 것이고, 나머지는 그 소스가 원래 안 주는 것이라 읽고 넘어갈 자리다.
+ */
+export function groupBlockedByReason(rows: MarketCapability[]) {
+  const groups = new Map<string, { reason: string; fixable: boolean; targets: string[] }>();
+
+  for (const row of rows) {
+    const reason = row.reason ?? "사유가 기록되지 않았습니다";
+    const group = groups.get(reason) ?? {
+      reason,
+      fixable: row.code === CREDENTIAL_MISSING_CODE,
+      targets: [],
+    };
+    group.targets.push(`${row.source} · ${row.market} · ${row.dataKind}`);
+    groups.set(reason, group);
+  }
+
+  return [...groups.values()].sort(
+    (a, b) => Number(b.fixable) - Number(a.fixable) || b.targets.length - a.targets.length,
+  );
+}
+
 /** 소스 가용성 — 무엇이 지금 되고, 안 되는 것은 왜 안 되는지. */
 function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; loading: boolean }) {
   if (rows === null) {
-    return (
-      <p className="break-keep text-2xs text-ink-muted">
-        {loading ? "소스를 확인하고 있습니다…" : "소스 목록을 읽지 못했습니다."}
-      </p>
+    // 「못 읽었다」와 「비어 있다」는 다르다 — 앞의 것은 고쳐야 할 일이라 색으로 갈라 둔다.
+    return loading ? (
+      <p className="break-keep text-2xs text-ink-muted">소스를 확인하고 있습니다…</p>
+    ) : (
+      <p className="break-keep text-2xs text-danger">소스 목록을 읽지 못했습니다.</p>
     );
   }
   if (rows.length === 0) {
@@ -68,26 +98,31 @@ function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; load
   }
 
   const blocked = rows.filter((row) => !row.available);
+  const groups = groupBlockedByReason(blocked);
+  const fixableCount = groups.filter((group) => group.fixable).reduce((sum, group) => sum + group.targets.length, 0);
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <p className="break-keep text-2xs text-ink-muted">
         {rows.length}건 중 <span className="text-ink">{rows.length - blocked.length}건</span> 사용 가능
-        {blocked.length > 0 && <> · {blocked.length}건은 아래 이유로 막혀 있습니다</>}
+        {blocked.length > 0 && (
+          <>
+            {" "}
+            · {blocked.length}건은 아래 {groups.length}가지 이유로 막혀 있습니다
+            {fixableCount > 0 && <> (그중 {fixableCount}건은 키를 넣으면 열립니다)</>}
+          </>
+        )}
       </p>
-      {blocked.length > 0 && (
-        <ul className="flex min-w-0 flex-col gap-0.5">
+      {groups.length > 0 && (
+        <ul className="flex min-w-0 flex-col gap-1.5">
           {/* 사유는 **서버가 정본**이다 — env 항목명과 발급 경로까지 완전한 문장으로 온다.
               프론트가 같은 안내를 다시 만들면 서버가 아는 항목명과 갈린다. */}
-          {blocked.map((row) => (
-            <li
-              key={`${row.source}:${row.market}:${row.dataKind}`}
-              className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-2xs"
-            >
-              <span className="font-mono text-ink-muted">
-                {row.source} · {row.market} · {row.dataKind}
-              </span>
-              <span className="min-w-0 break-keep text-danger">{row.reason ?? "사유가 기록되지 않았습니다"}</span>
+          {groups.map((group) => (
+            <li key={group.reason} className="flex min-w-0 flex-col gap-0.5 text-2xs">
+              <p className={cn("min-w-0 break-keep", group.fixable ? "text-danger" : "text-ink-muted")}>
+                {group.reason} <span className="text-ink-muted">({group.targets.length}건)</span>
+              </p>
+              <p className="min-w-0 break-words font-mono text-2xs text-ink-muted">{group.targets.join(", ")}</p>
             </li>
           ))}
         </ul>
@@ -99,10 +134,10 @@ function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; load
 /** 적재 이력 — 어디까지 받았고 무엇이 실패했는지. */
 function Runs({ rows, loading }: { rows: IngestRunOut[] | null; loading: boolean }) {
   if (rows === null) {
-    return (
-      <p className="break-keep text-2xs text-ink-muted">
-        {loading ? "이력을 불러오고 있습니다…" : "이력을 읽지 못했습니다."}
-      </p>
+    return loading ? (
+      <p className="break-keep text-2xs text-ink-muted">이력을 불러오고 있습니다…</p>
+    ) : (
+      <p className="break-keep text-2xs text-danger">이력을 읽지 못했습니다.</p>
     );
   }
   if (rows.length === 0) {
@@ -258,9 +293,11 @@ export function IngestConsole() {
           {symbol === null ? (
             <p className="break-keep text-2xs text-ink-muted">종목을 고르면 그 구간의 결측을 셉니다.</p>
           ) : gaps.data === null ? (
-            <p className="break-keep text-2xs text-ink-muted">
-              {gaps.isLoading ? "결측을 세고 있습니다…" : "결측을 읽지 못했습니다."}
-            </p>
+            gaps.isLoading ? (
+              <p className="break-keep text-2xs text-ink-muted">결측을 세고 있습니다…</p>
+            ) : (
+              <p className="break-keep text-2xs text-danger">결측을 읽지 못했습니다.</p>
+            )
           ) : missing.length === 0 ? (
             <p className="break-keep text-2xs text-ink-muted">
               {gaps.data.dateFrom} ~ {gaps.data.dateTo} 구간에 빠진 거래일이 없습니다.

@@ -139,7 +139,7 @@ export function ProvenanceBadge({
       return (
         <span className="inline-flex items-center gap-1 text-ink-muted">
           <UnavailableIcon />
-          제공 안 됨
+          {provenance.because === "not-chosen" ? "고르면 채워집니다" : "제공 안 됨"}
         </span>
       );
   }

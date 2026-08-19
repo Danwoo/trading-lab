@@ -17,6 +17,9 @@ class CapabilityOut(BaseModel):
     data_kind: str
     available: bool
     reason: str | None = None
+    # 화면이 「키를 넣으면 풀린다」와 「이 소스는 원래 안 준다」를 가르는 근거. 문구로 가르지
+    # 않는 이유는 문구만 바뀌어도 판정이 조용히 갈리기 때문이다 — 그래서 서버가 코드를 준다.
+    code: str | None = None
 
 
 class CapabilitiesOut(BaseModel):

@@ -171,10 +171,19 @@ export interface MarketCapability {
   dataKind: string;
   available: boolean;
   reason: string | null;
+  /** 사유의 종류. 지금은 `credential_missing` 하나 — 「키를 넣으면 풀린다」를 뜻한다. */
+  code: string | null;
 }
 
 interface CapabilitiesOut {
-  items: Array<{ source: string; market: string; data_kind: string; available: boolean; reason: string | null }>;
+  items: Array<{
+    source: string;
+    market: string;
+    data_kind: string;
+    available: boolean;
+    reason: string | null;
+    code: string | null;
+  }>;
   total_count: number;
 }
 
@@ -197,6 +206,7 @@ export async function selectMarketCapabilities(market?: string): Promise<MarketC
     dataKind: row.data_kind,
     available: row.available,
     reason: row.reason,
+    code: row.code ?? null,
   }));
 }
 
