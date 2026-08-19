@@ -40,6 +40,9 @@ _ALIAS_REGISTRY: dict[str, AliasResolverFactory] = {}
 # ② "무엇이 붙어 있나"가 코드 한 곳에서 읽힌다. `providers/__init__` 하단에서 import 하면 어댑터가
 # 다시 이 모듈의 `register_provider` 를 import 하며 순환하므로, 지연 import 로 끊는다.
 _SOURCE_MODULES: tuple[str, ...] = (
+    # 샘플은 **키 없이** 도는 유일한 시세 소스다 (#217) — 먼저 등록해 두면
+    # 키가 하나도 없는 기동에서도 캐패빌리티 표에 「가능」이 하나는 뜬다.
+    "providers.sample.adapter",
     "providers.sec.adapter",
     "providers.openfigi.resolver",
     "providers.data_go_kr.adapter",

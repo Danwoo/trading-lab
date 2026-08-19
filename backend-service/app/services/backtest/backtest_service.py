@@ -90,10 +90,17 @@ class BacktestService:
             reason = payload.get("unavailable_reason") or "그 구간에 적재된 캔들이 없습니다"
             raise BadRequestError(f"백테스트를 돌릴 캔들이 없습니다 — {reason}")
 
-        instrument_id = int(items[0].get("instrument_id") or 0)
+        # **`bar_service` 의 항목 계약은 `time` 이다** (`_to_item`) — `dt` 가 아니다.
+        # 처음엔 `dt` 로 읽어 `KeyError: 'dt'` 로 500 이 났다. 단위 테스트는 엔진에 직접
+        # BarSeries 를 넣어 돌리므로 이 경계를 한 번도 안 태웠고, 실제 적재본으로 돌린
+        # 첫 순간에 드러났다(#217).
+        #
+        # `instrument_id` 도 안 온다 — 그 표현은 종목이 아니라 캔들만 담는다. 백테스트는
+        # 한 종목만 다루므로 0 으로 두되, **없는 값을 있는 척 만들지 않는다**는 뜻으로
+        # 명시한다(다종목이 오면 이 자리가 먼저 바뀌어야 한다).
         return BarSeries(
-            instrument_id=instrument_id,
-            dt=[str(row["dt"]) for row in items],
+            instrument_id=0,
+            dt=[str(row["time"])[:10] for row in items],
             open=[float(row["open"]) for row in items],
             high=[float(row["high"]) for row in items],
             low=[float(row["low"]) for row in items],

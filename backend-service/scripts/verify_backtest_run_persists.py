@@ -64,7 +64,8 @@ def fake_bar_service(closes: list[float]):
     items = [
         {
             "instrument_id": 7,
-            "dt": (start + _dt.timedelta(days=i)).isoformat(),
+            # `bar_service._to_item` 의 계약은 **`time`** 이다 (#217 에서 잡힌 자리).
+            "time": (start + _dt.timedelta(days=i)).isoformat(),
             "open": c,
             "high": c,
             "low": c,
