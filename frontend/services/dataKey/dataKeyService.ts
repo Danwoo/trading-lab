@@ -38,12 +38,17 @@ export interface DataKeySaved {
   restart_required: boolean;
 }
 
-/** 넣으려는 값으로 소스에 한 번 물어본다 — **저장 전에** 확인한다. */
-export const probeDataKey = async (source: string, value: string): Promise<DataKeyProbe | null> => {
-  return apiCall<DataKeyProbe>(`${BASE_URL}/probe`, { method: "POST", data: { source, value } });
+/**
+ * 넣으려는 값으로 소스에 한 번 물어본다 — **저장 전에** 확인한다.
+ *
+ * `setting` 은 값이 둘인 소스(예: 앱 ID + 시크릿)에서 어느 항목인지 지목한다. 서버는 그
+ * 소스의 표에 적힌 이름만 받으므로 임의 변수를 가리킬 수 없다.
+ */
+export const probeDataKey = async (source: string, value: string, setting: string): Promise<DataKeyProbe | null> => {
+  return apiCall<DataKeyProbe>(`${BASE_URL}/probe`, { method: "POST", data: { source, value, setting } });
 };
 
 /** 키를 그 서비스의 `.env` 에 쓴다 — 로컬 개발에서만 열린다. */
-export const saveDataKey = async (source: string, value: string): Promise<DataKeySaved | null> => {
-  return apiCall<DataKeySaved>(BASE_URL, { method: "PUT", data: { source, value } });
+export const saveDataKey = async (source: string, value: string, setting: string): Promise<DataKeySaved | null> => {
+  return apiCall<DataKeySaved>(BASE_URL, { method: "PUT", data: { source, value, setting } });
 };

@@ -27,8 +27,25 @@ class AccountReadBlocked(Exception):
     """계좌 조회가 기본 차단됐다 — 호출부가 명시 플래그를 줘야 열린다."""
 
 
+def _normalized(path: str) -> str:
+    """dot-segment 를 접은 경로. **판정 전에** 접는다 — httpx 가 전송 직전에 접으므로,
+    접기 전 문자열로 판정하면 `/api/v1/candles/../orders` 가 가드를 지나 주문으로 나간다.
+    """
+    parts: list[str] = []
+    for segment in path.split("?", 1)[0].split("/"):
+        if segment in ("", "."):
+            continue
+        if segment == "..":
+            if parts:
+                parts.pop()
+            continue
+        parts.append(segment)
+    return "/" + "/".join(parts)
+
+
 def assert_path_allowed(path: str, *, allow_account_read: bool = False) -> None:
     """모든 토스 API 호출이 지나는 관문. 주문은 플래그, 계좌는 호출부 명시가 있어야 통과한다."""
+    path = _normalized(path)
     if path.startswith(ORDER_PATH_PREFIXES):
         if os.environ.get("TRADING_LIVE_ENABLED") != "true":
             raise TradingLiveDisabled(

@@ -53,6 +53,11 @@ import inspect  # noqa: E402
 from core.config import settings  # noqa: E402
 from core.exceptions import BadRequestError  # noqa: E402
 from providers import get_provider, list_sources  # noqa: E402
+from providers.base import (  # noqa: E402
+    CREDENTIAL_MISSING_CODE,
+    NOT_CANONICAL_CODE,
+    not_canonical_reason,
+)
 from providers.merge import merge_duplicate_bars  # noqa: E402
 from providers.models import NormalizedBar  # noqa: E402
 from services.bar.bar_service import MAX_BARS, BarService, synthesize_bars  # noqa: E402
@@ -274,8 +279,50 @@ def test_malformed_scope_is_rejected_not_silently_empty() -> str:
     return "test_malformed_scope_is_rejected_not_silently_empty"
 
 
+def test_not_canonical_row_is_guidance_not_a_deficiency() -> str:
+    """「이 시장의 정본은 내가 아니다」가 섞였다고 「키가 아직 없다」 판정이 사라지면 안 된다.
+
+    실측으로 겪은 회귀다 — 국내 시세 소스를 하나 더 붙이자(그 소스가 마스터의 정본이 아니라고
+    정직하게 선언했다) `credential_missing` 이 사라져, 빈 보드가 이유를 잃었다. 소스가 늘 때마다
+    화면이 조용히 나빠지는 자리라 클래스로 잠근다.
+    """
+    service = _bar_service()
+    rows = [
+        row
+        for row in service.capability_service.list_capabilities(1, "KOSPI")
+        if row["data_kind"] == "instrument_master"
+    ]
+    assert rows, "국내 마스터 capability 행이 0건 — 검사 대상 없음"
+    guidance = [row for row in rows if row["code"] == NOT_CANONICAL_CODE]
+    assert guidance, "정본 아님을 코드로 내는 행이 없다 — 이 테스트가 검사할 대상이 사라졌다"
+
+    reason, code = service._unavailable(1, "KOSPI", "instrument_master")
+    assert reason, "사유가 비었다"
+    assert code == CREDENTIAL_MISSING_CODE, f"안내가 섞였다고 코드를 잃었다: {code!r}"
+
+    # 반대 방향 — 막은 이유가 **전부** 안내뿐이면 코드를 주지 않는다 (보수적으로).
+    class _OnlyGuidance:
+        def list_capabilities(self, workspace_id, market=None):
+            return [
+                {
+                    "source": "toss",
+                    "market": "KOSPI",
+                    "data_kind": "instrument_master",
+                    "available": False,
+                    "reason": not_canonical_reason("국내 종목 마스터", "data_go_kr"),
+                    "code": NOT_CANONICAL_CODE,
+                }
+            ]
+
+    only = BarService(bar_repository=_StubBarRepository(), capability_service=_OnlyGuidance())
+    _, only_code = only._unavailable(1, "KOSPI", "instrument_master")
+    assert only_code is None, f"안내만 있는데 키 없음으로 단정했다: {only_code!r}"
+    return f"test_not_canonical_row_is_guidance_not_a_deficiency (행 {len(rows)}개 중 안내 {len(guidance)}개)"
+
+
 TESTS = [
     test_key_required_sources_build_without_key_and_explain_why,
+    test_not_canonical_row_is_guidance_not_a_deficiency,
     test_capability_reason_carries_next_action,
     test_bar_service_is_not_wired_to_any_provider,
     test_empty_response_carries_reason_not_bare_zero,

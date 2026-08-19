@@ -16,10 +16,16 @@ from __future__ import annotations
 
 import datetime as dt
 
+from core.calendar import get_market_calendar
 from core.logger import logger
 
 from providers import register_provider
-from providers.base import CREDENTIAL_MISSING_HINT, ProviderKeyMissing, ProviderResponseInvalid
+from providers.base import (
+    CREDENTIAL_MISSING_HINT,
+    ProviderKeyMissing,
+    ProviderResponseInvalid,
+    not_canonical_reason,
+)
 from providers.models import Capability, NormalizedBar, NormalizedInstrument, NormalizedQuote
 from providers.toss import SOURCE
 from providers.toss.client import PAGE_LIMIT, TossClient
@@ -28,17 +34,30 @@ from providers.toss.mapper import SkippedRow, to_bar, to_instrument
 KR_MARKETS = ("KOSPI", "KOSDAQ", "KONEX")
 US_MARKETS = ("NASDAQ", "NYSE", "AMEX")
 
-ENV_HINT = "TOSS_CLIENT_ID 와 TOSS_CLIENT_SECRET 두 값 — developers.tossinvest.com 앱 등록에서 발급"
+# 어댑터는 자격의 **모양**만 말한다 — 변수 이름은 로더(`services/data_key/`)가 안내한다.
+# 여기 이름을 적으면 그 값이 가림 등록을 안 거친 채 읽히는 길이 생긴다 (경계 스캐너가 잡는다).
+ENV_HINT = (
+    "토스증권 앱의 Client ID 와 Client Secret 을 'ID:SECRET' 형식으로 — developers.tossinvest.com 앱 등록에서 발급"
+)
 
-#: 페이지네이션 안전 상한 — 200봉×60페이지 = 12,000봉(일봉 약 48년). 이보다 길면 잘못된 루프다.
-MAX_PAGES = 60
+#: 페이지네이션 안전 상한. **분봉 소급이 기준이다** — KRX 정규장 390분×245일 ≈ 9.6만 봉이라
+#: 1년치가 약 478페이지다. 일봉으로 잡으면(60페이지=48년) 분봉 1년이 상한에 막힌다.
+#: 200봉×2000페이지 = 40만 봉 ≈ 분봉 4년치. 커서가 안 도는 경우는 상한이 아니라 아래에서 직접 잡는다.
+MAX_PAGES = 2000
 
-KST = dt.timezone(dt.timedelta(hours=9))
+
+def _market_tz(market: str) -> dt.tzinfo:
+    """소스에 보낼 **커서**용 tz. 저장 시각은 매퍼가 `market_local_naive` 로 고정한다."""
+    return get_market_calendar(market).tz
 
 
 class TossProvider:
     def __init__(self, api_key: str | None = None, *_args, **_kwargs):
+        self.api_key = (api_key or "").strip() or None
         self.client = TossClient(api_key or "")
+        #: 마지막 호출에서 건너뛴 행 — 적재 실행 기록의 `skipped_rows` 가 여기서 온다.
+        #: 없으면 「버렸는데 0건으로 기록」이 된다 (alpaca 관례).
+        self.last_skipped: list[str] = []
 
     def _key_reason(self) -> str | None:
         if self.client.credentials_well_formed:
@@ -51,9 +70,9 @@ class TossProvider:
         for market in KR_MARKETS + US_MARKETS:
             is_kr = market in KR_MARKETS
             if is_kr:
-                master = (key_reason is None, key_reason)
+                master = (False, not_canonical_reason("국내 종목 마스터", "data_go_kr"))
             else:
-                master = (False, "미국 종목 마스터의 정본 소스는 SEC 입니다 (MD-AD-17 — 시장마다 정본 소스 하나)")
+                master = (False, not_canonical_reason("미국 종목 마스터", "SEC"))
             for kind, (ok, reason) in {
                 "instrument_master": master,
                 "daily_bar": (key_reason is None, key_reason),
@@ -72,14 +91,15 @@ class TossProvider:
         self._require_key()
         rows = await self.client.stocks_all(market)
         out: list[NormalizedInstrument] = []
-        skipped = 0
+        skipped: list[str] = []
         for row in rows:
             try:
                 out.append(to_instrument(row, market))
-            except SkippedRow:
-                skipped += 1
+            except SkippedRow as exc:
+                skipped.append(str(exc))
+        self.last_skipped = skipped
         if skipped:
-            logger.warning(f"toss 마스터 행 건너뜀 — market={market} skipped={skipped}/{len(rows)}")
+            logger.warning(f"toss 마스터 행 건너뜀 — market={market} skipped={len(skipped)}/{len(rows)}")
         return out
 
     async def _paged_bars(
@@ -87,8 +107,9 @@ class TossProvider:
     ) -> list[NormalizedBar]:
         """`before` 커서로 최신→과거로 걷어, 구간 밖으로 나가면 멈춘다."""
         bars: list[NormalizedBar] = []
-        before = keep_to.isoformat()
-        skipped = 0
+        # 커서는 소스 쪽 시각이라 offset 을 붙여 보낸다 (경계는 naive, 커서는 aware).
+        before = keep_to.replace(tzinfo=_market_tz(market)).isoformat()
+        skipped: list[str] = []
         for _ in range(MAX_PAGES):
             result = await self.client.candles(symbol, interval, count=PAGE_LIMIT, before=before)
             rows = result.get("candles") or []
@@ -98,8 +119,8 @@ class TossProvider:
             for row in rows:
                 try:
                     bar = to_bar(row, symbol, market)
-                except SkippedRow:
-                    skipped += 1
+                except SkippedRow as exc:
+                    skipped.append(str(exc))
                     continue
                 oldest = bar.ts if oldest is None or bar.ts < oldest else oldest
                 if keep_from <= bar.ts <= keep_to:
@@ -107,19 +128,28 @@ class TossProvider:
             next_before = result.get("nextBefore")
             if not next_before or (oldest is not None and oldest < keep_from):
                 break
+            if next_before == before:
+                # 상한과 구분해서 잡는다 — 둘을 뭉치면 「구간이 길다」를 「소스가 고장」으로 오진한다.
+                raise ProviderResponseInvalid(
+                    f"커서가 전진하지 않습니다 — nextBefore 가 그대로입니다 (symbol={symbol})"
+                )
             before = next_before
         else:
-            raise ProviderResponseInvalid(f"페이지가 {MAX_PAGES}를 넘었습니다 — 커서가 전진하지 않는 것으로 보입니다")
+            raise ProviderResponseInvalid(
+                f"페이지 상한 {MAX_PAGES}에 닿았습니다 — 구간을 나눠 요청하세요 (symbol={symbol} interval={interval})"
+            )
+        self.last_skipped = skipped
         if skipped:
-            logger.warning(f"toss 캔들 행 건너뜀 — symbol={symbol} skipped={skipped}")
+            logger.warning(f"toss 캔들 행 건너뜀 — symbol={symbol} skipped={len(skipped)}")
         bars.sort(key=lambda b: b.ts)
         return bars
 
     async def fetch_daily(self, symbol: str, market: str, date_from: dt.date, date_to: dt.date) -> list[NormalizedBar]:
         self._require_key()
-        tz = KST if market in KR_MARKETS else dt.UTC
-        keep_from = dt.datetime.combine(date_from, dt.time.min, tz)
-        keep_to = dt.datetime.combine(date_to, dt.time.max, tz)
+        # 매퍼가 시장 벽시계 naive 를 돌려주므로 경계도 naive 다 — 섞으면 비교가 TypeError 다.
+        # (분봉 경로의 `ts_from`/`ts_to` 도 적재 서비스가 naive 로 만들어 넘긴다)
+        keep_from = dt.datetime.combine(date_from, dt.time.min)
+        keep_to = dt.datetime.combine(date_to, dt.time.max)
         return await self._paged_bars(symbol, market, "1d", keep_from=keep_from, keep_to=keep_to)
 
     async def fetch_minute(

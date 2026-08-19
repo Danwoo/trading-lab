@@ -8,6 +8,7 @@
   ④ 조회 경로는 가드를 그냥 지난다
   ⑤ 가드가 클라이언트의 유일한 관문(request)에 실제로 배선돼 있다
   ⑥ 자격증명·토큰이 예외 문구에 실리지 않는다
+  ⑦ 경로 문자열(`..`·`//`·쿼리)로 가드를 돌아가지 못한다 — 정규화 후 판정
 
 standalone 실행 겸용:
     cd backend-service && uv run python tests/test_toss_order_guard.py
@@ -104,6 +105,30 @@ def main() -> int:
         check("⑥ 예외에 시크릿이 없다", SECRET in str(exc), False)
     except Exception as exc:  # noqa: BLE001 — 네트워크 예외가 나면 가드보다 늦게 막힌 것이다
         check("request 가 가드를 태운다", type(exc).__name__, "TradingLiveDisabled")
+
+    # 경로 문자열로 가드를 우회하려는 시도 — httpx 는 보내기 직전에 dot-segment 를 접는다.
+    # 접기 전 문자열로 판정하면 아래가 전부 주문으로 나간다.
+    for sneaky in (
+        "/api/v1/candles/../orders",
+        "/api/v1/./orders",
+        "/api/v1//orders",
+        "/api/v1/a/b/../../orders",
+        "/api/v1/orders?symbol=005930",
+        "/api/v1/candles/../conditional-orders",
+    ):
+        try:
+            assert_path_allowed(sneaky)
+            check(f"우회 차단: {sneaky}", "통과함", "차단")
+        except TradingLiveDisabled:
+            check(f"우회 차단: {sneaky}", "차단", "차단")
+
+    # 정상 조회 경로는 정규화 뒤에도 그대로 지난다
+    for benign in ("/api/v1/candles", "/api/v1/stocks/all", "/api/v1/prices?symbols=005930"):
+        try:
+            assert_path_allowed(benign)
+            check(f"조회는 지난다: {benign}", "통과", "통과")
+        except Exception as exc:  # noqa: BLE001
+            check(f"조회는 지난다: {benign}", type(exc).__name__, "통과")
 
     # 가드 우회 경로가 없는지 — 클라이언트에 request 밖의 공개 HTTP 진입점이 없다
     public = [n for n in dir(client) if not n.startswith("_") and callable(getattr(client, n))]

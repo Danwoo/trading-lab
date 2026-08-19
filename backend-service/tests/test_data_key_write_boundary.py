@@ -9,6 +9,7 @@
   ③ **거부·성공 어디에도 값이 안 나온다** — 응답과 예외 메시지가 API 로 나간다
   ④ 저장은 **재기동이 필요하다고 답한다** — 감수한 것을 감추지 않는다
   ⑤ 확인 호출이 없는 소스는 「실패」가 아니라 「확인 안 함」으로 답한다
+  ⑥ **상태 표에 난 행은 전부 쓸 수 있다** — 화면에 죽은 행이 생기지 않는다
 
 standalone 실행 겸용:
     cd backend-service && uv run python tests/test_data_key_write_boundary.py
@@ -44,7 +45,12 @@ if str(_APP_DIR) not in sys.path:
     sys.path.insert(0, str(_APP_DIR))
 
 from core.exceptions import BadRequestError, ForbiddenError, TooManyRequestsError  # noqa: E402
-from services.data_key.data_key_service import SOURCE_KEY_SETTINGS, DataKeyService  # noqa: E402
+from services.data_key.data_key_service import (  # noqa: E402
+    COMPOSITE_KEY_SETTINGS,
+    SOURCE_KEY_SETTINGS,
+    DataKeyService,
+    secret_setting_names,
+)
 
 FAILURES: list[str] = []
 CHECKED = 0
@@ -66,7 +72,8 @@ def check(name: str, actual, expected) -> None:
 class Config:
     def __init__(self, app_env: str = "development") -> None:
         self.APP_ENV = app_env
-        for setting in SOURCE_KEY_SETTINGS.values():
+        # 이름을 손으로 열거하지 않는다 — 표가 늘면 이 이중도 자동으로 따라온다.
+        for setting in secret_setting_names():
             setattr(self, setting, "")
 
 
@@ -122,6 +129,52 @@ def main() -> int:
             except BadRequestError:
                 check(f"빈 값 거부: {blank!r}", True, True)
 
+        # ── ⑥ 상태 표에 난 행은 전부 쓸 수 있다 ───────────────────────────
+        # 표 생산자(list_key_status)만 늘고 소비자(save/probe)가 안 따라오면 화면에 죽은
+        # 행이 생긴다 — 사용자는 넣을 수 없는 칸을 보고 「고장」으로 읽는다.
+        listed = service_in(root)
+        rows = listed.list_key_status()
+        check("상태 표가 비어 있지 않다", len(rows) > 0, True)
+
+        identities = [(row["source"], row["setting"]) for row in rows]
+        check("행 식별자가 겹치지 않는다", len(set(identities)), len(identities))
+
+        for source, setting in identities:
+            try:
+                written = listed.save_key(source, SECRET, setting)
+                check(f"표의 행을 쓸 수 있다: {source}/{setting}", written["setting"], setting)
+            except BadRequestError as exc:
+                check(f"표의 행을 쓸 수 있다: {source}/{setting}", f"거부: {exc}", setting)
+
+        # 값이 둘인 소스는 항목을 지목해야 하고, 지목하는 이름은 그 소스의 표 안에서만 고른다
+        for source, names in COMPOSITE_KEY_SETTINGS.items():
+            emitted = sum(1 for listed_source, _ in identities if listed_source == source)
+            check(f"{source} 는 표에 {len(names)}행이다", emitted, len(names))
+            try:
+                listed.save_key(source, SECRET)
+                check(f"{source}: 항목 미지정을 거부한다", "저장됨", "거부")
+            except BadRequestError as exc:
+                check(f"{source}: 항목 미지정을 거부한다", True, True)
+                check(f"{source}: 사유에 값 없음", SECRET in str(exc), False)
+            for alien in ("JWT_SECRET", SOURCE_KEY_SETTINGS["alpaca"], "../../etc/passwd"):
+                try:
+                    listed.save_key(source, SECRET, alien)
+                    check(f"{source}: 남의 변수 {alien} 거부", "저장됨", "거부")
+                except BadRequestError:
+                    check(f"{source}: 남의 변수 {alien} 거부", True, True)
+
+        # 반쪽만 채운 합성 자격은 「확인했다」고 하지 않는다 — checked=False 로 사유를 낸다
+        for source, names in COMPOSITE_KEY_SETTINGS.items():
+            half = service_in(root)
+            try:
+                outcome = asyncio.run(half.probe_key(source, SECRET, names[0]))
+            except Exception as exc:  # noqa: BLE001 — 죽어도 검사 개수는 남겨야 한다
+                check(f"{source}: 반쪽 확인이 답한다", f"{type(exc).__name__}: {exc}", "답함")
+                continue
+            check(f"{source}: 반쪽 확인은 checked=False", outcome["checked"], False)
+            check(f"{source}: 반쪽 사유에 나머지 이름이 있다", names[1] in outcome["detail"], True)
+            check(f"{source}: 반쪽 사유에 값 없음", SECRET in outcome["detail"], False)
+
         # ── ② 로컬이 아니면 막힌다 (모르는 값도) ──────────────────────────
         for hostile_env in ("production", "staging", "", "Development", "unknown"):
             guarded = service_in(root, hostile_env)
@@ -164,14 +217,14 @@ def main() -> int:
         os.chdir(origin)
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과")
-    if CHECKED < 40:
+    if CHECKED < 55:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:
         print(f"::error::{line}", file=sys.stderr)
     if FAILURES:
         return 1
-    print("판정: 요청이 경로·변수명을 정하지 못하고, 로컬 개발에서만 열리고, 값이 안 나온다 (#225)")
+    print("판정: 요청이 경로·변수명을 정하지 못하고, 표의 모든 행이 쓸 수 있고, 값이 안 나온다 (#225)")
     return 0
 
 

@@ -10,7 +10,12 @@
 """
 
 from providers import get_provider, list_sources
-from providers.base import CREDENTIAL_MISSING_CODE, CREDENTIAL_MISSING_HINT
+from providers.base import (
+    CREDENTIAL_MISSING_CODE,
+    CREDENTIAL_MISSING_HINT,
+    NOT_CANONICAL_CODE,
+    NOT_CANONICAL_HINT,
+)
 from services.data_key.data_key_service import DataKeyService
 
 
@@ -30,6 +35,10 @@ class CapabilityService:
                     continue
                 reason = capability.reason
                 code = None
+                if reason and NOT_CANONICAL_HINT in reason:
+                    # 「정본이 아니다」는 결손이 아니라 안내다 — 코드로 흘려, 위층이 결손과
+                    # 섞어 세지 않게 한다.
+                    code = NOT_CANONICAL_CODE
                 if reason and CREDENTIAL_MISSING_HINT in reason:
                     code = CREDENTIAL_MISSING_CODE
                     # 어댑터는 "키가 없다"까지만 안다. **어디서 받아 어디에 넣는지**는 키를 아는

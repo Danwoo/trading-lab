@@ -21,12 +21,12 @@ export function DataKeyRow({ row, onSaved }: { row: DataKeyStatus; onSaved: () =
     setOutcome({ kind: "busy" });
     try {
       if (what === "probe") {
-        const probe = await probeDataKey(row.source, value);
+        const probe = await probeDataKey(row.source, value, row.setting);
         if (probe === null) throw new Error("확인 결과를 받지 못했습니다");
         setOutcome({ kind: "said", ok: probe.ok, text: probe.detail });
         return;
       }
-      const saved = await saveDataKey(row.source, value);
+      const saved = await saveDataKey(row.source, value, row.setting);
       if (saved === null) throw new Error("저장 결과를 받지 못했습니다");
       // 넣은 값을 화면에 남기지 않는다 — 저장이 끝나면 입력칸을 비운다.
       setValue("");

@@ -39,6 +39,10 @@ THROTTLE_INTERVAL_S: dict[str, float] = {
 #: 토큰 만료 전 이만큼 남으면 재발급 — 경계에서 만료 응답을 받지 않게.
 TOKEN_REFRESH_MARGIN_S = 60.0
 
+#: 응답이 수명을 안 알려줄 때 쓰는 보수값 — 사양 기본(86,400)보다 짧게 잡아 늦어도 한 시간이면
+#: 다시 받는다. 0 으로 두면 캐시가 죽어 매 호출이 재발급이 된다.
+TOKEN_FALLBACK_LIFETIME_S = 3600.0
+
 
 def _category(path: str) -> str:
     if path == TOKEN_PATH:
@@ -103,7 +107,10 @@ class TossClient:
                 raise httpx.DecodingError("토큰 응답에 access_token 이 없습니다")
             register_secret(token)
             self._token = token
-            self._token_expires_at = time.monotonic() + float(body.get("expires_in") or 0)
+            # `expires_in` 이 없으면 만료를 0 으로 두지 않는다 — 그러면 캐시가 영구 무효가 돼
+            # 매 요청이 재발급을 부르고 AUTH 한도(1/s)에 직렬화된다. 짧은 보수값으로 떨어진다.
+            lifetime = float(body.get("expires_in") or 0) or TOKEN_FALLBACK_LIFETIME_S
+            self._token_expires_at = time.monotonic() + lifetime
             return token
 
     async def request(
@@ -141,5 +148,13 @@ class TossClient:
         body = await self.request("/api/v1/stocks/all", {"market": market})
         result = (body or {}).get("result")
         if isinstance(result, dict):
-            return result.get("stocks") or result.get("items") or []
-        return result or []
+            for field in ("stocks", "items"):
+                rows = result.get(field)
+                if isinstance(rows, list):
+                    return rows
+            # 「종목 0개」와 「응답 모양이 다름」을 뭉개지 않는다 — 조용한 빈 목록은 적재를
+            # 성공으로 기록하면서 아무것도 안 넣는다.
+            raise httpx.DecodingError(f"stocks/all 응답에 종목 배열이 없습니다 (받은 키: {sorted(result)})")
+        if isinstance(result, list):
+            return result
+        raise httpx.DecodingError("stocks/all 응답에 result 가 없습니다")
