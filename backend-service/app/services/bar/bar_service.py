@@ -189,7 +189,9 @@ class BarService:
             "interval": f"{interval_min}m",
             "source": source,
             "adj_policy": adj_policy,
-            "session_scope": self._session_scope(rows),
+            # 분봉에는 이 축이 없다 — **계산된 척하지 않는다.** 「접었다/안 접었다」는 일봉의
+            # 성질이고, 분봉은 원본 그대로다.
+            "session_scope": None,
             "asof": asof,
             **_unavailable_fields(
                 None if items else self._empty_unavailable(args, market, symbol, "minute_bar", "분봉")

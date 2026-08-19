@@ -16,7 +16,8 @@ import datetime as dt
 from contextlib import contextmanager
 from decimal import Decimal
 
-from core.exceptions import BadRequestError
+from core.calendar import session_windows
+from core.exceptions import BadRequestError, HTTPError
 from core.logger import logger
 from fastapi.concurrency import run_in_threadpool
 from providers import get_alias_resolver, get_provider, list_alias_sources
@@ -291,6 +292,13 @@ class IngestService:
         await self._require_minute_partition(date_from, date_to)
         ts_from = dt.datetime.combine(date_from, dt.time.min)
         ts_to = dt.datetime.combine(date_to, dt.time.max)
+        # 접기용 정규장 창 — 모르는 시장이면 빈 목록이고, 그때는 **접지 않는다**
+        # (틀린 창으로 접으면 「우리가 만든 값」이 소스 값보다 나쁘다).
+        try:
+            windows = session_windows(market, date_from, date_to)
+        except HTTPError as exc:
+            logger.warning(f"정규장 창을 알 수 없어 일봉 재구성을 건너뜁니다 — market={market}: {exc}")
+            windows = []
 
         written = skipped = 0
         last_done = run.get("cursor") or ""
@@ -309,24 +317,17 @@ class IngestService:
             # 분봉이 들어왔으면 그 날의 일봉을 **정규장만 접어** 다시 만든다 (MD-AD-26 · #255).
             # 소스 일봉은 종목마다 다른 창을 덮어, 시간외를 포함하는 종목은 종가가 최대 4%
             # 어긋난다 — 우리가 접은 값만 「무엇인지 아는」 값이다.
-            session = REGULAR_SESSION.get(market)
-            if session is None:
-                # 정규장 구간을 모르는 시장은 **접지 않는다** — 틀린 창으로 접으면
-                # 「우리가 만든 값」이 소스 값보다 나쁘다.
-                logger.warning(f"정규장 구간을 모르는 시장이라 일봉 재구성을 건너뜁니다 — market={market}")
-                last_done = symbol
-                continue
-            await run_in_threadpool(
-                self.ingest_repository.rebuild_daily_from_minutes,
-                {
-                    "instrument_ids": [instrument_id],
-                    "date_from": date_from,
-                    "date_to": date_to,
-                    "session_open": session[0],
-                    "session_close": session[1],
-                    "ingest_run_id": run["run_id"],
-                },
-            )
+            # 창은 **날짜마다 다르다** — KRX 는 수능일에 전 일정을 1시간 늦춘다. 캘린더가
+            # 그것을 알고 있으므로 표로 굳히지 않고 물어본다 (`core.calendar.session_windows`).
+            if windows:
+                await run_in_threadpool(
+                    self.ingest_repository.rebuild_daily_from_minutes,
+                    {
+                        "instrument_ids": [instrument_id],
+                        "windows": windows,
+                        "ingest_run_id": run["run_id"],
+                    },
+                )
             last_done = symbol
             await run_in_threadpool(
                 self.ingest_repository.update_ingest_run_status,
@@ -358,21 +359,6 @@ def _resume_at(last_done: str):
     except RateLimitExhausted as exc:
         logger.info(f"어댑터 재개 지점 {exc.cursor!r} → 잡 재개 지점 {last_done!r} 로 환산")
         raise RateLimitExhausted(cursor=last_done) from exc
-
-
-#: 시장별 **정규장** 구간 — 분봉을 접어 일봉을 만들 때 쓰는 창 (#255).
-#:
-#: 국내는 09:00~15:30 이고 **마감 동시호가 체결이 15:31 봉에 찍힌다**(실측: 삼성전자
-#: 2026-08-19 의 15:31 봉 거래량 2,502,579). 그래서 끝을 15:31 로 잡아야 종가가 맞는다.
-#: 미국은 09:30~16:00 이고 마지막 봉이 16:00 이다.
-REGULAR_SESSION: dict[str, tuple[dt.time, dt.time]] = {
-    "KOSPI": (dt.time(9, 0), dt.time(15, 31)),
-    "KOSDAQ": (dt.time(9, 0), dt.time(15, 31)),
-    "KONEX": (dt.time(9, 0), dt.time(15, 31)),
-    "NASDAQ": (dt.time(9, 30), dt.time(16, 0)),
-    "NYSE": (dt.time(9, 30), dt.time(16, 0)),
-    "AMEX": (dt.time(9, 30), dt.time(16, 0)),
-}
 
 
 def parse_scope(job_kind: str, scope: str | None) -> tuple[str, list[str]]:
