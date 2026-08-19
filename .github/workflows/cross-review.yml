@@ -133,9 +133,15 @@
 #
 # 리뷰어 폴백 체인 (2026-07-29 사용자 확정 — kimi·codex 동시 한도 소진으로 리뷰 게이트가
 #   통째로 멎은 실사건이 계기):
-#   체인   claude 작성 고위험(CODEX_ON) : codex → kimi → claude(반대 티어)
-#          claude 작성 그 외            : kimi  → claude(반대 티어)
-#          kimi·codex·사람 작성         : claude (폴백 없음 — claude 가 이미 체인의 끝)
+#   체인 (2026-08-18 개정 — codex 를 모든 체인에 넣고, 저자 벤더를 뺀다):
+#          1순위 codex  : codex → kimi → claude(반대 티어)
+#          1순위 kimi   : kimi  → codex → claude(반대 티어)
+#          1순위 claude : claude(반대 티어) → codex → kimi
+#     그다음 **체인에서 저자 자신의 벤더를 뺀다** — 1순위 산출은 이미 저자를 제외하는데
+#     폴백이 그것을 안 지켜, codex 작성 PR 이 1순위 실패 한 번에 자기를 리뷰했다.
+#     전원이 저자 벤더면 체인이 빈다 = reviewer none 과 같은 종결(사람 리뷰 경로).
+#     codex 를 체인에 넣는 비용은 **쓸 수 있을 때만 쓰는 것**이다 — 사전 프로브가
+#     후보마다 2.5초에 한도를 걸러 준다. 예산은 「1순위로 두지 않는 것」으로 아낀다.
 #     저위험 경로에 codex 를 넣지 않는 것은 §9 "codex 는 월 한도가 매우 적어 아껴 쓴다" 를
 #     지키기 위해서다 (종전 라우팅과 동일 — 폴백이 codex 예산을 새로 쓰지 않는다).
 #   **발동 조건 — 실패 종류로 나눈다 (핵심 안전 속성)**. 아무 실패나 폴백하면 진짜로 고장난
@@ -414,7 +420,7 @@ jobs:
           # **1순위만 남긴다** — 교차가 불가능한 것과 리뷰가 불가능한 것은 다르고, 후자로 접으면
           # 그 PR 은 리뷰를 아예 못 받는다(코멘트가 교차 불가를 밝힌다).
           AUTHOR_VENDORS="$(val author_models)"
-            if [ -n "$AUTHOR_VENDORS" ]; then
+          if [ -n "$AUTHOR_VENDORS" ] && [ -n "$CHAIN" ]; then
             FILTERED=""
             for C in $CHAIN; do
               case ",$AUTHOR_VENDORS," in
@@ -423,13 +429,19 @@ jobs:
               FILTERED="$FILTERED $C"
             done
             FILTERED="$(printf '%s' "$FILTERED" | sed 's/^ *//')"
-            if [ -n "$FILTERED" ]; then
-              [ "$FILTERED" != "$CHAIN" ] && echo "리뷰어 체인에서 저자 벤더 제외: [$CHAIN] → [$FILTERED] (저자: $AUTHOR_VENDORS)"
-              CHAIN="$FILTERED"
-            else
-              echo "::warning::저자 벤더를 빼면 후보가 없다 (저자: $AUTHOR_MODELS) — 1순위만 남긴다 (교차 불가)"
-              CHAIN="$(val reviewer)"
+            # **비면 그대로 둔다 — 채우려 하지 않는다.**
+            #
+            # `FILTERED` 가 비는 경우는 체인 전원이 저자 벤더인 경우뿐이고, 그때 `reviewer` 는
+            # 반드시 `none` 이라 review 잡이 `reviewer != 'none'` 게이트에 어차피 걸린다.
+            # 「1순위만 남겨 리뷰를 받게 한다」는 그 게이트와 모순이고, 실제로 넣었더니
+            # `set -u` 에서 **route 잡이 통째로 죽었다**(리뷰 지적, 재현함).
+            #
+            # 종전 경로가 이미 깔끔하다: CHAIN="" → review 잡 skip → publish 가
+            # 「교차 가능 리뷰 모델 없음 — 사람 리뷰 경로 필요」로 종결한다.
+            if [ "$FILTERED" != "$CHAIN" ]; then
+              echo "리뷰어 체인에서 저자 벤더 제외: [$CHAIN] → [${FILTERED:-(없음)}] (저자: $AUTHOR_VENDORS)"
             fi
+            CHAIN="$FILTERED"
           fi
           if [ -n "$AUTHOR_TIER" ]; then TIER_SOURCE=commit-email; else TIER_SOURCE=none; fi
           if [ "$AUTHOR_TIER" = opus ]; then FALLBACK_TIER=sonnet; else FALLBACK_TIER=opus; fi
