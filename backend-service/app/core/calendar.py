@@ -29,6 +29,31 @@ CALENDAR_CODE_BY_MARKET: dict[str, str] = {
 }
 
 
+#: 라이브러리가 **거래일이라고 보지만 실제로는 휴장**인 날 (캘린더 코드 → 날짜들).
+#:
+#: `exchange_calendars` 는 한국의 그해 결정 사항을 늦게 반영한다. 그 차이는 조용하지 않다 —
+#: 갭 검출이 「영원히 못 채우는 결측」을 매번 보고하고, 백테스트가 장이 안 선 날에 신호를
+#: 판정한다. 실측으로 잡은 것만 적는다 (2026-08-19, 토스 실적재 3종목이 **같은 이틀**을
+#: 빠뜨렸다 — 종목 결손이 아니라 휴장의 서명이다).
+#:
+#: **원본은 KRX 휴장일 공지이고, 갱신은 연 1회(전년 12월) + 실데이터가 말할 때다** —
+#: 절차와 근거는 `.docs/4-아키텍처/시세적재-구현설계.md` §1.3.1 이 정본이다.
+#:
+#: **여기 적은 날은 `scripts/verify_calendar_corrections.py` 가 매번 되묻는다** — 라이브러리가
+#: 나중에 고치면 이 보정이 거짓이 되므로, 그때 실패해서 지우라고 말한다.
+EXTRA_CLOSURES: dict[str, frozenset[dt.date]] = {
+    "XKRX": frozenset(
+        {
+            # 각 줄은 **KRX 휴장일 공지**(한국거래소 「휴장일 안내」)가 정본이고, 옆의 사유가
+            # 그 공지에서 온 근거다. 실적재 관측은 **발견의 계기**이지 근거가 아니다 —
+            # 「이 날 데이터가 없다」는 소스 장애·수집 실패로도 같은 서명을 낸다.
+            dt.date(2026, 6, 3),  # 제9회 전국동시지방선거일 — 공직선거법상 임시공휴일 (KRX 휴장)
+            dt.date(2026, 7, 17),  # 제헌절 — 2026년부터 공휴일 재지정 (KRX 휴장)
+        }
+    ),
+}
+
+
 def calendar_code(market: str) -> str:
     """`market` 의 캘린더 코드. 모르는 시장은 조용히 기본값으로 떨어지지 않고 거절한다 —
     오타 하나가 "휴장일이 하나도 없는 시장"으로 둔갑해 갭 검출을 통째로 망가뜨린다."""
@@ -54,11 +79,20 @@ def sessions_between(market: str, date_from: dt.date, date_to: dt.date) -> list[
         raise BadRequestError(
             f"캘린더 수록 범위를 벗어난 기간입니다: {date_from}~{date_to} ({calendar.name} 수록 범위 {first}~{last})"
         )
-    return [ts.date() for ts in calendar.sessions_in_range(date_from, date_to)]
+    closed = extra_closures(market)
+    return [ts.date() for ts in calendar.sessions_in_range(date_from, date_to) if ts.date() not in closed]
+
+
+def extra_closures(market: str) -> frozenset[dt.date]:
+    """이 시장에 더 뺄 휴장일. **키는 `calendar_code` 가 정본**이다 —
+    `exchange_calendars` 의 `.name` 표기에 기대면 표기가 바뀔 때 보정이 **조용히 무효**가 된다."""
+    return EXTRA_CLOSURES.get(calendar_code(market), frozenset())
 
 
 def is_session(market: str, day: dt.date) -> bool:
-    """그 날짜가 이 시장의 거래일인가."""
+    """그 날짜가 이 시장의 거래일인가. 보정 목록(`EXTRA_CLOSURES`)을 빼고 답한다."""
+    if day in extra_closures(market):
+        return False
     return get_market_calendar(market).is_session(day)
 
 
@@ -88,8 +122,28 @@ def last_completed_session(market: str, asof: dt.datetime) -> dt.date | None:
     calendar = get_market_calendar(market)
     asof_utc = asof.astimezone(dt.UTC) if asof.tzinfo else asof.replace(tzinfo=dt.UTC)
     if asof_utc.date() > calendar.last_session.date():
-        return calendar.last_session.date()
+        return _skip_closures(market, calendar.last_session.date())
     previous = calendar.previous_close(asof_utc)
     if previous is None:
         return None
-    return calendar.minute_to_session(previous, direction="previous").date()
+    return _skip_closures(market, calendar.minute_to_session(previous, direction="previous").date())
+
+
+def _skip_closures(market: str, day: dt.date | None) -> dt.date | None:
+    """보정으로 뺀 날에 걸리면 그 **앞의 거래일**로 물러난다.
+
+    이 함수가 보정 밖에 있으면 2026-07-18 에 「마지막 완료 거래일 = 2026-07-17」이 나오고,
+    MD-AD-22 가 그 날을 재요청 기준으로 삼는다 — 이 보정층이 막으려던 바로 그 오류가
+    다른 문으로 들어온다.
+    """
+    closed = extra_closures(market)
+    if not closed or day is None:
+        return day
+    calendar = get_market_calendar(market)
+    first = calendar.first_session.date()
+    while day in closed and day > first:
+        previous = calendar.previous_session(day)
+        if previous is None:
+            return None
+        day = previous.date()
+    return day
