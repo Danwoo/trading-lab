@@ -29,6 +29,25 @@ CALENDAR_CODE_BY_MARKET: dict[str, str] = {
 }
 
 
+#: 라이브러리가 **거래일이라고 보지만 실제로는 휴장**인 날 (캘린더 코드 → 날짜들).
+#:
+#: `exchange_calendars` 는 한국의 그해 결정 사항을 늦게 반영한다. 그 차이는 조용하지 않다 —
+#: 갭 검출이 「영원히 못 채우는 결측」을 매번 보고하고, 백테스트가 장이 안 선 날에 신호를
+#: 판정한다. 실측으로 잡은 것만 적는다 (2026-08-19, 토스 실적재 3종목이 **같은 이틀**을
+#: 빠뜨렸다 — 종목 결손이 아니라 휴장의 서명이다).
+#:
+#: **여기 적은 날은 `scripts/verify_calendar_corrections.py` 가 매번 되묻는다** — 라이브러리가
+#: 나중에 고치면 이 보정이 거짓이 되므로, 그때 실패해서 지우라고 말한다.
+EXTRA_CLOSURES: dict[str, frozenset[dt.date]] = {
+    "XKRX": frozenset(
+        {
+            dt.date(2026, 6, 3),  # 제9회 전국동시지방선거 (공직선거법상 임시공휴일)
+            dt.date(2026, 7, 17),  # 제헌절 — 2026년부터 공휴일로 재지정
+        }
+    ),
+}
+
+
 def calendar_code(market: str) -> str:
     """`market` 의 캘린더 코드. 모르는 시장은 조용히 기본값으로 떨어지지 않고 거절한다 —
     오타 하나가 "휴장일이 하나도 없는 시장"으로 둔갑해 갭 검출을 통째로 망가뜨린다."""
@@ -54,12 +73,16 @@ def sessions_between(market: str, date_from: dt.date, date_to: dt.date) -> list[
         raise BadRequestError(
             f"캘린더 수록 범위를 벗어난 기간입니다: {date_from}~{date_to} ({calendar.name} 수록 범위 {first}~{last})"
         )
-    return [ts.date() for ts in calendar.sessions_in_range(date_from, date_to)]
+    closed = EXTRA_CLOSURES.get(calendar.name.upper(), frozenset())
+    return [ts.date() for ts in calendar.sessions_in_range(date_from, date_to) if ts.date() not in closed]
 
 
 def is_session(market: str, day: dt.date) -> bool:
-    """그 날짜가 이 시장의 거래일인가."""
-    return get_market_calendar(market).is_session(day)
+    """그 날짜가 이 시장의 거래일인가. 보정 목록(`EXTRA_CLOSURES`)을 빼고 답한다."""
+    calendar = get_market_calendar(market)
+    if day in EXTRA_CLOSURES.get(calendar.name.upper(), frozenset()):
+        return False
+    return calendar.is_session(day)
 
 
 def market_local_naive(market: str, when: dt.datetime) -> dt.datetime:
