@@ -25,6 +25,46 @@ from services.backtest.metrics import compute
 DEFAULT_COSTS = {"fee_rate": 0.00015, "slippage_rate": 0.0005, "sell_tax_rate": 0.0018}
 
 
+def _build_context(universe_series, initial_cash: float) -> dict:
+    """벤치마크·집중도 — 유니버스 캔들이 있어야 계산된다.
+
+    없으면 **지어내지 않고 사유를 남긴다.** 화면은 그 문구를 그대로 쓴다.
+    """
+    from services.backtest.context import cluster_concentration, equal_weight_universe
+
+    if not universe_series:
+        return {
+            "benchmarks": [],
+            "concentration": None,
+            "absent_reason": "유니버스 캔들을 싣지 않았습니다 — 벤치마크·집중도를 계산할 수 없습니다",
+        }
+
+    bench = equal_weight_universe(universe_series, initial_cash)
+    conc = cluster_concentration(universe_series)
+    return {
+        "benchmarks": [
+            {
+                "key": bench.key,
+                "label": bench.label,
+                "dt": bench.dt,
+                "equity": bench.equity,
+                "total_return": bench.total_return,
+                "derived_from": bench.derived_from,
+            }
+        ],
+        "concentration": {
+            "clusters": [
+                {"instrument_ids": c.instrument_ids, "representative": c.representative, "weight_pct": c.weight_pct}
+                for c in conc.clusters
+            ],
+            "top_share_pct": conc.top_share_pct,
+            "derived_from": conc.derived_from,
+            "absent_reason": conc.absent_reason,
+        },
+        "absent_reason": None,
+    }
+
+
 class BacktestService:
     def __init__(self, backtest_repository, bar_service, strategy_loader):
         self.backtest_repository = backtest_repository
@@ -452,6 +492,10 @@ class BacktestService:
                 }
                 for row in trade_rows
             ],
+            # **맥락(#204)** — 「내가 잘한 건가, 그냥 시장이 좋았던 건가」. 유니버스 캔들이 없으면
+            # 지어내지 않고 사유를 남긴다. 계산만 되고 결과에 안 실리면 「실행 결과」에 곡선·집중도가
+            # 없다(리뷰 지적 #212).
+            "context": _build_context(args.get("universe_series"), float(run["initial_cash"])),
             "metrics": [
                 {
                     "key": m.key,

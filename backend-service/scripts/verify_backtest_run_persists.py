@@ -271,7 +271,7 @@ def main() -> int:
 
     # ── 리포트 (#201·#204 배선) — 지표와 맥락이 실제로 실리는가 ─────────────
     # 계산만 되고 아무 데도 안 실리면 「결과」에 곡선·집중도가 없다(리뷰 지적).
-    report = service.select_report(run_id)
+    report = service.select_report({"run_id": run_id, "workspace_id": 4242})
     keys = {m["key"] for m in report["metrics"]}
     check("최장 미회복 기간이 있다", "longest_underwater" in keys, True)
     check("MDD 가 있다", "mdd" in keys, True)
@@ -301,7 +301,9 @@ def main() -> int:
         )
 
     wave = [100.0 + (i % 4) * 5 for i in range(40)]
-    with_ctx = service.select_report(run_id, {"universe_series": [mk(1, wave), mk(2, wave)]})
+    with_ctx = service.select_report(
+        {"run_id": run_id, "workspace_id": 4242, "universe_series": [mk(1, wave), mk(2, wave)]}
+    )
     check("벤치마크가 온다", len(with_ctx["context"]["benchmarks"]), 1)
     check("동일가중 라벨", with_ctx["context"]["benchmarks"][0]["label"], "내 유니버스 동일가중")
     check("벤치마크 유도 경로", bool(with_ctx["context"]["benchmarks"][0]["derived_from"]), True)
