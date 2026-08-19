@@ -11,9 +11,8 @@ RunStatus = Literal["queued", "running", "succeeded", "failed", "rate_limited"]
 class IngestRunCreateIn(BaseModel):
     """수동 적재 요청.
 
-    `scope` 형식은 잡 종류마다 다르다:
-    - `instrument_master` → `"NASDAQ"` (시장 하나)
-    - `daily_bar`·`minute_bar` → `"NASDAQ:AAPL,MSFT"` (시장 + 종목 목록)
+    각 필드의 형식은 **아래 `description` 이 정본**이다 — 그 문장이 OpenAPI 와 422 응답으로
+    그대로 나간다. 여기에 같은 설명을 다시 쓰면 두 벌이 되고, 곧 서로 어긋난다.
     """
 
     source: str = Field(
@@ -38,12 +37,12 @@ class IngestRunCreateIn(BaseModel):
         "market·symbol 을 따로 보내는 필드는 없습니다.",
         examples=["KOSPI:005930,000660"],
     )
+    # 예시에 **구체적인 날짜를 적지 않는다** — 작성일이 굳어 반년 뒤 OpenAPI 가 낡은 날짜를
+    # 정답처럼 제시한다. 특히 `period_to` 는 「비우면 오늘」이라 예시와 설명이 서로 어긋난다.
     period_from: str | None = Field(
-        default=None, description="적재 시작일 YYYY-MM-DD. 비우면 소스·잡 종류의 기본 구간.", examples=["2026-01-02"]
+        default=None, description="적재 시작일 (YYYY-MM-DD). 비우면 소스·잡 종류의 기본 구간."
     )
-    period_to: str | None = Field(
-        default=None, description="적재 종료일 YYYY-MM-DD. 비우면 오늘.", examples=["2026-08-19"]
-    )
+    period_to: str | None = Field(default=None, description="적재 종료일 (YYYY-MM-DD). 비우면 오늘.")
 
 
 class IngestRunOut(BaseModel):

@@ -103,6 +103,31 @@ describe("#224 화면에 나가는 API 에러 문구", () => {
     expect(message).toContain("KOSPI:005930,000660");
   });
 
+  it("여러 필드를 빠뜨리면 안내를 전부 낸다 — 한 번에 고칠 수 있게", () => {
+    const message = getApiErrorMessage({
+      response: {
+        status: 422,
+        data: {
+          detail: [
+            { loc: ["body", "source"], msg: "Field required", type: "missing", hint: "소스 id 를 넣으세요." },
+            { loc: ["body", "scope"], msg: "Field required", type: "missing", hint: "적재 범위를 넣으세요." },
+          ],
+        },
+      },
+    });
+
+    expect(message).toContain("source: 소스 id 를 넣으세요.");
+    expect(message).toContain("scope: 적재 범위를 넣으세요.");
+  });
+
+  it("안내가 없으면 프레임워크 영문을 내보내지 않는다", () => {
+    const message = getApiErrorMessage({
+      response: { status: 422, data: { detail: [{ loc: ["body", "x"], msg: "Field required", type: "missing" }] } },
+    });
+
+    expect(message).not.toMatch(HAS_LATIN_WORDS);
+  });
+
   it("안내가 없으면 종전대로 서버 메시지를 낸다", () => {
     const message = getApiErrorMessage({
       response: { status: 422, data: { detail: [{ loc: ["body", "x"], msg: "값이 필요합니다", type: "missing" }] } },
