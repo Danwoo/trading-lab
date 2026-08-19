@@ -6,6 +6,9 @@ import { cn } from "./primitives/cn";
 import { resolveFieldState } from "./primitives/fieldState";
 
 interface Props<T = any> {
+  /** 바깥 라벨(`<label htmlFor>`)이 가리킬 id. 안 주면 스스로 만든다. */
+  id?: string;
+  "aria-describedby"?: string;
   fieldName: keyof T;
   value?: boolean;
   text?: string;
@@ -39,8 +42,12 @@ export function CheckBox<T = any>({
   iconSize,
   onValueChanged,
   getFieldProps,
+  id,
+  "aria-describedby": describedBy,
 }: Props<T>) {
-  const inputId = useId();
+  // 바깥에서 라벨을 세웠으면 그 id 를 쓴다 — 자기 id 를 고집하면 라벨이 딴 곳을 가리킨다.
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
   const { isInvalid } = resolveFieldState(getFieldProps, fieldName);
   const boxSize = iconSize ? { width: iconSize, height: iconSize } : undefined;
 
@@ -48,6 +55,7 @@ export function CheckBox<T = any>({
     <span className="inline-flex items-center gap-2">
       <input
         id={inputId}
+        aria-describedby={describedBy}
         type="checkbox"
         checked={value || false}
         aria-readonly={readOnly || undefined}

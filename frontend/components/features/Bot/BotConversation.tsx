@@ -175,6 +175,9 @@ export function BotConversation({
             height="3.5rem"
             maxLength={4000}
             readOnly={ready === null}
+            // placeholder 는 접근 가능한 이름이 아니다 — 입력이 시작되면 사라지고, 보조기술이
+            // 이름으로 읽어 준다는 보장이 없다.
+            aria-label="봇에게 할 말"
             placeholder="무엇을 만들까요?"
             onValueChanged={(_field, value) => setDraft(String(value ?? ""))}
           />
