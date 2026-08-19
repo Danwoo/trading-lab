@@ -5,6 +5,7 @@ import { useIngestRuns } from "@/hooks/terminal/useIngestRuns";
 import { describeStaleness, type StalenessNote } from "@/lib/terminal/staleness";
 import type { IngestRunOut } from "@/schemas/terminal/ingest";
 import type { Provenance } from "@/types/terminal/provenance";
+import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 
 /** 시세 신선도를 좌우하는 잡 — 종목 마스터는 캔들이 아니라서 「시세가 언제까지 있나」에 답하지 않는다. */
 const CANDLE_JOB_KINDS = ["daily_bar", "minute_bar"];
@@ -77,7 +78,7 @@ export function useQuoteFreshness(): QuoteFreshness {
         provenance: { kind: "unavailable", reason },
         staleness: null,
         running: false,
-        failedReason: runs.error?.message ?? null,
+        failedReason: runs.error ? getApiErrorMessage(runs.error) : null,
       };
     }
 

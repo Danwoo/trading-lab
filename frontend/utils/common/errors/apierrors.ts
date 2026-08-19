@@ -93,7 +93,14 @@ export function getApiErrorMessage(error: any): string {
     console.error("[getApiErrorMessage] 미인식 에러 (네트워크 또는 코드 버그):", error);
   }
 
-  // 네트워크 연결 오류 등
+  // 응답이 없는 예외 — 그 문구를 우리가 썼는지로 가른다.
+  //
+  // `new Error("봇 목록을 불러오지 못했습니다")` 처럼 이 레포가 직접 던진 것은 이미 사람 말이라
+  // 그대로 낸다. axios 가 만든 것(`isAxiosError`)과 JS 내장 예외(`TypeError: Failed to fetch` 등)는
+  // 영문이므로 일반 문구로 바꾼다 — 생성자로 가른다: 우리가 쓰는 것은 맨 `Error` 다.
+  if (error instanceof Error && error.constructor === Error && !(error as any).isAxiosError && error.message) {
+    return error.message;
+  }
   if (error?.message) {
     return L.FALLBACK.network;
   }

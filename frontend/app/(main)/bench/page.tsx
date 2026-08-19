@@ -20,6 +20,7 @@ import {
   type BenchSelectionKind,
 } from "@/stores/shell/benchSelectionStore";
 import type { Provenance } from "@/types/terminal/provenance";
+import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 
 /** 좁은 화면에서 하나씩 보여주는 둘 (§21.6 「보드가 먼저 양보한다」) */
 const TABBED_ZONE_IDS = ["grid", "curve"] as const;
@@ -242,7 +243,7 @@ export default function Page() {
                 headline="봇 목록을 읽지 못했습니다 — 「0개」인지 「못 읽었다」인지 모르는 상태입니다"
                 halted={["내 봇 목록", "봇 수에 따른 안내"]}
                 running={["봇 만들기", "시세 보기"]}
-                detail={roster.error?.message ?? null}
+                detail={roster.error ? getApiErrorMessage(roster.error) : null}
               />
             ) : undefined
           }

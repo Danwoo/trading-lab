@@ -65,4 +65,19 @@ describe("#224 화면에 나가는 API 에러 문구", () => {
 
     expect(message).not.toMatch(HAS_LATIN_WORDS);
   });
+
+  it("JS 내장 예외의 영문도 나가지 않는다", () => {
+    expect(getApiErrorMessage(new TypeError("Failed to fetch"))).not.toMatch(HAS_LATIN_WORDS);
+  });
+
+  it("axios 가 만든 예외는 응답이 없어도 원문을 내지 않는다", () => {
+    const axiosError = Object.assign(new Error("Network Error"), { isAxiosError: true });
+
+    expect(getApiErrorMessage(axiosError)).not.toMatch(HAS_LATIN_WORDS);
+  });
+
+  // 이 레포가 직접 던진 문구는 이미 사람 말이다 — 일반 문구로 뭉개면 원인이 사라진다.
+  it("우리가 쓴 한국어 예외 문구는 그대로 나온다", () => {
+    expect(getApiErrorMessage(new Error("봇 목록을 불러오지 못했습니다"))).toBe("봇 목록을 불러오지 못했습니다");
+  });
 });
