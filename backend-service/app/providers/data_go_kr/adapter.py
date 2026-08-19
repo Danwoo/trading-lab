@@ -64,7 +64,8 @@ class DataGoKrProvider:
                 raise RateLimitExhausted(cursor=cursor) from exc
             raise ProviderResponseInvalid(f"금융위 응답 상태 {exc.response.status_code}") from exc
         except httpx.DecodingError as exc:
-            raise ProviderResponseInvalid(str(exc)) from exc
+            # 원문(영문)을 사유로 싣지 않는다 — 이 문자열은 화면까지 간다.
+            raise ProviderResponseInvalid("금융위 응답을 해석하지 못했습니다 (형식이 바뀌었을 수 있습니다)") from exc
 
     async def list_instruments(self, market: str) -> list[NormalizedInstrument]:
         """최신 거래일 스냅샷 한 장에서 종목 마스터를 뽑는다 — 국내는 날짜별 전종목이라

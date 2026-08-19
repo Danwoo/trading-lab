@@ -6,7 +6,9 @@
      data.go.kr 은 인증키를 쿼리로 받는다 (원문을 적으면 키가 화면에 실린다)
   ② **다음에 무엇을 하면 되는지**를 말한다 — 403 은 「IP 를 허용하라」는 구체적 요구다
   ③ 소스 이름이 들어간다 — 여러 소스가 섞인 이력에서 누가 실패했는지 알 수 있게
-  ④ 모르는 실패를 아는 척하지 않는다
+  ④ 모르는 실패를 아는 척하지 않는다 — 매핑 밖 상태 코드가 남의 조언을 빌리지 않는다
+  ⑥ **우리 도메인 예외의 한국어 사유를 삼키지 않는다** (덮으면 main 보다 나빠진다)
+  ⑦ 화면이 평문으로 그리므로 마크다운 강조 표기를 넣지 않는다
   ⑤ 적재 서비스가 실제로 이 변환을 태운다 (배선 확인)
 
 standalone 실행 겸용:
@@ -105,6 +107,28 @@ def main() -> int:
         check(f"{type(exc).__name__}: 사람 말이다", word in reason, True)
         check(f"{type(exc).__name__}: URL 이 없다", has_url(reason), False)
 
+    # ⑥ 우리가 만든 예외는 이미 한국어 + 다음 행동이다 — 덮으면 안 된다
+    from core.exceptions import BadRequestError, NotFoundError  # noqa: PLC0415
+
+    ours = describe_provider_failure(NotFoundError("등록되지 않은 시세 소스입니다: 'tos'"), "tos")
+    check("우리 예외의 사유가 남는다", "등록되지 않은 시세 소스입니다" in ours, True)
+    check("우리 예외에 소스 이름이 붙는다", ours.startswith("tos:"), True)
+    check("우리 예외를 뭉개지 않는다", "처리하지 못한 오류" in ours, False)
+    bad = describe_provider_failure(BadRequestError("scope 가 비어 있습니다"), "toss")
+    check("다른 도메인 예외도 그대로", "scope 가 비어 있습니다" in bad, True)
+
+    # ③ 매핑 밖 상태 코드 — 400 의 조언을 빌리면 「종목 코드를 확인하세요」라는 틀린 말을 한다
+    for odd in (302, 407, 409, 451, 418):
+        reason = describe_provider_failure(http_error(odd), "toss")
+        check(f"{odd}: 남의 조언을 빌리지 않는다", "종목 코드" in reason, False)
+        check(f"{odd}: 모른다고 말한다", "예상 밖" in reason, True)
+        check(f"{odd}: 상태 코드는 밝힌다", f"HTTP {odd}" in reason, True)
+
+    # ⑦ 화면은 평문으로 그린다 — 강조 표기를 넣으면 별표가 그대로 보인다
+    for status in (400, 401, 403, 404, 429, 500):
+        reason = describe_provider_failure(http_error(status), "toss")
+        check(f"{status}: 마크다운 강조가 없다", "**" in reason, False)
+
     # ④ 모르는 실패
     unknown = describe_provider_failure(ValueError(f"boom {SECRET} at {URL}"), "toss")
     check("모르는 실패: 종류를 남긴다", "ValueError" in unknown, True)
@@ -117,8 +141,16 @@ def main() -> int:
     check("적재 서비스가 변환을 태운다", "describe_provider_failure(exc, source)" in service_src, True)
     check("적재 서비스가 원문을 안 쓴다", 'redact_secrets(f"{type(exc).__name__}: {exc}")' in service_src, False)
 
+    key_src = (_APP_DIR / "services" / "data_key" / "data_key_service.py").read_text(encoding="utf-8")
+    check("키 확인 경로도 같은 변환을 태운다", "describe_provider_failure(exc, source)" in key_src, True)
+
+    # 어댑터가 httpx 원문을 사유로 싣지 않는지 — 그 문자열도 화면까지 간다
+    for adapter in ("alpaca", "data_go_kr"):
+        text = (_APP_DIR / "providers" / adapter / "adapter.py").read_text(encoding="utf-8")
+        check(f"{adapter}: 원문을 사유로 안 싣는다", "ProviderResponseInvalid(str(exc))" in text, False)
+
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과")
-    if CHECKED < 40:
+    if CHECKED < 70:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:
