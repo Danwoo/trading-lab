@@ -165,3 +165,49 @@ describe("ProductRail — 미완은 눌러보기 전에 드러난다 (#228)", ()
     }
   });
 });
+
+// #229 — **누른 버튼이 이동 중임을 말한다.**
+//
+// 이동은 즉시 끝나지 않고 그동안 화면은 이전 자리 그대로다. 반응이 없으면 「눌리긴 한 건가」를
+// 알 수 없고, 이슈의 관측처럼 「엉뚱한 내용이 그 자리에 있다」로 읽히기도 한다.
+//
+// 전체 화면 로딩(`loading.tsx`) 대신 누른 버튼만 표시한다 — 빠른 이동에서 화면 전체가 한 번
+// 깜빡이는 것이 더 나쁘다.
+describe("ProductRail — 이동 중임이 보인다 (#229)", () => {
+  function renderRail() {
+    return render(<ProductRail openPanelId={null} onTogglePanel={vi.fn()} panelRegionId="product-panel" />);
+  }
+
+  it("라우트 레일을 누르면 그 버튼이 바쁜 상태가 된다", async () => {
+    const user = userEvent.setup();
+    renderRail();
+
+    const button = screen.getByRole("button", { name: "시세" });
+    await user.click(button);
+
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(push).toHaveBeenCalledOnce();
+  });
+
+  it("패널 레일은 이동이 아니라 바쁜 상태가 되지 않는다", async () => {
+    const user = userEvent.setup();
+    renderRail();
+
+    const button = screen.getByRole("button", { name: "봇" });
+    await user.click(button);
+
+    expect(button.getAttribute("aria-busy")).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("갈 곳이 없는 레일도 바쁜 상태가 되지 않는다 — 안내만 뜬다", async () => {
+    const user = userEvent.setup();
+    renderRail();
+
+    const button = screen.getByRole("button", { name: "리서치" });
+    await user.click(button);
+
+    expect(button.getAttribute("aria-busy")).toBeNull();
+    expect(showToast).toHaveBeenCalledOnce();
+  });
+});
