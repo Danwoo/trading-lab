@@ -122,19 +122,42 @@ def main() -> int:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
         conn.execute(text(f"CREATE SCHEMA {schema}"))
 
-    migration_path = BACKEND / "alembic" / "versions" / "0015_backtest.py"
-    if not migration_path.is_file():
-        print(f"::error::마이그레이션이 없다: {migration_path}", file=sys.stderr)
+    # **체인을 끝까지 따라간다.** 한 파일만 태우면 뒤에 붙는 마이그레이션이 이 검사의
+    # 스키마에 안 들어오고, 그 컬럼을 쓰는 코드가 여기서만 죽는다(실측: `tax` 컬럼이
+    # 0016 에 있어 「column does not exist」로 CI 가 빨개졌다).
+    versions = BACKEND / "alembic" / "versions"
+    modules: dict[str, object] = {}
+    parents: dict[str, str | None] = {}
+    for path in sorted(versions.glob("[0-9]*.py")):
+        mod_spec = importlib.util.spec_from_file_location(f"_bt_mig_{path.stem}", path)
+        module = importlib.util.module_from_spec(mod_spec)
+        mod_spec.loader.exec_module(module)
+        modules[module.revision] = module
+        parents[module.revision] = getattr(module, "down_revision", None)
+    if not modules:
+        print(f"::error::마이그레이션을 0건 읽었다: {versions}", file=sys.stderr)
         return 1
-    mod_spec = importlib.util.spec_from_file_location("_bt_migration", migration_path)
-    migration = importlib.util.module_from_spec(mod_spec)
-    mod_spec.loader.exec_module(migration)
+
+    #: 부모 → 자식으로 걸어 실행 순서를 만든다. head 가 여럿이면 여기서 드러난다.
+    children: dict[str | None, list[str]] = {}
+    for revision, parent in parents.items():
+        children.setdefault(parent, []).append(revision)
+    order: list[str] = []
+    frontier = sorted(children.get(None, []))
+    while frontier:
+        revision = frontier.pop(0)
+        order.append(revision)
+        frontier.extend(sorted(children.get(revision, [])))
+    if len(order) != len(modules):
+        print(f"::error::마이그레이션 체인이 끊겼다 — {len(order)}/{len(modules)} 만 이어진다", file=sys.stderr)
+        return 1
 
     with engine.begin() as conn:
         ops = Operations(MigrationContext.configure(conn))
         ops._install_proxy()
         try:
-            migration.upgrade()
+            for revision in order:
+                modules[revision].upgrade()
         finally:
             ops._remove_proxy()
 
