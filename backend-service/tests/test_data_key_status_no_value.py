@@ -20,11 +20,30 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("APP_ENV", "development")
+# 설정을 세우고 나서 서비스를 import 한다 — `data_key_service` 는 `core.logger` →
+# `core.config.settings = Settings()` 를 물고 들어오고, 그 Settings 는 DB·SFTP·JWT 를
+# 요구한다. `.env.development` 는 gitignore 라 CI 러너에 없다.
+# 이 관용구는 `test_data_source_key_leak.py` 가 이미 쓰는 것과 같다 — 값은 쓰이지 않고
+# **존재만** 필요하므로 더미다.
+os.environ["APP_ENV"] = "data-key-status-test"
+for _name, _value in {
+    "BACKEND_SQL_DB_DRIVER": "postgresql+psycopg",
+    "BACKEND_SQL_DB_HOST": "localhost",
+    "BACKEND_SQL_DB_PORT": "5432",
+    "BACKEND_SQL_DB_NAME": "test",
+    "BACKEND_SQL_DB_USER": "test",
+    "BACKEND_SQL_DB_PASSWORD": "test",
+    "SFTP_HOST": "localhost",
+    "SFTP_PORT": "22",
+    "SFTP_USERNAME": "test",
+    "SFTP_PASSWORD": "test",
+    "JWT_SECRET": "test-secret",
+}.items():
+    os.environ.setdefault(_name, _value)
+
 _APP_DIR = Path(__file__).resolve().parents[1] / "app"
 if str(_APP_DIR) not in sys.path:
     sys.path.insert(0, str(_APP_DIR))
-os.chdir(_APP_DIR)
 
 from schemas.data_key.data_key_schema import DataKeyStatusOut  # noqa: E402
 from services.data_key.data_key_service import (  # noqa: E402
