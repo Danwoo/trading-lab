@@ -47,7 +47,9 @@ FRONT = REPO_ROOT / "frontend"
 FIELD = re.compile(r"\b(failed_reason|absent_reason|failedReason)\b")
 GUARD = "redactReason"
 #: fail-closed 핀 — 검사한 자리가 조용히 줄지 않게 박는다.
-EXPECTED_SITES = 8
+#: 이 스크립트를 그냥 돌려 나온 수다 (손으로 세면 계층을 빠뜨린다 — 실제로 hooks 2곳을 빠뜨려
+#: 8 로 박혔고, 그동안 자리 2곳이 사라져도 초록이었다).
+EXPECTED_SITES = 10
 SKIP_DIRS = {"node_modules", ".next", "dist", "build"}
 
 
@@ -86,14 +88,36 @@ def _guarded(code: str, at: int) -> bool:
     return False
 
 
+def _alias_binding(code: str, end: int) -> bool:
+    """`const { failed_reason: reason } = run` 인가 — **읽는 자리**다.
+
+    타입 선언(`{ failed_reason: string }`)과 글자 모양이 같아 tail 만으로는 못 가른다. 가르는
+    것은 **바인딩 키워드와 `=`** 다 — 타입에는 둘 다 없다. 개명해서 내보내는 이 패턴이 앞선
+    판에서 그물을 통째로 우회했다.
+    """
+    open_brace = code.rfind("{", max(0, end - 300), end)
+    if open_brace == -1:
+        return False
+    if not re.search(
+        r"\b(const|let|var)\s*$", code[max(0, open_brace - 30) : open_brace]
+    ):
+        return False
+    close = code.find("}", end)
+    return (
+        close != -1 and re.match(r"\s*=[^=]", code[close + 1 : close + 4]) is not None
+    )
+
+
 def sites(text: str) -> list[tuple[int, bool, str]]:
-    """`(줄, 가려졌나, 둘레)` — 타입 선언은 뺀다. **별칭 분해는 뺀 자리로 세지 않는다.**"""
+    """`(줄, 가려졌나, 둘레)` — 타입 선언은 뺀다. **별칭 분해는 읽는 자리로 센다.**"""
     code = _blank_comments(text)
     out: list[tuple[int, bool, str]] = []
     for match in FIELD.finditer(code):
         tail = code[match.end() : match.end() + 4]
         # 타입 선언(`x: T` · `x?: T`)만 제외한다. `??` 는 읽는 자리다.
-        if re.match(r"\s*\?\s*:", tail) or re.match(r"\s*:(?!\s*\w+\s*[,}])", tail):
+        if (
+            re.match(r"\s*\?\s*:", tail) or re.match(r"\s*:(?!\s*\w+\s*[,}])", tail)
+        ) and not _alias_binding(code, match.end()):
             continue
         line = code.count("\n", 0, match.start()) + 1
         around = code[max(0, match.start() - 70) : match.end() + 70]
