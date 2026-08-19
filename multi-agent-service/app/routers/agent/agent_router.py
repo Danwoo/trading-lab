@@ -1,6 +1,8 @@
 # routers/agent/agent_router.py
 import json
 
+from clients.llm.llm_client import describe_roles, fallback_count, fallback_problems
+from clients.llm.providers import PROVIDERS
 from core.auth_context import get_email
 from core.container import Container
 from core.exceptions import HTTPError
@@ -29,6 +31,26 @@ def _switches_to_enabled(b) -> set[str]:
 
 
 router = APIRouter(prefix="/agent", dependencies=[Depends(verify_access_token)])
+
+
+@router.get("/llm", operation_id="select_llm_status")
+@inject
+def select_llm_status(config=Depends(Provide[Container.config])):
+    """**지금 무슨 제공자·모델로 답하는가**, 못 부르면 왜인지 (#226).
+
+    화면이 답변 옆에 「무슨 모델이 답했는지」를 붙이려면 이 표가 있어야 한다 — 시세의 출처
+    라벨과 같은 축이다. **키는 담지 않는다** — 이 응답은 API 로 나간다.
+    """
+    roles = describe_roles(config)
+    return {
+        "roles": roles,
+        "ready": all(row["reason"] is None for row in roles),
+        "fallbacks": fallback_count(config.LLM_FALLBACKS),
+        "fallback_problems": fallback_problems(config.LLM_FALLBACKS),
+        "providers": [
+            {"id": p.id, "name": p.name, "model_example": p.model_example, "key_hint": p.key_hint} for p in PROVIDERS
+        ],
+    }
 
 
 def _user_error(exc: Exception) -> str:

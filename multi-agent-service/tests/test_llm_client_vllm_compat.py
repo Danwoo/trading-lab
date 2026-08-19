@@ -33,6 +33,10 @@ def _config(vllm_compat: bool) -> SimpleNamespace:
         ROUTER_LLM_API_KEY="test-key",
         ROUTER_LLM_MODEL="test-model",
         ROUTER_LLM_VLLM_COMPAT=vllm_compat,
+        # 제공자 축(#226) — 비우면 custom 이라 위 BASE_URL 을 그대로 쓴다
+        ROUTER_LLM_PROVIDER="",
+        GENERATOR_LLM_PROVIDER="",
+        LLM_FALLBACKS="",
     )
 
 
