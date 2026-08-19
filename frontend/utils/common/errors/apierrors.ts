@@ -22,10 +22,31 @@ function translatePrismaErrors(errors: any[], L: typeof ko): string | null {
 }
 
 /**
+ * 서버가 준 문구를 화면에 그대로 옮기지 않는 상태들.
+ *
+ * - 401 — 아직 인증되지 않은 응답이라 문구가 프레임워크 영문("Not authenticated")이고,
+ *   무엇이 적혀 있든 사용자가 할 일은 「다시 로그인」 하나뿐이다.
+ * - 5xx — 서버 내부 사정이라 사용자가 할 수 있는 것이 없고, 원문이 내부 정보를 흘린다.
+ *
+ * 원문은 버리지 않고 개발 콘솔에 남긴다 — 화면에서 감추는 것이지 없애는 것이 아니다.
+ */
+function serverTextIsNotShown(status: number): boolean {
+  return status === 401 || status >= 500;
+}
+
+/**
  * API 에러를 사용자 친화적인 메시지로 변환. 클라이언트 폴백은 현재 언어(getAppLocale)에 따름.
  */
 export function getApiErrorMessage(error: any): string {
   const L = LOCALES[getAppLocale()];
+
+  const status = error?.response?.status;
+  if (typeof status === "number" && serverTextIsNotShown(status)) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("[getApiErrorMessage] 서버 원문(화면 비노출):", error?.response?.data ?? error?.message);
+    }
+    return L.STATUS_MESSAGES[status] || L.FALLBACK.processing;
+  }
 
   if (error?.response?.data) {
     const errorData = error.response.data;
