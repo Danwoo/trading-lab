@@ -113,14 +113,16 @@ def load_migration():
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         modules[module.revision] = module
-        parents[module.revision] = getattr(module, "down_revision", None)
+        parent = getattr(module, "down_revision", None)
+        # merge 리비전의 `down_revision` 은 **튜플**이다 (부모가 둘).
+        parents[module.revision] = () if parent is None else (parent,) if isinstance(parent, str) else tuple(parent)
     if not modules:
         print(f"::error::backtest 테이블을 다루는 마이그레이션을 0건 찾았다: {versions}", file=sys.stderr)
         return None
 
     order, remaining = [], dict(modules)
     while remaining:
-        ready = [rev for rev in remaining if parents[rev] not in remaining]
+        ready = [rev for rev in remaining if all(p not in remaining for p in parents[rev])]
         if not ready:
             print(f"::error::마이그레이션 순서를 정할 수 없다 (순환?): {sorted(remaining)}", file=sys.stderr)
             return None

@@ -164,10 +164,6 @@ function EquityCurve({ report }: { report: RunReportOut }) {
   return <div ref={containerRef} className="h-[30svh] w-full min-w-0" />;
 }
 
-/**
- * 격자에서 고른 한 조합의 리포트 (#203) — 곡선·낙폭, 판정 지표, 거래목록이 **그 조합으로**
- * 바뀌는 자리다 (전파 규칙 §2.3).
- */
 /** 비용 항목의 사람 말 — 값 자체는 백엔드가 준 키다. */
 const COST_LABEL: Record<string, string> = {
   fee_rate: "수수료",
@@ -175,6 +171,19 @@ const COST_LABEL: Record<string, string> = {
   sell_tax_rate: "증권거래세",
 };
 
+/**
+ * 요율을 백분율로. 소수 셋째 자리에서 반올림하면 극소 요율이 「0.000%」가 되어 **0 과
+ * 구분되지 않는다** — 그때만 유효숫자로 물러선다.
+ */
+function ratePercent(rate: number): string {
+  const fixed = (rate * 100).toFixed(3);
+  return rate > 0 && Number(fixed) === 0 ? (rate * 100).toPrecision(2) : fixed;
+}
+
+/**
+ * 격자에서 고른 한 조합의 리포트 (#203) — 곡선·낙폭, 판정 지표, 거래목록이 **그 조합으로**
+ * 바뀌는 자리다 (전파 규칙 §2.3).
+ */
 export function RunReportView({ report }: { report: RunReportOut }) {
   const run = report.run;
 
@@ -196,7 +205,7 @@ export function RunReportView({ report }: { report: RunReportOut }) {
         {Object.keys(run.cost_assumptions).length === 0
           ? "기록되지 않았습니다"
           : Object.entries(run.cost_assumptions)
-              .map(([key, rate]) => `${COST_LABEL[key] ?? key} ${(rate * 100).toFixed(3)}%`)
+              .map(([key, rate]) => `${COST_LABEL[key] ?? key} ${ratePercent(rate)}%`)
               .join(" · ")}
       </p>
 

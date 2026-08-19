@@ -513,7 +513,7 @@ class BacktestTrade(Base):
     exit_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
     fee: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, server_default="0")
     slippage: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, server_default="0")
-    #: 증권거래세 — **매도에만** 붙고 국내 명시 비용 중 가장 크다(0.15% vs 수수료 0.015%).
+    #: 증권거래세 — **매도에만** 붙고 국내 명시 비용 중 가장 크다(0.18% vs 수수료 0.015%).
     #: 이 컬럼이 없으면 「치른 비용」이 가장 큰 항목을 빼고 답한다 (#271).
     tax: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False, server_default="0")
     realized_pnl: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)

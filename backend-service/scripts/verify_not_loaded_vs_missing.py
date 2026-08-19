@@ -130,10 +130,26 @@ def main() -> int:
     }
 
     # ── 마스터가 통째로 빈 상태 — 「없는 종목」이라 단정하면 안 된다 ─────────
-    check("일봉 — 아직 안 받았다고 답한다", NOT_LOADED in message_of(lambda: service.select_daily_bar_list(dict(daily))), True)
-    check("일봉 — 없는 종목이라 단정하지 않는다", MISSING in message_of(lambda: service.select_daily_bar_list(dict(daily))), False)
-    check("분봉 — 아직 안 받았다고 답한다", NOT_LOADED in message_of(lambda: service.select_minute_bar_list(dict(minute))), True)
-    check("마스터 해석 — 아직 안 받았다고 답한다", NOT_LOADED in message_of(lambda: service._instrument(MARKET, ASKED)), True)
+    check(
+        "일봉 — 아직 안 받았다고 답한다",
+        NOT_LOADED in message_of(lambda: service.select_daily_bar_list(dict(daily))),
+        True,
+    )
+    check(
+        "일봉 — 없는 종목이라 단정하지 않는다",
+        MISSING in message_of(lambda: service.select_daily_bar_list(dict(daily))),
+        False,
+    )
+    check(
+        "분봉 — 아직 안 받았다고 답한다",
+        NOT_LOADED in message_of(lambda: service.select_minute_bar_list(dict(minute))),
+        True,
+    )
+    check(
+        "마스터 해석 — 아직 안 받았다고 답한다",
+        NOT_LOADED in message_of(lambda: service._instrument(MARKET, ASKED)),
+        True,
+    )
     check("다음 걸음이 문구에 있다", "적재" in message_of(lambda: service._instrument(MARKET, ASKED)), True)
 
     # ── 마스터를 한 번 받은 뒤 — 진짜 없는 종목은 없다고 답해야 한다 ────────
@@ -147,7 +163,9 @@ def main() -> int:
         )
 
     check("받은 뒤 — 없는 종목이라 답한다", MISSING in message_of(lambda: service._instrument(MARKET, ASKED)), True)
-    check("받은 뒤 — 안 받았다고 하지 않는다", NOT_LOADED in message_of(lambda: service._instrument(MARKET, ASKED)), False)
+    check(
+        "받은 뒤 — 안 받았다고 하지 않는다", NOT_LOADED in message_of(lambda: service._instrument(MARKET, ASKED)), False
+    )
     check("받은 뒤 — 일봉도 같다", MISSING in message_of(lambda: service.select_daily_bar_list(dict(daily))), True)
     check("받은 뒤 — 분봉도 같다", MISSING in message_of(lambda: service.select_minute_bar_list(dict(minute))), True)
 

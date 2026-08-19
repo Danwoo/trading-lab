@@ -149,11 +149,15 @@ def compute(
     equity: list[float],
     trades: list,
     round_trip_cost_rate: float,
+    initial_cash: float,
+    sell_tax_rate: float,
 ) -> list[Metric]:
     """스펙 D-Q2 의 순서대로 지표를 낸다.
 
     `trades` 는 `engine.Trade` 목록. `round_trip_cost_rate` 는 왕복 비용률(수수료 왕복 +
     슬리피지 + 증권거래세)로, 「거래당 평균 수익이 비용을 먹고도 남나」를 답하는 데 쓴다.
+    `initial_cash`·`sell_tax_rate` 는 비용 지표가 무엇으로 나누고 무엇을 기록으로 인정할지를
+    가른다 — 기본값을 두지 않는 것은 안 넘기면 조용히 틀린 값이 나오기 때문이다.
     """
     out: list[Metric] = []
 
@@ -314,40 +318,62 @@ def compute(
         (getattr(t, "fee", 0.0) or 0.0) + (getattr(t, "slippage", 0.0) or 0.0) + (getattr(t, "tax", 0.0) or 0.0)
         for t in trades
     )
-    start_equity = equity[0] if equity else 0.0
-    out.append(
-        Metric(
-            key="cost_paid",
-            label="치른 비용",
-            value=paid,
-            unit="원",
-            derived_from=f"거래 {len(trades)}건의 수수료 + 슬리피지 + 증권거래세 합",
-        )
-    )
-    if start_equity > 0:
-        out.append(
-            Metric(
-                key="cost_drag_pct",
-                label="비용이 먹은 수익률",
-                value=paid / start_equity * 100,
-                unit="p",
-                # **재실행이 아니다.** 비용을 0 으로 두고 다시 돌리면 현금 제약이 달라져 체결
-                # 수량이 달라질 수 있다. 이 값은 「치른 비용」이지 「비용 없는 세계의 성과」가
-                # 아니다 — 그 경계를 여기 적어 화면이 그대로 읽게 한다.
-                derived_from="치른 비용 ÷ 시작 자금 (비용 0으로 다시 돌린 값이 아니다 — 체결 수량이 달라질 수 있다)",
+    # `tax` 축은 나중에 들어왔고 기존 행은 `server_default="0"` 으로 채워졌다. 그 0 은 「안 냈다」가
+    # 아니라 **「기록이 없다」**다. `trades` 에는 청산된 거래만 들어오므로 매도세율이 걸려 있으면
+    # 세금은 반드시 0보다 크다 — 전부 0이면 합계를 내는 대신 기록이 없다고 말한다.
+    tax_unrecorded = sell_tax_rate > 0 and bool(trades) and not any((getattr(t, "tax", 0.0) or 0.0) > 0 for t in trades)
+    # 「구간 끝에 열려 있는 자리」의 진입 비용은 이미 치렀지만 `trades` 에 없다 (engine 이 청산한
+    # 척하지 않는다). 그래서 유도 문구가 **청산된 거래**라고 범위를 밝힌다.
+    paid_derivation = f"청산된 거래 {len(trades)}건의 수수료 + 슬리피지 + 증권거래세 합"
+    # 분모는 **시작 자금**이다. `equity[0]` 은 첫 봉 종료 시점 평가액이라 그 봉에서 진입했다면
+    # 이미 매수 비용이 빠져 있어, 이름(「시작 자금」)과 값이 어긋난다.
+    start_equity = initial_cash
+    if tax_unrecorded:
+        for key, label, unit in (("cost_paid", "치른 비용", "원"), ("cost_drag_pct", "비용이 먹은 수익률", "p")):
+            out.append(
+                Metric(
+                    key=key,
+                    label=label,
+                    value=None,
+                    unit=unit,
+                    derived_from=paid_derivation,
+                    absent_reason="증권거래세 기록이 없는 옛 실행입니다 — 세금을 뺀 합계를 내면 적게 말하게 됩니다. 다시 실행하면 채워집니다",
+                )
             )
-        )
     else:
         out.append(
             Metric(
-                key="cost_drag_pct",
-                label="비용이 먹은 수익률",
-                value=None,
-                unit="p",
-                derived_from="치른 비용 ÷ 시작 자금",
-                absent_reason="시작 자금이 0이라 나눌 수 없습니다",
+                key="cost_paid",
+                label="치른 비용",
+                value=paid,
+                unit="원",
+                derived_from=paid_derivation,
             )
         )
+        if start_equity > 0:
+            out.append(
+                Metric(
+                    key="cost_drag_pct",
+                    label="비용이 먹은 수익률",
+                    value=paid / start_equity * 100,
+                    unit="p",
+                    # **재실행이 아니다.** 비용을 0 으로 두고 다시 돌리면 현금 제약이 달라져 체결
+                    # 수량이 달라질 수 있다. 이 값은 「치른 비용」이지 「비용 없는 세계의 성과」가
+                    # 아니다 — 그 경계를 여기 적어 화면이 그대로 읽게 한다.
+                    derived_from="치른 비용 ÷ 시작 자금 (비용 0으로 다시 돌린 값이 아니다 — 체결 수량이 달라질 수 있다)",
+                )
+            )
+        else:
+            out.append(
+                Metric(
+                    key="cost_drag_pct",
+                    label="비용이 먹은 수익률",
+                    value=None,
+                    unit="p",
+                    derived_from="치른 비용 ÷ 시작 자금",
+                    absent_reason="시작 자금이 0 이하라 나눌 수 없습니다",
+                )
+            )
 
     # ── 5급: 샤프 (참고용) ────────────────────────────────────────────
     # 무위험수익률은 0 고정이고 화면이 그 사실을 밝힌다 (스펙 D-Q2).

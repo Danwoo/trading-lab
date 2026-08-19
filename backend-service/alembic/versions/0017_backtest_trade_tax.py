@@ -4,7 +4,7 @@ Revision ID: 0017_backtest_trade_tax
 Revises: 0016_daily_bar_session_scope
 Create Date: 2026-08-20
 
-증권거래세는 국내 명시 비용 중 **가장 크다**(0.15% vs 수수료 0.015%). 엔진은 `sell_cost` 안에서
+증권거래세는 국내 명시 비용 중 **가장 크다**(0.18% vs 수수료 0.015%). 엔진은 `sell_cost` 안에서
 차감만 하고 거래에 남기지 않아, 「이 성과가 무엇을 치르고 남은 것인가」를 물으면 가장 큰 항목을
 빼고 답하게 된다.
 

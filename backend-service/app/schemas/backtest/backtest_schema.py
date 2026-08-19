@@ -110,6 +110,7 @@ class TradeOut(BaseModel):
     exit_price: float | None
     fee: float
     slippage: float
+    tax: float
     realized_pnl: float | None
     mae: float | None
     mfe: float | None

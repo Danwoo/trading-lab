@@ -137,6 +137,10 @@ def test_sell_tax_only_on_sell() -> None:
         strategy=strategy_from({0}, {1}), params={}, series=s, rows=s.rows(), initial_cash=1000.0, costs=costs
     )
     check("매도세만 차감", r.final_equity, 990.0)
+    # 차감만으로는 부족하다 — **얼마를 세금으로 냈는지 거래에 적혀야** 화면이 비용을 말한다.
+    # 매도 대금 1,000 × 1% = 10. 이 단언이 없으면 `open_trade.tax += …` 를 지워도 초록이다.
+    check("거래에 적힌 세금", r.trades[0].tax, 10.0)
+    check("수수료는 0", r.trades[0].fee, 0.0)
 
 
 def test_mae_mfe() -> None:

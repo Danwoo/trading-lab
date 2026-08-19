@@ -103,6 +103,7 @@ export interface TradeOut {
   exit_price: number | null;
   fee: number;
   slippage: number;
+  tax: number;
   realized_pnl: number | null;
   mae: number | null;
   mfe: number | null;

@@ -140,7 +140,10 @@ def main() -> int:
         module = importlib.util.module_from_spec(mod_spec)
         mod_spec.loader.exec_module(module)
         modules[module.revision] = module
-        parents[module.revision] = getattr(module, "down_revision", None)
+        parent = getattr(module, "down_revision", None)
+        # merge 리비전의 `down_revision` 은 **튜플**이다. 스칼라로만 다루면 그 튜플이 통째로
+        # 키가 되어 어느 부모에도 안 걸리고, 부모보다 먼저 도는 순서가 나온다.
+        parents[module.revision] = () if parent is None else (parent,) if isinstance(parent, str) else tuple(parent)
     if not modules:
         print(f"::error::backtest 테이블을 다루는 마이그레이션을 0건 찾았다: {versions}", file=sys.stderr)
         return 1
@@ -148,7 +151,7 @@ def main() -> int:
     #: 고른 것들끼리 체인 순서를 만든다 — 부모가 목록 밖이면 그것이 시작점이다.
     order, remaining = [], dict(modules)
     while remaining:
-        ready = [rev for rev in remaining if parents[rev] not in remaining]
+        ready = [rev for rev in remaining if all(p not in remaining for p in parents[rev])]
         if not ready:
             print(f"::error::마이그레이션 순서를 정할 수 없다 (순환?): {sorted(remaining)}", file=sys.stderr)
             return 1
