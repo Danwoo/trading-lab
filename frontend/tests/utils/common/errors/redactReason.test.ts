@@ -43,6 +43,9 @@ describe("실패 사유는 화면에 URL 을 내보내지 않는다", () => {
       `요청 실패: serviceKey=${KEY}`,
       `params={'api_key': '${KEY}'}`,
       `헤더 Authorization: Bearer ${KEY} 가 거절됐습니다`,
+      // 스킴은 Bearer 하나가 아니다 — 낱말을 고정하면 그 낱말이 아닐 때 통째로 빠져나간다.
+      `헤더 Authorization: Basic ${KEY} 가 거절됐습니다`,
+      `Authorization: Digest ${KEY}`,
       `ACCESS_TOKEN=${KEY}`,
     ]) {
       expect(redactReason(stored)).not.toContain(KEY);

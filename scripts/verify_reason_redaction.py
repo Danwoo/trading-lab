@@ -53,15 +53,61 @@ EXPECTED_SITES = 10
 SKIP_DIRS = {"node_modules", ".next", "dist", "build"}
 
 
-def _blank_comments(text: str) -> str:
-    """주석을 공백으로 바꾼다(줄 번호 보존). 설계 의도를 적으며 필드를 언급하는 것은 위반이 아니다."""
+def _blank_noncode(text: str) -> str:
+    """문자열과 주석을 공백으로 눕힌다(줄 번호 보존).
 
-    def blank(match: re.Match) -> str:
-        return re.sub(r"[^\n]", " ", match.group(0))
+    **한 번에 훑어야 한다.** 주석만 먼저 지우면 `href="https://…"` 안의 `//` 를 주석 시작으로
+    읽어 그 줄의 나머지가 통째로 사라진다 — 링크가 있는 줄에서 사유를 그리면 그 자리가 검사에서
+    빠졌다. 문자열만 먼저 지우면 주석 안의 따옴표가 문자열을 연다.
 
-    return re.sub(
-        r"//[^\n]*", blank, re.sub(r"/\*.*?\*/", blank, text, flags=re.DOTALL)
-    )
+    따옴표는 **같은 줄에서 닫힐 때만** 문자열로 본다. JSX 본문의 아포스트로피가 뒤 코드를
+    삼키지 않게 하는 안전장치다 (역따옴표는 여러 줄이 정상이라 예외).
+    """
+    out = list(text)
+    index, size = 0, len(text)
+    while index < size:
+        char = text[index]
+        if char in "'\"`":
+            end = _string_end(text, index)
+            if end is None:
+                index += 1
+                continue
+            for pos in range(index + 1, end):
+                if out[pos] != "\n":
+                    out[pos] = " "
+            index = end + 1
+        elif text.startswith("//", index):
+            stop = text.find("\n", index)
+            stop = size if stop == -1 else stop
+            out[index:stop] = " " * (stop - index)
+            index = stop
+        elif text.startswith("/*", index):
+            stop = text.find("*/", index + 2)
+            stop = size if stop == -1 else stop + 2
+            for pos in range(index, stop):
+                if out[pos] != "\n":
+                    out[pos] = " "
+            index = stop
+        else:
+            index += 1
+    return "".join(out)
+
+
+def _string_end(text: str, start: int) -> int | None:
+    """여는 따옴표 위치를 받아 닫는 위치를 준다. 못 닫으면 문자열이 아니다."""
+    quote = text[start]
+    index = start + 1
+    while index < len(text):
+        char = text[index]
+        if char == "\\":
+            index += 2
+            continue
+        if char == quote:
+            return index
+        if char == "\n" and quote != "`":
+            return None
+        index += 1
+    return None
 
 
 def _guarded(code: str, at: int) -> bool:
@@ -83,34 +129,90 @@ def _guarded(code: str, at: int) -> bool:
             if depth == 0:
                 return code[max(0, index - len(GUARD)) : index].endswith(GUARD)
             depth -= 1
-        elif char in ";\n" and depth == 0:
+        elif char == ";" and depth == 0:
+            # 개행에서 멈추면 포매터가 인자를 줄바꿈한 **정상 코드**가 빨강이 된다
+            # (`redactReason(\n  run.failed_reason,\n)`). 문장 끝에서만 멈춘다.
             return False
     return False
 
 
 def _alias_binding(code: str, end: int) -> bool:
-    """`const { failed_reason: reason } = run` 인가 — **읽는 자리**다.
+    """`{ failed_reason: reason }` 이 **바인딩**인가 — 그렇다면 읽는 자리다.
 
     타입 선언(`{ failed_reason: string }`)과 글자 모양이 같아 tail 만으로는 못 가른다. 가르는
-    것은 **바인딩 키워드와 `=`** 다 — 타입에는 둘 다 없다. 개명해서 내보내는 이 패턴이 앞선
-    판에서 그물을 통째로 우회했다.
+    것은 **바깥에 무엇이 있는가**다. 중첩·매개변수 분해까지 잡으려면 안쪽 중괄호가 아니라
+    **가장 바깥 중괄호**를 보고 판정해야 한다:
+
+        const { run: { failed_reason: reason } } = props   ← 앞이 `const`
+        function Cell({ failed_reason: reason }: Props)    ← 앞이 `(`
+
+    안쪽 중괄호 바로 앞만 보면 각각 `run: ` · `(` 라 둘 다 타입으로 오분류된다.
     """
-    open_brace = code.rfind("{", max(0, end - 300), end)
-    if open_brace == -1:
+    brace = _pattern_root(code, end)
+    if brace is None:
         return False
-    if not re.search(
-        r"\b(const|let|var)\s*$", code[max(0, open_brace - 30) : open_brace]
-    ):
+    before = code[max(0, brace - 40) : brace].rstrip()
+    if before.endswith(("(", ",")):
+        return True
+    if not re.search(r"\b(const|let|var)$", before):
         return False
-    close = code.find("}", end)
+    close = _matching_brace(code, brace)
     return (
-        close != -1 and re.match(r"\s*=[^=]", code[close + 1 : close + 4]) is not None
+        close is not None
+        and re.match(r"\s*=[^=]", code[close + 1 : close + 4]) is not None
     )
+
+
+def _pattern_root(code: str, at: int) -> int | None:
+    """`at` 을 감싸는 **분해 패턴의 뿌리** 중괄호.
+
+    중첩 분해(`const { run: { … } }`)의 안쪽에서 시작해 바깥으로 오르되, **`:` 로 이어질 때만**
+    오른다 — 그것이 패턴 안쪽이라는 표시다. 함수 본문·JSX 블록까지 오르면 뿌리를 지나쳐
+    `const` 를 못 보게 된다.
+    """
+    brace = _enclosing_brace(code, at)
+    while brace is not None and code[max(0, brace - 40) : brace].rstrip().endswith(":"):
+        outer = _enclosing_brace(code, brace)
+        if outer is None:
+            break
+        brace = outer
+    return brace
+
+
+def _enclosing_brace(code: str, at: int) -> int | None:
+    """`at` 을 바로 감싸는 여는 중괄호."""
+    depth = 0
+    index = at
+    while index > 0:
+        index -= 1
+        char = code[index]
+        if char == "}":
+            depth += 1
+        elif char == "{":
+            if depth == 0:
+                return index
+            depth -= 1
+        elif char == ";" and depth == 0:
+            return None
+    return None
+
+
+def _matching_brace(code: str, opening: int) -> int | None:
+    """여는 중괄호와 짝이 되는 닫는 위치."""
+    depth = 0
+    for index in range(opening, len(code)):
+        if code[index] == "{":
+            depth += 1
+        elif code[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
 
 
 def sites(text: str) -> list[tuple[int, bool, str]]:
     """`(줄, 가려졌나, 둘레)` — 타입 선언은 뺀다. **별칭 분해는 읽는 자리로 센다.**"""
-    code = _blank_comments(text)
+    code = _blank_noncode(text)
     out: list[tuple[int, bool, str]] = []
     for match in FIELD.finditer(code):
         tail = code[match.end() : match.end() + 4]

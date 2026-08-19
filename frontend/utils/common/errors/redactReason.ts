@@ -22,8 +22,10 @@ const BARE_QUERY = /\?[A-Za-z0-9_%+.-]+=[^\s'"()<>]*/g;
  * 새 행은 저장 시점 가림이 덮지만, **이 관문이 겨냥하는 옛 행에는 여기뿐이다.** 키처럼 보이는
  * 이름에 한정한다 — 아무 `a=b` 나 지우면 사유 문장이 부서진다.
  */
+//: 스킴 낱말은 `Bearer` 하나가 아니다 — `Basic`·`Digest` 도 같은 자리에 온다. 낱말을 고정하면
+//: 그 낱말이 아닐 때 값 클래스가 스킴에서 끊겨 매치 자체가 실패한다(`Basic <base64>` 가 그대로 나갔다).
 const KEY_ASSIGNMENT =
-  /\b(?:authorization|[A-Za-z0-9_-]*(?:key|token|secret|password|passwd|pwd))['"]?\s*[=:]\s*['"]?(?:bearer\s+)?[A-Za-z0-9_%+./=-]{6,}['"]?/gi;
+  /\b(?:authorization|[A-Za-z0-9_-]*(?:key|token|secret|password|passwd|pwd))['"]?\s*[=:]\s*['"]?(?:[A-Za-z]+\s+)?[A-Za-z0-9_%+./=-]{6,}['"]?/gi;
 
 /**
  * 사유에서 URL·쿼리를 걷는다. **사유 자체는 남긴다** — 통째로 지우면 원인이 사라진다.
