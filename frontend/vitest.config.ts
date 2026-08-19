@@ -2,6 +2,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { configDefaults, defineConfig } from "vitest/config";
 
+import { API_REGRESSION_TESTS } from "./vitest.api-regressions.config";
+
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
@@ -27,12 +29,7 @@ export default defineConfig({
       ...configDefaults.exclude,
       "**/.next/**",
       "prisma/generated/**",
-      "tests/regressions/337-path-traversal.test.ts",
-      "tests/regressions/389-filter-fail-closed.test.ts",
-      "tests/regressions/388-signup-boundary.test.ts",
-      "tests/regressions/400-put-full-representation.test.ts",
-      "tests/regressions/238-email-immutability.test.ts",
-      "tests/regressions/251-personal-workspace-menu.test.tsx",
+        ...API_REGRESSION_TESTS,
     ],
     // 기본은 node(빠름) — 순수 유틸 대다수가 여기 해당. DOM 이 필요한 파일(컴포넌트 렌더
     // 테스트)만 파일 최상단 `// @vitest-environment jsdom` 주석으로 opt-in 한다.
