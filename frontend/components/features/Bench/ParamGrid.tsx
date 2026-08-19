@@ -84,20 +84,24 @@ function Cell({
   const value = spec.of(cell);
   const returnPct = cellReturnPct(cell, initialCash);
 
+  // **「실패」와 「지표 없음」을 가른다.** 매매가 0건이면 「최장 미회복 기간」은 정당하게 없는
+  // 값이다 — 그것을 실패로 그리면 화면이 사실이 아닌 것을 말한다 (FR-021 과 같은 계열).
   if (cell.status === "failed" || value === null) {
+    const failed = cell.status === "failed";
     return (
       <button
         type="button"
         onClick={() => onSelect(cell.run_id, label)}
-        title={cell.failed_reason ?? undefined}
-        aria-label={`${label} — 실패`}
+        title={failed ? (cell.failed_reason ?? undefined) : `${spec.label} 값이 없습니다 — 눌러서 이유를 보세요`}
+        aria-label={`${label} — ${failed ? "실패" : `${spec.label} 없음`}`}
         className={cn(
-          "min-h-[26px] w-full min-w-0 break-keep rounded-badge px-1 py-0.5 text-2xs text-danger",
+          "min-h-[26px] w-full min-w-0 break-keep rounded-badge px-1 py-0.5 text-2xs",
+          failed ? "text-danger" : "text-ink-muted",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
-          selected ? "border-2 border-ink-strong" : "border border-line",
+          selected ? "border-2 border-ink-strong" : failed ? "border border-line" : "border border-dashed border-line",
         )}
       >
-        실패
+        {failed ? "실패" : "—"}
       </button>
     );
   }

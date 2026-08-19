@@ -38,12 +38,33 @@ class GridAxisOut(BaseModel):
     values: list[Any]
 
 
+class GridCellMetricsOut(BaseModel):
+    """격자 칸이 지고 다니는 **1급 지표** (#220).
+
+    격자는 조합을 **고르는** 자리라, 4급(수익률)만 보이면 「가장 많이 번 칸」이 가장 진해
+    보이고 사용자는 그 칸을 고른다 — 스펙 D-Q2 가 뒤집어 놓은 순서와 정면으로 어긋난다.
+    """
+
+    #: 1급 — 전 고점 아래에 머문 최장 (봉).
+    longest_underwater: float
+    #: 끝에서 미회복인가 — 「아직 회복 중」을 화면이 밝힌다.
+    still_underwater: bool
+    #: 2급 — 그때의 고점 대비 최대 하락률 (%, 음수).
+    mdd_pct: float
+    #: 4급 — 구간 총수익률 (%). 버리지 않되 기본 채색이 아니다.
+    total_return_pct: float | None = None
+
+
 class GridCellOut(BaseModel):
     run_id: int
     params: dict[str, Any]
     status: str
     failed_reason: str | None = None
     final_equity: float | None = None
+    #: **이 필드가 없으면 응답에서 통째로 사라진다.** 서비스는 만들어 넣는데 응답 모델이
+    #: 선언하지 않으면 FastAPI 가 버리고, 화면은 채색 값을 못 구해 **성공한 칸을 전부
+    #: 「실패」로 그린다** (#268 실측 — 25칸 전부). 프론트 `GridCellOut` 과 짝이다.
+    metrics: GridCellMetricsOut | None = None
 
 
 class GridOut(BaseModel):
