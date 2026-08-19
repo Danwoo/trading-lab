@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { selectDataKeyStatus, type DataKeyStatus } from "@/services/dataKey/dataKeyService";
+import { DataKeyRow } from "@/components/features/Settings/DataKeyRow";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 
 /**
@@ -15,21 +16,16 @@ export function DataKeyList() {
   const [rows, setRows] = useState<DataKeyStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(() => {
+    setError(null);
     selectDataKeyStatus()
-      .then((result) => {
-        if (cancelled) return;
-        setRows(result?.items ?? []);
-      })
-      .catch((cause: unknown) => {
-        if (cancelled) return;
-        setError(getApiErrorMessage(cause));
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((result) => setRows(result?.items ?? []))
+      .catch((cause: unknown) => setError(getApiErrorMessage(cause)));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (error !== null) {
     // 「못 읽었다」와 「없다」를 가른다 — 둘 다 회색이면 같아 보인다.
@@ -45,16 +41,7 @@ export function DataKeyList() {
   return (
     <ul className="flex min-w-0 flex-col">
       {rows.map((row) => (
-        <li key={row.source} className="flex min-w-0 flex-col gap-0.5 border-b border-line py-2 last:border-b-0">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-            <span className="text-sm text-ink">{row.source}</span>
-            <span className="min-w-0 break-all font-mono text-2xs text-ink-muted">{row.setting}</span>
-            <span className={row.filled ? "text-2xs text-ink" : "text-2xs text-danger"}>
-              {row.filled ? "설정됨" : "없음"}
-            </span>
-          </div>
-          {row.guidance && <p className="min-w-0 break-keep text-2xs text-ink-muted">{row.guidance}</p>}
-        </li>
+        <DataKeyRow key={row.source} row={row} onSaved={load} />
       ))}
     </ul>
   );

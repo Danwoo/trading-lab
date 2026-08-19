@@ -21,3 +21,29 @@ interface DataKeyStatusListOut {
 export const selectDataKeyStatus = async (): Promise<DataKeyStatusListOut | null> => {
   return apiCall<DataKeyStatusListOut>(BASE_URL, { method: "GET" });
 };
+
+export interface DataKeyProbe {
+  /** 키가 통했는가. */
+  ok: boolean;
+  /** 실제로 물어봤는가 — 확인 호출이 없는 소스는 `false` 다(「실패」와 다르다). */
+  checked: boolean;
+  /** 사람이 읽을 사유. **값을 담지 않는다.** */
+  detail: string;
+}
+
+export interface DataKeySaved {
+  source: string;
+  setting: string;
+  action: string;
+  restart_required: boolean;
+}
+
+/** 넣으려는 값으로 소스에 한 번 물어본다 — **저장 전에** 확인한다. */
+export const probeDataKey = async (source: string, value: string): Promise<DataKeyProbe | null> => {
+  return apiCall<DataKeyProbe>(`${BASE_URL}/probe`, { method: "POST", data: { source, value } });
+};
+
+/** 키를 그 서비스의 `.env` 에 쓴다 — 로컬 개발에서만 열린다. */
+export const saveDataKey = async (source: string, value: string): Promise<DataKeySaved | null> => {
+  return apiCall<DataKeySaved>(BASE_URL, { method: "PUT", data: { source, value } });
+};

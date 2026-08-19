@@ -23,4 +23,22 @@ const getHandler = async (req: NextRequest, session: any) => {
   }
 };
 
+// [PUT] 키를 그 서비스의 `.env` 에 쓴다 — 로컬 개발에서만 열린다(백엔드가 판정)
+const putHandler = async (req: NextRequest, session: any) => {
+  const operation = "PUT";
+
+  try {
+    const result = await proxyApiRequest(BACKEND_URL, {
+      method: operation,
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+      data: await req.json(),
+    });
+
+    return createSuccessResponse(result, operation);
+  } catch (error) {
+    return createErrorResponse(error, operation);
+  }
+};
+
 export const GET = withAuth(getHandler);
+export const PUT = withAuth(putHandler);

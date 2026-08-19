@@ -14,8 +14,9 @@ export default function Page() {
       <section aria-label="데이터 소스 키" className="min-w-0 border border-line px-3 py-2">
         <h2 className="text-sm text-ink">데이터 소스 키</h2>
         <p className="mt-1 break-keep text-2xs text-ink-muted">
-          지금은 상태만 보입니다 — 넣으려면 해당 서비스의 <code className="font-mono">.env</code> 를 고치고
-          재기동하세요. 화면에서 넣는 길은 준비 중입니다.
+          값을 넣고 저장하면 <code className="font-mono">.env</code> 에 그 한 줄만 갈립니다 —{" "}
+          <strong className="font-normal text-ink">반영에는 재기동이 필요합니다</strong>. 저장 전에 「연결 확인」으로 그
+          키가 통하는지 볼 수 있습니다. 넣은 값은 저장 뒤 화면에 남지 않습니다.
         </p>
         <div className="mt-2">
           <DataKeyList />

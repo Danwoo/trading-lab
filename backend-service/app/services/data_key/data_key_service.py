@@ -25,7 +25,13 @@
 절반은 "어댑터가 `settings.` 를 읽는 것"이고, 자격 주입의 소유자는 언제나 이 자리다.
 """
 
+import datetime as _dt
+from pathlib import Path
+
+from core.exceptions import BadRequestError, ForbiddenError, HTTPError
 from core.logger import logger
+from providers import get_provider
+from utils.env_file.env_writer import EnvWriteRejected, set_env_value
 from utils.redaction.redactor import install_log_redaction, register_secret
 
 # 소스 → `.env` 설정 이름. 이 표가 「어느 키가 어느 소스로 가나」의 유일한 정의다.
@@ -47,6 +53,9 @@ KEY_ACQUISITION_HINT: dict[str, str] = {
 }
 
 # 비밀이 아니라 "우리가 누구인지"인 소스 — settings 의 연락처 문자열을 그대로 넘긴다.
+#: 「연결 확인」이 물어보는 구간 — 짧게 잡는다. 키가 통하는지만 보는 호출이다.
+PROBE_WINDOW_DAYS = 7
+
 NON_SECRET_CONTACT_SOURCES = ("sec",)
 CONTACT_SETTING = "MARKET_DATA_CONTACT"
 
@@ -112,6 +121,122 @@ class DataKeyService:
             for source in NON_SECRET_CONTACT_SOURCES
         )
         return rows
+
+    # `.env` 를 쓰는 것은 **로컬판 전용**이다 (결정 로그 2026-08-19 — 앱이 파일을 쓰므로
+    # 호스팅에서는 쓰기 권한을 주지 않는다). 모르는 환경은 막는다 — fail-closed 다.
+    WRITABLE_APP_ENV = "development"
+
+    def can_write_keys(self) -> bool:
+        """이 설치에서 화면이 키를 넣을 수 있는가. **모르면 False** 다."""
+        return (getattr(self.config, "APP_ENV", "") or "").strip() == self.WRITABLE_APP_ENV
+
+    def _env_path(self) -> Path:
+        """이 서비스의 `.env` — 설정이 읽는 그 파일이다.
+
+        경로를 요청이 정하지 못한다. `core/config.py` 가 `env_file=f".env.{APP_ENV}"` 를
+        **cwd 상대**로 읽으므로 같은 규칙으로 만든다 (기동은 언제나 `app` 에서 한다).
+        """
+        return Path.cwd() / f".env.{self.WRITABLE_APP_ENV}"
+
+    def save_key(self, source: str, value: str) -> dict:
+        """소스의 키를 이 서비스의 `.env` 에 쓴다 — **변수 이름은 표에서 꺼낸다.**
+
+        요청은 소스 id 와 값만 준다. 파일 경로도 변수 이름도 요청이 정하지 못하므로, 경로
+        조작이나 임의 변수 덮어쓰기가 도달할 수 없다.
+
+        되돌릴 사본을 남기지 않으므로(백업 미사용 판정) 쓰기는 최소다 — 그 경계는
+        `utils/env_file/env_writer.py` 가 지킨다.
+        """
+        if not self.can_write_keys():
+            raise ForbiddenError("이 설치에서는 화면으로 키를 넣을 수 없습니다 — 로컬 개발에서만 열립니다")
+
+        setting = self._writable_setting(source)
+        cleaned = value.strip()
+        if not cleaned:
+            raise BadRequestError("값이 비어 있습니다 — 지우려면 .env 에서 직접 지우세요")
+
+        try:
+            action = set_env_value(self._env_path(), setting, cleaned)
+        except EnvWriteRejected as exc:
+            # 사유는 값을 담지 않는다 (`env_writer` 의 계약) — 그대로 화면에 낸다.
+            raise BadRequestError(str(exc)) from exc
+
+        register_secret(cleaned)
+        logger.info(f"데이터 소스 키 저장 — source={source} setting={setting} action={action}")
+        return {"source": source, "setting": setting, "action": action, "restart_required": True}
+
+    def _writable_setting(self, source: str) -> str:
+        """쓸 수 있는 변수 이름. **표에 없으면 거부한다** — 요청이 이름을 정하지 못한다."""
+        if source in NON_SECRET_CONTACT_SOURCES:
+            return CONTACT_SETTING
+        setting = SOURCE_KEY_SETTINGS.get(source)
+        if setting is None:
+            raise BadRequestError(f"{source} 는 화면에서 키를 넣을 수 있는 소스가 아닙니다")
+        return setting
+
+    # 「연결 확인」이 무엇으로 물어볼지. **시장마다 확실히 상장돼 있는 종목** 하나면 된다 —
+    # 값이 맞는지가 아니라 **키가 통하는지**만 보는 호출이다.
+    PROBE_SYMBOL_BY_MARKET: dict[str, str] = {
+        "KOSPI": "005930",
+        "KOSDAQ": "005930",
+        "KONEX": "005930",
+        "NASDAQ": "AAPL",
+        "NYSE": "AAPL",
+        "AMEX": "AAPL",
+    }
+
+    async def probe_key(self, source: str, value: str) -> dict:
+        """**넣으려는 값으로** 소스에 한 번 물어본다 — 저장 전에 확인할 수 있게.
+
+        설정에서 읽지 않고 인자로 받는 이유: 방금 `.env` 에 쓴 값은 재기동 전까지 설정에
+        안 들어온다. 값을 그대로 태우면 「저장했는데 되는지 모른다」가 안 생긴다.
+
+        호출은 **한 번**이고 결과는 통했는지·왜 안 통했는지뿐이다. 값은 응답·로그에 없다.
+        """
+        if not self.can_write_keys():
+            raise ForbiddenError("이 설치에서는 화면으로 키를 확인할 수 없습니다 — 로컬 개발에서만 열립니다")
+
+        self._writable_setting(source)  # 표에 없는 소스를 먼저 거부한다
+        cleaned = value.strip()
+        if not cleaned:
+            raise BadRequestError("확인할 값이 없습니다")
+        register_secret(cleaned)
+
+        try:
+            provider = get_provider(source, cleaned)
+        except HTTPError:
+            # 키는 쓰는데 시세 어댑터가 없는 소스가 있다 (`openfigi` — 종목 마스터 보조용).
+            # 그런 소스는 확인할 호출이 없다. 404 를 화면에 내면 「고장」으로 읽힌다.
+            return {"ok": False, "checked": False, "detail": f"{source} 는 확인 호출이 없는 소스입니다 — 저장만 됩니다"}
+
+        target = self._probe_target(provider)
+        if target is None:
+            return {"ok": False, "checked": False, "detail": f"{source} 는 확인 호출이 없는 소스입니다 — 저장만 됩니다"}
+
+        market, symbol = target
+        date_to = _dt.date.today()
+        date_from = date_to - _dt.timedelta(days=PROBE_WINDOW_DAYS)
+        try:
+            bars = await provider.fetch_daily(symbol, market, date_from, date_to)
+        except HTTPError as exc:
+            # 어댑터가 만든 사유는 사람이 읽을 문장이고 값을 담지 않는다 (`ProviderKeyMissing` 등).
+            return {"ok": False, "checked": True, "detail": str(exc)}
+        except Exception as exc:  # noqa: BLE001 — 어떤 실패든 화면에 사유가 있어야 한다
+            logger.warning(f"키 확인 호출 실패 — source={source} error={type(exc).__name__}")
+            return {"ok": False, "checked": True, "detail": f"확인 호출이 실패했습니다 ({type(exc).__name__})"}
+
+        # 빈 응답도 실패가 아니다 — 주말·휴장이면 봉이 없을 수 있다. 키가 막혔으면 위에서 던진다.
+        return {"ok": True, "checked": True, "detail": f"{market} {symbol} 로 확인했습니다 (봉 {len(bars)}개)"}
+
+    def _probe_target(self, provider) -> tuple[str, str] | None:
+        """이 어댑터가 일봉을 주는 첫 시장과 그 시장의 확인용 종목."""
+        for capability in provider.capabilities():
+            if capability.data_kind != "daily_bar" or not capability.available:
+                continue
+            symbol = self.PROBE_SYMBOL_BY_MARKET.get(capability.market.upper())
+            if symbol:
+                return capability.market, symbol
+        return None
 
     def unavailable_reason(self, source: str) -> str:
         """키가 없는 이유 + 리드가 무엇을 하면 열리는지. 화면이 그대로 보여줄 문장이다.
