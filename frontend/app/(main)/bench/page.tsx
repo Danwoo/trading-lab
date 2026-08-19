@@ -21,6 +21,7 @@ import {
 } from "@/stores/shell/benchSelectionStore";
 import type { Provenance } from "@/types/terminal/provenance";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
+import { ProductStages } from "@/components/features/Bench/ProductStages";
 
 /** 좁은 화면에서 하나씩 보여주는 둘 (§21.6 「보드가 먼저 양보한다」) */
 const TABBED_ZONE_IDS = ["grid", "curve"] as const;
@@ -173,9 +174,13 @@ export default function Page() {
       <header className="min-w-0">
         <h1 className="break-keep text-base font-title text-ink-strong">실험대</h1>
         <p className="mt-1 break-keep text-sm text-ink-muted">
-          봇을 만들고 검증하고 굴리는 자리입니다. 아래 넷이 이 화면에 상시로 놓입니다.
+          봇을 만들고 조건을 다듬는 자리입니다. 아래 넷이 이 화면에 상시로 놓입니다.
+          <br />
+          검증(백테스트)과 굴리기(주문)는 아직 없습니다 — 무엇이 언제 오는지는 아래에 적어 두었습니다.
         </p>
       </header>
+
+      <ProductStages />
 
       <QuoteFreshnessBanner />
 
