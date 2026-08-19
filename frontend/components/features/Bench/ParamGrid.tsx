@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { GridCellOut, GridOut } from "@/schemas/backtest/backtest";
 import { cn } from "@/components/shared/ui/primitives/cn";
+import { redactReason } from "@/utils/common/errors/redactReason";
 
 interface Props {
   grid: GridOut;
@@ -92,7 +93,11 @@ function Cell({
       <button
         type="button"
         onClick={() => onSelect(cell.run_id, label)}
-        title={failed ? (cell.failed_reason ?? undefined) : `${spec.label} 값이 없습니다 — 눌러서 이유를 보세요`}
+        title={
+          failed
+            ? (redactReason(cell.failed_reason) ?? undefined)
+            : `${spec.label} 값이 없습니다 — 눌러서 이유를 보세요`
+        }
         aria-label={`${label} — ${failed ? "실패" : `${spec.label} 없음`}`}
         className={cn(
           "min-h-[26px] w-full min-w-0 break-keep rounded-badge px-1 py-0.5 text-2xs",

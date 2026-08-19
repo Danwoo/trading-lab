@@ -5,6 +5,7 @@ import { createEquityChart, type EquityChartHandle, type EquityChartPoint } from
 import { downsampleLttb, drawdownRatios } from "@/lib/bench/equityMath";
 import type { MetricOut, RunReportOut, TradeOut } from "@/schemas/backtest/backtest";
 import { cn } from "@/components/shared/ui/primitives/cn";
+import { redactReason } from "@/utils/common/errors/redactReason";
 
 /** 등락 숫자 하나 — 부호를 항상 함께 그린다 (디자인 시스템 §2.3). */
 function SignedPct({ value, unit }: { value: number; unit: string }) {
@@ -46,7 +47,7 @@ function MetricsList({ metrics }: { metrics: MetricOut[] }) {
           </dt>
           <dd className="min-w-0 text-right">
             {metric.value === null ? (
-              <span className="break-keep text-sm text-ink-muted">{metric.absent_reason}</span>
+              <span className="break-keep text-sm text-ink-muted">{redactReason(metric.absent_reason)}</span>
             ) : (
               <span className="text-sm text-ink tabular-nums">{formatMetricValue(metric)}</span>
             )}
@@ -183,7 +184,7 @@ export function RunReportView({ report }: { report: RunReportOut }) {
 
       {run.status === "failed" ? (
         <p className="break-keep border border-danger p-2 text-sm text-ink" role="alert">
-          이 조합은 실패했습니다 — {run.failed_reason ?? "사유가 남지 않았습니다"}
+          이 조합은 실패했습니다 — {redactReason(run.failed_reason) ?? "사유가 남지 않았습니다"}
         </p>
       ) : (
         <>
