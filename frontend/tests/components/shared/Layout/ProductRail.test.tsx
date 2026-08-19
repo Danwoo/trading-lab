@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event";
 
 import { ProductRail } from "@/components/shared/Layout/ProductRail";
 import { RAIL_ITEMS } from "@/constants/shell";
+import { MARKET_PATH } from "@/constants/routes";
 
 const push = vi.fn();
 let pathname = "/bench";
@@ -209,5 +210,17 @@ describe("ProductRail — 이동 중임이 보인다 (#229)", () => {
 
     expect(button.getAttribute("aria-busy")).toBeNull();
     expect(showToast).toHaveBeenCalledOnce();
+  });
+
+  it("이미 그 화면에 있으면 바쁜 상태로 굳지 않는다", async () => {
+    const user = userEvent.setup();
+    pathname = MARKET_PATH;
+    render(<ProductRail openPanelId={null} onTogglePanel={vi.fn()} panelRegionId="product-panel" />);
+
+    const button = screen.getByRole("button", { name: "시세" });
+    await user.click(button);
+
+    // 경로가 안 바뀌면 도착 신호도 안 온다 — 바쁘다고 켜면 영영 안 꺼진다.
+    expect(button.getAttribute("aria-busy")).toBeNull();
   });
 });

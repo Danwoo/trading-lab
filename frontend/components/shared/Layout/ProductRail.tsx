@@ -71,6 +71,10 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
       showToast(item.pending, "info");
       return;
     }
+    // 이미 그 화면이면 아무 데도 안 간다 — 그래도 바쁘다고 켜면 도착 신호(경로 변경)가
+    // 영영 안 와서 「계속 로딩 중」이 굳는다. 반응이 없는 것보다 끝나지 않는 반응이 나쁘다.
+    if (isRouteActive(item)) return;
+
     const path = item.path;
     setNavigatingTo(item.id);
     startNavigation(() => router.push(path));
