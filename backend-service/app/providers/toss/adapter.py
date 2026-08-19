@@ -1,15 +1,16 @@
-"""토스증권 어댑터 — 국내(KRX) 일봉·분봉·마스터의 소스 (운영 규약 0.0.3).
+"""토스증권 어댑터 — 국내(KRX) 일봉·분봉·마스터의 소스.
 
-**실호출 미검증** — 자격증명 한쪽이 아직 없다. 사양(openapi.json) 기준 구현이며 실측 대조는
-자격 완성 뒤의 일이다. `capabilities()` 가 그 상태를 credential_missing 으로 정직하게 낸다.
+실호출로 대조했다 (2026-08-19, IP 허용 후): 캔들 `timestamp` 에 `+09:00` 이 붙고 가격·거래량은
+문자열이며, `stocks/all` 은 KOSPI 2,476 · KOSDAQ 1,824 행을 `symbol·name·securityType·
+isCommonShare·isinCode` 로 준다(market·currency 없음 — 요청 컨텍스트에서 채운다).
 
 시세(quote)는 선언하지 않는다 — `/api/v1/prices` 응답이 `symbol·timestamp·lastPrice·currency`
-뿐이라(사양) `NormalizedQuote` 가 요구하는 등락·등락률·거래량을 채울 수 없다. 없는 값을 0 으로
-채워 파는 것보다 「못 준다」가 낫다(FR-021).
+뿐이라 `NormalizedQuote` 가 요구하는 등락·등락률·거래량을 채울 수 없다(실측 확인). 없는 값을
+0 으로 채워 파는 것보다 「못 준다」가 낫다(FR-021).
 
-국내 종목 마스터를 available 로 선언한다 — MD-AD-17(시장마다 정본 하나)의 현 정본은
-data_go_kr 이지만 그 키가 없는 설치에서 토스 키만으로 마스터를 채울 수 있어야 한다.
-두 소스가 함께 키를 갖는 설치에서의 정본 판정은 결정 대기(Cycle 0 결정 묶음).
+**국내 마스터의 정본은 토스다** — 제품 정의 §7(리드 확정 2026-08-19) 이 "브로커·시세는 토스증권
+Open API 단일" 이라고 못박는다. data_go_kr 은 빈 구간을 채우는 쪽이다(MD-AD-17). 미국 마스터는
+SEC 가 정본이라 여기서 내지 않는다.
 """
 
 from __future__ import annotations
@@ -70,7 +71,9 @@ class TossProvider:
         for market in KR_MARKETS + US_MARKETS:
             is_kr = market in KR_MARKETS
             if is_kr:
-                master = (False, not_canonical_reason("국내 종목 마스터", "data_go_kr"))
+                # 국내는 토스가 정본이다 — 제품 정의 §7(리드 확정 2026-08-19): "브로커·시세는
+                # 토스증권 Open API 단일". data_go_kr 은 빈 구간을 채우는 쪽이다 (MD-AD-17).
+                master = (key_reason is None, key_reason)
             else:
                 master = (False, not_canonical_reason("미국 종목 마스터", "SEC"))
             for kind, (ok, reason) in {
