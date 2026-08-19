@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import datetime as dt
-import os
 import sys
 from pathlib import Path
 
@@ -26,21 +25,7 @@ _APP_DIR = Path(__file__).resolve().parent.parent / "app"
 if str(_APP_DIR) not in sys.path:
     sys.path.insert(0, str(_APP_DIR))
 
-os.environ.setdefault("APP_ENV", "calendar-corrections-check")
-for _name, _value in {
-    "BACKEND_SQL_DB_DRIVER": "postgresql+psycopg",
-    "BACKEND_SQL_DB_HOST": "localhost",
-    "BACKEND_SQL_DB_PORT": "5432",
-    "BACKEND_SQL_DB_NAME": "test",
-    "BACKEND_SQL_DB_USER": "test",
-    "BACKEND_SQL_DB_PASSWORD": "test",
-    "SFTP_HOST": "localhost",
-    "SFTP_PORT": "22",
-    "SFTP_USERNAME": "test",
-    "SFTP_PASSWORD": "test",
-    "JWT_SECRET": "test-secret",
-}.items():
-    os.environ.setdefault(_name, _value)
+# `core.calendar` 는 `core.config` 를 안 탄다 — 설정 더미가 필요 없다.
 
 import exchange_calendars as xcals  # noqa: E402
 from core.calendar import EXTRA_CLOSURES  # noqa: E402
@@ -76,14 +61,28 @@ def main() -> int:
                     f" (exchange_calendars {xcals.__version__})"
                 )
 
-        # 한 해를 통째로 지우는 실수 방어 — 보정 뒤에도 거래일이 충분히 남아야 한다
+        # 한 해를 통째로 지우는 실수 방어 — 보정 뒤에도 거래일이 충분히 남아야 한다.
+        #
+        # **고정 200일로 재지 않는다.** 캘린더 상한은 유한하고 시간과 함께 움직여, 다음 해
+        # 날짜를 미리 넣는 「연 1회 갱신」에서는 그 해가 **부분 수록**이다 — 고정 하한이면
+        # 정상 갱신을 「보정이 과합니다」로 오탐한다. 창의 실제 길이 대비 비율로 잰다.
         for year in sorted({day.year for day in days}):
             start = max(dt.date(year, 1, 1), first)
             end = min(dt.date(year, 12, 31), last)
+            if start > end:
+                print(f"  {code} {year}년: 캘린더 수록 범위({first}~{last}) 밖이라 잔여 거래일 검사를 건너뜁니다")
+                continue
             sessions = [ts.date() for ts in calendar.sessions_in_range(start, end)]
+            if not sessions:
+                continue
             remaining = [day for day in sessions if day not in days]
-            if len(remaining) < 200:
-                failures.append(f"{code} {year}년: 보정 뒤 거래일이 {len(remaining)}일뿐입니다 — 보정이 과합니다")
+            partial = (start, end) != (dt.date(year, 1, 1), dt.date(year, 12, 31))
+            if len(remaining) < len(sessions) * 0.9:
+                scope = "부분 수록" if partial else "전체"
+                failures.append(
+                    f"{code} {year}년({scope} {start}~{end}): 세션 {len(sessions)}일 중 {len(sessions) - len(remaining)}일을"
+                    f" 뺐습니다 — 보정이 과합니다"
+                )
 
     print(f"보정 대상 {checked}건 · 캘린더 {len(EXTRA_CLOSURES)}종 (exchange_calendars {xcals.__version__})")
     for code, days in sorted(EXTRA_CLOSURES.items()):
