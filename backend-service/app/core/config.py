@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     MARKET_DATA_ALPACA_KEY: str = ""
     # 없어도 동작한다 — 있으면 OpenFIGI 배치 한도만 올라간다.
     MARKET_DATA_OPENFIGI_KEY: str = ""
+    # 토스증권 Open API — OAuth2 Client Credentials 쌍 (data_key_service 가 합성 주입)
+    TOSS_CLIENT_ID: str = ""
+    TOSS_CLIENT_SECRET: str = ""
+    # 주문 계열 호출 개폐 — 가드(providers/toss/live_guard.py)는 이 값을 **환경변수로 직접** 읽는다
+    # (설정 배관과 독립인 마지막 방어층). 기본 닫힘이며 기본값 변경은 리드 승인 사항이다.
+    TRADING_LIVE_ENABLED: bool = False
 
     # doc-search-mcp-service (리서치 문서 인제스트·청크 회수 — 내부 서비스 토큰 호출)
     DOC_SEARCH_SERVICE_URL: str = "http://localhost:8008"

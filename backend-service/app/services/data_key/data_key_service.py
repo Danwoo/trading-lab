@@ -51,11 +51,17 @@ KEY_ACQUISITION_HINT: dict[str, str] = {
     "data_go_kr": "공공데이터포털(data.go.kr) 금융위원회 주식시세정보 활용신청 → 일반 인증키(Encoding)",
     "alpaca": "Alpaca 계정(paper) → API Keys → 'KEYID:SECRET' 형식으로 한 줄",
     "openfigi": "OpenFIGI(openfigi.com) → Request an API Key. 없어도 동작하며 배치 한도만 낮다",
+    "toss": "developers.tossinvest.com → 앱 등록 → client_id 와 client_secret 두 값",
 }
 
 # 비밀이 아니라 "우리가 누구인지"인 소스 — settings 의 연락처 문자열을 그대로 넘긴다.
 #: 「연결 확인」이 물어보는 구간 — 짧게 잡는다. 키가 통하는지만 보는 호출이다.
 PROBE_WINDOW_DAYS = 7
+
+# 자격이 **두 값의 합성**인 소스 — 어댑터에는 `"<앞>:<뒤>"` 한 줄로 넘긴다 (alpaca 관례).
+COMPOSITE_KEY_SETTINGS: dict[str, tuple[str, str]] = {
+    "toss": ("TOSS_CLIENT_ID", "TOSS_CLIENT_SECRET"),
+}
 
 NON_SECRET_CONTACT_SOURCES = ("sec",)
 CONTACT_SETTING = "MARKET_DATA_CONTACT"
@@ -79,6 +85,16 @@ class DataKeyService:
         """어댑터에 넘길 자격 문자열. 비어 있으면 `None` — 어댑터가 사유를 들고 스스로 막는다."""
         if source in NON_SECRET_CONTACT_SOURCES:
             return (getattr(self.config, CONTACT_SETTING, "") or "").strip() or None
+
+        composite = COMPOSITE_KEY_SETTINGS.get(source)
+        if composite is not None:
+            first, second = ((getattr(self.config, name, "") or "").strip() for name in composite)
+            if not (first and second):
+                logger.debug(f"데이터 소스 키 조회 — workspace={workspace_id} source={source}: 합성 자격 미완성")
+                return None
+            value = f"{first}:{second}"
+            register_secret(second)
+            return value
 
         setting = SOURCE_KEY_SETTINGS.get(source)
         if setting is None:
@@ -112,6 +128,17 @@ class DataKeyService:
             }
             for source, setting in SOURCE_KEY_SETTINGS.items()
         ]
+        rows.extend(
+            {
+                "source": source,
+                "setting": name,
+                "filled": bool((getattr(self.config, name, "") or "").strip()),
+                "secret": True,
+                "guidance": KEY_ACQUISITION_HINT.get(source),
+            }
+            for source, names in COMPOSITE_KEY_SETTINGS.items()
+            for name in names
+        )
         rows.extend(
             {
                 "source": source,
@@ -258,6 +285,12 @@ class DataKeyService:
         """
         if source in NON_SECRET_CONTACT_SOURCES:
             return f".env 의 {CONTACT_SETTING} 에 연락처를 채우세요 (비밀값이 아닙니다 — 소스가 우리를 식별하는 문자열)"
+
+        composite = COMPOSITE_KEY_SETTINGS.get(source)
+        if composite is not None:
+            hint = KEY_ACQUISITION_HINT.get(source)
+            reason = f".env 의 {composite[0]}·{composite[1]} 이 다 있어야 합니다"
+            return f"{reason}. 발급 경로: {hint}" if hint else reason
 
         setting = SOURCE_KEY_SETTINGS.get(source)
         if setting is None:
