@@ -114,6 +114,33 @@ class BacktestRepository:
             row = conn.execute(text(sql), {"run_id": run_id}).mappings().first()
             return dict(row) if row else None
 
+    def select_runs_by_bot(self, bot_id: int, workspace_id: int, limit: int) -> list[dict]:
+        """한 봇의 실행 이력. 워크스페이스를 SQL 에서 함께 좁힌다 — 남의 봇 번호를 넣어도 빈 목록이다."""
+        sql = """
+            SELECT run_id, status, strategy_key, universe_def, period_from, period_to
+                 , attempt_no, parent_run_id, finished_dt
+              FROM tn_backtest_run
+             WHERE bot_id = :bot_id
+               AND workspace_id = :workspace_id
+             ORDER BY run_id DESC
+             LIMIT :limit
+        """
+        params = {"bot_id": bot_id, "workspace_id": workspace_id, "limit": limit}
+        with self.sql_client.connect() as conn:
+            return [dict(r) for r in conn.execute(text(sql), params).mappings()]
+
+    def count_runs_by_bot(self, bot_id: int, workspace_id: int) -> int:
+        """`LIMIT` 뒤 건수는 총수가 아니다 — 한 페이지만 보고 「이 봇은 3번 검증했다」고 말하면 거짓이 된다."""
+        sql = """
+            SELECT COUNT(*) AS total
+              FROM tn_backtest_run
+             WHERE bot_id = :bot_id
+               AND workspace_id = :workspace_id
+        """
+        params = {"bot_id": bot_id, "workspace_id": workspace_id}
+        with self.sql_client.connect() as conn:
+            return int(conn.execute(text(sql), params).scalar_one())
+
     def select_equity_curve(self, run_id: int) -> list[dict]:
         sql = """
             SELECT dt, equity, cash, position_count, gross_exposure

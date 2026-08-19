@@ -18,6 +18,7 @@ import {
 } from "./botFormModel";
 import { cn } from "@/components/shared/ui/primitives/cn";
 import type { StrategyForm } from "@/schemas/bot/bot";
+import { BotRunHistory } from "@/components/features/Bot/BotRunHistory";
 
 interface Props {
   /** 없으면 새 봇, 있으면 저장된 봇을 열어 고친다. */
@@ -204,6 +205,8 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
           <Button text={isSaving ? "저장 중…" : "저장"} disabled={isSaving || isLoading} onClick={handleSave} />
         </div>
       </header>
+
+      {botId !== undefined && <BotRunHistory botId={botId} />}
 
       {loadError && (
         <p role="status" className="border border-line px-3 py-2 text-sm text-ink">

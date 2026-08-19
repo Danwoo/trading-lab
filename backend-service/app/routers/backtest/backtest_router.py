@@ -9,8 +9,15 @@ from core.authorization import ROLE_ADMIN, ROLE_OPERATOR, require_role, require_
 from core.container import Container
 from core.security import verify_access_token
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends
-from schemas.backtest.backtest_schema import BacktestGridIn, BacktestRunIn, GridOut, RunCreatedOut, RunReportOut
+from fastapi import APIRouter, Depends, Query
+from schemas.backtest.backtest_schema import (
+    BacktestGridIn,
+    BacktestRunIn,
+    BotRunListOut,
+    GridOut,
+    RunCreatedOut,
+    RunReportOut,
+)
 from services.backtest.backtest_service import BacktestService
 
 router = APIRouter(prefix="/backtest-run", tags=["backtest-run"])
@@ -46,6 +53,26 @@ def insert_backtest_grid(
     args["workspace_id"] = get_workspace_id()
     args["reg_id"] = get_email()
     return GridOut(**backtest_service.run_grid(args))
+
+
+@router.get(
+    "/by-bot/{bot_id}",
+    response_model=BotRunListOut,
+    dependencies=[Depends(verify_access_token), Depends(require_user)],
+    operation_id="select_backtest_runs_by_bot",
+)
+@inject
+def select_backtest_runs_by_bot(
+    bot_id: int,
+    limit: int = Query(default=20, ge=1, le=100),
+    backtest_service: BacktestService = Depends(Provide[Container.backtest_service]),
+):
+    """한 봇의 검증 이력. `/{run_id}` 보다 위에 둔다 — 아래 두면 `by-bot` 이 run_id 로 먹힌다."""
+    return BotRunListOut(
+        **backtest_service.select_runs_by_bot(
+            {"bot_id": bot_id, "workspace_id": get_workspace_id(), "limit": limit}
+        )
+    )
 
 
 @router.get(

@@ -351,13 +351,63 @@ def main() -> int:
     check("수익률도 함께 (4급이지만 버리지 않는다)", "total_return_pct" in cm, True)
     check("최장 미회복 기간이 숫자다", isinstance(cm["longest_underwater"], float), True)
 
+    # ── 봇 고리 (#232) — 봇 번호가 실행에 남고, 그 봇의 이력으로 조회되는가 ───
+    # 「만들고 → 검증하고 → 굴린다」의 가운데를 잇는 유일한 고리다. 늘 NULL 이면 봇 화면이
+    # 자기 검증 이력을 못 찾는다.
+    BOT_ID = 90210
+    bot_run = service.run(
+        {
+            "workspace_id": 4242,
+            "strategy_key": "fixture",
+            "market": "KR",
+            "symbol": "TEST",
+            "period_from": "2026-01-01",
+            "period_to": "2026-01-04",
+            "initial_cash": 1000,
+            "bot_id": BOT_ID,
+            "costs": {"fee_rate": 0.0, "slippage_rate": 0.0, "sell_tax_rate": 0.0},
+        }
+    )
+    stored = service.backtest_repository.select_run(bot_run["run_id"])
+    check("봇 번호가 실행에 저장된다", stored["bot_id"], BOT_ID)
+
+    history = service.select_runs_by_bot({"bot_id": BOT_ID, "workspace_id": 4242, "limit": 20})
+    check("그 봇의 이력으로 조회된다", history["total_count"], 1)
+    check("이력이 그 실행이다", history["items"][0]["run_id"], bot_run["run_id"])
+    check("기간이 문자열로 온다", isinstance(history["items"][0]["period_from"], str), True)
+
+    other = service.select_runs_by_bot({"bot_id": BOT_ID, "workspace_id": 9999, "limit": 20})
+    check("남의 워크스페이스에서는 빈 목록이다", other["total_count"], 0)
+
+    none_bot = service.select_runs_by_bot({"bot_id": 999_999, "workspace_id": 4242, "limit": 20})
+    check("없는 봇도 빈 목록이다", none_bot["total_count"], 0)
+
+    # 총수는 LIMIT 뒤 건수가 아니다 — 한 페이지만 보고 「이 봇은 1번 검증했다」고 말하면 거짓이다.
+    for _ in range(2):
+        service.run(
+            {
+                "workspace_id": 4242,
+                "strategy_key": "fixture",
+                "market": "KR",
+                "symbol": "TEST",
+                "period_from": "2026-01-01",
+                "period_to": "2026-01-04",
+                "initial_cash": 1000,
+                "bot_id": BOT_ID,
+                "costs": {"fee_rate": 0.0, "slippage_rate": 0.0, "sell_tax_rate": 0.0},
+            }
+        )
+    paged = service.select_runs_by_bot({"bot_id": BOT_ID, "workspace_id": 4242, "limit": 1})
+    check("한 페이지만 온다", len(paged["items"]), 1)
+    check("총수는 페이지 건수가 아니다", paged["total_count"], 3)
+
     # 정리 — 전용 스키마째 지운다.
     with admin.begin() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (REQUIRE=db 실행됨)")
 
-    if CHECKED < 54:
+    if CHECKED < 63:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:

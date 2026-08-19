@@ -113,6 +113,25 @@ class RunSummaryOut(BaseModel):
     finished_dt: str | None
 
 
+class BotRunOut(BaseModel):
+    """봇 이력의 한 줄 — 목록에 필요한 것만. 곡선·거래는 칸을 눌러 리포트로 간다."""
+
+    run_id: int
+    status: str
+    strategy_key: str
+    universe_def: dict[str, Any]
+    period_from: str
+    period_to: str
+    attempt_no: int
+    parent_run_id: int | None
+    finished_dt: str | None
+
+
+class BotRunListOut(BaseModel):
+    items: list[BotRunOut]
+    total_count: int
+
+
 class RunReportOut(BaseModel):
     """한 조합의 리포트 — 곡선·거래·지표가 한 번에 온다 (칸 클릭은 계산이 아니라 조회다)."""
 

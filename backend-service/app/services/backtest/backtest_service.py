@@ -437,6 +437,23 @@ class BacktestService:
             "trades": self.backtest_repository.select_trades(run_id),
         }
 
+    def select_runs_by_bot(self, args: dict) -> dict:
+        """봇 하나의 검증 이력. 「만들고 → 검증하고 → 굴린다」의 가운데를 화면이 잇는 근거다."""
+        rows = self.backtest_repository.select_runs_by_bot(
+            int(args["bot_id"]), int(args["workspace_id"]), int(args["limit"])
+        )
+        items = [
+            {
+                **row,
+                "period_from": str(row["period_from"]),
+                "period_to": str(row["period_to"]),
+                "finished_dt": str(row["finished_dt"]) if row["finished_dt"] else None,
+            }
+            for row in rows
+        ]
+        total = self.backtest_repository.count_runs_by_bot(int(args["bot_id"]), int(args["workspace_id"]))
+        return {"items": items, "total_count": total}
+
     def select_report(self, args: dict) -> dict:
         """한 조합의 리포트 — 곡선·거래에 **지표를 붙여** 낸다 (#203).
 
