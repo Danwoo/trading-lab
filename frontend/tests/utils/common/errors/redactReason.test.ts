@@ -38,6 +38,23 @@ describe("실패 사유는 화면에 URL 을 내보내지 않는다", () => {
     expect(redactReason(`파라미터 ?serviceKey=${KEY} 가 거절됐습니다`)).not.toContain(KEY);
   });
 
+  it("`?` 없이 옮겨 적힌 키도 걷힌다 — 옛 행에는 이 관문뿐이다", () => {
+    for (const stored of [
+      `요청 실패: serviceKey=${KEY}`,
+      `params={'api_key': '${KEY}'}`,
+      `헤더 Authorization: Bearer ${KEY} 가 거절됐습니다`,
+      `ACCESS_TOKEN=${KEY}`,
+    ]) {
+      expect(redactReason(stored)).not.toContain(KEY);
+    }
+  });
+
+  it("키처럼 보이지 않는 등호는 안 건드린다 — 사유 문장이 부서지면 원인이 사라진다", () => {
+    const ours = "적재 구간 period_from=2026-01-02 가 period_to 보다 늦습니다";
+
+    expect(redactReason(ours)).toBe(ours);
+  });
+
   it("우리가 쓴 한국어 사유는 그대로 남는다", () => {
     const ours =
       "toss: 소스가 이 서버의 접근을 막았습니다 (HTTP 403). 발급처 앱 설정에서 이 서버의 IP 를 허용 목록에 등록하세요.";

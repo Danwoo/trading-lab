@@ -17,6 +17,15 @@ const URL_LIKE = /[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^\s'"()<>]+/g;
 const BARE_QUERY = /\?[A-Za-z0-9_%+.-]+=[^\s'"()<>]*/g;
 
 /**
+ * `?` 없이 `키=값` 만 옮겨 적힌 모양 — `serviceKey=…`·`api_key=…`·`access_token=…`.
+ *
+ * 새 행은 저장 시점 가림이 덮지만, **이 관문이 겨냥하는 옛 행에는 여기뿐이다.** 키처럼 보이는
+ * 이름에 한정한다 — 아무 `a=b` 나 지우면 사유 문장이 부서진다.
+ */
+const KEY_ASSIGNMENT =
+  /\b(?:authorization|[A-Za-z0-9_-]*(?:key|token|secret|password|passwd|pwd))['"]?\s*[=:]\s*['"]?(?:bearer\s+)?[A-Za-z0-9_%+./=-]{6,}['"]?/gi;
+
+/**
  * 사유에서 URL·쿼리를 걷는다. **사유 자체는 남긴다** — 통째로 지우면 원인이 사라진다.
  *
  * 지운 자리에 표식을 남기는 이유: 「원래 없었다」와 「우리가 지웠다」를 읽는 사람이 구분해야
@@ -24,6 +33,9 @@ const BARE_QUERY = /\?[A-Za-z0-9_%+.-]+=[^\s'"()<>]*/g;
  */
 export function redactReason(reason: string | null | undefined): string | null {
   if (!reason) return null;
-  const cleaned = reason.replace(URL_LIKE, "[주소 생략]").replace(BARE_QUERY, "[질의 생략]");
+  const cleaned = reason
+    .replace(URL_LIKE, "[주소 생략]")
+    .replace(BARE_QUERY, "[질의 생략]")
+    .replace(KEY_ASSIGNMENT, "[값 생략]");
   return cleaned.trim() || null;
 }
