@@ -20,3 +20,5 @@ __pycache__/
 
 # 어느 깊이의 node_modules 든 (frontend/.gitignore 의 `/node_modules` 는 그 폴더에만 앵커된다)
 node_modules/
+# 사이클 작업 로그 — 레포를 깨끗하게 (0.0 결정 ④, 2026-08-19). 복구 커서는 CONTEXT.md 가 맡는다
+.work/
