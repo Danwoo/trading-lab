@@ -9,7 +9,7 @@ import { useMarketCapabilities } from "@/hooks/terminal/useMarketCapabilities";
 import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
 import { insertIngestRun } from "@/services/terminal/ingestService";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
-import type { IngestRunOut } from "@/schemas/terminal/ingest";
+import type { DataKind, IngestRunOut } from "@/schemas/terminal/ingest";
 import type { MarketCapability } from "@/services/terminal/marketService";
 import { CREDENTIAL_MISSING_CODE } from "@/lib/terminal/marketDataError";
 
@@ -131,6 +131,20 @@ function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; load
   );
 }
 
+/**
+ * 「받음 0행」이 성공처럼 보이지 않게 한다.
+ *
+ * 잡은 성공했는데 한 행도 안 들어온 경우가 실제로 있다 — 종목 마스터에 없는 심볼을 캔들 적재에
+ * 넣으면 서버가 그 심볼을 건너뛰고 `succeeded` 로 끝낸다. 화면이 「받음 · 0행」만 보여 주면
+ * 사용자는 성공했다고 읽고 차트가 왜 비어 있는지 알 길이 없다 (FR-021 — 없는 값을 0 으로 뭉개지 않는다).
+ */
+function emptyReason(run: IngestRunOut): string | null {
+  if (run.status !== "succeeded" || run.written_rows !== 0) return null;
+  if (run.job_kind === "instrument_master") return "받은 종목이 없습니다 — 소스 응답이 비었습니다.";
+  if ((run.skipped_rows ?? 0) > 0) return "종목 마스터에 없는 종목이라 건너뛰었습니다 — 「종목 목록」을 먼저 받으세요.";
+  return "그 구간에 받을 캔들이 없었습니다 (휴장이거나 이미 받은 구간입니다).";
+}
+
 /** 적재 이력 — 어디까지 받았고 무엇이 실패했는지. */
 function Runs({ rows, loading }: { rows: IngestRunOut[] | null; loading: boolean }) {
   if (rows === null) {
@@ -157,6 +171,10 @@ function Runs({ rows, loading }: { rows: IngestRunOut[] | null; loading: boolean
           </span>
           {run.period_to && <span className="font-mono text-ink">~{run.period_to} 까지</span>}
           {run.written_rows !== null && <span className="text-ink-muted">{run.written_rows}행</span>}
+          {run.skipped_rows !== null && run.skipped_rows > 0 && (
+            <span className="text-ink-muted">건너뜀 {run.skipped_rows}</span>
+          )}
+          {emptyReason(run) && <span className="min-w-0 break-keep text-danger">{emptyReason(run)}</span>}
           {run.failed_reason && <span className="min-w-0 break-keep text-danger">{run.failed_reason}</span>}
         </li>
       ))}
@@ -172,9 +190,27 @@ function Runs({ rows, loading }: { rows: IngestRunOut[] | null; loading: boolean
  * 규칙: 그 시장의 캔들을 다루면서 **지금 사용 가능한** 소스 중 첫째. 없으면 `null` —
  * 그때는 버튼이 무엇이 없어서 못 하는지를 말한다.
  */
-function pickSource(rows: MarketCapability[] | null, market: string): string | null {
+function pickSource(rows: MarketCapability[] | null, market: string, dataKind: DataKind): string | null {
   if (rows === null) return null;
-  return rows.find((row) => row.market === market && row.dataKind === "candles" && row.available)?.source ?? null;
+  return rows.find((row) => row.market === market && row.dataKind === dataKind && row.available)?.source ?? null;
+}
+
+/**
+ * 종목 목록을 받을 수 있는 (시장, 소스) — 마스터를 주는 소스가 실제로 열려 있는 곳만.
+ *
+ * **소스를 함께 보인다.** 같은 「종목 목록」이라도 합성 샘플과 실소스는 전혀 다른 것이고,
+ * 시장 이름만 보이면 무엇을 받는지 모른 채 누르게 된다.
+ */
+function mastersAvailable(rows: MarketCapability[] | null): Array<{ market: string; source: string }> {
+  if (rows === null) return [];
+  const seen = new Set<string>();
+  const out: Array<{ market: string; source: string }> = [];
+  for (const row of rows) {
+    if (row.dataKind !== "instrument_master" || !row.available || seen.has(row.market)) continue;
+    seen.add(row.market);
+    out.push({ market: row.market, source: row.source });
+  }
+  return out.sort((a, b) => a.market.localeCompare(b.market));
 }
 
 export function IngestConsole() {
@@ -182,12 +218,19 @@ export function IngestConsole() {
   const [reloadToken, setReloadToken] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; failed: boolean } | null>(null);
+  const [masterMarket, setMasterMarket] = useState("");
+  const [barKind, setBarKind] = useState<DataKind>("daily_bar");
 
   const capabilities = useMarketCapabilities(true);
   const runs = useIngestRuns(reloadToken, true);
   const gaps = useBarGaps(true);
 
-  const source = symbol === null ? null : pickSource(capabilities.data, symbol.market);
+  const source = symbol === null ? null : pickSource(capabilities.data, symbol.market, "daily_bar");
+  const masters = useMemo(() => mastersAvailable(capabilities.data), [capabilities.data]);
+  // 기본값은 **지금 보고 있는 시장** 이다 — 알파벳 첫 시장을 기본으로 두면 관심 없는 시장을 받게 된다.
+  const defaultMarket = masters.find((row) => row.market === symbol?.market)?.market ?? masters[0]?.market ?? "";
+  const chosenMarket = masterMarket || defaultMarket;
+  const masterSource = masters.find((row) => row.market === chosenMarket)?.source ?? null;
 
   /**
    * 적재 버튼이 무엇을 말할까 — **모르는 것을 「없다」고 하지 않는다.**
@@ -205,7 +248,10 @@ export function IngestConsole() {
         : { label: "소스 목록을 읽지 못해 적재할 수 없습니다", disabled: true };
     }
     if (source === null) return { label: `${symbol.market} 를 받을 소스가 없습니다`, disabled: true };
-    return { label: `${symbol.ticker} 일봉 적재 (${source})`, disabled: false };
+    return {
+      label: `${symbol.ticker} ${barKind === "minute_bar" ? "분봉" : "일봉"} 받기 (${source})`,
+      disabled: false,
+    };
   })();
   const missing = gaps.data?.missingDates ?? [];
   const runningNow = useMemo(
@@ -221,7 +267,42 @@ export function IngestConsole() {
     return () => clearInterval(timer);
   }, [runningNow]);
 
-  const start = async () => {
+  /**
+   * 종목 목록(마스터) 받기 — **종목 선택에 매이지 않는 유일한 경로**다.
+   *
+   * 이 자리가 없으면 첫 진입이 순환에 갇힌다: 캔들을 받으려면 종목을 골라야 하고, 종목을
+   * 고르려면 마스터가 있어야 하고, 마스터는 이 잡으로만 채워진다.
+   */
+  const startMaster = async () => {
+    if (!chosenMarket || masterSource === null) {
+      setMessage({ text: "종목 목록을 줄 소스가 없습니다 — 위 「소스」의 사유를 보세요.", failed: true });
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const created = await insertIngestRun({
+        source: masterSource,
+        job_kind: "instrument_master",
+        scope: chosenMarket,
+      });
+      if (created === null) {
+        setMessage({ text: "종목 목록 요청이 받아들여지지 않았습니다.", failed: true });
+        return;
+      }
+      setMessage({
+        text: `${chosenMarket} 종목 목록을 큐에 넣었습니다. 아래 이력에서 진행을 볼 수 있습니다.`,
+        failed: false,
+      });
+      setReloadToken((n) => n + 1);
+    } catch (error) {
+      setMessage({ text: getApiErrorMessage(error), failed: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const start = async (kind: DataKind = "daily_bar") => {
     if (symbol === null) {
       setMessage({ text: "종목을 먼저 고르시면 그 종목을 적재합니다.", failed: true });
       return;
@@ -238,7 +319,7 @@ export function IngestConsole() {
     try {
       const created = await insertIngestRun({
         source,
-        job_kind: "daily_bar",
+        job_kind: kind,
         scope: `${symbol.market}:${symbol.ticker}`,
       });
       if (created === null) {
@@ -264,14 +345,66 @@ export function IngestConsole() {
           </span>
           {runningNow && <span className="break-keep text-2xs text-ink-muted">지금 돌고 있습니다.</span>}
         </div>
-        <button
-          type="button"
-          onClick={start}
-          disabled={buttonState.disabled}
-          className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
-        >
-          {buttonState.label}
-        </button>
+        {/* 주기는 고르는 것이고 실행은 하나다 — 버튼을 늘리면 무엇이 주 동작인지 흐려진다. */}
+        <div role="group" aria-label="이 종목 받기" className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <select
+            aria-label="받을 주기"
+            value={barKind}
+            onChange={(event) => setBarKind(event.target.value as DataKind)}
+            className="min-h-touch-min rounded-control border border-line bg-bg-base px-2 py-1 text-2xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+          >
+            <option value="daily_bar">일봉</option>
+            <option value="minute_bar">분봉</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => start(barKind)}
+            disabled={buttonState.disabled}
+            className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
+          >
+            {buttonState.label}
+          </button>
+        </div>
+      </div>
+
+      {/* 종목 목록 — 종목을 고르기 **전에** 필요한 것이라 종목 선택과 나란히 두지 않는다. */}
+      <div
+        role="group"
+        aria-label="종목 목록 받기"
+        className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-2xs"
+      >
+        <span className="text-ink-muted">종목 목록</span>
+        {masters.length === 0 ? (
+          <span className="break-keep text-ink-muted">
+            {capabilities.isLoading
+              ? "소스를 확인하는 중입니다"
+              : "지금 종목 목록을 줄 소스가 없습니다 — 아래 「소스」의 사유를 보세요."}
+          </span>
+        ) : (
+          <>
+            <select
+              aria-label="종목 목록을 받을 시장"
+              value={chosenMarket}
+              onChange={(event) => setMasterMarket(event.target.value)}
+              className="min-h-touch-min rounded-control border border-line bg-bg-base px-2 py-1 text-2xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            >
+              {masters.map((row) => (
+                <option key={row.market} value={row.market}>
+                  {row.market} · {row.source}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={startMaster}
+              disabled={busy}
+              className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
+            >
+              {busy ? "요청 중…" : `${chosenMarket} 종목 목록 받기`}
+            </button>
+            <span className="break-keep text-ink-muted">종목을 고르기 전에 이것부터 받습니다.</span>
+          </>
+        )}
       </div>
 
       {message && (

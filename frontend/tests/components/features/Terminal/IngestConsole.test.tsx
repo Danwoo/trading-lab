@@ -13,7 +13,7 @@ import userEvent from "@testing-library/user-event";
 import { IngestConsole } from "@/components/features/Terminal/IngestConsole";
 import type { PanelData } from "@/types/terminal/provenance";
 
-const SYMBOL = { market: "KRX", ticker: "005930", name: "삼성전자" };
+const SYMBOL = { market: "KOSPI", ticker: "005930", name: "삼성전자" };
 
 vi.mock("@/hooks/terminal/useTerminalContext", () => ({ useTerminalSymbol: vi.fn() }));
 vi.mock("@/hooks/terminal/useMarketCapabilities", () => ({ useMarketCapabilities: vi.fn() }));
@@ -53,7 +53,7 @@ function given({
 /** 이 종목(KRX)의 캔들을 지금 받을 수 있는 상태. */
 function usableKrx() {
   return panel<unknown[]>({
-    data: [{ source: "data_go_kr", market: "KRX", dataKind: "candles", available: true, reason: null }],
+    data: [{ source: "data_go_kr", market: "KOSPI", dataKind: "daily_bar", available: true, reason: null }],
   });
 }
 
@@ -86,8 +86,8 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
     given({
       capabilities: panel<unknown[]>({
         data: [
-          { source: "sec", market: "US", dataKind: "financials", available: true, reason: null },
-          { source: "alpaca", market: "US", dataKind: "candles", available: false, reason: serverReason },
+          { source: "sec", market: "NASDAQ", dataKind: "quote", available: true, reason: null },
+          { source: "alpaca", market: "NASDAQ", dataKind: "daily_bar", available: false, reason: serverReason },
         ],
       }),
     });
@@ -107,8 +107,8 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
     given({
       capabilities: panel<unknown[]>({
         data: [
-          { source: "alpaca", market: "US", dataKind: "candles", available: true, reason: null },
-          { source: "data_go_kr", market: "KRX", dataKind: "candles", available: true, reason: null },
+          { source: "alpaca", market: "NASDAQ", dataKind: "daily_bar", available: true, reason: null },
+          { source: "data_go_kr", market: "KOSPI", dataKind: "daily_bar", available: true, reason: null },
         ],
       }),
     });
@@ -146,7 +146,9 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
   it("그 시장을 받을 소스가 없으면 누를 수 없고, 왜인지 말한다", () => {
     given({
       capabilities: panel<unknown[]>({
-        data: [{ source: "data_go_kr", market: "KRX", dataKind: "candles", available: false, reason: "키가 없습니다" }],
+        data: [
+          { source: "data_go_kr", market: "KOSPI", dataKind: "daily_bar", available: false, reason: "키가 없습니다" },
+        ],
       }),
     });
     render(<IngestConsole />);
@@ -180,7 +182,7 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
             run_id: 1,
             source: "data_go_kr",
             job_kind: "daily_bar",
-            scope: "KRX:005930",
+            scope: "KOSPI:005930",
             period_from: null,
             period_to: null,
             status: "failed",
@@ -252,7 +254,76 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
     });
     expect(vi.mocked(insertIngestRun).mock.calls[0][0]).toMatchObject({
       job_kind: "daily_bar",
-      scope: "KRX:005930",
+      scope: "KOSPI:005930",
     });
+  });
+
+  it("종목 목록은 종목을 고르지 않아도 받을 수 있다 — 첫 진입의 순환을 끊는 자리", async () => {
+    given({
+      capabilities: panel<unknown[]>({
+        data: [
+          { source: "toss", market: "KOSPI", dataKind: "instrument_master", available: true, reason: null },
+          { source: "toss", market: "KOSPI", dataKind: "daily_bar", available: true, reason: null },
+        ],
+      }),
+      symbol: null,
+    });
+    vi.mocked(insertIngestRun).mockResolvedValue({ data: { run_id: 11 } } as never);
+    render(<IngestConsole />);
+
+    const group = screen.getByRole("group", { name: "종목 목록 받기" });
+    expect((within(group).getByRole("button") as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.setup().click(within(group).getByRole("button"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toContain("큐에 넣었습니다");
+    });
+    expect(vi.mocked(insertIngestRun).mock.calls[0][0]).toMatchObject({
+      job_kind: "instrument_master",
+      scope: "KOSPI",
+    });
+  });
+
+  it("종목 목록을 줄 소스가 없으면 버튼 대신 사유가 선다", () => {
+    given({
+      capabilities: panel<unknown[]>({
+        data: [{ source: "toss", market: "KOSPI", dataKind: "daily_bar", available: true, reason: null }],
+      }),
+      symbol: null,
+    });
+    render(<IngestConsole />);
+    const group = screen.getByRole("group", { name: "종목 목록 받기" });
+    expect(within(group).queryByRole("button")).toBeNull();
+    expect(group.textContent).toContain("종목 목록을 줄 소스가 없습니다");
+  });
+
+  it("성공했는데 0행이면 왜인지 말한다 — 「받음」만 보이면 성공으로 읽힌다", () => {
+    given({
+      capabilities: usableKrx(),
+      runs: panel<unknown[]>({
+        data: [
+          {
+            run_id: 3,
+            source: "toss",
+            job_kind: "daily_bar",
+            scope: "KOSPI:005930",
+            period_from: null,
+            period_to: "2026-08-19",
+            status: "succeeded",
+            cursor: null,
+            written_rows: 0,
+            skipped_rows: 1,
+            failed_reason: null,
+            started_dt: null,
+            finished_dt: null,
+            reg_dt: null,
+          },
+        ],
+      }),
+    });
+    render(<IngestConsole />);
+    const history = section("적재").textContent ?? "";
+    expect(history).toContain("종목 마스터에 없는 종목이라 건너뛰었습니다");
+    expect(history).toContain("건너뜀 1");
   });
 });

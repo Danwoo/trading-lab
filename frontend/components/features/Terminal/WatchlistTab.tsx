@@ -43,7 +43,12 @@ export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
   }
 
   if (table.rows.length === 0) {
-    return <PanelUnavailable reason="관심종목이 없습니다 — 관심종목 화면에서 먼저 등록하세요." />;
+    return (
+      <PanelUnavailable
+        reason="관심종목이 없습니다 — 여기에 종목을 등록하면 차트·호가가 그 종목으로 채워집니다."
+        action={{ href: "/admin/watchlist", label: "관심종목 등록하러 가기" }}
+      />
+    );
   }
 
   const isTruncated = table.totalCount > table.rows.length;
