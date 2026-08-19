@@ -21,6 +21,7 @@ from core.logger import logger
 from fastapi.concurrency import run_in_threadpool
 from providers import get_alias_resolver, get_provider, list_alias_sources
 from providers.base import ProviderKeyMissing, ProviderResponseInvalid, RateLimitExhausted
+from providers.failure import describe_provider_failure
 from providers.models import NormalizedBar, NormalizedInstrument
 from repositories.ingest.ingest_repository import IngestRepository
 from services.data_key.data_key_service import DataKeyService
@@ -85,10 +86,11 @@ class IngestService:
             logger.warning(f"적재 잡 {run_id} 실패: {exc}")
             return {"status": "failed", "failed_reason": str(exc)}
         except Exception as exc:  # noqa: BLE001 — 잡 하나의 실패가 워커를 죽이지 않게 한다
-            logger.exception(f"INGEST_JOB_ERROR run_id={run_id}")
-            # 어댑터가 변환하지 못하고 그대로 올라온 예외다 — `httpx.HTTPStatusError` 라면 문자열에
-            # 요청 URL 이 통째로 들어 있고, data.go.kr 은 인증키를 쿼리로 받는다.
-            reason = redact_secrets(f"{type(exc).__name__}: {exc}")[:1000]
+            logger.exception(f"INGEST_JOB_ERROR run_id={run_id} source={source}")
+            # 어댑터가 변환하지 못하고 그대로 올라온 예외다. **원문을 화면에 싣지 않는다** —
+            # `httpx.HTTPStatusError` 문자열에는 요청 URL 이 통째로 들어 있고 data.go.kr 은
+            # 인증키를 쿼리로 받는다. 기술 원문은 바로 위 `logger.exception` 이 가져간다.
+            reason = redact_secrets(describe_provider_failure(exc, source))[:1000]
             await self._finish(run_id, "failed", failed_reason=reason)
             return {"status": "failed", "failed_reason": reason}
 

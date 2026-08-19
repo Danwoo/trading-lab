@@ -32,6 +32,7 @@ from pathlib import Path
 from core.exceptions import BadRequestError, ForbiddenError, HTTPError, TooManyRequestsError
 from core.logger import logger
 from providers import get_provider
+from providers.failure import describe_provider_failure
 from utils.env_file.env_writer import EnvWriteRejected, set_env_value
 from utils.redaction.redactor import install_log_redaction, register_secret
 
@@ -325,7 +326,9 @@ class DataKeyService:
             return {"ok": False, "checked": True, "detail": str(exc)}
         except Exception as exc:  # noqa: BLE001 — 어떤 실패든 화면에 사유가 있어야 한다
             logger.warning(f"키 확인 호출 실패 — source={source} error={type(exc).__name__}")
-            return {"ok": False, "checked": True, "detail": f"확인 호출이 실패했습니다 ({type(exc).__name__})"}
+            # 적재 이력과 **같은 변환**을 쓴다 — 403 이 사용자를 보내는 곳이 바로 이 화면이라,
+            # 여기서만 「확인 호출이 실패했습니다 (HTTPStatusError)」로 끝나면 길이 끊긴다.
+            return {"ok": False, "checked": True, "detail": describe_provider_failure(exc, source)}
 
         # 빈 응답도 실패가 아니다 — 주말·휴장이면 봉이 없을 수 있다. 키가 막혔으면 위에서 던진다.
         return {"ok": True, "checked": True, "detail": f"{market} {symbol} 로 확인했습니다 (봉 {len(bars)}개)"}
