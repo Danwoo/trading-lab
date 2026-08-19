@@ -60,10 +60,24 @@ class BarService:
         codes = {row.get("code") for row in rows}
         return reason, CREDENTIAL_MISSING_CODE if codes == {CREDENTIAL_MISSING_CODE} else None
 
+    def _missing_instrument_error(self, market: str, symbol: str) -> NotFoundError:
+        """「없는 종목」과 「아직 안 받은 종목」을 가른다.
+
+        그 시장의 마스터가 통째로 비어 있으면 **둘 중 무엇인지 알 수 없다** — 그때 「없는
+        종목입니다」라고 답하면 사용자가 멀쩡한 종목 코드를 의심하고 다음에 무엇을 할지도
+        잃는다. 소스가 가용한데 아직 안 돌린 상태는 키 없이 도는 소스가 생기면서 처음 생겼다.
+        """
+        if self.bar_repository.has_any_instrument(market):
+            return NotFoundError(f"종목 마스터에 없는 종목입니다: {market} {symbol}")
+        return NotFoundError(
+            f"{market} 종목 마스터를 아직 한 번도 받지 않았습니다 — {symbol} 이 없는 종목인지"
+            f" 아직 안 받은 것인지 알 수 없습니다. 「적재」에서 종목 마스터를 먼저 받아 오세요."
+        )
+
     def _instrument(self, market: str, symbol: str) -> dict:
         instrument = self.bar_repository.select_instrument({"market": market, "symbol": symbol})
         if not instrument:
-            raise NotFoundError(f"종목 마스터에 없는 종목입니다: {market} {symbol}")
+            raise self._missing_instrument_error(market, symbol)
         return instrument
 
     @staticmethod
@@ -94,7 +108,7 @@ class BarService:
             reason, code = self._unavailable(args.get("workspace_id"), market, "instrument_master")
             if reason:
                 return self._empty(market, symbol, "1d", reason, code)
-            raise NotFoundError(f"종목 마스터에 없는 종목입니다: {market} {symbol}")
+            raise self._missing_instrument_error(market, symbol)
 
         rows, total = self.bar_repository.select_daily_bar_list(
             {
@@ -133,7 +147,7 @@ class BarService:
             reason, code = self._unavailable(args.get("workspace_id"), market, "instrument_master")
             if reason:
                 return self._empty(market, symbol, f"{interval_min}m", reason, code)
-            raise NotFoundError(f"종목 마스터에 없는 종목입니다: {market} {symbol}")
+            raise self._missing_instrument_error(market, symbol)
 
         # 합성 주기는 1분봉 N개를 접어 1개를 만든다 — 상한도 그만큼 넉넉히 읽어야 한다.
         rows, total = self.bar_repository.select_minute_bar_list(

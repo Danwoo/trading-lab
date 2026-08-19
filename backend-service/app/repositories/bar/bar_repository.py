@@ -33,6 +33,17 @@ class BarRepository:
             row = conn.execute(text(sql), {"market": args["market"], "symbol": args["symbol"]}).mappings().fetchone()
             return dict(row) if row else None
 
+    def has_any_instrument(self, market: str) -> bool:
+        """그 시장의 종목 마스터를 한 번이라도 받았는가.
+
+        「없는 종목」과 「아직 안 받은 종목」을 가르는 유일한 근거다 — 마스터가 통째로 비어
+        있으면 그 종목이 없는 것인지 아직 안 받은 것인지 **알 수 없고**, 모르는 것을 아는 척
+        답하면 사용자가 자기 입력을 의심한다.
+        """
+        sql = "SELECT EXISTS (SELECT 1 FROM tn_instrument WHERE market = :market) AS present"
+        with self.sql_client.connect() as conn:
+            return bool(conn.execute(text(sql), {"market": market}).scalar_one())
+
     def select_daily_bar_list(self, args: dict) -> tuple[list[dict], int]:
         """기간 지정 일봉. 차트는 페이지가 아니라 **기간 윈도**로 자르므로 `skip/take` 대신
         기간 + 상한(`limit`)이 페이지네이션 역할을 한다 — anti-patterns 룰 6 의 해석은 라우터
