@@ -423,6 +423,23 @@ jobs:
           if [ -n "$AUTHOR_VENDORS" ] && [ -n "$CHAIN" ]; then
             FILTERED=""
             for C in $CHAIN; do
+              # **claude 는 빼지 않는다 — 티어 축이 있다.**
+              #
+              # kimi·codex 는 티어가 없어 같은 벤더면 그대로 자기리뷰다. claude 는
+              # `FALLBACK_TIER` 로 **반대 티어**를 쓰므로(opus 작성 → sonnet 리뷰) 자기리뷰가
+              # 아니고, 이 체인의 **마지막 보루**다. 종전 설계 주석이 세 체인 모두 끝에
+              # 「claude(반대 티어)」를 둔 이유가 그것이다.
+              #
+              # 실측(PR #219): claude 저자에서 claude 를 빼니 체인이 `kimi codex` 뿐이었고,
+              # kimi 한도 + codex 기동 실패로 **전멸해 판정이 unable** 이 됐다. CI 는 초록인데
+              # 리뷰가 없어 PR 이 멎었다 — 자기리뷰를 막으려다 **리뷰 자체를 막았다.**
+              #
+              # 자동 머지는 별개로 막힌다: review_record 의 동일 벤더·동일 티어 차단이
+              # 여기서 통과해도 arm 을 막는다.
+              if [ "$C" = claude ]; then
+                FILTERED="$FILTERED $C"
+                continue
+              fi
               case ",$AUTHOR_VENDORS," in
                 *",$C,"*) continue ;;
               esac
