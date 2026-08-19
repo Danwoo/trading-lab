@@ -96,7 +96,7 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
             // 테두리 색은 **가지마다 정확히 하나씩** 준다. `border-transparent` 를 기본으로 깔면
             // Tailwind 가 그것을 색 유틸리티 중 마지막에 내보내 뒤에 오는 조건부 색을 전부 덮는다
             // (같은 명시도 → 소스 순서 승). 그렇게 두면 활성·열림 테두리가 코드엔 있고 화면엔 없다.
-            "relative flex h-[30px] w-[30px] items-center justify-center rounded-lg border transition-colors",
+            "relative flex h-touch-rail-target w-touch-rail-target items-center justify-center rounded-lg border transition-colors",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
             isActive && "border-line-strong bg-bg-raised text-ink",
             isOpen && "border-ink-strong bg-bg-raised text-ink-strong",
@@ -130,13 +130,17 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
 
   // 레일은 어느 폭에서도 46px 이다 — 18px 아이콘 한 줄이라 늘려도 담을 것이 없고 줄이면
   // 표적이 무너진다. 그래서 여기만 구간을 안 탄다(값은 globals.css 의 `--shell-rail`).
+  //
+  // 표적 크기는 폭과 **다른 축**이다 — 손가락으로 누르는 기기에서는 버튼이 44px 로 커진다
+  // (`--touch-rail-target`). 그러면 가로로 누운 폰처럼 짧은 화면에서 9개가 안 들어가므로
+  // 주 목록만 스크롤시킨다 — 잘라 내면 마지막 항목이 조용히 사라진다.
   return (
     <nav
       aria-label="제품 레일"
       className="flex h-full w-shell-rail flex-none flex-col items-center gap-1 border-r border-line bg-bg-panel py-2"
     >
-      <ul className="flex flex-col items-center gap-1">{renderGroup(mainItems)}</ul>
-      <ul className="mt-auto flex flex-col items-center gap-1">{renderGroup(footerItems)}</ul>
+      <ul className="flex min-h-0 flex-col items-center gap-1 overflow-y-auto">{renderGroup(mainItems)}</ul>
+      <ul className="mt-auto flex flex-none flex-col items-center gap-1">{renderGroup(footerItems)}</ul>
     </nav>
   );
 }

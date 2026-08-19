@@ -71,3 +71,42 @@ describe("폭 구간 경계 — CSS 와 JS 가 같은 숫자를 본다", () => {
     expect("screens" in themeExtend()).toBe(false);
   });
 });
+
+// #230 — **표적 크기는 폭과 다른 축이다.**
+//
+// 모바일 390px 에서 표적 14개 중 12개가 44px 미만이었고, 그중 9개가 레일 아이콘(30×30)이다.
+// 손끝 접촉면은 45~57px 이라 30px 표적은 옆 것을 누르게 된다.
+//
+// 레일 폭(46px)은 「세로줄 하나」가 정한 값이라 안 건드린다. 대신 **누를 수 있는 영역**을
+// 별도 토큰으로 두고 `pointer: coarse` 에서만 키운다 — 폭으로 가르면 터치 노트북이 빠진다.
+describe("터치 표적 — 손가락 축 (#230)", () => {
+  const COARSE_BLOCK = /@media \(pointer: coarse\) \{[\s\S]*?\n\}/;
+
+  it("기본값은 마우스 치수다 — 데스크톱 디자인이 안 바뀐다", () => {
+    expect(GLOBALS_CSS).toMatch(/--touch-rail-target:\s*30px;/);
+    expect(GLOBALS_CSS).toMatch(/--touch-min:\s*26px;/);
+  });
+
+  it("손가락으로 누르는 기기에서 권장치까지 커진다", () => {
+    const block = GLOBALS_CSS.match(COARSE_BLOCK)?.[0];
+
+    expect(block, "`pointer: coarse` 블록이 없다").toBeTruthy();
+    expect(block).toMatch(/--touch-rail-target:\s*44px;/);
+    expect(block).toMatch(/--touch-min:\s*44px;/);
+  });
+
+  it("레일 폭 자체는 그대로다 — 표적을 키우려고 셸 결정을 바꾸지 않는다", () => {
+    const coarse = GLOBALS_CSS.match(COARSE_BLOCK)?.[0] ?? "";
+
+    expect(coarse).not.toContain("--shell-rail:");
+  });
+
+  it("Tailwind 가 그 토큰을 읽는다 — 클래스가 값 없이 죽지 않게", () => {
+    const extend = themeExtend();
+    const spacing = extend.spacing as Record<string, string>;
+    const minHeight = extend.minHeight as Record<string, string>;
+
+    expect(spacing["touch-rail-target"]).toBe("var(--touch-rail-target)");
+    expect(minHeight["touch-min"]).toBe("var(--touch-min)");
+  });
+});

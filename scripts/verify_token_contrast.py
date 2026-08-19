@@ -122,6 +122,8 @@ NON_COLOR_PREFIXES = (
     "--space-",
     "--size-",
     "--shell-",
+    # 누를 수 있는 영역의 치수 (#230) — 손가락 축이라 셸 폭(`--shell-`)과 이름을 가른다.
+    "--touch-",
     "--radius-",
     "--focus-",
     "--btn-inset-alpha",
