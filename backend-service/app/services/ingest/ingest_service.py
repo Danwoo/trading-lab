@@ -306,9 +306,6 @@ class IngestService:
             skipped += len(getattr(provider, "last_skipped", []))
             rows = [_minute_row(bar, instrument_id, run) for bar in bars]
             written += await run_in_threadpool(self.ingest_repository.upsert_minute_bars, rows)
-            # 분봉이 들어왔으면 그 날의 일봉을 **정규장만 접어** 다시 만든다 (MD-AD-26 · #255).
-            # 소스 일봉은 종목마다 다른 창을 덮어, 시간외를 포함하는 종목은 종가가 최대 4%
-            # 어긋난다 — 우리가 접은 값만 「무엇인지 아는」 값이다.
             last_done = symbol
             await run_in_threadpool(
                 self.ingest_repository.update_ingest_run_status,

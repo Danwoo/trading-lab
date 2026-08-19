@@ -57,32 +57,6 @@ def sessions_between(market: str, date_from: dt.date, date_to: dt.date) -> list[
     return [ts.date() for ts in calendar.sessions_in_range(date_from, date_to)]
 
 
-#: 마감 동시호가 체결이 찍히는 자리 — 캘린더의 마감 시각 **다음 봉**이다.
-#:
-#: 실측: 삼성전자 2026-08-19 의 15:30 봉은 거래량 0 이고 15:31 봉이 2,502,579 다. 마감 시각에서
-#: 끊으면 종가를 놓친다.
-CLOSING_AUCTION_LAG = dt.timedelta(minutes=1)
-
-
-def session_windows(market: str, date_from: dt.date, date_to: dt.date) -> list[tuple[dt.date, dt.time, dt.time]]:
-    """구간의 거래일마다 `(날짜, 시작 시각, 끝 시각)` — **시장 현지 벽시계**.
-
-    시각을 표로 굳히지 않고 캘린더에서 받는 이유: KRX 는 **수능일에 전 일정을 1시간 늦춘다**
-    (2016-08 이후 09:00~15:30 → 10:00~16:30). 고정 창으로 접으면 그날 종가가 장중 가격이 되고,
-    그 행에 「정규장」이라는 표가 붙어 소스 값을 덮는다 — 접기가 없애려던 실패 모드 그대로다.
-
-    끝은 마감 동시호가가 찍히는 봉까지 포함한다(`CLOSING_AUCTION_LAG`).
-    """
-    calendar = get_market_calendar(market)
-    tz = calendar.tz
-    out: list[tuple[dt.date, dt.time, dt.time]] = []
-    for day in sessions_between(market, date_from, date_to):
-        opened = calendar.session_open(day).astimezone(tz)
-        closed = (calendar.session_close(day) + CLOSING_AUCTION_LAG).astimezone(tz)
-        out.append((day, opened.time(), closed.time()))
-    return out
-
-
 def is_session(market: str, day: dt.date) -> bool:
     """그 날짜가 이 시장의 거래일인가."""
     return get_market_calendar(market).is_session(day)
