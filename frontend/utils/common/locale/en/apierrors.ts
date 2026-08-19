@@ -3,7 +3,7 @@
 
 export const STATUS_MESSAGES: Record<number, string> = {
   400: "Bad request.",
-  401: "Authentication is required.",
+  401: "Your session has ended. Please sign in again.",
   403: "You do not have permission to access this.",
   404: "The requested resource was not found.",
   405: "Method not allowed.",
@@ -15,10 +15,10 @@ export const STATUS_MESSAGES: Record<number, string> = {
   416: "The requested range is invalid.",
   422: "Please check your input.",
   429: "Too many requests. Please try again later.",
-  500: "A server error occurred.",
-  502: "Invalid response from an external service.",
-  503: "A temporary service issue occurred.",
-  504: "The external service response timed out.",
+  500: "The server did not respond. Please try again shortly.",
+  502: "Invalid response from an external service. Please try again shortly.",
+  503: "The service is not responding right now. Please try again shortly.",
+  504: "The external service response timed out. Please try again shortly.",
 };
 
 export const FALLBACK = {

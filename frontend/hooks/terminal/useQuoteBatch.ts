@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { QUOTE_BATCH_INTERVAL_MS } from "@/constants/terminal";
 import { classifyMarketDataError } from "@/lib/terminal/marketDataError";
+import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import { selectQuoteBatch } from "@/services/terminal/marketService";
 import type { Quote } from "@/lib/terminal/realtimeArbiter";
 import type { Provenance } from "@/types/terminal/provenance";
@@ -51,7 +52,7 @@ export function useQuoteBatch(symbols: Array<{ ticker: string; market: string }>
           setProvenance(PLACEHOLDER_PROVENANCE);
           return;
         }
-        setProvenance({ kind: "unavailable", reason: outcome.error.message });
+        setProvenance({ kind: "unavailable", reason: getApiErrorMessage(outcome.error) });
       }
     }
 

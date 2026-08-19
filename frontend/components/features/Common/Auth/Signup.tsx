@@ -12,6 +12,7 @@ import { TextBox } from "@/components/shared/ui/TextBox";
 import PolicyPopup from "@/components/features/Common/Policy/PolicyPopup";
 import { showMessage } from "@/stores/shared/messageStore";
 import { sendEmail, verifySignupOTP, checkEmail } from "@/services/common/authService";
+import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 
 interface Props {}
 
@@ -48,7 +49,7 @@ export const Signup: FC<Props> = () => {
       );
       setEmailToggle("");
     } catch (error: any) {
-      const message = error?.response?.data?.message ?? "이메일 발송 중 오류가 발생했습니다.";
+      const message = getApiErrorMessage(error);
       showMessage("오류", message);
     }
   };

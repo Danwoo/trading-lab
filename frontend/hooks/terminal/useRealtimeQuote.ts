@@ -1,6 +1,7 @@
 "use client";
 
 import { useRealtimeState } from "@/stores/terminal/realtimeStore";
+import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import type { Quote } from "@/lib/terminal/realtimeArbiter";
 import type { PanelData } from "@/types/terminal/provenance";
 
@@ -38,7 +39,10 @@ export function useRealtimeQuote(): PanelData<Quote> {
         data: null,
         isLoading: false,
         error: state.error,
-        provenance: { kind: "unavailable", reason: state.error?.message ?? "실시간 시세를 가져오지 못했습니다" },
+        provenance: {
+          kind: "unavailable",
+          reason: state.error ? getApiErrorMessage(state.error) : "실시간 시세를 가져오지 못했습니다",
+        },
       };
     case "idle":
     default:

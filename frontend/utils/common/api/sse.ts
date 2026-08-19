@@ -14,6 +14,21 @@ export interface FetchSSEOptions<T extends SSEChunk = SSEChunk> {
   signal?: AbortSignal;
 }
 
+/**
+ * 스트림이 시작된 뒤 서버가 보낸 `{type:"error"}` 를 예외로 옮긴다.
+ *
+ * HTTP 는 이미 200 으로 나갔다 — 그래서 상태를 지어내지 않는다. 종전에는 `status: 500` 을
+ * 찍었는데, 그러면 「5xx 는 서버 원문을 화면에 내지 않는다」(#224)는 규칙에 걸려 서버가
+ * 보낸 사유가 일반 문구로 뭉개진다. 사유를 그대로 보이는 것이 이 이벤트의 존재 이유다.
+ */
+function streamError(chunk: { error?: string; message?: string }): Error {
+  const err = new Error("stream error") as Error & { response: { data: { detail: string } } };
+  err.response = {
+    data: { detail: chunk.error || chunk.message || "스트리밍 중 오류가 발생했습니다." },
+  };
+  return err;
+}
+
 export async function fetchSSE<T extends SSEChunk = SSEChunk>({
   url,
   body,
@@ -61,12 +76,7 @@ export async function fetchSSE<T extends SSEChunk = SSEChunk>({
           const chunk = JSON.parse(jsonStr) as T;
 
           if (chunk.type === "error") {
-            const err = new Error("HTTP 500") as any;
-            err.response = {
-              data: { detail: chunk.error || chunk.message || "스트리밍 중 오류가 발생했습니다." },
-              status: 500,
-            };
-            throw err;
+            throw streamError(chunk);
           }
 
           onChunk(chunk);
@@ -86,12 +96,7 @@ export async function fetchSSE<T extends SSEChunk = SSEChunk>({
       try {
         const chunk = JSON.parse(jsonStr) as T;
         if (chunk.type === "error") {
-          const err = new Error("HTTP 500") as any;
-          err.response = {
-            data: { detail: chunk.error || chunk.message || "스트리밍 중 오류가 발생했습니다." },
-            status: 500,
-          };
-          throw err;
+          throw streamError(chunk);
         }
         onChunk(chunk);
       } catch (e) {
@@ -158,13 +163,7 @@ export async function fetchNDJSON<T extends SSEChunk = SSEChunk>({
       throw e;
     }
     if (chunk.type === "error") {
-      // example-ai error 이벤트는 {type:"error", message} — message 를 detail 로 실어 500 shape throw
-      const err = new Error("HTTP 500") as any;
-      err.response = {
-        data: { detail: (chunk as any).message || "스트리밍 중 오류가 발생했습니다." },
-        status: 500,
-      };
-      throw err;
+      throw streamError(chunk as { message?: string });
     }
     onChunk(chunk);
   };

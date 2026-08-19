@@ -5,6 +5,7 @@ import { sweepValues } from "@/lib/bench/sweep";
 import type { BacktestGridIn } from "@/schemas/backtest/backtest";
 import type { BotDetailOut, BotStrategyOut, StrategyField } from "@/schemas/bot/bot";
 import { selectBot } from "@/services/bot/botService";
+import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 
 /** 축마다 훑는 칸 수 기본값 — 두 축이면 25칸. 격자는 지형을 보는 도구지 봉우리 찾기가 아니다. */
 const DEFAULT_STEPS = 5;
@@ -89,7 +90,7 @@ export function useGridRunForm(): GridRunFormController {
         // 앞의 두 축만 기본으로 켠다 — 격자는 2축까지 표로 펴진다. 셋째부터는 사용자가 켠다.
         setAxes(fields.map((field, i) => ({ field, enabled: i < 2, steps: DEFAULT_STEPS })));
       })
-      .catch((error: Error) => setBotDetailError(error.message));
+      .catch((error: unknown) => setBotDetailError(getApiErrorMessage(error)));
   };
 
   const changeField = (fieldName: keyof GridRunFormState, value: unknown) => {
