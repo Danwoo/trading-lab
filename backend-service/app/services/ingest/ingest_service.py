@@ -306,6 +306,27 @@ class IngestService:
             skipped += len(getattr(provider, "last_skipped", []))
             rows = [_minute_row(bar, instrument_id, run) for bar in bars]
             written += await run_in_threadpool(self.ingest_repository.upsert_minute_bars, rows)
+            # 분봉이 들어왔으면 그 날의 일봉을 **정규장만 접어** 다시 만든다 (MD-AD-26 · #255).
+            # 소스 일봉은 종목마다 다른 창을 덮어, 시간외를 포함하는 종목은 종가가 최대 4%
+            # 어긋난다 — 우리가 접은 값만 「무엇인지 아는」 값이다.
+            session = REGULAR_SESSION.get(market)
+            if session is None:
+                # 정규장 구간을 모르는 시장은 **접지 않는다** — 틀린 창으로 접으면
+                # 「우리가 만든 값」이 소스 값보다 나쁘다.
+                logger.warning(f"정규장 구간을 모르는 시장이라 일봉 재구성을 건너뜁니다 — market={market}")
+                last_done = symbol
+                continue
+            await run_in_threadpool(
+                self.ingest_repository.rebuild_daily_from_minutes,
+                {
+                    "instrument_ids": [instrument_id],
+                    "date_from": date_from,
+                    "date_to": date_to,
+                    "session_open": session[0],
+                    "session_close": session[1],
+                    "ingest_run_id": run["run_id"],
+                },
+            )
             last_done = symbol
             await run_in_threadpool(
                 self.ingest_repository.update_ingest_run_status,
@@ -337,6 +358,21 @@ def _resume_at(last_done: str):
     except RateLimitExhausted as exc:
         logger.info(f"어댑터 재개 지점 {exc.cursor!r} → 잡 재개 지점 {last_done!r} 로 환산")
         raise RateLimitExhausted(cursor=last_done) from exc
+
+
+#: 시장별 **정규장** 구간 — 분봉을 접어 일봉을 만들 때 쓰는 창 (#255).
+#:
+#: 국내는 09:00~15:30 이고 **마감 동시호가 체결이 15:31 봉에 찍힌다**(실측: 삼성전자
+#: 2026-08-19 의 15:31 봉 거래량 2,502,579). 그래서 끝을 15:31 로 잡아야 종가가 맞는다.
+#: 미국은 09:30~16:00 이고 마지막 봉이 16:00 이다.
+REGULAR_SESSION: dict[str, tuple[dt.time, dt.time]] = {
+    "KOSPI": (dt.time(9, 0), dt.time(15, 31)),
+    "KOSDAQ": (dt.time(9, 0), dt.time(15, 31)),
+    "KONEX": (dt.time(9, 0), dt.time(15, 31)),
+    "NASDAQ": (dt.time(9, 30), dt.time(16, 0)),
+    "NYSE": (dt.time(9, 30), dt.time(16, 0)),
+    "AMEX": (dt.time(9, 30), dt.time(16, 0)),
+}
 
 
 def parse_scope(job_kind: str, scope: str | None) -> tuple[str, list[str]]:
@@ -396,6 +432,9 @@ def _daily_row(bar: NormalizedBar, instrument_id: int, run: dict) -> dict:
         "trade_value": bar.trade_value if isinstance(bar.trade_value, Decimal | type(None)) else None,
         "source": run["source"],
         "adj_policy": bar.adj_policy,
+        # 소스가 준 일봉이 어느 구간을 덮는지 **우리는 모른다** — 소스마다, 같은 소스의
+        # 종목마다 다르다(#255). 모르면 모른다고 적는다. 분봉으로 다시 만든 봉만 `regular` 다.
+        "session_scope": "unknown",
         "ingest_run_id": run["run_id"],
     }
 

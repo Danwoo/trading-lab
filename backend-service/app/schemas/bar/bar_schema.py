@@ -31,6 +31,10 @@ class BarsOut(BaseModel):
     interval: str
     source: str | None = None
     adj_policy: str | None = None
+    # 이 봉들이 **어느 창**을 덮는가 — `regular`(정규장만 접은 것) · `unknown`(소스가 준 그대로) ·
+    # `mixed`(구간 안에서 섞임). 소스 일봉은 종목마다 시간외 포함 여부가 달라, 이것을 안 밝히면
+    # 백테스트가 정규장에서 낼 수 없는 가격에 체결한다 (#255 — 실측 최대 4% 차이).
+    session_scope: str | None = None
     asof: str | None = None
     unavailable_reason: str | None = None
     # 사유의 **기계가 읽는 갈래**. `credential_missing` 은 「키가 아직 없다」 하나뿐일 때만 온다 —

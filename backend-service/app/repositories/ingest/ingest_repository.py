@@ -302,6 +302,58 @@ class IngestRepository:
         return dt.date.fromisoformat(low), dt.date.fromisoformat(high)
 
     # ── 캔들 ─────────────────────────────────────────────────────────────────
+    def rebuild_daily_from_minutes(self, args: dict) -> int:
+        """분봉이 있는 날의 일봉을 **정규장 구간만 접어** 다시 만든다 (MD-AD-26 · #255).
+
+        소스 일봉은 종목마다 다른 창을 덮는다 — 시간외를 포함하는 종목의 종가는 정규장 종가와
+        최대 4% 어긋났다(실측). 분봉이 있으면 우리가 직접 접는 편이 **무엇인지 아는** 값이다.
+
+        분봉이 없는 날은 건드리지 않는다 — 그 행은 `session_scope='unknown'` 으로 남아, 화면과
+        엔진이 「모르는 값」인 것을 알 수 있다.
+
+        시가는 **첫 봉의 시가**, 종가는 **마지막 봉의 종가**다. 국내 정규장은 09:00~15:30 이고
+        마감 동시호가 체결이 15:31 봉에 찍히므로 끝을 15:31 로 잡는다.
+        """
+        sql = """
+            WITH folded AS (
+                SELECT m.instrument_id
+                     , m.ts::date                                              AS trade_date
+                     , (ARRAY_AGG(m.open  ORDER BY m.ts))[1]                   AS open
+                     , MAX(m.high)                                             AS high
+                     , MIN(m.low)                                              AS low
+                     , (ARRAY_AGG(m.close ORDER BY m.ts DESC))[1]              AS close
+                     , SUM(m.volume)                                           AS volume
+                     , MIN(m.source)                                           AS source
+                     , MIN(m.adj_policy)                                       AS adj_policy
+                  FROM tn_minute_bar m
+                 WHERE m.instrument_id = ANY(:instrument_ids)
+                   AND m.ts::date BETWEEN :date_from AND :date_to
+                   AND m.ts::time BETWEEN :session_open AND :session_close
+                 GROUP BY m.instrument_id, m.ts::date
+            )
+            INSERT INTO tn_daily_bar (
+                 instrument_id, trade_date, open, high, low, close, volume, trade_value
+               , source, adj_policy, session_scope, ingest_run_id, ingested_at
+            )
+            SELECT instrument_id, trade_date, open, high, low, close, volume, NULL
+                 , source, adj_policy, 'regular', :ingest_run_id, CURRENT_TIMESTAMP
+              FROM folded
+            ON CONFLICT (instrument_id, trade_date) DO UPDATE
+               SET open          = EXCLUDED.open
+                 , high          = EXCLUDED.high
+                 , low           = EXCLUDED.low
+                 , close         = EXCLUDED.close
+                 , volume        = EXCLUDED.volume
+                 , source        = EXCLUDED.source
+                 , adj_policy    = EXCLUDED.adj_policy
+                 , session_scope = EXCLUDED.session_scope
+                 , ingest_run_id = EXCLUDED.ingest_run_id
+                 , ingested_at   = CURRENT_TIMESTAMP
+        """
+        with self.sql_client.engine.begin() as conn:
+            result = conn.execute(text(sql), args)
+            return result.rowcount or 0
+
     def upsert_daily_bars(self, rows: list[dict]) -> int:
         """일봉 벌크 upsert (MD-AD-16). 감사 컬럼 대신 `source`·`ingest_run_id`·`ingested_at`."""
         if not rows:
@@ -309,10 +361,10 @@ class IngestRepository:
         sql = """
             INSERT INTO tn_daily_bar (
                  instrument_id, trade_date, open, high, low, close, volume, trade_value
-               , source, adj_policy, ingest_run_id, ingested_at
+               , source, adj_policy, session_scope, ingest_run_id, ingested_at
             ) VALUES (
                  :instrument_id, :trade_date, :open, :high, :low, :close, :volume, :trade_value
-               , :source, :adj_policy, :ingest_run_id, CURRENT_TIMESTAMP
+               , :source, :adj_policy, :session_scope, :ingest_run_id, CURRENT_TIMESTAMP
             )
             ON CONFLICT (instrument_id, trade_date) DO UPDATE
                SET open          = EXCLUDED.open
@@ -323,6 +375,7 @@ class IngestRepository:
                  , trade_value   = EXCLUDED.trade_value
                  , source        = EXCLUDED.source
                  , adj_policy    = EXCLUDED.adj_policy
+                 , session_scope = EXCLUDED.session_scope
                  , ingest_run_id = EXCLUDED.ingest_run_id
                  , ingested_at   = CURRENT_TIMESTAMP
         """

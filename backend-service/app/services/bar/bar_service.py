@@ -96,6 +96,18 @@ class BarService:
             ingested.isoformat(timespec="seconds") if ingested else None,
         )
 
+    @staticmethod
+    def _session_scope(rows: list[dict]) -> str | None:
+        """이 구간의 일봉이 **어느 창**을 덮는가 — `regular`·`unknown`·`mixed`.
+
+        섞이면 `mixed` 다. 한쪽으로 뭉개면 「이 구간은 정규장 값이다」가 절반만 참인 채로
+        화면에 나가고, 그 절반이 백테스트 체결가가 된다 (#255).
+        """
+        scopes = {row.get("session_scope") or "unknown" for row in rows}
+        if not scopes:
+            return None
+        return scopes.pop() if len(scopes) == 1 else "mixed"
+
     def select_daily_bar_list(self, args: dict) -> dict:
         market, symbol = args["market"].upper(), args["symbol"].upper()
         date_from, date_to = args["date_from"], args["date_to"]
@@ -129,6 +141,7 @@ class BarService:
             "interval": "1d",
             "source": source,
             "adj_policy": adj_policy,
+            "session_scope": self._session_scope(rows),
             "asof": asof,
             **_unavailable_fields(None if rows else self._empty_unavailable(args, market, symbol, "daily_bar", "일봉")),
         }
@@ -176,6 +189,7 @@ class BarService:
             "interval": f"{interval_min}m",
             "source": source,
             "adj_policy": adj_policy,
+            "session_scope": self._session_scope(rows),
             "asof": asof,
             **_unavailable_fields(
                 None if items else self._empty_unavailable(args, market, symbol, "minute_bar", "분봉")

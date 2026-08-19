@@ -69,9 +69,7 @@ def select_backtest_runs_by_bot(
 ):
     """한 봇의 검증 이력. `/{run_id}` 보다 위에 둔다 — 아래 두면 `by-bot` 이 run_id 로 먹힌다."""
     return BotRunListOut(
-        **backtest_service.select_runs_by_bot(
-            {"bot_id": bot_id, "workspace_id": get_workspace_id(), "limit": limit}
-        )
+        **backtest_service.select_runs_by_bot({"bot_id": bot_id, "workspace_id": get_workspace_id(), "limit": limit})
     )
 
 
