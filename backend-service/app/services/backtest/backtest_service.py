@@ -451,7 +451,8 @@ class BacktestService:
             }
             for row in rows
         ]
-        return {"items": items, "total_count": len(items)}
+        total = self.backtest_repository.count_runs_by_bot(int(args["bot_id"]), int(args["workspace_id"]))
+        return {"items": items, "total_count": total}
 
     def select_report(self, args: dict) -> dict:
         """한 조합의 리포트 — 곡선·거래에 **지표를 붙여** 낸다 (#203).

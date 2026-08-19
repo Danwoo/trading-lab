@@ -382,13 +382,32 @@ def main() -> int:
     none_bot = service.select_runs_by_bot({"bot_id": 999_999, "workspace_id": 4242, "limit": 20})
     check("없는 봇도 빈 목록이다", none_bot["total_count"], 0)
 
+    # 총수는 LIMIT 뒤 건수가 아니다 — 한 페이지만 보고 「이 봇은 1번 검증했다」고 말하면 거짓이다.
+    for _ in range(2):
+        service.run(
+            {
+                "workspace_id": 4242,
+                "strategy_key": "fixture",
+                "market": "KR",
+                "symbol": "TEST",
+                "period_from": "2026-01-01",
+                "period_to": "2026-01-04",
+                "initial_cash": 1000,
+                "bot_id": BOT_ID,
+                "costs": {"fee_rate": 0.0, "slippage_rate": 0.0, "sell_tax_rate": 0.0},
+            }
+        )
+    paged = service.select_runs_by_bot({"bot_id": BOT_ID, "workspace_id": 4242, "limit": 1})
+    check("한 페이지만 온다", len(paged["items"]), 1)
+    check("총수는 페이지 건수가 아니다", paged["total_count"], 3)
+
     # 정리 — 전용 스키마째 지운다.
     with admin.begin() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (REQUIRE=db 실행됨)")
 
-    if CHECKED < 60:
+    if CHECKED < 63:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:

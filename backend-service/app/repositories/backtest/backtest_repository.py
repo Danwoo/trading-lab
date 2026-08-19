@@ -129,6 +129,18 @@ class BacktestRepository:
         with self.sql_client.connect() as conn:
             return [dict(r) for r in conn.execute(text(sql), params).mappings()]
 
+    def count_runs_by_bot(self, bot_id: int, workspace_id: int) -> int:
+        """`LIMIT` 뒤 건수는 총수가 아니다 — 한 페이지만 보고 「이 봇은 3번 검증했다」고 말하면 거짓이 된다."""
+        sql = """
+            SELECT COUNT(*) AS total
+              FROM tn_backtest_run
+             WHERE bot_id = :bot_id
+               AND workspace_id = :workspace_id
+        """
+        params = {"bot_id": bot_id, "workspace_id": workspace_id}
+        with self.sql_client.connect() as conn:
+            return int(conn.execute(text(sql), params).scalar_one())
+
     def select_equity_curve(self, run_id: int) -> list[dict]:
         sql = """
             SELECT dt, equity, cash, position_count, gross_exposure

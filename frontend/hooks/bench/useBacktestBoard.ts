@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BacktestGridIn, GridOut, RunReportOut } from "@/schemas/backtest/backtest";
 import { runBacktestGrid, selectBacktestReport } from "@/services/backtest/backtestService";
 import { useBenchSelectionStore } from "@/stores/shell/benchSelectionStore";
@@ -93,6 +93,17 @@ export function useBacktestBoard(): BacktestBoard {
     },
     [select],
   );
+
+  // 봇 상세의 검증 이력이 `/bench?run=<id>` 로 온다 — 그 실행의 리포트를 열어 둔다.
+  // 한 번만 연다: 사용자가 격자에서 다른 칸을 고른 뒤 주소가 되돌리면 안 된다.
+  const openedFromUrl = useRef(false);
+  useEffect(() => {
+    if (openedFromUrl.current) return;
+    const asked = Number(new URLSearchParams(window.location.search).get("run"));
+    if (!Number.isInteger(asked) || asked <= 0) return;
+    openedFromUrl.current = true;
+    selectCell(asked, `실행 #${asked}`);
+  }, [selectCell]);
 
   return {
     grid,

@@ -104,7 +104,6 @@ export function useGridRunForm(): GridRunFormController {
     if (!Number.isInteger(asked) || asked <= 0) return;
     pickedFromUrl.current = true;
     changeBot(asked);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const changeField = (fieldName: keyof GridRunFormState, value: unknown) => {
