@@ -45,8 +45,8 @@ from utils.agent.events import (
     trace_event,
 )
 from utils.agent.grounding import any_sourced, compute_grounding
-from utils.agent.model_identity import model_identity
 from utils.agent.mcp_classify import ALL_MCP_SERVICES, filter_tool_map
+from utils.agent.model_identity import model_identity
 from utils.agent.numeric_guard import annotate_ungrounded_numbers
 from utils.agent.plan_utils import plan_domains
 from utils.agent.trace_metadata import build_trace_metadata
