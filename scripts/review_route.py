@@ -175,7 +175,16 @@ def decide(emails, head_ref, issue_risks, codex_on):
 
     risk, risk_source = _read_risk(issue_risks)
 
-    candidates = ["claude", "kimi"] + (["codex"] if codex_on else [])
+    # **후보에서 벤더를 빼지 않는다.** 종전엔 codex 를 `codex_on` 변수로 막았는데, 그 변수를
+    # 끈 채 10일이 지나도록 아무도 안 켜 **한도가 남아 있는데도 안 쓰였다**(실측 2026-08-18:
+    # codex 정상 응답, 변수는 2026-08-08 부터 off).
+    #
+    # 한도 판정은 사람이 켜고 끄는 플래그가 아니라 **사전 프로브**가 한다 — 워크플로가 후보마다
+    # 2.5초짜리 프로브로 CLI 를 찔러 소진됐으면 다음 홉으로 간다(stderr 로 확증해 위조 불가).
+    # 이 함수는 **1순위만** 정하고, 못 쓰는 후보는 체인이 건너뛴다.
+    #
+    # `codex_on` 은 「고위험을 codex 에 1순위로 줄 것인가」만 남긴다 — codex 예산이 적어
+    # 1순위를 아끼는 것이 §9 이고, 체인 참여는 그것과 별개다.
     if author_kind == "agent" and author_vendor == "kimi":
         reviewer = "claude"
     elif author_kind == "agent" and author_vendor == "claude":
@@ -185,6 +194,9 @@ def decide(emails, head_ref, issue_risks, codex_on):
     elif author_kind == "human":
         reviewer = "claude"
     else:
+        # 혼재 저자는 **자기 벤더가 아닌** 후보를 찾는다. 여기서는 codex_on 을 존중한다 —
+        # codex 를 못 쓰는데 후보로 세우면 「후보 소진(none)」이 가려진다(그물 ②가 그 계약이다).
+        candidates = ["claude", "kimi"] + (["codex"] if codex_on else [])
         reviewer = next((c for c in candidates if c not in vendors), "none")
 
     label_allowed = (

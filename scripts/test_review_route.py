@@ -235,6 +235,37 @@ CASES = [
         False,
         {"risk": "high", "risk_source": "undeclared-fail-closed"},
     ),
+    # ── codex 를 플래그로 체인에서 빼지 않는다 (2026-08-18) ──────────────────
+    # 종전엔 CROSS_REVIEW_CODEX 를 끄면 codex 가 **체인에 들어가지도 못했다** — 한도가
+    # 남아 있어도 안 쓰였다(실측: 변수를 2026-08-08 에 끄고 10일간 아무도 안 켰고,
+    # 그 사이 codex 는 정상이었다). 한도 판정은 사전 프로브가 한다.
+    #
+    # 이 함수는 **1순위만** 정한다 — 체인(폴백 순서)은 워크플로가 세우고, 못 쓰는 후보는
+    # 프로브가 건너뛴다.
+    (
+        "codex_on 이 꺼져도 claude 저자의 1순위는 kimi (종전과 같다)",
+        ["claude-opus-agent@noreply.local"],
+        "fix-1-claude",
+        "",
+        False,
+        {"reviewer": "kimi"},
+    ),
+    (
+        "고위험 + codex_on 이면 codex 가 1순위 — 예산은 1순위로만 아낀다",
+        ["claude-opus-agent@noreply.local"],
+        "fix-1-claude",
+        "#1=high",
+        True,
+        {"reviewer": "codex"},
+    ),
+    (
+        "codex 저자는 claude 가 본다 — 자기 벤더를 피한다",
+        ["codex-agent@noreply.local"],
+        "fix-1-codex",
+        "",
+        True,
+        {"reviewer": "claude"},
+    ),
 ]
 
 
