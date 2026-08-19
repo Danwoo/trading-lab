@@ -26,6 +26,15 @@ import {
 export const COMBINE_RULES = ["AND", "OR", "SCORE"] as const;
 export const UNIVERSE_KINDS = ["POOL", "WATCHLIST", "LIST"] as const;
 export const BOT_ROLES = ["READONLY", "PROPOSE", "EXECUTE"] as const;
+/**
+ * 역할의 사람 말 — 화면에 `READONLY` 를 그대로 내보내지 않는다.
+ * 계약 옆에 하나만 둔다: 역할이 늘면 이 표에 없는 값이 타입으로 걸린다.
+ */
+export const BOT_ROLE_LABEL: Record<(typeof BOT_ROLES)[number], string> = {
+  READONLY: "보기만 한다",
+  PROPOSE: "제안까지 한다",
+  EXECUTE: "주문까지 한다",
+};
 /** 설정 하나가 어디서 왔나 — 실험대 스펙 §8.6.3 「출처가 남는다」 */
 export const PARAM_SOURCES = ["USER", "AI_SUGGESTED"] as const;
 

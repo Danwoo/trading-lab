@@ -5,12 +5,7 @@ import Link from "next/link";
 import { getApiErrorMessage } from "@/utils/common/errors";
 import { selectBotList } from "@/services/bot/botService";
 import type { BotOut } from "@/schemas/bot/bot";
-
-const ROLE_LABEL: Record<string, string> = {
-  READONLY: "보기만 한다",
-  PROPOSE: "제안까지 한다",
-  EXECUTE: "주문까지 한다",
-};
+import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
 
 /**
  * 내 봇 목록. **0개일 때가 첫 화면**이라, 빈 자리가 무엇이 올 자리인지 말한다 (§21.4) —
@@ -69,7 +64,7 @@ export function BotList() {
           >
             <span className="text-sm text-ink">{bot.bot_nm}</span>
             <span className="font-mono text-2xs text-ink-muted">
-              {ROLE_LABEL[bot.bot_role] ?? bot.bot_role} · {bot.use_at === "Y" ? "켜짐" : "꺼짐"}
+              {BOT_ROLE_LABEL[bot.bot_role]} · {bot.use_at === "Y" ? "켜짐" : "꺼짐"}
             </span>
           </Link>
         </li>

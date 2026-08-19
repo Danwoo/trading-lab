@@ -7,12 +7,7 @@ import { selectBotList } from "@/services/bot/botService";
 import { getApiErrorMessage } from "@/utils/common/errors";
 import type { BotOut } from "@/schemas/bot/bot";
 import type { PanelProps } from "@/types/terminal/panel";
-
-const ROLE_LABEL: Record<string, string> = {
-  READONLY: "보기만 한다",
-  PROPOSE: "제안까지 한다",
-  EXECUTE: "주문까지 한다",
-};
+import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
 
 /**
  * 봇 상태 패널 — 저장한 봇과 지금 상태.
@@ -69,7 +64,7 @@ export default function BotStatePanel({ instanceId }: PanelProps) {
           >
             <span className="min-w-0 truncate text-ink">{bot.bot_nm}</span>
             <span className="flex-shrink-0 text-ink-muted">
-              {ROLE_LABEL[bot.bot_role] ?? bot.bot_role} · {bot.use_at === "Y" ? "켜짐" : "꺼짐"}
+              {BOT_ROLE_LABEL[bot.bot_role]} · {bot.use_at === "Y" ? "켜짐" : "꺼짐"}
             </span>
           </Link>
         </li>

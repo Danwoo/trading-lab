@@ -74,7 +74,9 @@ export function groupBlockedByReason(rows: MarketCapability[]) {
       fixable: row.code === CREDENTIAL_MISSING_CODE,
       targets: [],
     };
-    group.targets.push(`${row.source} · ${row.market} · ${row.dataKind}`);
+    // 종류는 바로 위 「지금 받을 수 있는 것」과 같은 말로 적는다 — 한 패널 안에서 같은 값이
+    // 「일봉」과 `daily_bar` 로 갈리면 사용자는 둘을 다른 것으로 읽는다.
+    group.targets.push(`${row.source} · ${row.market} · ${KIND_LABEL[row.dataKind] ?? row.dataKind}`);
     groups.set(reason, group);
   }
 

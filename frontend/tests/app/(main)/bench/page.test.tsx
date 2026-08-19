@@ -94,7 +94,8 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
 
     await waitFor(() => expect(firstRegion("내 봇").textContent).toContain("아직 만든 봇이 없습니다"));
     expect(firstRegion("격자").textContent).toContain("돌릴 봇이 없습니다");
-    expect(firstRegion("곡선").textContent).toContain("거래가 0건이라 그릴 곡선이 없습니다");
+    // 봇이 0개면 「거래가 0건」이 아니다 — 돌린 적이 없다. 안 일어난 실행의 결과를 말하지 않는다.
+    expect(firstRegion("곡선").textContent).toContain("돌릴 봇이 없습니다");
     expect(firstRegion("오늘 할 일").textContent).toContain("리서치 저녁 배치가 아직 없어");
   });
 
@@ -109,6 +110,16 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
     expect(firstRegion("격자").textContent).not.toContain("돌릴 봇이 없습니다");
     expect(firstRegion("곡선").textContent).toContain("아직 돌리지 않았습니다");
     expect(within(firstRegion("격자")).getByRole("form", { name: "격자 실행" })).toBeTruthy();
+  });
+
+  it("봇의 역할을 사람 말로 적는다 — READONLY 를 그대로 내보내지 않는다", async () => {
+    givenBackend({ bots: [{ bot_id: 1, bot_nm: "봇 알파", bot_role: "READONLY", use_at: "Y" }] });
+    render(<BenchPage />);
+
+    const zone = firstRegion("내 봇");
+    await waitFor(() => expect(zone.textContent).toContain("봇 알파"));
+    expect(zone.textContent).toContain("보기만 한다");
+    expect(zone.textContent).not.toContain("READONLY");
   });
 
   it("길을 둘 준다 — 「봇 만들기」와 「에이전트에게 맡기기」 (§21.4)", () => {
@@ -232,6 +243,33 @@ describe("봇 목록 실패 — 「0개」로 뭉개지 않는다", () => {
     await waitFor(() => expect(zone.textContent).toContain("읽지 못했습니다"));
     expect(zone.textContent).not.toContain("아직 만든 봇이 없습니다");
     expect(zone.textContent).toContain("멈추는 것");
+  });
+
+  it("못 읽었을 때 격자·곡선·시작하는 길도 「없다」고 말하지 않는다", async () => {
+    givenBackend({ bots: null });
+    render(<BenchPage />);
+
+    await waitFor(() => expect(firstRegion("내 봇").textContent).toContain("읽지 못했습니다"));
+    for (const zone of ["격자", "곡선"]) {
+      expect(firstRegion(zone).textContent).toContain("봇이 있는지 아직 모릅니다");
+      expect(firstRegion(zone).textContent).not.toContain("돌릴 봇이 없습니다");
+    }
+    // 「시작하는 길」은 보드 밖이라 자리 이름이 없다 — 문서 전체에서 본다.
+    expect(document.body.textContent).not.toContain("아직 봇이 없습니다.");
+    expect(document.body.textContent).toContain("몇 개인지 모릅니다");
+  });
+
+  it("아직 불러오는 중일 때도 「없다」로 앞질러 말하지 않는다", async () => {
+    // 응답을 붙잡아 둔다 — 느린 연결에서 첫 페인트가 무엇을 말하는가.
+    let release: (value: unknown) => void = () => {};
+    vi.mocked(selectBotList).mockReturnValue(new Promise((resolve) => (release = resolve)) as never);
+    render(<BenchPage />);
+
+    expect(document.body.textContent).not.toContain("아직 봇이 없습니다.");
+    expect(document.body.textContent).toContain("봇 목록을 확인하고 있습니다");
+
+    release({ items: [{ bot_id: 1, bot_nm: "봇 알파", bot_role: "READONLY", use_at: "Y" }], total_count: 1 });
+    await waitFor(() => expect(document.body.textContent).toContain("봇 1개가 있습니다"));
   });
 
   it("원인 문구가 영향 범위보다 앞에 서지 않는다 (§21.5)", async () => {

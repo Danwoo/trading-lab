@@ -19,6 +19,7 @@ import {
   type BenchSelection,
   type BenchSelectionKind,
 } from "@/stores/shell/benchSelectionStore";
+import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
 import type { Provenance } from "@/types/terminal/provenance";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import { ProductStages } from "@/components/features/Bench/ProductStages";
@@ -28,6 +29,34 @@ const TABBED_ZONE_IDS = ["grid", "curve"] as const;
 type TabbedZoneId = (typeof TABBED_ZONE_IDS)[number];
 
 const TAB_TITLES: Record<TabbedZoneId, string> = { grid: "격자", curve: "곡선" };
+
+/** 봇 목록이 지금 어떤 상태인가 — 「못 읽음」·「불러오는 중」을 「없음」과 가른다. */
+type RosterState = "loading" | "unreadable" | "empty" | "filled";
+
+/** 봇 수를 아직 모를 때 두 자리가 공통으로 하는 말. */
+const ROSTER_UNKNOWN: Record<"loading" | "unreadable", string> = {
+  loading: "봇 목록을 확인하고 있습니다",
+  unreadable: "봇 목록을 읽지 못했습니다 — 봇이 있는지 아직 모릅니다",
+};
+
+const GRID_EMPTY_REASON: Record<RosterState, string> = {
+  ...ROSTER_UNKNOWN,
+  empty: "돌릴 봇이 없습니다 — 봇을 하나 만들면 조합이 여기 깔립니다",
+  filled: "아직 돌리지 않았습니다 — 봇·종목·구간을 골라 실행하면 조합이 칸으로 깔립니다",
+};
+
+const CURVE_EMPTY_REASON: Record<RosterState, string> = {
+  ...ROSTER_UNKNOWN,
+  empty: "돌릴 봇이 없습니다 — 봇을 하나 만들면 격자를 실행할 수 있습니다",
+  filled: "아직 돌리지 않았습니다 — 격자를 실행하면 곡선이 그려집니다",
+};
+
+/** 「시작하는 길」의 머리말. `filled` 는 개수를 넣어야 해서 부르는 쪽이 만든다. */
+const PATHS_LEAD: Record<Exclude<RosterState, "filled">, string> = {
+  loading: "봇 목록을 확인하고 있습니다. 그동안 두 갈래 중 하나로 시작하셔도 됩니다.",
+  unreadable: "봇 목록을 읽지 못해 몇 개인지 모릅니다. 두 갈래는 그대로 쓰실 수 있습니다.",
+  empty: "아직 봇이 없습니다. 두 갈래 중 하나로 시작하시면 됩니다.",
+};
 
 /**
  * 고른 지점을 자리 안에 적는다 — §20.2 「패널에서 고르기 = 보드가 그 지점 표시」.
@@ -70,6 +99,17 @@ export default function Page() {
   const bots = roster.data;
   const botCount = bots?.length ?? 0;
   const rosterUnreadable = roster.provenance.kind === "unavailable";
+  //  「봇이 0개다」는 목록을 **읽고 나서야** 할 수 있는 말이다. 아직 안 왔거나 못 읽었는데
+  //  0으로 세면, 봇이 있는 사용자에게 없다고 말하게 된다 (실측: 느린 응답에서 1.5초 동안,
+  //  백엔드가 죽으면 계속). 네 상태를 한 곳에서 정해 자리마다 다시 판단하지 않게 한다.
+  const rosterState: RosterState =
+    roster.isLoading && bots === null
+      ? "loading"
+      : rosterUnreadable
+        ? "unreadable"
+        : botCount === 0
+          ? "empty"
+          : "filled";
 
   const handleTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
@@ -92,10 +132,7 @@ export default function Page() {
       ? { kind: "loaded", source: "백테스트 격자", asOf: null }
       : {
           kind: "unavailable",
-          reason:
-            botCount === 0
-              ? "돌릴 봇이 없습니다 — 봇을 하나 만들면 조합이 여기 깔립니다"
-              : "아직 돌리지 않았습니다 — 봇·종목·구간을 골라 실행하면 조합이 칸으로 깔립니다",
+          reason: GRID_EMPTY_REASON[rosterState],
         };
 
   const curveProvenance: Provenance = activeReport
@@ -111,15 +148,13 @@ export default function Page() {
           : (board.reportError ??
             (board.grid !== null
               ? "격자에서 칸을 누르면 그 조합의 곡선·지표·거래가 여기 그려집니다"
-              : botCount === 0
-                ? "거래가 0건이라 그릴 곡선이 없습니다"
-                : "아직 돌리지 않았습니다 — 격자를 실행하면 곡선이 그려집니다")),
+              : CURVE_EMPTY_REASON[rosterState])),
       };
 
   const rosterProvenance: Provenance =
-    roster.isLoading && bots === null
-      ? { kind: "unavailable", reason: "봇 목록을 확인하고 있습니다" }
-      : botCount === 0 && !rosterUnreadable
+    rosterState === "loading"
+      ? { kind: "unavailable", reason: ROSTER_UNKNOWN.loading }
+      : rosterState === "empty"
         ? { kind: "unavailable", reason: "아직 만든 봇이 없습니다" }
         : roster.provenance;
 
@@ -131,7 +166,7 @@ export default function Page() {
       marked={selection?.kind === "grid-point"}
     >
       <SelectionLine selection={selection} kind="grid-point" />
-      {botCount > 0 && (
+      {rosterState === "filled" && (
         <div className="flex min-w-0 flex-col gap-3">
           <GridRunForm
             bots={bots}
@@ -186,9 +221,9 @@ export default function Page() {
 
       <section aria-label="시작하는 길" className="min-w-0">
         <p className="mb-2 break-keep text-sm text-ink">
-          {botCount === 0
-            ? "아직 봇이 없습니다. 두 갈래 중 하나로 시작하시면 됩니다."
-            : `봇 ${botCount}개가 있습니다. 하나 더 만드시려면 여기서 시작하시면 됩니다.`}
+          {rosterState === "filled"
+            ? `봇 ${botCount}개가 있습니다. 하나 더 만드시려면 여기서 시작하시면 됩니다.`
+            : PATHS_LEAD[rosterState]}
         </p>
         <BenchPaths />
       </section>
@@ -262,7 +297,7 @@ export default function Page() {
                 <li key={bot.bot_id} className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
                   <span className="min-w-0 break-keep text-ink">{bot.bot_nm}</span>
                   <span className="break-keep text-2xs text-ink-muted">
-                    {bot.bot_role} · {bot.use_at === "Y" ? "사용" : "중지"}
+                    {BOT_ROLE_LABEL[bot.bot_role]} · {bot.use_at === "Y" ? "켜짐" : "꺼짐"}
                   </span>
                 </li>
               ))}

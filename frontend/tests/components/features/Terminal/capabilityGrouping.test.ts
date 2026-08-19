@@ -30,7 +30,7 @@ describe("#227 막힌 소스를 사유로 묶는다", () => {
 
     expect(groups).toHaveLength(1);
     expect(groups[0].targets).toHaveLength(3);
-    expect(groups[0].targets[0]).toBe("alpaca · NASDAQ · daily_bar");
+    expect(groups[0].targets[0]).toBe("alpaca · NASDAQ · 일봉");
   });
 
   it("키를 넣으면 풀리는 것이 앞에 선다 — 건수가 적어도", () => {
@@ -60,6 +60,21 @@ describe("#227 막힌 소스를 사유로 묶는다", () => {
     const groups = groupBlockedByReason([{ ...blocked("x", "M", "quote", ""), reason: null }]);
 
     expect(groups[0].reason).toBe("사유가 기록되지 않았습니다");
+  });
+
+  it("막힌 자리의 종류도 사람 말로 적는다 — 같은 패널 위쪽과 같은 어휘로", () => {
+    const groups = groupBlockedByReason([
+      blocked("alpaca", "NASDAQ", "daily_bar", NO_KEY, CREDENTIAL_MISSING_CODE),
+      blocked("alpaca", "NASDAQ", "instrument_master", NO_KEY, CREDENTIAL_MISSING_CODE),
+    ]);
+
+    expect(groups[0].targets).toEqual(["alpaca · NASDAQ · 일봉", "alpaca · NASDAQ · 종목목록"]);
+  });
+
+  it("모르는 종류는 버리지 않고 원문으로 남긴다", () => {
+    const groups = groupBlockedByReason([blocked("x", "M", "future_kind", "막힘")]);
+
+    expect(groups[0].targets).toEqual(["x · M · future_kind"]);
   });
 
   it("막힌 것이 없으면 묶을 것도 없다", () => {

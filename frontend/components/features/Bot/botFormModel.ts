@@ -1,4 +1,5 @@
 import type { BotDetailOut, StrategyForm } from "@/schemas/bot/bot";
+import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
 import { defaultParams } from "@/services/bot/botService";
 
 /** 봇 하나가 싣는 전략 하나의 편집 상태. */
@@ -56,10 +57,10 @@ export const COMBINE_RULE_ITEMS = [
  * 주문을 낼 엔진이 없어 **켜도 아무 일이 일어나지 않는다.** 고를 수 있게 두면 「켰으니 돈다」로
  * 읽힌다.
  */
-export const BOT_ROLE_ITEMS = [
-  { value: "READONLY", label: "보기만 한다" },
-  { value: "PROPOSE", label: "제안까지 한다" },
-];
+export const BOT_ROLE_ITEMS = (["READONLY", "PROPOSE"] as const).map((value) => ({
+  value,
+  label: BOT_ROLE_LABEL[value],
+}));
 
 /** 저장된 봇 → 편집 상태. 다시 열었을 때 저장한 조건이 그대로 보여야 한다(M2 완료 조건). */
 export function toDraft(bot: BotDetailOut): BotDraft {
