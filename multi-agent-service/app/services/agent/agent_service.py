@@ -45,6 +45,7 @@ from utils.agent.events import (
     trace_event,
 )
 from utils.agent.grounding import any_sourced, compute_grounding
+from utils.agent.model_identity import model_identity
 from utils.agent.mcp_classify import ALL_MCP_SERVICES, filter_tool_map
 from utils.agent.numeric_guard import annotate_ungrounded_numbers
 from utils.agent.plan_utils import plan_domains
@@ -451,6 +452,9 @@ class AgentService:
                 "answer_len": len(answer_text_full or history_text),
             }
             trace_payload["usage"] = usage_tracker.trace_payload()
+            # 「무슨 모델이 답했나」 — 근거 라벨과 같은 축이다. 설정이 실제로 쓰였는지를
+            # 사용자가 답변 자리에서 바로 확인한다 (#226).
+            trace_payload["models"] = model_identity(self._config)
             yield trace_event(trace_payload)
 
         except Exception as e:
