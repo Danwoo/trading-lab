@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import { NumberBox } from "@/components/shared/ui/NumberBox";
 import { SelectBox } from "@/components/shared/ui/SelectBox";
 import { TextArea } from "@/components/shared/ui/TextArea";
@@ -45,18 +47,31 @@ function Row({
   help?: string;
   sourced?: boolean;
   source?: "USER" | "AI_SUGGESTED";
-  children: React.ReactNode;
+  /**
+   * 컨트롤을 만드는 함수. **라벨이 만든 id 를 받아 컨트롤에 달아야** 둘이 이어진다 —
+   * 눈에 보이는 라벨을 `<span>` 으로만 그리면 보조기술에는 이름 없는 칸이고, 라벨을 눌러도
+   * 포커스가 안 간다(#259). 설명(`help`)도 `aria-describedby` 로 함께 읽히게 잇는다.
+   */
+  children: (control: { id: string; "aria-describedby"?: string }) => React.ReactNode;
 }) {
+  const id = useId();
+  const helpId = `${id}-help`;
   return (
     <div data-row className="grid gap-1.5 sm:grid-cols-[minmax(9rem,14rem)_minmax(0,1fr)] sm:items-start sm:gap-3">
       <div className="pt-1.5">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm text-ink">{label}</span>
+          <label htmlFor={id} className="text-sm text-ink">
+            {label}
+          </label>
           {sourced && <SourceTag source={source} />}
         </div>
-        {help && <p className="mt-0.5 text-2xs leading-relaxed text-ink-muted">{help}</p>}
+        {help && (
+          <p id={helpId} className="mt-0.5 text-2xs leading-relaxed text-ink-muted">
+            {help}
+          </p>
+        )}
       </div>
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0">{children({ id, ...(help ? { "aria-describedby": helpId } : {}) })}</div>
     </div>
   );
 }
@@ -102,21 +117,27 @@ export function BotForm({
     >
       <Section title="봇">
         <Row label="이름">
-          <TextBox
-            fieldName="bot_nm"
-            value={draft.bot_nm}
-            placeholder="예: 대형주 20일선 눌림목"
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <TextBox
+              {...control}
+              fieldName="bot_nm"
+              value={draft.bot_nm}
+              placeholder="예: 대형주 20일선 눌림목"
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
         <Row label="설명" help="나중에 「왜 이렇게 샀지」를 되짚을 때 읽는 줄입니다.">
-          <TextArea
-            fieldName="bot_desc"
-            value={draft.bot_desc}
-            height="4.5rem"
-            maxLength={500}
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <TextArea
+              {...control}
+              fieldName="bot_desc"
+              value={draft.bot_desc}
+              height="4.5rem"
+              maxLength={500}
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
       </Section>
 
@@ -143,15 +164,18 @@ export function BotForm({
         )}
 
         <Row label="고른 전략">
-          <SelectBox
-            fieldName="strategy_key"
-            value={strategy?.strategyKey ?? null}
-            items={strategyForms.map((form) => ({ value: form.key, label: form.name }))}
-            displayExpr="label"
-            valueExpr="value"
-            noDataText="읽은 전략이 없습니다"
-            onValueChanged={(_field, value) => onStrategyChange(String(value))}
-          />
+          {(control) => (
+            <SelectBox
+              {...control}
+              fieldName="strategy_key"
+              value={strategy?.strategyKey ?? null}
+              items={strategyForms.map((form) => ({ value: form.key, label: form.name }))}
+              displayExpr="label"
+              valueExpr="value"
+              noDataText="읽은 전략이 없습니다"
+              onValueChanged={(_field, value) => onStrategyChange(String(value))}
+            />
+          )}
         </Row>
 
         {selectedForm?.summary && <p className="text-2xs leading-relaxed text-ink-muted">{selectedForm.summary}</p>}
@@ -164,92 +188,123 @@ export function BotForm({
             sourced
             source={strategy?.paramSources[field.name]}
           >
-            <StrategyFieldControl field={field} value={strategy?.params[field.name]} onChange={onParamChange} />
+            {(control) => (
+              <StrategyFieldControl
+                {...control}
+                field={field}
+                value={strategy?.params[field.name]}
+                onChange={onParamChange}
+              />
+            )}
           </Row>
         ))}
       </Section>
 
       <Section title="굴리는 규칙" note="아직 봇을 돌리지는 않습니다 — 저장되는 조건입니다.">
         <Row label="대상 종목">
-          <SelectBox
-            fieldName="universe_kind"
-            value={draft.universe_kind}
-            items={UNIVERSE_KIND_ITEMS}
-            displayExpr="label"
-            valueExpr="value"
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <SelectBox
+              {...control}
+              fieldName="universe_kind"
+              value={draft.universe_kind}
+              items={UNIVERSE_KIND_ITEMS}
+              displayExpr="label"
+              valueExpr="value"
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
         <Row label="조건 결합" help="전략을 여럿 실으면 어떻게 합칠지입니다.">
-          <SelectBox
-            fieldName="combine_rule"
-            value={draft.combine_rule}
-            items={COMBINE_RULE_ITEMS}
-            displayExpr="label"
-            valueExpr="value"
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <SelectBox
+              {...control}
+              fieldName="combine_rule"
+              value={draft.combine_rule}
+              items={COMBINE_RULE_ITEMS}
+              displayExpr="label"
+              valueExpr="value"
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
         <Row label="봇이 하는 일" help="실주문은 아직 없습니다. 지금 고를 수 있는 것은 보기와 제안뿐입니다.">
-          <SelectBox
-            fieldName="bot_role"
-            value={draft.bot_role}
-            items={BOT_ROLE_ITEMS}
-            displayExpr="label"
-            valueExpr="value"
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <SelectBox
+              {...control}
+              fieldName="bot_role"
+              value={draft.bot_role}
+              items={BOT_ROLE_ITEMS}
+              displayExpr="label"
+              valueExpr="value"
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
         <Row label="손절">
-          <NumberBox
-            fieldName="stop_loss_pct"
-            value={draft.stop_loss_pct}
-            min={0}
-            max={100}
-            step={0.5}
-            format="#,##0.##%"
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <NumberBox
+              {...control}
+              fieldName="stop_loss_pct"
+              value={draft.stop_loss_pct}
+              min={0}
+              max={100}
+              step={0.5}
+              format="#,##0.##%"
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
         <Row label="익절">
-          <NumberBox
-            fieldName="take_profit_pct"
-            value={draft.take_profit_pct}
-            min={0}
-            step={0.5}
-            format="#,##0.##%"
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <NumberBox
+              {...control}
+              fieldName="take_profit_pct"
+              value={draft.take_profit_pct}
+              min={0}
+              step={0.5}
+              format="#,##0.##%"
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
         <Row label="종목당 비중">
-          <NumberBox
-            fieldName="alloc_per_symbol"
-            value={draft.alloc_per_symbol}
-            min={0}
-            step={1}
-            format="#,##0.##%"
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <NumberBox
+              {...control}
+              fieldName="alloc_per_symbol"
+              value={draft.alloc_per_symbol}
+              min={0}
+              step={1}
+              format="#,##0.##%"
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
         <Row label="최대 보유 종목">
-          <NumberBox
-            fieldName="max_positions"
-            value={draft.max_positions}
-            min={1}
-            step={1}
-            format="#,##0종목"
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <NumberBox
+              {...control}
+              fieldName="max_positions"
+              value={draft.max_positions}
+              min={1}
+              step={1}
+              format="#,##0종목"
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
         <Row label="하루 최대 매매">
-          <NumberBox
-            fieldName="max_trades_per_day"
-            value={draft.max_trades_per_day}
-            min={1}
-            step={1}
-            format="#,##0회"
-            onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
-          />
+          {(control) => (
+            <NumberBox
+              {...control}
+              fieldName="max_trades_per_day"
+              value={draft.max_trades_per_day}
+              min={1}
+              step={1}
+              format="#,##0회"
+              onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
+            />
+          )}
         </Row>
       </Section>
     </div>

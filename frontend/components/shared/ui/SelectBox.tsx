@@ -7,6 +7,10 @@ import { FieldShell } from "./primitives/FieldShell";
 import { SelectMenu } from "./primitives/SelectMenu";
 
 interface Props<T = any> {
+  /** 바깥 라벨(`<label htmlFor>`)과 잇는 id. 안 주면 라벨과 안 이어진다. */
+  id?: string;
+  /** 도움말 문단과 잇는 id — 검증 오류가 있을 때는 그쪽이 이긴다. */
+  "aria-describedby"?: string;
   fieldName: keyof T;
   value?: string | number | null;
   items: any[];
@@ -53,6 +57,8 @@ export function SelectBox<T = any>({
   fieldRender,
   onValueChanged,
   getFieldProps,
+  id,
+  "aria-describedby": describedBy,
 }: Props<T>) {
   const errorMessageId = useId();
   const { isInvalid, errorMessage, effectiveWidth } = resolveFieldState(getFieldProps, fieldName, width);
@@ -65,6 +71,8 @@ export function SelectBox<T = any>({
       width={effectiveWidth}
     >
       <SelectMenu
+        id={id}
+        aria-describedby={describedBy}
         items={items}
         displayExpr={displayExpr}
         valueExpr={valueExpr}

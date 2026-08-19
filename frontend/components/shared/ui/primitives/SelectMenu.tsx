@@ -49,6 +49,10 @@ export interface SelectMenuProps {
   isInvalid?: boolean;
   /** 검증 실패 시 입력이 가리킬 에러 메시지 id. */
   errorMessageId?: string;
+  /** 바깥 라벨(`<label htmlFor>`)이 가리킬 id — 트리거 버튼에 단다. */
+  id?: string;
+  /** 도움말 문단 id. 검증 오류가 있으면 그쪽이 이긴다. */
+  "aria-describedby"?: string;
   onChange: (next: any) => void;
 }
 
@@ -81,6 +85,8 @@ export function SelectMenu({
   itemRender,
   fieldRender,
   isInvalid = false,
+  id,
+  "aria-describedby": describedBy,
   errorMessageId,
   onChange,
 }: SelectMenuProps) {
@@ -216,11 +222,12 @@ export function SelectMenu({
         <PopoverPrimitive.Trigger asChild>
           <button
             type="button"
+            id={id}
             disabled={disabled}
             aria-haspopup="listbox"
             aria-expanded={open}
             aria-invalid={isInvalid || undefined}
-            aria-describedby={isInvalid && errorMessageId ? errorMessageId : undefined}
+            aria-describedby={isInvalid && errorMessageId ? errorMessageId : describedBy}
             aria-readonly={readOnly || undefined}
             style={{ height }}
             className={cn(

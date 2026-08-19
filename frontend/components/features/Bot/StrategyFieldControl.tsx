@@ -9,6 +9,9 @@ interface Props {
   field: StrategyField;
   value: unknown;
   onChange: (name: string, value: unknown) => void;
+  /** 라벨이 만든 id — 안 받으면 라벨과 안 이어져 보조기술에 이름 없는 칸이 된다 (#259). */
+  id?: string;
+  "aria-describedby"?: string;
 }
 
 /**
@@ -18,11 +21,12 @@ interface Props {
  * 규약의 약속이고(§3.4), 백엔드 `test_strategy_contract.py` 가 세 종 밖의 control 이 나오면
  * 실패한다. 즉 이 `switch` 가 규약의 화면 쪽 끝이다.
  */
-export function StrategyFieldControl({ field, value, onChange }: Props) {
+export function StrategyFieldControl({ field, value, onChange, ...control }: Props) {
   switch (field.control) {
     case "number":
       return (
         <NumberBox
+          {...control}
           fieldName={field.name}
           value={typeof value === "number" ? value : null}
           min={field.min}
@@ -36,6 +40,7 @@ export function StrategyFieldControl({ field, value, onChange }: Props) {
     case "select":
       return (
         <SelectBox
+          {...control}
           fieldName={field.name}
           value={typeof value === "string" ? value : null}
           items={field.options ?? []}
@@ -47,6 +52,7 @@ export function StrategyFieldControl({ field, value, onChange }: Props) {
     case "toggle":
       return (
         <CheckBox
+          {...control}
           fieldName={field.name}
           value={value === true}
           onValueChanged={(name, next) => onChange(String(name), next)}

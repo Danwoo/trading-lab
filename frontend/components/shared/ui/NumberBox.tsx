@@ -7,6 +7,10 @@ import { resolveFieldState } from "./primitives/fieldState";
 import { FIELD_INPUT_CLASS, FieldShell, fieldBorderClass } from "./primitives/FieldShell";
 
 interface Props<T = any> {
+  /** 바깥 라벨(`<label htmlFor>`)과 잇는 id. 안 주면 라벨과 안 이어진다. */
+  id?: string;
+  /** 도움말 문단과 잇는 id — 검증 오류가 있을 때는 그쪽이 이긴다. */
+  "aria-describedby"?: string;
   fieldName: keyof T;
   value?: number | null;
   placeholder?: string;
@@ -64,6 +68,8 @@ export function NumberBox<T = any>({
   visible = true,
   onValueChanged,
   getFieldProps,
+  id,
+  "aria-describedby": describedBy,
   width,
   height,
   disabled,
@@ -91,6 +97,7 @@ export function NumberBox<T = any>({
     >
       <input
         type="number"
+        id={id}
         value={value ?? ""}
         placeholder={readOnly ? "" : placeholder}
         readOnly={readOnly}
@@ -101,7 +108,8 @@ export function NumberBox<T = any>({
         step={step}
         onChange={handleChange}
         aria-invalid={isInvalid || undefined}
-        aria-describedby={isInvalid && errorMessage ? errorMessageId : undefined}
+        // 검증 오류가 있으면 그쪽이 이긴다 — 지금 고쳐야 할 것이 먼저 읽혀야 한다.
+        aria-describedby={isInvalid && errorMessage ? errorMessageId : describedBy}
         style={{ height }}
         className={cn(
           FIELD_INPUT_CLASS,
