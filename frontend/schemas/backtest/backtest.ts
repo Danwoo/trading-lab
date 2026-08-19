@@ -128,6 +128,24 @@ export interface RunSummaryOut {
 }
 
 /** 한 조합의 리포트 — 곡선·거래·지표가 한 번에 온다 (칸 클릭은 계산이 아니라 조회다). */
+/** 봇 이력의 한 줄 — 목록에 필요한 것만. 곡선·거래는 칸을 눌러 리포트로 간다. */
+export interface BotRunOut {
+  run_id: number;
+  status: string;
+  strategy_key: string;
+  universe_def: Record<string, unknown>;
+  period_from: string;
+  period_to: string;
+  attempt_no: number;
+  parent_run_id: number | null;
+  finished_dt: string | null;
+}
+
+export interface BotRunListOut {
+  items: BotRunOut[];
+  total_count: number;
+}
+
 export interface RunReportOut {
   run: RunSummaryOut;
   equity: EquityPointOut[];

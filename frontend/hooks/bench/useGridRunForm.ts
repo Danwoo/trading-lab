@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sweepValues } from "@/lib/bench/sweep";
 import type { BacktestGridIn } from "@/schemas/backtest/backtest";
 import type { BotDetailOut, BotStrategyOut, StrategyField } from "@/schemas/bot/bot";
@@ -92,6 +92,20 @@ export function useGridRunForm(): GridRunFormController {
       })
       .catch((error: unknown) => setBotDetailError(getApiErrorMessage(error)));
   };
+
+  // 봇 화면의 「이 봇으로 검증하러 가기」가 `/bench?bot=<id>` 로 온다 — 그 봇을 집어 든다.
+  // `useSearchParams` 대신 주소를 직접 읽는다: 그 훅은 정적 렌더에서 Suspense 경계를 요구하고
+  // 라우터 컨텍스트 없이는 null 이라, 폼 하나 때문에 페이지 구조를 바꾸게 된다.
+  // 한 번만 집는다 — 사용자가 폼에서 다른 봇으로 바꾼 뒤 되돌리면 안 된다.
+  const pickedFromUrl = useRef(false);
+  useEffect(() => {
+    if (pickedFromUrl.current) return;
+    const asked = Number(new URLSearchParams(window.location.search).get("bot"));
+    if (!Number.isInteger(asked) || asked <= 0) return;
+    pickedFromUrl.current = true;
+    changeBot(asked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const changeField = (fieldName: keyof GridRunFormState, value: unknown) => {
     setForm((prev) => ({ ...prev, [fieldName]: value as never }));

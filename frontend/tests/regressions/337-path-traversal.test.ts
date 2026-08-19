@@ -209,6 +209,16 @@ const CALL_SITES: CallSite[] = [
     paramKeys: ["run_id"],
     buildUrl: (p: Record<string, string>) => `${BACKTEST_RUN}/${p.run_id}`,
   },
+  // 봇의 검증 이력 — #232. `bot_id` 를 경로에 넣는다.
+  {
+    file: "@/app/api/external/backend/backtest-run/by-bot/[bot_id]/route",
+    label: "backtest-run/by-bot/[bot_id] GET",
+    method: "GET" as const,
+    opName: "GET",
+    needsBody: false,
+    paramKeys: ["bot_id"],
+    buildUrl: (p: Record<string, string>) => `${BACKTEST_RUN}/by-bot/${p.bot_id}`,
+  },
   // 봇 — #150 B1. `bot/route` 와 `bot/strategy-catalog/route` 는 params 를 URL 에 안 꽂아
   // 콜사이트가 아니다(정적 카운트에도 안 잡힌다).
   ...(["GET", "PUT", "DELETE"] as const).map((method) => ({
