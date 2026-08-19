@@ -75,5 +75,5 @@ export default async function middleware(request: NextRequest) {
 // 그래서 목록을 손으로 유지하고, `tests/proxyMatcher.test.ts` 가 `app/**/page.tsx` 전수와
 // 대조해 빠진 경로가 있으면 실패시킨다(검사 건수 0건도 실패).
 export const config = {
-  matcher: ["/api/:path*", "/admin/:path*", "/user/:path*", "/terminal/:path*", "/bench/:path*"],
+  matcher: ["/api/:path*", "/admin/:path*", "/user/:path*", "/terminal/:path*", "/bench/:path*", "/settings/:path*"],
 };

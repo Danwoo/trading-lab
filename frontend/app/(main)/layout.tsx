@@ -10,6 +10,7 @@ import { useMenuAccessGate } from "@/hooks/shared/useMenuAccessGate";
 import { usePanelOverlaysBoard } from "@/hooks/shared/usePanelOverlaysBoard";
 import { useProductPanelStore } from "@/stores/shell/productPanelStore";
 import { RAIL_ITEMS } from "@/constants/shell";
+import { SETTINGS_PATH } from "@/constants/routes";
 
 const PANEL_REGION_ID = "product-panel";
 
@@ -27,6 +28,22 @@ const PANEL_REGION_ID = "product-panel";
  * 무엇이 열려 있나는 `stores/shell/productPanelStore.ts` 가 갖는다 — 보드의 빈 상태가 주는
  * 길(§21.4)도 패널을 열어야 해서, 셸의 지역 상태로 두면 보드에서 닿을 수 없다.
  */
+/**
+ * DB 메뉴 행 없이도 열리는 셸 진입점 — **자기 자신만** 열린다(하위 경로는 안 열린다).
+ *
+ * `/settings` 가 여기 있는 이유: 이 화면은 **어느 키가 비어 있는지**를 보이는 자리라,
+ * 설치 직후·메뉴가 아직 없는 상태에서 가장 필요하다. 메뉴 행에 매달면 그 행은 `seed.sql`
+ * 에만 있고 재시드는 계정을 지우므로, **이미 설치한 사람에게는 영영 안 보인다**
+ * (리드 결정 2026-08-19 — 키 화면은 메뉴 게이트 뒤에 두지 않는다).
+ *
+ * 키 **값**은 이 화면에 오지 않으므로 읽기 권한을 넓게 두어도 새는 것이 없다. 값을 넣는
+ * 경로가 생기면 그때는 권한을 따로 판정한다.
+ */
+const SHELL_ENTRY_PATHS = [SETTINGS_PATH] as const;
+
+/** 접두어로 여는 경로는 없다 — 하나라도 넣으면 그 아래 전부가 게이트 밖으로 나간다. */
+const NO_PREFIX_ALLOWED: readonly string[] = [];
+
 export default function ProductLayout({ children }: { children: ReactNode }) {
   const openPanelId = useProductPanelStore((s) => s.openPanelId);
   const expanded = useProductPanelStore((s) => s.expanded);
@@ -35,7 +52,7 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
   const closePanel = useProductPanelStore((s) => s.close);
   const toggleExpanded = useProductPanelStore((s) => s.toggleExpanded);
   const clearFocusRequest = useProductPanelStore((s) => s.clearFocusRequest);
-  const { loaded, authorized } = useMenuAccessGate();
+  const { loaded, authorized } = useMenuAccessGate(NO_PREFIX_ALLOWED, SHELL_ENTRY_PATHS);
   // 폭·배분은 CSS 가 정한다. JS 가 아직 답해야 하는 것은 이 하나 — 덮는가(그래서 보드가 죽는가).
   const panelOverlaysBoard = usePanelOverlaysBoard();
 

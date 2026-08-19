@@ -1,4 +1,4 @@
-import { ADMIN_PATH, BENCH_PATH, MARKET_PATH } from "@/constants/routes";
+import { BENCH_PATH, MARKET_PATH, SETTINGS_PATH } from "@/constants/routes";
 
 /**
  * §21.6 의 폭 구간 경계.
@@ -99,5 +99,5 @@ export const RAIL_ITEMS: readonly RailItem[] = [
     kind: "panel",
     pending: "포트폴리오는 아직 없습니다 — 봇 실행 엔진이 체결을 남기기 시작하면 옵니다.",
   },
-  { id: "settings", label: "설정", icon: "preferences", kind: "route", path: ADMIN_PATH, footer: true },
+  { id: "settings", label: "설정", icon: "preferences", kind: "route", path: SETTINGS_PATH, footer: true },
 ] as const;

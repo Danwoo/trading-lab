@@ -81,6 +81,38 @@ class DataKeyService:
         register_secret(value)
         return value
 
+    def list_key_status(self) -> list[dict]:
+        """어느 키가 어디에 있고 지금 채워졌는지 — **값은 싣지 않는다.**
+
+        화면이 「어디에 무엇을 넣어야 하나」를 답하려면 이 표가 필요하다. 지금은 그 지식이
+        서비스 안에만 있어 사용자가 문서를 뒤져야 한다 (#225).
+
+        `filled` 는 불리언이다. 앞자리 몇 글자도 내지 않는다 — 이 응답은 API 로 나가고,
+        키의 일부는 전체를 좁히는 단서가 된다.
+        """
+        rows = [
+            {
+                "source": source,
+                "setting": setting,
+                "filled": bool((getattr(self.config, setting, "") or "").strip()),
+                "secret": True,
+                "guidance": KEY_ACQUISITION_HINT.get(source),
+            }
+            for source, setting in SOURCE_KEY_SETTINGS.items()
+        ]
+        rows.extend(
+            {
+                "source": source,
+                "setting": CONTACT_SETTING,
+                "filled": bool((getattr(self.config, CONTACT_SETTING, "") or "").strip()),
+                # 비밀이 아니라 「우리가 누구인지」다 — 화면이 마스킹으로 감출 값이 아니다.
+                "secret": False,
+                "guidance": "소스가 우리를 식별하는 연락처입니다 — 비밀값이 아닙니다",
+            }
+            for source in NON_SECRET_CONTACT_SOURCES
+        )
+        return rows
+
     def unavailable_reason(self, source: str) -> str:
         """키가 없는 이유 + 리드가 무엇을 하면 열리는지. 화면이 그대로 보여줄 문장이다.
 
