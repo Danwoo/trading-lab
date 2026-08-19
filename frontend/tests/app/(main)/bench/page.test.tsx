@@ -112,6 +112,16 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
     expect(within(firstRegion("격자")).getByRole("form", { name: "격자 실행" })).toBeTruthy();
   });
 
+  it("봇의 역할을 사람 말로 적는다 — READONLY 를 그대로 내보내지 않는다", async () => {
+    givenBackend({ bots: [{ bot_id: 1, bot_nm: "봇 알파", bot_role: "READONLY", use_at: "Y" }] });
+    render(<BenchPage />);
+
+    const zone = firstRegion("내 봇");
+    await waitFor(() => expect(zone.textContent).toContain("봇 알파"));
+    expect(zone.textContent).toContain("보기만 한다");
+    expect(zone.textContent).not.toContain("READONLY");
+  });
+
   it("길을 둘 준다 — 「봇 만들기」와 「에이전트에게 맡기기」 (§21.4)", () => {
     render(<BenchPage />);
 

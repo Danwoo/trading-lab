@@ -19,6 +19,7 @@ import {
   type BenchSelection,
   type BenchSelectionKind,
 } from "@/stores/shell/benchSelectionStore";
+import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
 import type { Provenance } from "@/types/terminal/provenance";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import { ProductStages } from "@/components/features/Bench/ProductStages";
@@ -296,7 +297,7 @@ export default function Page() {
                 <li key={bot.bot_id} className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
                   <span className="min-w-0 break-keep text-ink">{bot.bot_nm}</span>
                   <span className="break-keep text-2xs text-ink-muted">
-                    {bot.bot_role} · {bot.use_at === "Y" ? "사용" : "중지"}
+                    {BOT_ROLE_LABEL[bot.bot_role]} · {bot.use_at === "Y" ? "켜짐" : "꺼짐"}
                   </span>
                 </li>
               ))}
