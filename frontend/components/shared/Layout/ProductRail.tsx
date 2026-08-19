@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { showToast } from "@/components/shared/Feedback";
 import { Icon } from "@/components/shared/ui/primitives/icons";
@@ -51,6 +51,12 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
   const isRouteActive = (item: RailItem) =>
     !!item.path && (pathname === item.path || pathname.startsWith(item.path + "/"));
 
+  // 이동은 즉시 끝나지 않는다 — 그동안 화면은 이전 자리 그대로다. 누른 버튼이 반응하지 않으면
+  // 「눌리긴 한 건가」를 알 수 없다. 전체 화면 로딩 대신 **누른 버튼만** 표시하는 이유는,
+  // 빠른 이동에서 화면 전체가 한 번 깜빡이는 것이 더 나쁘기 때문이다.
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+  const [, startNavigation] = useTransition();
+
   const handleClick = (item: RailItem) => {
     if (item.kind === "panel") {
       onTogglePanel(item.id);
@@ -60,14 +66,21 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
       showToast(item.pending, "info");
       return;
     }
-    router.push(item.path);
+    const path = item.path;
+    setNavigatingTo(item.id);
+    startNavigation(() => router.push(path));
   };
+
+  useEffect(() => {
+    setNavigatingTo(null);
+  }, [pathname]);
 
   const renderItem = (item: RailItem) => {
     const isPanel = item.kind === "panel";
     const isOpen = isPanel && openPanelId === item.id;
     const isActive = !isPanel && isRouteActive(item);
     const isPending = !isPanel && !item.path;
+    const isNavigating = navigatingTo === item.id;
 
     return (
       <li key={item.id}>
@@ -83,6 +96,7 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
           aria-expanded={isPanel ? isOpen : undefined}
           aria-controls={isPanel ? panelRegionId : undefined}
           aria-disabled={isPending || undefined}
+          aria-busy={isNavigating || undefined}
           onClick={() => handleClick(item)}
           className={cn(
             // 테두리 색은 **가지마다 정확히 하나씩** 준다. `border-transparent` 를 기본으로 깔면
@@ -94,6 +108,7 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
             isOpen && "border-ink-strong bg-bg-raised text-ink-strong",
             !isActive && !isOpen && "border-transparent text-ink-muted hover:bg-bg-raised hover:text-ink",
             isPending && "opacity-60",
+            isNavigating && "animate-pulse border-line-strong bg-bg-raised",
           )}
         >
           <Icon name={item.icon} size={18} />
