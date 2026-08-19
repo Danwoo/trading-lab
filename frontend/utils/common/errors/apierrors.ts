@@ -67,6 +67,9 @@ export function getApiErrorMessage(error: any): string {
         // detail 배열의 첫 번째 에러 메시지 처리 (서버 제공)
         if (errorData.detail.length > 0) {
           const firstError = errorData.detail[0];
+          // `hint` 는 서버가 그 필드의 설명을 실어 준 것이다 — **행동을 말하는 쪽은 이것**이다.
+          // `msg`("Field required")만 보여 주면 무엇을 넣어야 하는지 여전히 알 수 없다.
+          if (firstError.hint) return firstError.msg ? `${firstError.msg} — ${firstError.hint}` : firstError.hint;
           if (firstError.msg) return firstError.msg;
         }
 
