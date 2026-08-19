@@ -67,15 +67,7 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
     const isPanel = item.kind === "panel";
     const isOpen = isPanel && openPanelId === item.id;
     const isActive = !isPanel && isRouteActive(item);
-    // 두 축을 가른다.
-    //
-    // `isPending` — **스스로 미완이라 선언했다**(`pending` 문구가 있다). 표식은 이 축이다.
-    //   종전 판정은 라우트만 봐서, 패널로 열리지만 안이 빈 넷(에이전트·거래 로그·내 기준·
-    //   포트폴리오)을 놓쳤다. 눌러야 「아직 없습니다」가 나오면 몇 번 겪고 레일을 안 누르게 된다.
-    // `leadsNowhere` — **눌러도 갈 곳이 없다**(라우트인데 경로가 없어 안내만 띄운다).
-    //   `aria-disabled` 는 이 축이다 — 패널은 실제로 열리므로 못 쓴다고 말하면 거짓이다.
-    const isPending = Boolean(item.pending);
-    const leadsNowhere = !isPanel && !item.path;
+    const isPending = !isPanel && !item.path;
 
     return (
       <li key={item.id}>
@@ -90,13 +82,13 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
           aria-current={isActive ? "page" : undefined}
           aria-expanded={isPanel ? isOpen : undefined}
           aria-controls={isPanel ? panelRegionId : undefined}
-          aria-disabled={leadsNowhere || undefined}
+          aria-disabled={isPending || undefined}
           onClick={() => handleClick(item)}
           className={cn(
             // 테두리 색은 **가지마다 정확히 하나씩** 준다. `border-transparent` 를 기본으로 깔면
             // Tailwind 가 그것을 색 유틸리티 중 마지막에 내보내 뒤에 오는 조건부 색을 전부 덮는다
             // (같은 명시도 → 소스 순서 승). 그렇게 두면 활성·열림 테두리가 코드엔 있고 화면엔 없다.
-            "relative flex h-[30px] w-[30px] items-center justify-center rounded-lg border transition-colors",
+            "flex h-[30px] w-[30px] items-center justify-center rounded-lg border transition-colors",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
             isActive && "border-line-strong bg-bg-raised text-ink",
             isOpen && "border-ink-strong bg-bg-raised text-ink-strong",
@@ -105,10 +97,6 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
           )}
         >
           <Icon name={item.icon} size={18} />
-          {isPending && (
-            // 흐리기만으로는 「미완」이 안 읽힌다 — 점 하나를 얹어 눌러보기 전에 알게 한다.
-            <span aria-hidden className="absolute right-1 top-1 h-1 w-1 rounded-full bg-ink-muted" />
-          )}
         </button>
       </li>
     );
