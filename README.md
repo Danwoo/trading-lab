@@ -32,9 +32,24 @@ cd frontend && npm install && cd ..
 
 # 3. Start everything.
 process-compose up
+
+# 4. Seed the demo accounts (once, after the database is up).
+docker exec -i fintech-pg psql -U fintech -d fintech < frontend/prisma/init/seed.sql
 ```
 
-Then open <http://localhost:3010>.
+Then open <http://localhost:3010> and sign in:
+
+| Account | Password | Role |
+| --- | --- | --- |
+| `admin@example.com` | `changeme1234` | System admin — sees `/admin` |
+| `operator@example.com` | `changeme1234` | Operator — one workspace |
+
+**These are demo credentials in a public repo.** Change them before exposing the app to anything
+but your own machine.
+
+Signing up through the UI works too, without a mail server: leave `EMAIL_HOST` empty in
+`frontend/.env.development` (the default) and the verification code is printed to the frontend's
+console instead of being emailed. Production never takes that path.
 
 **No API keys needed.** Every MCP server ships with mock financial data, so the whole stack boots
 and the research chat answers out of the box. For real data, put your own key in that service's

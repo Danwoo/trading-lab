@@ -10,6 +10,10 @@ import { emailVerificationOtpIdentifier, normalizeEmail } from "@/lib/auth/authU
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// SMTP 를 설정하지 않은 개발 환경에서는 메일 대신 서버 콘솔에 코드를 찍는다 — 메일 서버 없이 가입까지 도달하게.
+// 운영에서는 EMAIL_HOST 가 비어도 이 경로를 타지 않는다 (코드가 콘솔로 새는 것을 막는다).
+const isConsoleOtpMode = env.NODE_ENV !== "production" && !env.EMAIL_HOST;
+
 function toFriendlyEmailError(message: string): string {
   if (
     /user.*unavailable|account.*unavailable|no such user|user.*not.*exist|does not exist|unknown user|invalid.*mailbox/i.test(
@@ -48,16 +52,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: `요청이 너무 많습니다.\n잠시 후 다시 시도해주세요.` }, { status: 429 });
   }
 
-  const transporter = nodemailer.createTransport({
-    host: env.EMAIL_HOST,
-    port: Number(env.EMAIL_PORT),
-    secure: true,
-    auth: {
-      user: env.EMAIL_USER,
-      pass: env.EMAIL_PASSWORD,
-    },
-  });
-
   // 6자리 랜덤 OTP 생성
   const otp = crypto
     .randomBytes(4)
@@ -71,18 +65,21 @@ export async function POST(request: NextRequest) {
   // MX 레코드 검증
   const domain = to.split("@")[1];
   const subject = `[ACME] 인증 코드: ${otp}`;
-  try {
-    const mxRecords = await dns.resolveMx(domain);
-    if (!mxRecords || mxRecords.length === 0) throw new Error(`No MX records found for domain: ${domain}`);
-  } catch (e) {
-    const rawError = e instanceof Error ? e.message : String(e);
-    await prisma.emailLog.create({
-      data: { to, subject, status: "FAIL", error_msg: rawError, reg_dt: new Date() },
-    });
-    return NextResponse.json(
-      { message: `유효하지 않은 이메일 도메인입니다.\n이메일 주소를 다시 확인해주세요.` },
-      { status: 400 },
-    );
+  // 콘솔 모드에서는 DNS 를 타지 않는다 — 오프라인 개발에서도 가입이 뚫려야 한다.
+  if (!isConsoleOtpMode) {
+    try {
+      const mxRecords = await dns.resolveMx(domain);
+      if (!mxRecords || mxRecords.length === 0) throw new Error(`No MX records found for domain: ${domain}`);
+    } catch (e) {
+      const rawError = e instanceof Error ? e.message : String(e);
+      await prisma.emailLog.create({
+        data: { to, subject, status: "FAIL", error_msg: rawError, reg_dt: new Date() },
+      });
+      return NextResponse.json(
+        { message: `유효하지 않은 이메일 도메인입니다.\n이메일 주소를 다시 확인해주세요.` },
+        { status: 400 },
+      );
+    }
   }
 
   // BaVerification 테이블에 OTP 저장 (BA emailOtp 포맷: `${hash}:${attempts}`)
@@ -128,6 +125,24 @@ export async function POST(request: NextRequest) {
       },
     ],
   };
+
+  if (isConsoleOtpMode) {
+    console.info(`[dev] SMTP 미설정 — ${to} 인증 코드: ${otp}`);
+    await prisma.emailLog.create({
+      data: { to, subject, status: "CONSOLE", reg_dt: new Date() },
+    });
+    return NextResponse.json({ message: "Email sent successfully" });
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: env.EMAIL_HOST,
+    port: Number(env.EMAIL_PORT),
+    secure: true,
+    auth: {
+      user: env.EMAIL_USER,
+      pass: env.EMAIL_PASSWORD,
+    },
+  });
 
   try {
     await transporter.sendMail(mailOptions);

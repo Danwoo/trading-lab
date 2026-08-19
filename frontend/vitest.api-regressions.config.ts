@@ -29,6 +29,7 @@ export default defineConfig({
       "tests/regressions/400-put-full-representation.test.ts",
       "tests/regressions/238-email-immutability.test.ts",
       "tests/regressions/251-personal-workspace-menu.test.tsx",
+      "tests/regressions/231-console-otp-dev-only.test.ts",
     ],
     environment: "node",
     // 검사 대상이 0건이면 실패한다 — vitest.config.ts 와 같은 원칙(#252). include 를 파일
