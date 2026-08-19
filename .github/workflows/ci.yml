@@ -343,6 +343,20 @@ jobs:
             *) echo "::error::검사가 실제로 돌지 않았다 (DB URL 이 안 닿았다) — 건너뜀은 통과가 아니다"; exit 1 ;;
           esac
 
+      # 「아직 안 받았다」와 「없는 종목이다」가 같은 문구로 나오면 사용자가 자기 입력을
+      # 의심한다 (#223). 키 없이 도는 소스가 생기면서 처음 생긴 상태라 단위 테스트가 못 본다.
+      - name: 미적재와 없는 종목이 다른 답을 내는지 검증
+        if: ${{ !cancelled() }}
+        env:
+          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+        run: |
+          out=$(uv run python scripts/verify_not_loaded_vs_missing.py)
+          echo "$out"
+          case "$out" in
+            *"REQUIRE=db 실행됨"*) : ;;
+            *) echo "::error::검사가 실제로 돌지 않았다 — 건너뜀은 통과가 아니다"; exit 1 ;;
+          esac
+
       - name: frontend FK 참조 동작 계약 검증
         if: ${{ !cancelled() }}
         run: uv run python scripts/verify_frontend_fk_referential_actions.py --i-know-this-drops-tables
