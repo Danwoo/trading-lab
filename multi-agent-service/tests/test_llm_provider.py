@@ -12,6 +12,9 @@
   ④ 모르는 제공자를 조용히 기본값으로 떨어뜨리지 않는다
   ⑤ 폴백 설정의 모양이 어긋나면 사유를 낸다 — 조용히 무시하면 「적었는데 안 도는」 상태가 된다
   ⑥ 상태 표에 키가 안 실린다
+  ⑦ **폴백 사유에도** 키가 안 실린다 — 칸 순서를 바꿔 적으면 첫 칸이 키다
+  ⑧ 제공자가 vLLM 토글을 이긴다 — Groq 를 고른 사람이 400 으로 죽지 않게
+  ⑨ 고른 제공자와 실제 주소가 어긋나면 조용하지 않다
 
 standalone 실행 겸용:
     cd multi-agent-service && uv run python tests/test_llm_provider.py
@@ -31,7 +34,13 @@ if str(_APP_DIR) not in sys.path:
     sys.path.insert(0, str(_APP_DIR))
 
 from clients.llm.llm_client import describe_roles, fallback_count, fallback_problems  # noqa: E402
-from clients.llm.providers import PROVIDERS, resolve, unavailable_reason  # noqa: E402
+from clients.llm.providers import (  # noqa: E402
+    PROVIDERS,
+    address_mismatch,
+    resolve,
+    sends_vllm_extra_body,
+    unavailable_reason,
+)
 
 FAILURES: list[str] = []
 CHECKED = 0
@@ -126,8 +135,47 @@ def main() -> int:
     check("generator 는 사유가 있다", by_role["generator"]["reason"] is not None, True)
     check("답한 모델을 알려 준다", by_role["router"]["model"], "llama-3.3-70b-versatile")
 
+    # ⑦ **폴백 사유에 값이 실리지 않는다** — 칸 순서를 바꿔 적으면 첫 칸이 키다.
+    #    리뷰가 지목한 그 공격을 그대로 건다.
+    leaked = fallback_problems(f"{SECRET}|groq|llama-3.3-70b-versatile")
+    check("칸 순서를 바꿔도 사유가 난다", len(leaked), 1)
+    check("사유에 키가 안 실린다", any(SECRET in problem for problem in leaked), False)
+    check("사유가 아는 것을 알려 준다", "groq" in leaked[0], True)
+    try:
+        resolve(SECRET, "")
+        check("모르는 제공자를 거절한다", "통과함", "거절")
+    except Exception as exc:  # noqa: BLE001
+        check("예외 문구에도 키가 없다", SECRET in str(exc), False)
+
+    # ⑧ **제공자가 vLLM 토글을 이긴다** — Groq 를 고른 사람이 400 으로 죽지 않게
+    groq_provider, _ = resolve("groq", "")
+    vllm_provider, _ = resolve("vllm", "")
+    custom_provider, _ = resolve("custom", "")
+    check("Groq 는 토글이 켜져도 안 보낸다", sends_vllm_extra_body(groq_provider, True), False)
+    check("자체 vLLM 은 보낸다", sends_vllm_extra_body(vllm_provider, True), True)
+    check("custom 은 토글을 따른다 (켬)", sends_vllm_extra_body(custom_provider, True), True)
+    check("custom 은 토글을 따른다 (끔)", sends_vllm_extra_body(custom_provider, False), False)
+
+    class GroqWithToggleOn(Config):
+        ROUTER_LLM_VLLM_COMPAT = True
+
+    from clients.llm.llm_client import _vllm_compat_kwargs  # noqa: PLC0415
+
+    check("팩토리가 Groq 에 extra_body 를 안 싣는다", _vllm_compat_kwargs(GroqWithToggleOn(), groq_provider), {})
+
+    # ⑨ **주소가 어긋나면 조용하지 않다** — 제공자만 고르고 BASE_URL 을 안 비운 상태
+    check("표의 주소면 경고 없음", address_mismatch(groq_provider, "https://api.groq.com/openai/v1"), None)
+    mismatch = address_mismatch(groq_provider, "http://198.51.100.35:18080/router/v1")
+    check("다른 주소면 경고", mismatch is not None, True)
+    check("경고가 무엇을 하면 되는지 말한다", "BASE_URL 을 비우세요" in (mismatch or ""), True)
+    check("custom 은 경고 없음", address_mismatch(custom_provider, "http://gw.internal/v1"), None)
+
+    rows = describe_roles(Config())
+    check("상태에 실제 주소가 실린다", all("base_url" in row for row in rows), True)
+    check("상태에 경고 칸이 있다", all("warning" in row for row in rows), True)
+
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (제공자 {len(PROVIDERS)}종)")
-    if CHECKED < 30:
+    if CHECKED < 60:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:

@@ -16,6 +16,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+class UnknownProvider(ValueError):
+    """표에 없는 제공자. **메시지에 입력 값을 담지 않는다** — 이 문장은 API 로 나간다."""
+
+
 @dataclass(frozen=True)
 class LlmProvider:
     """한 제공자를 쓰는 데 필요한 것 전부."""
@@ -64,7 +68,9 @@ PROVIDERS: tuple[LlmProvider, ...] = (
     LlmProvider(
         id="vllm",
         name="자체 vLLM 서버",
-        base_url="http://localhost:8000/v1",
+        # **8000 은 이 레포의 backend-service 다** — 기본값으로 두면 주소를 안 적은 사람의
+        # LLM 요청이 자기 백엔드로 간다. vLLM 기본 서빙 포트(8080)를 쓴다.
+        base_url="http://localhost:8080/v1",
         model_example="Qwen/Qwen2.5-7B-Instruct",
         key_hint="자체 서빙이라 키가 없으면 EMPTY 로 둡니다",
         vllm_compat=True,
@@ -92,9 +98,38 @@ def resolve(provider_id: str, base_url: str) -> tuple[LlmProvider, str]:
     """
     provider = PROVIDER_BY_ID.get((provider_id or "").strip().lower() or DEFAULT_PROVIDER_ID)
     if provider is None:
+        # **입력 원문을 담지 않는다.** 이 문장은 `fallback_problems()` 를 거쳐 API 응답으로
+        # 나가는데, 폴백 항목의 칸 순서를 바꿔 적으면 그 자리에 **키**가 들어 있다.
         known = ", ".join(sorted(PROVIDER_BY_ID))
-        raise ValueError(f"모르는 LLM 제공자입니다: {provider_id!r} (아는 것: {known})")
+        raise UnknownProvider(f"모르는 LLM 제공자입니다 (아는 것: {known})")
     return provider, (base_url or "").strip() or provider.base_url
+
+
+def sends_vllm_extra_body(provider: LlmProvider, toggle: bool) -> bool:
+    """이 호출에 vLLM 전용 `extra_body` 를 실을 것인가.
+
+    **제공자를 골랐으면 그 제공자가 이긴다.** 토글(`ROUTER_LLM_VLLM_COMPAT`)의 기본값이 `True`
+    라, 무료 티어 Groq 키로 이 제품을 처음 쓰는 사람이 `ROUTER_LLM_PROVIDER=groq` 만 고르면
+    상용 API 가 **400 으로 거절**해 plan·guardrail·clarify 가 전멸한다 — 이 PR 이 겨냥한 바로
+    그 사람이다. `custom` 은 무엇인지 모르므로 토글을 따른다.
+    """
+    if provider.id == DEFAULT_PROVIDER_ID:
+        return toggle
+    return provider.vllm_compat
+
+
+def address_mismatch(provider: LlmProvider, base_url: str) -> str | None:
+    """고른 제공자와 **실제로 부르는 주소**가 다르면 그 사실. 다르지 않으면 `None`.
+
+    설정의 `BASE_URL` 이 표를 이기는 것은 의도된 설계지만(사내 게이트웨이), 그 결과가
+    조용하면 안 된다 — 배포되는 `.env.example` 은 vLLM 주소를 채운 채 나가므로, 제공자만
+    고른 사람은 **Groq 키를 vLLM 주소로 보내면서** 화면에서는 「groq」를 본다.
+    """
+    if provider.id == DEFAULT_PROVIDER_ID or not provider.base_url:
+        return None
+    if (base_url or "").strip().rstrip("/") == provider.base_url.rstrip("/"):
+        return None
+    return f"{provider.name} 를 골랐는데 BASE_URL 이 다른 주소를 가리킵니다 — 표의 주소를 쓰려면 BASE_URL 을 비우세요"
 
 
 def unavailable_reason(provider: LlmProvider, base_url: str, model: str, api_key: str) -> str | None:

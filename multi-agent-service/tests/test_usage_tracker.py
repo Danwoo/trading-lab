@@ -171,12 +171,13 @@ _LLM_RECEIVERS = frozenset(
         "deps.generator_llm",
         "llm_to_use",  # map_reduce 도메인 답변 작성
         "self._generator_llm",  # agent_service 제목·후속질문 생성
+        "probe_client",  # /agent/llm/probe — 키가 실제로 통하는지 1토큰으로 확인 (#226)
     }
 )
 # LLM 이 아닌 invoke — 도구 실행·서브그래프 호출. run_name 은 trace 가독용이라 강제하지 않는다.
 _NON_LLM_RECEIVERS = frozenset({"tool", "agent", "graph"})
 # fail-closed 핀 — 검사 0건이 초록이 되지 않게, 그리고 관측 지점이 조용히 줄지 않게 박는다.
-_EXPECTED_LLM_CALL_SITES = 15
+_EXPECTED_LLM_CALL_SITES = 16
 
 
 def _llm_call_sites() -> tuple[list[str], list[str], int]:
