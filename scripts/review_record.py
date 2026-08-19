@@ -730,7 +730,21 @@ def decide_delegate(payload) -> dict:
             "위임 머지는 게이트를 기다리지 않는다. 초록이 된 뒤 다시 요청하라"
         )
 
-    if arm["risk"] != "low":
+    # **미선언은 저위험으로 본다** — arm 경로와 같은 규칙이다 (리드 결정 2026-08-18).
+    #
+    # 종전엔 `arm` 이 완화를 받는데 `delegate` 는 `risk != "low"` 를 직접 봐, 자동 경로는
+    # 흐르고 위임 경로만 막혔다. **같은 판정부를 재사용한다**는 이 함수의 전제가 여기서
+    # 깨져 있었다(실측: PR #216 이 그 자리에 막혔다).
+    #
+    # 「못 읽음」과 「안 적음」의 구분도 arm 과 같다 — 조회 실패는 여전히 사람 경로다.
+    # 봇 PR 은 이 완화의 대상이 아니다 — 위임 경로는 상승 종류 예외를 아예 안 타므로
+    # (그물이 못박은 계약), 미선언을 이유로 그 문을 열면 major 의존성 상승이 위임으로 샌다.
+    _lookup_failed = "조회 실패" in (arm.get("risk_evidence") or "")
+    _bot = bool(payload.get("pr_author_is_bot"))
+    _risk_ok = arm["risk"] == "low" or (
+        arm["risk"] == "undeclared" and not _lookup_failed and not _bot
+    )
+    if not _risk_ok:
         reasons.append(
             f"③ 저위험 확정 아님 (위험도: {arm['risk']} — {arm['risk_evidence']}) — "
             "미선언·고위험은 사람 경로다"
