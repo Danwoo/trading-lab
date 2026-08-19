@@ -122,19 +122,49 @@ def main() -> int:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
         conn.execute(text(f"CREATE SCHEMA {schema}"))
 
-    migration_path = BACKEND / "alembic" / "versions" / "0015_backtest.py"
-    if not migration_path.is_file():
-        print(f"::error::마이그레이션이 없다: {migration_path}", file=sys.stderr)
+    # **이 그물이 필요로 하는 마이그레이션만 태운다.** 전 도메인을 순서대로 돌리면 다른
+    # 스키마를 명시적으로 박은 데이터 마이그레이션(`0013` 은 `public.tn_board` 를 SQL 에
+    # 직접 적는다)이 이 격리 스키마에서 죽는다 — 실제로 그렇게 CI 를 깨뜨렸다.
+    #
+    # 목록을 손으로 적지 않는다: **backtest 테이블을 건드리는 마이그레이션**을 소스에서 찾아
+    # 체인 순서대로 태운다. 뒤에 붙는 것도 그 테이블을 건드리면 자동으로 따라온다.
+
+    versions = BACKEND / "alembic" / "versions"
+    modules, parents = {}, {}
+    for path in sorted(versions.glob("[0-9]*.py")):
+        # `text` 는 sqlalchemy 것이다 — 여기서 가리면 뒤의 쿼리가 통째로 죽는다.
+        source = path.read_text(encoding="utf-8")
+        if "tn_backtest" not in source:
+            continue
+        mod_spec = importlib.util.spec_from_file_location(f"_bt_mig_{path.stem}", path)
+        module = importlib.util.module_from_spec(mod_spec)
+        mod_spec.loader.exec_module(module)
+        modules[module.revision] = module
+        parent = getattr(module, "down_revision", None)
+        # merge 리비전의 `down_revision` 은 **튜플**이다. 스칼라로만 다루면 그 튜플이 통째로
+        # 키가 되어 어느 부모에도 안 걸리고, 부모보다 먼저 도는 순서가 나온다.
+        parents[module.revision] = () if parent is None else (parent,) if isinstance(parent, str) else tuple(parent)
+    if not modules:
+        print(f"::error::backtest 테이블을 다루는 마이그레이션을 0건 찾았다: {versions}", file=sys.stderr)
         return 1
-    mod_spec = importlib.util.spec_from_file_location("_bt_migration", migration_path)
-    migration = importlib.util.module_from_spec(mod_spec)
-    mod_spec.loader.exec_module(migration)
+
+    #: 고른 것들끼리 체인 순서를 만든다 — 부모가 목록 밖이면 그것이 시작점이다.
+    order, remaining = [], dict(modules)
+    while remaining:
+        ready = [rev for rev in remaining if all(p not in remaining for p in parents[rev])]
+        if not ready:
+            print(f"::error::마이그레이션 순서를 정할 수 없다 (순환?): {sorted(remaining)}", file=sys.stderr)
+            return 1
+        for rev in sorted(ready):
+            order.append(rev)
+            del remaining[rev]
 
     with engine.begin() as conn:
         ops = Operations(MigrationContext.configure(conn))
         ops._install_proxy()
         try:
-            migration.upgrade()
+            for revision in order:
+                modules[revision].upgrade()
         finally:
             ops._remove_proxy()
 

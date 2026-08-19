@@ -96,6 +96,18 @@ def test_metrics_ride_along_and_longest_underwater_is_first() -> None:
     keys = [m["key"] for m in report["metrics"]]
     check("샤프는 맨 뒤다", keys[-1], "sharpe")
 
+    # **이 성과가 무엇을 치르고 남은 것인지** 말한다 (#271 — 제품 정의 §5 W4 완료 조건).
+    check("치른 비용이 있다", "cost_paid" in keys, True)
+    check("비용이 먹은 수익률이 있다", "cost_drag_pct" in keys, True)
+    by_key = {m["key"]: m for m in report["metrics"]}
+    # 재실행이 아니라는 것을 **유도 문구가** 밝힌다 — 비용 0 으로 다시 돌리면 체결 수량이 달라진다
+    check(
+        "재실행이 아님을 밝힌다",
+        "다시 돌린 값이 아니다" in (by_key["cost_drag_pct"]["derived_from"] or ""),
+        True,
+    )
+    check("치른 비용의 유도가 세 항목을 말한다", "증권거래세" in (by_key["cost_paid"]["derived_from"] or ""), True)
+
 
 def test_zero_trades_is_absent_not_zero() -> None:
     repo = FakeRepository(run_row(), equity_rows([100.0, 101.0, 102.0]), [])
@@ -119,6 +131,7 @@ def test_decimal_rows_become_floats() -> None:
             "exit_price": Decimal("110"),
             "fee": Decimal("0.1"),
             "slippage": Decimal("0.1"),
+            "tax": Decimal("0.6"),
             "realized_pnl": Decimal("30"),
             "mae": None,
             "mfe": None,
@@ -132,6 +145,14 @@ def test_decimal_rows_become_floats() -> None:
     check("run.initial_cash 가 float 이다", isinstance(report["run"]["initial_cash"], float), True)
     win = next(m for m in report["metrics"] if m["key"] == "win_rate")
     check("청산 거래 1건이 승률 계산에 들어간다", win["value"], 100.0)
+    check("거래 목록이 세금을 싣고 나온다", report["trades"][0]["tax"], 0.6)
+    # **비용 3종이 다 실려야 값이 맞는다.** `backtest_service` 에서 `fee=`·`slippage=`·`tax=`
+    # 중 하나만 빠져도 이 합이 조용히 작아진다 — 실측으로 25거래에 0원이 나왔던 자리다.
+    paid = next(m for m in report["metrics"] if m["key"] == "cost_paid")
+    check("치른 비용 = 수수료+슬리피지+세금", paid["value"], 0.8)
+    # 분모는 run 의 시작 자금(1,000,000)이지 `equity[0]`(=100) 이 아니다.
+    drag = next(m for m in report["metrics"] if m["key"] == "cost_drag_pct")
+    check("비용이 먹은 수익률의 분모는 시작 자금", drag["value"], 0.8 / 1_000_000 * 100)
 
 
 def test_other_workspace_run_is_hidden() -> None:
@@ -158,6 +179,8 @@ def test_round_trip_cost_feeds_metric() -> None:
             "exit_price": Decimal("101"),
             "fee": Decimal("0"),
             "slippage": Decimal("0"),
+            # 세율이 걸린 run 인데 세금이 0 — `0017` 이전에 남은 행이 이 모양이다.
+            "tax": Decimal("0"),
             "realized_pnl": Decimal("1"),
             "mae": None,
             "mfe": None,
@@ -169,6 +192,10 @@ def test_round_trip_cost_feeds_metric() -> None:
 
     avg = next(m for m in report["metrics"] if m["key"] == "avg_trade_vs_cost")
     check("거래당 평균 − 왕복 비용", round(avg["value"], 4), round(1.0 - 0.31, 4))
+    # 세금 기록이 없는 옛 실행은 합계를 지어내지 않는다 — 세금은 명시 비용의 절반을 넘는다.
+    paid = next(m for m in report["metrics"] if m["key"] == "cost_paid")
+    check("옛 실행의 치른 비용은 값이 없다", paid["value"], None)
+    check("사유가 옛 실행임을 말한다", "옛 실행" in (paid["absent_reason"] or ""), True)
 
 
 def main() -> int:

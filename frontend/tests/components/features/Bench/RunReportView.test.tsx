@@ -128,6 +128,7 @@ describe("RunReportView", () => {
           exit_price: 110,
           fee: 0.1,
           slippage: 0.1,
+          tax: 0.2,
           realized_pnl: 30,
           mae: null,
           mfe: null,
@@ -138,6 +139,28 @@ describe("RunReportView", () => {
 
     const section = screen.getByRole("region", { name: "거래 목록" });
     expect(section.textContent).toContain("+30");
+  });
+
+  it("비용 가정 3종을 그대로 읽어 준다 — 이 숫자들이 무엇 위에 서 있는지", () => {
+    const withCosts = report();
+    withCosts.run = {
+      ...withCosts.run,
+      cost_assumptions: { fee_rate: 0.00015, slippage_rate: 0.0005, sell_tax_rate: 0.0018 },
+    };
+    render(<RunReportView report={withCosts} />);
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("수수료 0.015%");
+    expect(text).toContain("슬리피지 0.050%");
+    expect(text).toContain("증권거래세 0.180%");
+  });
+
+  it("가정이 비어 있으면 0% 로 지어내지 않고 기록이 없다고 말한다", () => {
+    const noCosts = report();
+    noCosts.run = { ...noCosts.run, cost_assumptions: {} };
+    render(<RunReportView report={noCosts} />);
+
+    expect(document.body.textContent ?? "").toContain("비용 가정 — 기록되지 않았습니다");
   });
 
   it("실패한 실행은 지표를 지어내지 않고 사유를 낸다", () => {

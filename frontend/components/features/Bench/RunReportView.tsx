@@ -164,6 +164,22 @@ function EquityCurve({ report }: { report: RunReportOut }) {
   return <div ref={containerRef} className="h-[30svh] w-full min-w-0" />;
 }
 
+/** 비용 항목의 사람 말 — 값 자체는 백엔드가 준 키다. */
+const COST_LABEL: Record<string, string> = {
+  fee_rate: "수수료",
+  slippage_rate: "슬리피지",
+  sell_tax_rate: "증권거래세",
+};
+
+/**
+ * 요율을 백분율로. 소수 셋째 자리에서 반올림하면 극소 요율이 「0.000%」가 되어 **0 과
+ * 구분되지 않는다** — 그때만 유효숫자로 물러선다.
+ */
+function ratePercent(rate: number): string {
+  const fixed = (rate * 100).toFixed(3);
+  return rate > 0 && Number(fixed) === 0 ? (rate * 100).toPrecision(2) : fixed;
+}
+
 /**
  * 격자에서 고른 한 조합의 리포트 (#203) — 곡선·낙폭, 판정 지표, 거래목록이 **그 조합으로**
  * 바뀌는 자리다 (전파 규칙 §2.3).
@@ -179,6 +195,18 @@ export function RunReportView({ report }: { report: RunReportOut }) {
           .map(([key, value]) => `${key}=${String(value)}`)
           .join(" · ")}{" "}
         · {run.period_from} ~ {run.period_to}
+      </p>
+
+      {/* **이 화면의 모든 숫자가 이 가정 위에 서 있다.** 가정을 안 보이면 수익률·Calmar·샤프가
+          무엇을 전제한 값인지 알 수 없다 (제품 정의 counter-metric — 모든 숫자가 출처 표시를
+          유지한다). 실측: 명시 비용 3종만으로 회전에 따라 0.24~20.48p 가 갈린다. */}
+      <p className="break-keep text-2xs text-ink-muted">
+        비용 가정 —{" "}
+        {Object.keys(run.cost_assumptions).length === 0
+          ? "기록되지 않았습니다"
+          : Object.entries(run.cost_assumptions)
+              .map(([key, rate]) => `${COST_LABEL[key] ?? key} ${ratePercent(rate)}%`)
+              .join(" · ")}
       </p>
 
       {run.status === "failed" ? (

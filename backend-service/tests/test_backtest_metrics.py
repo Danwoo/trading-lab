@@ -99,7 +99,17 @@ def test_underwater_still_recovering() -> None:
     longest, still = longest_underwater(equity)
     check("미회복 길이", longest, 2)
     check("아직 회복 중", still, True)
-    m = by_key(compute(equity_dt=dates(4), equity=equity, trades=[], round_trip_cost_rate=0.0), "longest_underwater")
+    m = by_key(
+        compute(
+            equity_dt=dates(4),
+            equity=equity,
+            trades=[],
+            round_trip_cost_rate=0.0,
+            initial_cash=1000.0,
+            sell_tax_rate=0.0,
+        ),
+        "longest_underwater",
+    )
     check("메트릭 note 가 말한다", m.note, "아직 회복 중")
 
 
@@ -109,7 +119,9 @@ def test_short_sample_is_not_annualized() -> None:
     스펙: 26일 구간을 연환산하면 57.8% 가 나온다.
     """
     equity = [1000.0 + i * 5 for i in range(26)]
-    ms = compute(equity_dt=dates(26), equity=equity, trades=[], round_trip_cost_rate=0.0)
+    ms = compute(
+        equity_dt=dates(26), equity=equity, trades=[], round_trip_cost_rate=0.0, initial_cash=1000.0, sell_tax_rate=0.0
+    )
     cagr = by_key(ms, "cagr")
     check("CAGR 은 없다", cagr.value, None)
     check("이유를 말한다", "연환산하지 않습니다" in (cagr.absent_reason or ""), True)
@@ -120,7 +132,14 @@ def test_short_sample_is_not_annualized() -> None:
 def test_long_sample_is_annualized() -> None:
     """1년 이상이면 연환산한다. 2년에 자산 2배 → CAGR ≈ 41.42%."""
     dts = ["2024-01-01", "2026-01-01"]
-    ms = compute(equity_dt=dts, equity=[1000.0, 2000.0], trades=[], round_trip_cost_rate=0.0)
+    ms = compute(
+        equity_dt=dts,
+        equity=[1000.0, 2000.0],
+        trades=[],
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0,
+    )
     cagr = by_key(ms, "cagr")
     check("CAGR 계산됨", cagr.value is not None, True)
     check("CAGR 값", cagr.value, (2.0 ** (365 / 731.0) - 1) * 100, tol=0.5)
@@ -129,7 +148,9 @@ def test_long_sample_is_annualized() -> None:
 def test_calmar_absent_when_cagr_absent() -> None:
     """CAGR 이 없으면 Calmar 도 없다 — 없는 계산을 한 척하지 않는다."""
     equity = [1000.0, 1200.0, 900.0]
-    ms = compute(equity_dt=dates(3), equity=equity, trades=[], round_trip_cost_rate=0.0)
+    ms = compute(
+        equity_dt=dates(3), equity=equity, trades=[], round_trip_cost_rate=0.0, initial_cash=1000.0, sell_tax_rate=0.0
+    )
     calmar = by_key(ms, "calmar")
     check("Calmar 없음", calmar.value, None)
     check("이유가 CAGR 부재", "연환산 수익률이 없어" in (calmar.absent_reason or ""), True)
@@ -137,7 +158,14 @@ def test_calmar_absent_when_cagr_absent() -> None:
 
 def test_no_trades_is_not_zero_percent() -> None:
     """거래 0건이면 승률은 `0%` 가 아니라 「거래 없음」이다 (스펙 §8.5.3)."""
-    ms = compute(equity_dt=dates(3), equity=[1000.0, 1000.0, 1000.0], trades=[], round_trip_cost_rate=0.001)
+    ms = compute(
+        equity_dt=dates(3),
+        equity=[1000.0, 1000.0, 1000.0],
+        trades=[],
+        round_trip_cost_rate=0.001,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0,
+    )
     win = by_key(ms, "win_rate")
     check("승률 값이 없다", win.value, None)
     check("0.0 이 아니다", win.value != 0.0, True)
@@ -155,6 +183,8 @@ def test_every_metric_carries_derivation() -> None:
         equity=[1000.0, 1300.0, 1200.0],
         trades=[trade],
         round_trip_cost_rate=0.0015,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0,
     )
     global CHECKED
     for m in ms:
@@ -170,7 +200,12 @@ def test_metric_order_is_the_decided_one() -> None:
     """순서가 스펙 D-Q2 다 — 최장 미회복 기간이 맨 위."""
     trade = SimpleNamespace(realized_pnl=50.0, entry_price=100.0, qty=10.0)
     ms = compute(
-        equity_dt=["2024-01-01", "2026-01-01"], equity=[1000.0, 1400.0], trades=[trade], round_trip_cost_rate=0.0015
+        equity_dt=["2024-01-01", "2026-01-01"],
+        equity=[1000.0, 1400.0],
+        trades=[trade],
+        round_trip_cost_rate=0.0015,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0,
     )
     check("1급이 최장 미회복 기간", ms[0].key, "longest_underwater")
     keys = [m.key for m in ms]
@@ -200,13 +235,20 @@ def test_avg_trade_subtracts_round_trip_cost() -> None:
     왕복 비용률 0.15% → 5 − 0.15 = 4.85%
     """
     trade = SimpleNamespace(realized_pnl=50.0, entry_price=100.0, qty=10.0)
-    ms = compute(equity_dt=dates(3), equity=[1000.0, 1020.0, 1050.0], trades=[trade], round_trip_cost_rate=0.0015)
+    ms = compute(
+        equity_dt=dates(3),
+        equity=[1000.0, 1020.0, 1050.0],
+        trades=[trade],
+        round_trip_cost_rate=0.0015,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0,
+    )
     check("평균 − 비용", by_key(ms, "avg_trade_vs_cost").value, 4.85, tol=1e-9)
 
 
 def test_empty_equity_says_why() -> None:
     """자산곡선이 없으면 전 지표가 사유를 단다 — 0 으로 채우지 않는다."""
-    ms = compute(equity_dt=[], equity=[], trades=[], round_trip_cost_rate=0.0)
+    ms = compute(equity_dt=[], equity=[], trades=[], round_trip_cost_rate=0.0, initial_cash=1000.0, sell_tax_rate=0.0)
     global CHECKED
     CHECKED += 1
     if not ms:
@@ -216,6 +258,83 @@ def test_empty_equity_says_why() -> None:
         CHECKED += 1
         if m.value is not None or not m.absent_reason:
             FAILURES.append(f"{m.key} 가 빈 곡선인데 값을 냈다")
+
+
+def _cost_trade(*, fee: float, slippage: float, tax: float):
+    """비용 3종을 실은 청산 거래. 100원 10주, 실현손익 50."""
+    return SimpleNamespace(realized_pnl=50.0, entry_price=100.0, qty=10.0, fee=fee, slippage=slippage, tax=tax)
+
+
+def test_cost_paid_sums_all_three_axes() -> None:
+    """치른 비용 = 수수료 + 슬리피지 + **세금**.
+
+    세 축 중 하나라도 안 넘어오면 그만큼 조용히 적게 나온다 — 실측으로 25거래에 0원이
+    나왔던 자리다. 값 단언이 없으면 그 회귀가 다시 초록으로 지나간다.
+    """
+    trades = [_cost_trade(fee=1.5, slippage=5.0, tax=18.0), _cost_trade(fee=1.5, slippage=5.0, tax=18.0)]
+    ms = compute(
+        equity_dt=dates(3),
+        equity=[990.0, 1020.0, 1050.0],
+        trades=trades,
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0018,
+    )
+    check("치른 비용", by_key(ms, "cost_paid").value, 49.0)
+    # 분모는 시작 자금 1,000 이지 `equity[0]`(=990) 이 아니다. 990 이면 4.9495… 가 나온다.
+    check("비용이 먹은 수익률", by_key(ms, "cost_drag_pct").value, 4.9, tol=1e-9)
+
+
+def test_cost_drag_denominator_is_initial_cash() -> None:
+    """`equity[0]` 을 분모로 쓰면 첫 봉에서 진입한 run 이 이름과 다른 값을 낸다."""
+    trades = [_cost_trade(fee=0.0, slippage=0.0, tax=10.0)]
+    ms = compute(
+        equity_dt=dates(2),
+        equity=[500.0, 600.0],
+        trades=trades,
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0018,
+    )
+    # 잘못된 구현(= equity[0]=500)이면 2.0 이 나온다.
+    check("분모 = 시작 자금", by_key(ms, "cost_drag_pct").value, 1.0, tol=1e-9)
+
+
+def test_old_run_without_tax_record_says_so() -> None:
+    """세율이 걸려 있는데 청산 거래의 세금이 전부 0이면 **기록이 없는 것**이다.
+
+    합계를 내면 세금(명시 비용의 절반 이상)을 뺀 값을 「증권거래세 포함」이라 읽어 준다.
+    """
+    trades = [_cost_trade(fee=1.5, slippage=5.0, tax=0.0)]
+    ms = compute(
+        equity_dt=dates(2),
+        equity=[1000.0, 1050.0],
+        trades=trades,
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0018,
+    )
+    for key in ("cost_paid", "cost_drag_pct"):
+        m = by_key(ms, key)
+        check(f"{key} 값 없음", m.value, None)
+        global CHECKED
+        CHECKED += 1
+        if not m.absent_reason:
+            FAILURES.append(f"{key} 가 옛 실행인데 사유 없이 비었다")
+
+
+def test_zero_tax_rate_run_still_reports_cost() -> None:
+    """세율이 0인 run 은 세금 0이 정상이다 — 옛 실행으로 오인하면 안 된다."""
+    trades = [_cost_trade(fee=1.5, slippage=5.0, tax=0.0)]
+    ms = compute(
+        equity_dt=dates(2),
+        equity=[1000.0, 1050.0],
+        trades=trades,
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0,
+    )
+    check("세율 0 run 의 치른 비용", by_key(ms, "cost_paid").value, 6.5)
 
 
 def main() -> int:

@@ -72,10 +72,10 @@ class BacktestRepository:
         sql = """
             INSERT INTO tn_backtest_trade (
                  run_id, instrument_id, side, entry_ts, exit_ts, qty
-               , fill_price, exit_price, fee, slippage, realized_pnl, mae, mfe
+               , fill_price, exit_price, fee, slippage, tax, realized_pnl, mae, mfe
             ) VALUES (
                  :run_id, :instrument_id, :side, :entry_ts, :exit_ts, :qty
-               , :fill_price, :exit_price, :fee, :slippage, :realized_pnl, :mae, :mfe
+               , :fill_price, :exit_price, :fee, :slippage, :tax, :realized_pnl, :mae, :mfe
             )
         """
         with self.sql_client.connect() as conn:
@@ -154,7 +154,7 @@ class BacktestRepository:
     def select_trades(self, run_id: int) -> list[dict]:
         sql = """
             SELECT trade_id, instrument_id, side, entry_ts, exit_ts, qty
-                 , fill_price, exit_price, fee, slippage, realized_pnl, mae, mfe
+                 , fill_price, exit_price, fee, slippage, tax, realized_pnl, mae, mfe
               FROM tn_backtest_trade
              WHERE run_id = :run_id
              ORDER BY entry_ts, trade_id
