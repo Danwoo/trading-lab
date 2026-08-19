@@ -126,9 +126,7 @@ describe("ProductRail — 패널을 닫으면 포커스가 레일 버튼으로 �
 // 실측으로 미완 5개 중 1개만 표식이 있었다.
 describe("ProductRail — 미완은 눌러보기 전에 드러난다 (#228)", () => {
   function renderRail() {
-    return render(
-      <ProductRail openPanelId={null} onTogglePanel={vi.fn()} panelRegionId="product-panel" />,
-    );
+    return render(<ProductRail openPanelId={null} onTogglePanel={vi.fn()} panelRegionId="product-panel" />);
   }
 
   it("pending 을 선언한 레일은 전부 표식을 단다 — 패널이든 라우트든", () => {
