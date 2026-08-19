@@ -38,7 +38,10 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(BACKEND / "app"))
 
-MIGRATION = "0015_backtest"
+#: 태울 마이그레이션 — **backtest 테이블을 건드리는 것 전부**를 소스에서 찾는다.
+#: 한 파일을 핀으로 박아 두면 뒤에 붙는 것이 영원히 이 그물 밖으로 남는다 — 실제로 0016 의
+#: `tax` 컬럼이 그렇게 빠졌고, 아래 `EXPECTED` 도 함께 낡았다.
+MIGRATION_MARKER = "tn_backtest"
 
 # 스펙 §6 표의 사본. 표를 고치면 여기도 고친다.
 EXPECTED: dict[str, set[str]] = {
@@ -71,6 +74,9 @@ EXPECTED: dict[str, set[str]] = {
         "fill_price",
         "fee",
         "slippage",
+        # 증권거래세 — 국내 명시 비용 중 가장 크다(0.15%). 이것이 없으면 「치른 비용」이
+        # 가장 큰 항목을 빼고 답한다 (#271).
+        "tax",
         "realized_pnl",
         "mae",
         "mfe",
@@ -95,16 +101,33 @@ EXPECTED_INDEXES: dict[str, set[str]] = {
 
 
 def load_migration():
+    """backtest 테이블을 건드리는 마이그레이션들 — **체인 순서대로**. 없으면 `None`."""
     import importlib.util
 
-    path = BACKEND / "alembic" / "versions" / f"{MIGRATION}.py"
-    if not path.is_file():
-        print(f"::error::마이그레이션이 없다: {path}", file=sys.stderr)
+    versions = BACKEND / "alembic" / "versions"
+    modules, parents = {}, {}
+    for path in sorted(versions.glob("[0-9]*.py")):
+        if MIGRATION_MARKER not in path.read_text(encoding="utf-8"):
+            continue
+        spec = importlib.util.spec_from_file_location(f"_bt_schema_{path.stem}", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        modules[module.revision] = module
+        parents[module.revision] = getattr(module, "down_revision", None)
+    if not modules:
+        print(f"::error::backtest 테이블을 다루는 마이그레이션을 0건 찾았다: {versions}", file=sys.stderr)
         return None
-    spec = importlib.util.spec_from_file_location(MIGRATION, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+
+    order, remaining = [], dict(modules)
+    while remaining:
+        ready = [rev for rev in remaining if parents[rev] not in remaining]
+        if not ready:
+            print(f"::error::마이그레이션 순서를 정할 수 없다 (순환?): {sorted(remaining)}", file=sys.stderr)
+            return None
+        for rev in sorted(ready):
+            order.append(rev)
+            del remaining[rev]
+    return [modules[rev] for rev in order]
 
 
 def main() -> int:
@@ -117,8 +140,8 @@ def main() -> int:
     from alembic.operations import Operations
     from sqlalchemy import create_engine, inspect, text
 
-    module = load_migration()
-    if module is None:
+    migrations = load_migration()
+    if migrations is None:
         return 1
 
     # 이 레포는 SQL 예외 로그에 파라미터 값이 새는 것을 막는다 — `test_sql_parameter_hiding` 이 강제.
@@ -134,7 +157,8 @@ def main() -> int:
         ops = Operations(ctx)
         ops._install_proxy()
         try:
-            module.upgrade()
+            for migration in migrations:
+                migration.upgrade()
         finally:
             ops._remove_proxy()
 
@@ -186,7 +210,9 @@ def main() -> int:
         ops = Operations(ctx)
         ops._install_proxy()
         try:
-            module.downgrade()
+            # 역순으로 내린다 — 뒤에 붙인 것부터 걷어야 의존이 안 깨진다.
+            for migration in reversed(migrations):
+                migration.downgrade()
         except Exception as exc:  # noqa: BLE001
             problems.append(f"downgrade 가 실패했다: {exc}")
         finally:

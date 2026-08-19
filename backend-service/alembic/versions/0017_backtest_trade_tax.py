@@ -1,7 +1,7 @@
 """backtest_trade — 증권거래세를 거래에 기록한다 (#271)
 
-Revision ID: 0016_backtest_trade_tax
-Revises: 0015_backtest
+Revision ID: 0017_backtest_trade_tax
+Revises: 0016_daily_bar_session_scope
 Create Date: 2026-08-20
 
 증권거래세는 국내 명시 비용 중 **가장 크다**(0.15% vs 수수료 0.015%). 엔진은 `sell_cost` 안에서
@@ -15,8 +15,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0016_backtest_trade_tax"
-down_revision = "0015_backtest"
+revision = "0017_backtest_trade_tax"
+down_revision = "0016_daily_bar_session_scope"
 branch_labels = None
 depends_on = None
 

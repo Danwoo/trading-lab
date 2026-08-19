@@ -122,35 +122,39 @@ def main() -> int:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
         conn.execute(text(f"CREATE SCHEMA {schema}"))
 
-    # **체인을 끝까지 따라간다.** 한 파일만 태우면 뒤에 붙는 마이그레이션이 이 검사의
-    # 스키마에 안 들어오고, 그 컬럼을 쓰는 코드가 여기서만 죽는다(실측: `tax` 컬럼이
-    # 0016 에 있어 「column does not exist」로 CI 가 빨개졌다).
+    # **이 그물이 필요로 하는 마이그레이션만 태운다.** 전 도메인을 순서대로 돌리면 다른
+    # 스키마를 명시적으로 박은 데이터 마이그레이션(`0013` 은 `public.tn_board` 를 SQL 에
+    # 직접 적는다)이 이 격리 스키마에서 죽는다 — 실제로 그렇게 CI 를 깨뜨렸다.
+    #
+    # 목록을 손으로 적지 않는다: **backtest 테이블을 건드리는 마이그레이션**을 소스에서 찾아
+    # 체인 순서대로 태운다. 뒤에 붙는 것도 그 테이블을 건드리면 자동으로 따라온다.
+
     versions = BACKEND / "alembic" / "versions"
-    modules: dict[str, object] = {}
-    parents: dict[str, str | None] = {}
+    modules, parents = {}, {}
     for path in sorted(versions.glob("[0-9]*.py")):
+        # `text` 는 sqlalchemy 것이다 — 여기서 가리면 뒤의 쿼리가 통째로 죽는다.
+        source = path.read_text(encoding="utf-8")
+        if "tn_backtest" not in source:
+            continue
         mod_spec = importlib.util.spec_from_file_location(f"_bt_mig_{path.stem}", path)
         module = importlib.util.module_from_spec(mod_spec)
         mod_spec.loader.exec_module(module)
         modules[module.revision] = module
         parents[module.revision] = getattr(module, "down_revision", None)
     if not modules:
-        print(f"::error::마이그레이션을 0건 읽었다: {versions}", file=sys.stderr)
+        print(f"::error::backtest 테이블을 다루는 마이그레이션을 0건 찾았다: {versions}", file=sys.stderr)
         return 1
 
-    #: 부모 → 자식으로 걸어 실행 순서를 만든다. head 가 여럿이면 여기서 드러난다.
-    children: dict[str | None, list[str]] = {}
-    for revision, parent in parents.items():
-        children.setdefault(parent, []).append(revision)
-    order: list[str] = []
-    frontier = sorted(children.get(None, []))
-    while frontier:
-        revision = frontier.pop(0)
-        order.append(revision)
-        frontier.extend(sorted(children.get(revision, [])))
-    if len(order) != len(modules):
-        print(f"::error::마이그레이션 체인이 끊겼다 — {len(order)}/{len(modules)} 만 이어진다", file=sys.stderr)
-        return 1
+    #: 고른 것들끼리 체인 순서를 만든다 — 부모가 목록 밖이면 그것이 시작점이다.
+    order, remaining = [], dict(modules)
+    while remaining:
+        ready = [rev for rev in remaining if parents[rev] not in remaining]
+        if not ready:
+            print(f"::error::마이그레이션 순서를 정할 수 없다 (순환?): {sorted(remaining)}", file=sys.stderr)
+            return 1
+        for rev in sorted(ready):
+            order.append(rev)
+            del remaining[rev]
 
     with engine.begin() as conn:
         ops = Operations(MigrationContext.configure(conn))
