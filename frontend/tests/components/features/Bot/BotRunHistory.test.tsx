@@ -59,6 +59,23 @@ describe("#232 봇 상세의 검증 이력", () => {
     expect(screen.getByText("#12")).toBeTruthy();
   });
 
+  it("한 페이지만 보일 때 총수를 말한다 — 「이만큼이 전부」로 읽히지 않게", async () => {
+    selectRuns.mockResolvedValue({ items: [aRun(11), aRun(12)], total_count: 37 });
+
+    render(<BotRunHistory botId={7} />);
+
+    await waitFor(() => expect(screen.getByText(/모두 37번 검증했습니다/)).toBeTruthy());
+  });
+
+  it("다 보일 때는 총수를 덧붙이지 않는다", async () => {
+    selectRuns.mockResolvedValue({ items: [aRun(11)], total_count: 1 });
+
+    render(<BotRunHistory botId={7} />);
+
+    await waitFor(() => expect(screen.getByText("#11")).toBeTruthy());
+    expect(screen.queryByText(/모두 .*번 검증했습니다/)).toBeNull();
+  });
+
   it("검증하러 가는 길이 그 봇을 데리고 간다", async () => {
     selectRuns.mockResolvedValue({ items: [], total_count: 0 });
 
