@@ -43,7 +43,7 @@ _APP_DIR = Path(__file__).resolve().parents[1] / "app"
 if str(_APP_DIR) not in sys.path:
     sys.path.insert(0, str(_APP_DIR))
 
-from core.exceptions import BadRequestError, ForbiddenError  # noqa: E402
+from core.exceptions import BadRequestError, ForbiddenError, TooManyRequestsError  # noqa: E402
 from services.data_key.data_key_service import SOURCE_KEY_SETTINGS, DataKeyService  # noqa: E402
 
 FAILURES: list[str] = []
@@ -51,7 +51,9 @@ CHECKED = 0
 
 SECRET = "sk-live-WRITECANARY-0123456789"
 
-ENV_BEFORE = '# 주석\nOTHER="keep"\nMARKET_DATA_ALPACA_KEY="old"\n'
+# 변수 이름은 표에서 도출한다 — 리터럴로 적으면 단일 로더 그물에 걸리고, 표가 바뀌면 여기도 낡는다.
+ALPACA_SETTING = SOURCE_KEY_SETTINGS["alpaca"]
+ENV_BEFORE = f'# 주석\nOTHER="keep"\n{ALPACA_SETTING}="old"\n'
 
 
 def check(name: str, actual, expected) -> None:
@@ -147,11 +149,22 @@ def main() -> int:
             check("확인도 표를 본다", "확인됨", "거부")
         except BadRequestError:
             check("확인도 표를 본다", True, True)
+
+        # 확인 호출은 소스당 쿨다운이 있다 — 밖으로 나가는 호출이라 연타가 외부 한도를 갉아먹는다.
+        fresh = service_in(root)
+        first = asyncio.run(fresh.probe_key("openfigi", SECRET))
+        check("첫 확인은 답한다", first["checked"], False)
+        try:
+            asyncio.run(fresh.probe_key("openfigi", SECRET))
+            check("연타는 막힌다", "답함", "429")
+        except TooManyRequestsError as exc:
+            check("연타는 막힌다", True, True)
+            check("쿨다운 사유에 값이 없다", SECRET in str(exc), False)
     finally:
         os.chdir(origin)
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과")
-    if CHECKED < 35:
+    if CHECKED < 40:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:

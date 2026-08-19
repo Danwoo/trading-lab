@@ -26,9 +26,10 @@
 """
 
 import datetime as _dt
+import time
 from pathlib import Path
 
-from core.exceptions import BadRequestError, ForbiddenError, HTTPError
+from core.exceptions import BadRequestError, ForbiddenError, HTTPError, TooManyRequestsError
 from core.logger import logger
 from providers import get_provider
 from utils.env_file.env_writer import EnvWriteRejected, set_env_value
@@ -63,6 +64,8 @@ CONTACT_SETTING = "MARKET_DATA_CONTACT"
 class DataKeyService:
     def __init__(self, config):
         self.config = config
+        #: 소스 → 마지막 확인 호출 시각 (monotonic). 프로세스 로컬이면 족하다 — 워커는 1개다.
+        self._last_probe_at: dict[str, float] = {}
         # 순서가 곧 불변식이다 — 관문을 먼저 세우고 비밀을 들인다.
         install_log_redaction()
         self._register_secrets()
@@ -185,6 +188,9 @@ class DataKeyService:
         "AMEX": "AAPL",
     }
 
+    #: 소스당 확인 호출 간격 하한 — 외부 소스에 우리가 폭주하지 않게. 연타는 답을 바꾸지 않는다.
+    PROBE_COOLDOWN_S = 5.0
+
     async def probe_key(self, source: str, value: str) -> dict:
         """**넣으려는 값으로** 소스에 한 번 물어본다 — 저장 전에 확인할 수 있게.
 
@@ -200,6 +206,13 @@ class DataKeyService:
         cleaned = value.strip()
         if not cleaned:
             raise BadRequestError("확인할 값이 없습니다")
+
+        # 소스당 쿨다운 — 이 호출은 밖으로 나간다. 저장·조회와 달리 연타가 외부 한도를 갉아먹는다.
+        now = time.monotonic()
+        last = self._last_probe_at.get(source)
+        if last is not None and now - last < self.PROBE_COOLDOWN_S:
+            raise TooManyRequestsError(f"확인 호출은 소스당 {self.PROBE_COOLDOWN_S:.0f}초에 한 번입니다 — 잠시 후 다시 시도하세요")
+        self._last_probe_at[source] = now
         register_secret(cleaned)
 
         try:

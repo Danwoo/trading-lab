@@ -35,11 +35,13 @@ CHECKED = 0
 
 SECRET = "sk-live-CANARY-0123456789"
 
+# 픽스처의 변수 이름은 **중립**이다 — `env_writer` 는 이름을 모르는 범용 모듈이고, 실제 설정
+# 이름(`MARKET_DATA_*`)을 여기 적으면 단일 로더 그물(`verify_data_key_env_boundary.py`)에 걸린다.
 SAMPLE = """# 주석은 보존된다
 FIRST="keep me"
 
 # 빈 줄도 보존된다
-MARKET_DATA_ALPACA_KEY="old-value"
+WRITER_TEST_KEY="old-value"
 LAST=tail
 """
 
@@ -63,11 +65,11 @@ def given(content: str, mode: int = 0o600) -> Path:
 def main() -> int:
     # ── ① 한 줄만 갈리고 나머지가 그대로다 ────────────────────────────────
     path = given(SAMPLE)
-    action = set_env_value(path, "MARKET_DATA_ALPACA_KEY", SECRET)
+    action = set_env_value(path, "WRITER_TEST_KEY", SECRET)
     after = path.read_text(encoding="utf-8")
 
     check("갈아 끼웠다고 답한다", action, "replaced")
-    check("새 값이 들어갔다", f'MARKET_DATA_ALPACA_KEY="{SECRET}"' in after, True)
+    check("새 값이 들어갔다", f'WRITER_TEST_KEY="{SECRET}"' in after, True)
     check("옛 값이 남지 않았다", "old-value" in after, False)
     check("주석이 보존된다", "# 주석은 보존된다" in after, True)
     check("빈 줄이 보존된다", "\n\n# 빈 줄도" in after, True)
@@ -82,7 +84,7 @@ def main() -> int:
 
     # ── ② 없는 이름은 끝에 더해진다 ───────────────────────────────────────
     path = given(SAMPLE)
-    action = set_env_value(path, "MARKET_DATA_OPENFIGI_KEY", "figi-1")
+    action = set_env_value(path, "WRITER_TEST_SECOND_KEY", "figi-1")
     after = path.read_text(encoding="utf-8")
 
     check("더했다고 답한다", action, "appended")
@@ -108,7 +110,7 @@ def main() -> int:
         path = given(SAMPLE)
         before = path.read_text(encoding="utf-8")
         try:
-            set_env_value(path, "MARKET_DATA_ALPACA_KEY", bad)
+            set_env_value(path, "WRITER_TEST_KEY", bad)
             check("줄바꿈 값 거부", "예외 없음", "EnvWriteRejected")
         except EnvWriteRejected as exc:
             check("줄바꿈 값 거부", True, True)
@@ -120,7 +122,7 @@ def main() -> int:
     # ── 값에 따옴표·백슬래시가 있어도 한 줄로 남는다 ──────────────────────
     path = given(SAMPLE)
     tricky = 'a"b\\c d'
-    set_env_value(path, "MARKET_DATA_ALPACA_KEY", tricky)
+    set_env_value(path, "WRITER_TEST_KEY", tricky)
     after = path.read_text(encoding="utf-8")
     check("따옴표·백슬래시가 있어도 줄 수가 그대로다", len(after.split("\n")), len(SAMPLE.split("\n")))
     path.unlink()
@@ -132,7 +134,7 @@ def main() -> int:
     # 옮겨지는지 봐야 「옮긴다」가 검사된다.
     for mode in (0o600, 0o644):
         path = given(SAMPLE, mode=mode)
-        set_env_value(path, "MARKET_DATA_ALPACA_KEY", SECRET)
+        set_env_value(path, "WRITER_TEST_KEY", SECRET)
         check(f"{oct(mode)} 이 유지된다", stat.S_IMODE(path.stat().st_mode), mode)
         path.unlink()
 
