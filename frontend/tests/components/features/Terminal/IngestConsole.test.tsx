@@ -297,6 +297,81 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
     expect(group.textContent).toContain("종목 목록을 줄 소스가 없습니다");
   });
 
+  it("되는 것을 먼저 보인다 — 부분적으로 막힌 소스가 「안 되는 소스」로 읽히지 않게", () => {
+    given({
+      capabilities: panel<unknown[]>({
+        data: [
+          // 토스는 국내를 열고 미국 마스터만 SEC 에 양보한다 — 화면이 그 사실을 거꾸로 전하면 안 된다
+          { source: "toss", market: "KOSPI", dataKind: "instrument_master", available: true, reason: null },
+          { source: "toss", market: "KOSPI", dataKind: "daily_bar", available: true, reason: null },
+          { source: "toss", market: "KOSPI", dataKind: "minute_bar", available: true, reason: null },
+          {
+            source: "toss",
+            market: "NASDAQ",
+            dataKind: "instrument_master",
+            available: false,
+            reason: "미국 종목 마스터의 정본 소스는 SEC 입니다",
+            code: null,
+          },
+        ],
+      }),
+      symbol: null,
+    });
+    render(<IngestConsole />);
+
+    const open = screen.getByRole("list", { name: "지금 받을 수 있는 것" });
+    expect(open.textContent).toContain("KOSPI");
+    // **종류마다 소스를 붙인다** — 종류와 소스를 따로 합집합하면 곱집합으로 읽혀,
+    // 「그 소스가 이 종류도 준다」는 사실이 아닌 말이 된다.
+    expect(open.textContent).toContain("종목목록(toss)");
+    expect(open.textContent).toContain("일봉(toss)");
+    expect(open.textContent).toContain("분봉(toss)");
+    // 막힌 목록에만 있고 되는 목록엔 없는 상태가 이 이슈의 증상이었다
+    expect(screen.getByRole("list", { name: "막힌 이유" }).textContent).toContain("정본 소스는 SEC");
+  });
+
+  it("한 시장을 여러 소스가 나눠 줄 때 어느 종류를 누가 주는지 뭉개지 않는다", () => {
+    given({
+      capabilities: panel<unknown[]>({
+        data: [
+          // 실제 배선이다: SEC 은 미국 마스터만, 토스는 미국 캔들만 준다 (MD-AD-17)
+          { source: "sec", market: "NASDAQ", dataKind: "instrument_master", available: true, reason: null },
+          { source: "toss", market: "NASDAQ", dataKind: "daily_bar", available: true, reason: null },
+          { source: "toss", market: "NASDAQ", dataKind: "minute_bar", available: true, reason: null },
+        ],
+      }),
+      symbol: null,
+    });
+    render(<IngestConsole />);
+
+    const text = screen.getByRole("list", { name: "지금 받을 수 있는 것" }).textContent ?? "";
+    expect(text).toContain("종목목록(sec)");
+    expect(text).toContain("일봉(toss)");
+    // 곱집합으로 읽히면 「토스가 미국 마스터를 준다」가 된다 — 이 이슈가 바로잡으려던 사실의 반대다
+    expect(text).not.toContain("종목목록(sec, toss)");
+    expect(text).not.toContain("종목목록(toss)");
+  });
+
+  it("되는 것이 하나도 없으면 그 목록을 아예 세우지 않는다", () => {
+    given({
+      capabilities: panel<unknown[]>({
+        data: [
+          {
+            source: "toss",
+            market: "KOSPI",
+            dataKind: "daily_bar",
+            available: false,
+            reason: "키가 없습니다",
+            code: null,
+          },
+        ],
+      }),
+      symbol: null,
+    });
+    render(<IngestConsole />);
+    expect(screen.queryByRole("list", { name: "지금 받을 수 있는 것" })).toBeNull();
+  });
+
   it("성공했는데 0행이면 왜인지 말한다 — 「받음」만 보이면 성공으로 읽힌다", () => {
     given({
       capabilities: usableKrx(),
