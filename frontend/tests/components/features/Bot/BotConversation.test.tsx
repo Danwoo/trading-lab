@@ -47,7 +47,11 @@ function givenServer(streamLines: string[]) {
 async function send(text: string) {
   const user = userEvent.setup();
   await user.type(screen.getByRole("textbox"), text);
-  await user.click(screen.getByRole("button", { name: /보내기/ }));
+  // **준비 조회가 끝나기 전에는 보내기가 비활성이다.** 그것을 안 기다리고 누르면 클릭이
+  // 아무 일도 안 하고, 테스트는 부하에 따라 붙었다 떨어졌다 한다(병렬 실행에서 실측).
+  const button = screen.getByRole("button", { name: /보내기/ }) as HTMLButtonElement;
+  await waitFor(() => expect(button.disabled).toBe(false));
+  await user.click(button);
 }
 
 describe("BotConversation — 스트림 중 실패가 사라지지 않는다 (실제 SSE 경로)", () => {

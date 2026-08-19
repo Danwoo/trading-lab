@@ -297,6 +297,58 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
     expect(group.textContent).toContain("종목 목록을 줄 소스가 없습니다");
   });
 
+  it("되는 것을 먼저 보인다 — 부분적으로 막힌 소스가 「안 되는 소스」로 읽히지 않게", () => {
+    given({
+      capabilities: panel<unknown[]>({
+        data: [
+          // 토스는 국내를 열고 미국 마스터만 SEC 에 양보한다 — 화면이 그 사실을 거꾸로 전하면 안 된다
+          { source: "toss", market: "KOSPI", dataKind: "instrument_master", available: true, reason: null },
+          { source: "toss", market: "KOSPI", dataKind: "daily_bar", available: true, reason: null },
+          { source: "toss", market: "KOSPI", dataKind: "minute_bar", available: true, reason: null },
+          {
+            source: "toss",
+            market: "NASDAQ",
+            dataKind: "instrument_master",
+            available: false,
+            reason: "미국 종목 마스터의 정본 소스는 SEC 입니다",
+            code: null,
+          },
+        ],
+      }),
+      symbol: null,
+    });
+    render(<IngestConsole />);
+
+    const open = screen.getByRole("list", { name: "지금 받을 수 있는 것" });
+    expect(open.textContent).toContain("KOSPI");
+    expect(open.textContent).toContain("종목목록");
+    expect(open.textContent).toContain("일봉");
+    expect(open.textContent).toContain("분봉");
+    expect(open.textContent).toContain("toss");
+    // 막힌 목록에만 있고 되는 목록엔 없는 상태가 이 이슈의 증상이었다
+    expect(screen.getByRole("list", { name: "막힌 이유" }).textContent).toContain("정본 소스는 SEC");
+  });
+
+  it("되는 것이 하나도 없으면 그 목록을 아예 세우지 않는다", () => {
+    given({
+      capabilities: panel<unknown[]>({
+        data: [
+          {
+            source: "toss",
+            market: "KOSPI",
+            dataKind: "daily_bar",
+            available: false,
+            reason: "키가 없습니다",
+            code: null,
+          },
+        ],
+      }),
+      symbol: null,
+    });
+    render(<IngestConsole />);
+    expect(screen.queryByRole("list", { name: "지금 받을 수 있는 것" })).toBeNull();
+  });
+
   it("성공했는데 0행이면 왜인지 말한다 — 「받음」만 보이면 성공으로 읽힌다", () => {
     given({
       capabilities: usableKrx(),
