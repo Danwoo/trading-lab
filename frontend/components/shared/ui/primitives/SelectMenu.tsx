@@ -169,7 +169,8 @@ export function SelectMenu({
 
   // ── 닫힌 상태의 표시 ─────────────────────────────────────────────────────
   const renderTriggerContent = () => {
-    if (!hasValue) return <span className="truncate text-gray-400">{placeholder}</span>;
+    // placeholder 도 읽는 글자다 — gray-400 은 다크에서 2.54:1 로 AA 미달이었다 (#203 실측).
+    if (!hasValue) return <span className="truncate text-ink-muted">{placeholder}</span>;
     if (!multiple) {
       const selectedItem = itemFor(value);
       if (fieldRender && selectedItem !== undefined)
