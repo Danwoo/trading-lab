@@ -403,6 +403,13 @@ class DailyBar(Base):
     trade_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
     source: Mapped[str] = mapped_column(String(30), nullable=False)
     adj_policy: Mapped[str] = mapped_column(String(20), nullable=False)  # raw·adj_split·adj_split_div
+    #: 이 봉이 **어느 구간**을 덮는가 — `regular`(정규장만) · `unknown`(소스가 준 그대로).
+    #:
+    #: 소스마다, 심지어 **같은 소스의 종목마다** 다르다: 토스 일봉은 시간외를 포함하는 종목이
+    #: 있고(보통주 표본 25종목 중 9종목) 그 종목의 종가는 정규장 종가와 최대 4% 어긋났다.
+    #: 같은 컬럼이 종목마다 다른 것을 뜻하면 백테스트가 정규장에서 낼 수 없는 가격에 체결한다.
+    #: 그래서 **무엇인지 모르면 모른다고 적는다** (FR-021 — 없는 값을 0 으로 뭉개지 않는다).
+    session_scope: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown", server_default="unknown")
     ingest_run_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("tn_ingest_run.run_id"), nullable=True)
     ingested_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=func.now())
 

@@ -309,10 +309,10 @@ class IngestRepository:
         sql = """
             INSERT INTO tn_daily_bar (
                  instrument_id, trade_date, open, high, low, close, volume, trade_value
-               , source, adj_policy, ingest_run_id, ingested_at
+               , source, adj_policy, session_scope, ingest_run_id, ingested_at
             ) VALUES (
                  :instrument_id, :trade_date, :open, :high, :low, :close, :volume, :trade_value
-               , :source, :adj_policy, :ingest_run_id, CURRENT_TIMESTAMP
+               , :source, :adj_policy, :session_scope, :ingest_run_id, CURRENT_TIMESTAMP
             )
             ON CONFLICT (instrument_id, trade_date) DO UPDATE
                SET open          = EXCLUDED.open
@@ -323,6 +323,7 @@ class IngestRepository:
                  , trade_value   = EXCLUDED.trade_value
                  , source        = EXCLUDED.source
                  , adj_policy    = EXCLUDED.adj_policy
+                 , session_scope = EXCLUDED.session_scope
                  , ingest_run_id = EXCLUDED.ingest_run_id
                  , ingested_at   = CURRENT_TIMESTAMP
         """

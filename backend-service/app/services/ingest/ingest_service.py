@@ -396,6 +396,9 @@ def _daily_row(bar: NormalizedBar, instrument_id: int, run: dict) -> dict:
         "trade_value": bar.trade_value if isinstance(bar.trade_value, Decimal | type(None)) else None,
         "source": run["source"],
         "adj_policy": bar.adj_policy,
+        # 소스가 준 일봉이 어느 구간을 덮는지 **우리는 모른다** — 소스마다, 같은 소스의
+        # 종목마다 다르다(#255). 모르면 모른다고 적는다. 분봉으로 다시 만든 봉만 `regular` 다.
+        "session_scope": "unknown",
         "ingest_run_id": run["run_id"],
     }
 

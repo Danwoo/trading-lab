@@ -70,6 +70,7 @@ class BarRepository:
                  , CAST(trade_value AS float)         AS trade_value
                  , source
                  , adj_policy
+                 , session_scope
                  , ingested_at
               FROM tn_daily_bar
              WHERE instrument_id = :instrument_id
