@@ -12,11 +12,12 @@ import { curveZoneProvenance, gridZoneProvenance, type RosterState } from "@/lib
 
 const ROSTER_STATES: RosterState[] = ["loading", "unreadable", "empty", "filled"];
 
+const IDLE = { isRunning: false };
 const NO_CURVE = { report: null, isReportLoading: false, reportError: null };
 
 describe("격자 자리", () => {
   it("봇이 있고 아직 안 돌렸으면 「아직 실행 안 함」이다 — 「제공 안 됨」이 아니다", () => {
-    const provenance = gridZoneProvenance({ rosterState: "filled", hasGrid: false, runError: null });
+    const provenance = gridZoneProvenance({ rosterState: "filled", hasGrid: false, ...IDLE, runError: null });
 
     expect(provenance).toEqual({
       kind: "unavailable",
@@ -29,6 +30,7 @@ describe("격자 자리", () => {
     const provenance = gridZoneProvenance({
       rosterState: "filled",
       hasGrid: false,
+      ...IDLE,
       runError: "캔들이 없습니다 — 적재를 먼저 돌리세요",
     });
 
@@ -41,13 +43,41 @@ describe("격자 자리", () => {
   });
 
   it("앞선 격자가 남아 있어도 방금 실패를 덮지 않는다", () => {
-    const provenance = gridZoneProvenance({ rosterState: "filled", hasGrid: true, runError: "서버에서 오류" });
+    const provenance = gridZoneProvenance({
+      rosterState: "filled",
+      hasGrid: true,
+      ...IDLE,
+      runError: "서버에서 오류",
+    });
 
     expect(provenance.kind).toBe("unavailable");
   });
 
   it("격자가 있고 실패도 없으면 적재본이다", () => {
-    expect(gridZoneProvenance({ rosterState: "filled", hasGrid: true, runError: null })).toEqual({
+    expect(gridZoneProvenance({ rosterState: "filled", hasGrid: true, ...IDLE, runError: null })).toEqual({
+      kind: "loaded",
+      source: "백테스트 격자",
+      asOf: null,
+    });
+  });
+
+  it("돌고 있는 동안 「골라 실행하면…」이라 말하지 않는다 — 이미 눌렀다", () => {
+    const provenance = gridZoneProvenance({
+      rosterState: "filled",
+      hasGrid: false,
+      isRunning: true,
+      runError: null,
+    });
+
+    expect(provenance).toEqual({
+      kind: "unavailable",
+      reason: "격자를 돌리고 있습니다 — 끝나면 조합이 칸으로 깔립니다",
+      because: "checking",
+    });
+  });
+
+  it("앞선 격자가 깔린 채 재실행 중이면 그 칸들은 여전히 적재본이다", () => {
+    expect(gridZoneProvenance({ rosterState: "filled", hasGrid: true, isRunning: true, runError: null })).toEqual({
       kind: "loaded",
       source: "백테스트 격자",
       asOf: null,
@@ -56,7 +86,7 @@ describe("격자 자리", () => {
 
   it("봇 목록의 네 상태가 서로 다른 사유·배지를 갖는다 — 「못 읽음」을 「없음」과 가른다", () => {
     const seen = ROSTER_STATES.map((rosterState) =>
-      gridZoneProvenance({ rosterState, hasGrid: false, runError: null }),
+      gridZoneProvenance({ rosterState, hasGrid: false, ...IDLE, runError: null }),
     );
     const becauses = seen.map((p) => (p.kind === "unavailable" ? p.because : "loaded"));
 
@@ -70,6 +100,7 @@ describe("곡선 자리", () => {
     const provenance = curveZoneProvenance({
       rosterState: "filled",
       hasGrid: false,
+      ...IDLE,
       runError: "서버에서 오류가 발생했습니다.",
       ...NO_CURVE,
     });
@@ -81,16 +112,59 @@ describe("곡선 자리", () => {
     });
   });
 
+  // 앞선 격자가 남은 채 재실행이 실패하면 칸은 화면에 그대로 깔려 있고(`ParamGrid` 는
+  // `grid !== null` 에만 걸린다) 눌러서 곡선을 채울 수 있다 — 그때 「고를 칸이 없습니다」는
+  // 거짓이다. 배지는 실패로 두되 문장을 갈라야 한다.
+  it("앞선 격자가 남아 있으면 「고를 칸이 없다」고 말하지 않는다", () => {
+    const provenance = curveZoneProvenance({
+      rosterState: "filled",
+      hasGrid: true,
+      ...IDLE,
+      runError: "서버에서 오류가 발생했습니다.",
+      ...NO_CURVE,
+    });
+
+    expect(provenance).toEqual({
+      kind: "unavailable",
+      reason: "격자 실행이 실패했습니다 — 앞선 격자의 칸은 그대로 고를 수 있습니다",
+      because: "run-failed",
+    });
+    expect(JSON.stringify(provenance)).not.toContain("고를 칸이 없습니다");
+  });
+
   it("격자가 있는데 칸을 안 골랐으면 「고르면 채워집니다」다", () => {
-    const provenance = curveZoneProvenance({ rosterState: "filled", hasGrid: true, runError: null, ...NO_CURVE });
+    const provenance = curveZoneProvenance({
+      rosterState: "filled",
+      hasGrid: true,
+      ...IDLE,
+      runError: null,
+      ...NO_CURVE,
+    });
 
     expect(provenance.kind === "unavailable" && provenance.because).toBe("not-chosen");
+  });
+
+  it("첫 격자를 돌리는 동안은 「확인 중」이다 — 「아직 안 돌렸다」가 아니다", () => {
+    const provenance = curveZoneProvenance({
+      rosterState: "filled",
+      hasGrid: false,
+      isRunning: true,
+      runError: null,
+      ...NO_CURVE,
+    });
+
+    expect(provenance).toEqual({
+      kind: "unavailable",
+      reason: "격자를 돌리고 있습니다 — 끝나면 칸을 고를 수 있습니다",
+      because: "checking",
+    });
   });
 
   it("리포트를 불러오는 중은 「확인 중」이고, 못 읽은 것은 「못 읽음」이다", () => {
     const loading = curveZoneProvenance({
       rosterState: "filled",
       hasGrid: true,
+      ...IDLE,
       runError: null,
       report: null,
       isReportLoading: true,
@@ -99,6 +173,7 @@ describe("곡선 자리", () => {
     const failed = curveZoneProvenance({
       rosterState: "filled",
       hasGrid: true,
+      ...IDLE,
       runError: null,
       report: null,
       isReportLoading: false,
@@ -114,6 +189,7 @@ describe("곡선 자리", () => {
       curveZoneProvenance({
         rosterState: "filled",
         hasGrid: true,
+        ...IDLE,
         runError: null,
         report: { runId: 42, finishedDt: "2026-08-19T18:00:00" },
         isReportLoading: false,

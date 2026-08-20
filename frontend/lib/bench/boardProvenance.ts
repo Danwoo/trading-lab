@@ -33,6 +33,8 @@ export interface GridZoneInput {
   rosterState: RosterState;
   /** 격자가 이미 그려져 있나 (`useBacktestBoard` 의 `grid`) */
   hasGrid: boolean;
+  /** 실행이 지금 돌고 있나 — 「아직 안 돌렸다」와 갈라야 하는 상태다 */
+  isRunning: boolean;
   /** 마지막 실행이 실패했을 때의 서버 사유 */
   runError: string | null;
 }
@@ -43,13 +45,23 @@ export interface GridZoneInput {
  * **실패가 가장 세다.** 실행이 실패했는데 「아직 돌리지 않았습니다」라고 말하면 이미 한 일을
  * 다시 하라고 안내하는 것이고(#291), 앞선 격자가 남아 있을 때 그것만 보여 주면 방금 실패가
  * 화면에서 사라진다. 그래서 실패는 격자 유무보다 먼저 답한다.
+ *
+ * 「돌고 있다」는 격자가 아직 없을 때만 머리가 말한다 — 앞선 격자가 깔린 채 재실행 중이면
+ * 그 칸들은 여전히 참이라 자리는 적재본으로 남는다.
  */
-export function gridZoneProvenance({ rosterState, hasGrid, runError }: GridZoneInput): Provenance {
+export function gridZoneProvenance({ rosterState, hasGrid, isRunning, runError }: GridZoneInput): Provenance {
   if (runError !== null) {
     return { kind: "unavailable", reason: `격자 실행이 실패했습니다 — ${runError}`, because: "run-failed" };
   }
   if (hasGrid) {
     return { kind: "loaded", source: "백테스트 격자", asOf: null };
+  }
+  if (isRunning) {
+    return {
+      kind: "unavailable",
+      reason: "격자를 돌리고 있습니다 — 끝나면 조합이 칸으로 깔립니다",
+      because: "checking",
+    };
   }
   return { kind: "unavailable", reason: GRID_EMPTY_REASON[rosterState], because: ROSTER_BECAUSE[rosterState] };
 }
@@ -64,12 +76,14 @@ export interface CurveZoneInput extends GridZoneInput {
 /**
  * 곡선 자리의 출처 (#284 · #291).
  *
- * 격자와 같은 순서로 답한다 — 실행이 실패했으면 고를 칸 자체가 없으므로 「칸을 누르세요」가
- * 아니라 실패를 말한다.
+ * 격자와 같은 순서로 답한다 — 실행이 실패했으면 실패부터 말한다. 다만 **앞선 격자가 남아
+ * 있으면 「고를 칸이 없다」는 거짓**이다. 그 칸들은 그대로 눌러 곡선을 채울 수 있으므로,
+ * 같은 `run-failed` 안에서 문장을 갈라 준다.
  */
 export function curveZoneProvenance({
   rosterState,
   hasGrid,
+  isRunning,
   runError,
   report,
   isReportLoading,
@@ -85,13 +99,26 @@ export function curveZoneProvenance({
     return { kind: "unavailable", reason: reportError, because: "unreadable" };
   }
   if (runError !== null) {
-    return { kind: "unavailable", reason: "격자 실행이 실패해 고를 칸이 없습니다", because: "run-failed" };
+    return {
+      kind: "unavailable",
+      reason: hasGrid
+        ? "격자 실행이 실패했습니다 — 앞선 격자의 칸은 그대로 고를 수 있습니다"
+        : "격자 실행이 실패해 고를 칸이 없습니다",
+      because: "run-failed",
+    };
   }
   if (hasGrid) {
     return {
       kind: "unavailable",
       reason: "격자에서 칸을 누르면 그 조합의 곡선·지표·거래가 여기 그려집니다",
       because: "not-chosen",
+    };
+  }
+  if (isRunning) {
+    return {
+      kind: "unavailable",
+      reason: "격자를 돌리고 있습니다 — 끝나면 칸을 고를 수 있습니다",
+      because: "checking",
     };
   }
   return { kind: "unavailable", reason: CURVE_EMPTY_REASON[rosterState], because: ROSTER_BECAUSE[rosterState] };

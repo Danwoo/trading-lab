@@ -54,7 +54,9 @@ const NEEDS_SYMBOL_VERDICT: CapabilityVerdict = {
 const MARKET_MISSING_VERDICT: CapabilityVerdict = {
   available: false,
   reason: "이 종목에 등록된 시장 값이 비어 있습니다 — 시장을 채우면 이 패널이 열립니다.",
-  because: "no-source",
+  // 「제공 안 됨」이 아니다 — 그 축은 사용자가 할 수 있는 것이 없을 때이고, 여기는 시장 값을
+  // 채우면 열린다. 배지를 「제공 안 됨」으로 두면 바로 아래 사유와 두 말을 한다 (#284).
+  because: "not-chosen",
 };
 
 /**

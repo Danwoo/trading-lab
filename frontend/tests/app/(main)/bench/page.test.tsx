@@ -350,6 +350,9 @@ describe("격자 실행 실패 — 자리 머리가 「아직 안 돌렸다」�
 
     await waitFor(() => expect(firstRegion("격자").textContent).toContain("격자 실행이 실패했습니다"));
     expect(firstRegion("격자").textContent).not.toContain("아직 돌리지 않았습니다");
+    // 실패는 실패처럼 그려진다 — 형제 자리(「내 봇」 읽기 실패)와 같은 알림 관례다.
+    expect(firstRegion("격자").querySelectorAll('[class*="text-danger"]').length).toBeGreaterThan(0);
+    expect(firstRegion("격자").textContent).toContain("멈추는 것");
     // 곡선도 같은 실패를 안다 — 「격자를 실행하면 곡선이 그려집니다」는 이미 한 일이다.
     expect(firstRegion("곡선").textContent).toContain("격자 실행이 실패해 고를 칸이 없습니다");
   });
@@ -570,6 +573,19 @@ describe("#285 상태 → 색 토큰", () => {
       if (token === expected) expect(hits).toBeGreaterThan(0);
       else expect(hits).toBe(0);
     }
+  });
+
+  // #284 — 배지와 본문이 두 말을 하면 안 된다. 「돌았고 전부 실패했다」를 「아직 실행 안 함」
+  // 이라 부르면 본문(「한 번도 성공하지 못했습니다」 + 실패 사유)과 정면으로 부딪힌다.
+  it("돌았고 전부 실패한 적재를 배지가 「아직 실행 안 함」이라 부르지 않는다", async () => {
+    givenBackend({ runs: [failedRun("2026-08-14")] });
+    render(<BenchPage />);
+
+    const banner = screen.getByRole("region", { name: "시세 신선도" });
+    await waitFor(() => expect(banner.textContent).toContain("한 번도 성공하지 못했습니다"));
+
+    expect(banner.textContent).toContain("실행 실패");
+    expect(banner.textContent).not.toContain("아직 실행 안 함");
   });
 
   it("적재를 한 번도 안 돌린 첫 화면에는 오류색이 하나도 없다 (#285 완료 조건)", async () => {

@@ -105,7 +105,9 @@ export function useQuoteFreshness(): QuoteFreshness {
         provenance: {
           kind: "unavailable",
           reason: running ? "첫 적재가 아직 끝나지 않았습니다" : "성공한 캔들 적재가 없습니다",
-          because: running ? "checking" : "not-run",
+          // 돌았고 전부 실패한 상태다 — 같은 return 이 `failedReason` 까지 들고 나간다.
+          // 「아직 실행 안 함」으로 부르면 배지와 본문이 두 말을 한다 (#284).
+          because: running ? "checking" : "run-failed",
         },
         staleness: null,
         running,

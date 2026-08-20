@@ -107,11 +107,17 @@ export default function Page() {
 
   // 격자·곡선이 비어 있는 이유는 상태마다 다르다. 「봇이 없다」·「아직 안 돌렸다」·「돌렸는데
   // 실패했다」·「칸을 아직 안 골랐다」를 한 문장으로 뭉개면 무엇을 하면 되는지가 사라진다.
-  const gridProvenance = gridZoneProvenance({ rosterState, hasGrid: board.grid !== null, runError: board.runError });
+  const gridProvenance = gridZoneProvenance({
+    rosterState,
+    hasGrid: board.grid !== null,
+    isRunning: board.isRunning,
+    runError: board.runError,
+  });
 
   const curveProvenance = curveZoneProvenance({
     rosterState,
     hasGrid: board.grid !== null,
+    isRunning: board.isRunning,
     runError: board.runError,
     report: activeReport && { runId: activeReport.run.run_id, finishedDt: activeReport.run.finished_dt },
     isReportLoading: board.isReportLoading,
@@ -131,6 +137,16 @@ export default function Page() {
       incoming="파라미터 조합이 칸으로 깔립니다. 칸을 누르면 곡선이 그 조합으로 바뀝니다."
       provenance={gridProvenance}
       marked={selection?.kind === "grid-point"}
+      notice={
+        board.runError !== null ? (
+          <ImpactNotice
+            headline="격자 실행이 실패했습니다"
+            halted={board.grid !== null ? ["새 격자"] : ["격자", "곡선·지표·거래"]}
+            running={board.grid !== null ? ["앞선 격자의 칸 고르기"] : ["봇 만들기", "시세 보기"]}
+            detail={board.runError}
+          />
+        ) : undefined
+      }
     >
       <SelectionLine selection={selection} kind="grid-point" />
       {rosterState === "filled" && (

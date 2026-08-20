@@ -45,7 +45,9 @@ export function useBacktestBoard(): BacktestBoard {
     setRunError(null);
     try {
       const result = await runBacktestGrid(input);
-      if (result === null) throw new Error("격자 실행이 실패했습니다");
+      // 사유는 자리 머리가 「격자 실행이 실패했습니다 — 」를 앞에 붙여 낸다. 여기서 같은
+      // 문장을 다시 쓰면 한 줄에 두 번 붙는다(`{success: false}` 200 → `apiCall` 이 null).
+      if (result === null) throw new Error("서버가 실패를 알렸고 사유는 주지 않았습니다");
       setGrid(result);
       // 새 격자는 새 지형이다 — 옛 격자의 칸을 가리키던 리포트를 남겨 두면 화면이 거짓말한다.
       setReport(null);

@@ -9,9 +9,11 @@
 // **검증 경계** — 리포트 조회 서비스를 세운다. 화면에 곡선이 그려지는지는 보지 않는다.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import { useBacktestBoard } from "@/hooks/bench/useBacktestBoard";
+import { gridZoneProvenance } from "@/lib/bench/boardProvenance";
+import { runBacktestGrid } from "@/services/backtest/backtestService";
 
 const selectReport = vi.fn();
 
@@ -66,5 +68,28 @@ describe("#232 `/bench?run=<id>` 로 오면 그 리포트가 열린다", () => {
     const { result } = renderHook(() => useBacktestBoard());
 
     await waitFor(() => expect(result.current.reportError).toBe("리포트를 불러오지 못했습니다"));
+  });
+});
+
+// #284 — 자리 머리가 사유 앞에 「격자 실행이 실패했습니다 — 」를 붙인다. 훅이 사유로 같은
+// 문장을 내면 한 줄에 두 번 붙는다. 백엔드가 `{success: false}` 로 200 을 주면 `apiCall` 이
+// null 을 돌려주는 경로가 정확히 그 자리였다.
+describe("격자 실행이 사유 없이 실패한 경로", () => {
+  it("자리 머리의 문장을 사유가 되풀이하지 않는다", async () => {
+    vi.mocked(runBacktestGrid).mockResolvedValue(null as never);
+
+    const { result } = renderHook(() => useBacktestBoard());
+    await act(async () => {
+      await result.current.runGrid({} as never);
+    });
+
+    expect(result.current.runError).not.toBeNull();
+    const head = gridZoneProvenance({
+      rosterState: "filled",
+      hasGrid: false,
+      isRunning: false,
+      runError: result.current.runError,
+    });
+    expect(head.kind === "unavailable" && head.reason.split("격자 실행이 실패했습니다")).toHaveLength(2);
   });
 });
