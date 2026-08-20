@@ -197,22 +197,22 @@ function CostComparison({
 }) {
   const twin = run.costless_summary;
 
-  if (twin === null) {
-    // 아직 도는 실행은 **아직 안 채워진 것**이지 옛 실행이 아니다 — 재실행을 권하면 안 된다.
-    return (
-      <p className="break-keep text-2xs text-ink-muted">
-        비용 미반영 대비 —{" "}
-        {run.status === "running" || run.status === "queued"
-          ? "실행이 끝나면 채워집니다."
-          : "대조군을 돌리지 않은 옛 실행입니다. 다시 실행하면 채워집니다."}
-      </p>
-    );
+  // 견줄 상대가 없는 이유가 셋이다 — 뭉개면 **터진 실행에 소용없는 재실행을 시킨다.**
+  const missing =
+    twin === null
+      ? run.status === "running" || run.status === "queued"
+        ? "실행이 끝나면 채워집니다."
+        : "대조군을 돌리지 않은 옛 실행입니다. 다시 실행하면 채워집니다."
+      : (twin.absent_reason ?? null);
+  if (missing !== null || twin === null) {
+    return <p className="break-keep text-2xs text-ink-muted">비용 미반영 대비 — {missing}</p>;
   }
   if (finalEquity === null) {
     return <p className="break-keep text-2xs text-ink-muted">비용 미반영 대비 — 자산곡선이 없어 견줄 수 없습니다.</p>;
   }
 
   const won = (value: number) => Math.round(value).toLocaleString("ko-KR");
+  const twinEquity = twin.final_equity as number;
   return (
     <table className="min-w-0 text-2xs">
       <caption className="break-keep pb-1 text-left text-2xs text-ink-muted">
@@ -235,14 +235,14 @@ function CostComparison({
             끝난 자산
           </th>
           <td className="pr-3 text-right tabular-nums">{won(finalEquity)}</td>
-          <td className="text-right tabular-nums">{won(twin.final_equity)}</td>
+          <td className="text-right tabular-nums">{won(twinEquity)}</td>
         </tr>
         <tr>
           <th scope="row" className="pr-3 text-left font-normal text-ink-muted">
             차이
           </th>
           <td className="pr-3 text-right tabular-nums text-ink-muted">—</td>
-          <td className="text-right tabular-nums">{won(twin.final_equity - finalEquity)}</td>
+          <td className="text-right tabular-nums">{won(twinEquity - finalEquity)}</td>
         </tr>
       </tbody>
     </table>

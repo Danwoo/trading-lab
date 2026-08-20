@@ -48,9 +48,11 @@ FREE_COSTS = CostModel(fee_rate=0.0, slippage_rate=0.0, sell_tax_rate=0.0)
 # `--workers=1` 이라 그동안 모든 HTTP 요청이 함께 멈춘다 — 안전핀이 안전핀 역할을 못 한 것이다.
 #
 # **대조군이 이 값을 밀어냈다** (SC-007). 칸마다 엔진을 두 번 도므로 상한에서의 소요가 두 배가
-# 됐고, CI 러너 실측으로 2000칸이 13.0초 — 예산 밖이었다. `scripts/verify_grid_cost_budget.py`
-# 가 그것을 잡아 이 값을 내리게 했다. 1200 은 그 러너에서 7.8초다.
-MAX_COMBOS = 1200
+# 됐다. `scripts/verify_grid_cost_budget.py` 가 선언 범위 전체를 훑어 실측한다 — 칸당 9.16ms 라
+# 500칸이 이 기계에서 4.6초, CI 러너(실측 1.7배)에서 약 7.8초다. 800칸은 러너에서 예산 밖이다.
+#
+# 상한은 안전핀이지 목표가 아니다 — 흔한 격자는 2축×5값 = 25칸이다.
+MAX_COMBOS = 500
 
 
 @dataclass(frozen=True)

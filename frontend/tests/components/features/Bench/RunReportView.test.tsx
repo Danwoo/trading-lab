@@ -203,6 +203,21 @@ describe("RunReportView", () => {
     expect(screen.queryByRole("table", { name: /비용 미반영 대비/ })).toBeNull();
   });
 
+  it("대조군이 터진 실행에 재실행을 권하지 않는다 — 같은 이유로 또 터진다", () => {
+    const broken = report();
+    broken.run = {
+      ...broken.run,
+      costless_summary: { absent_reason: "대조군을 구하지 못했습니다 — 실행이 KeyError 으로 멈췄습니다" },
+    };
+    render(<RunReportView report={broken} />);
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("대조군을 구하지 못했습니다");
+    expect(text).not.toContain("옛 실행");
+    expect(text).not.toContain("다시 실행하면");
+    expect(screen.queryByRole("table", { name: /비용 미반영 대비/ })).toBeNull();
+  });
+
   it("아직 도는 실행에 재실행을 권하지 않는다", () => {
     const running = report();
     running.run = { ...running.run, status: "running", costless_summary: null };

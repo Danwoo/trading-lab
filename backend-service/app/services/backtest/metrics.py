@@ -384,7 +384,10 @@ def compute(
     # 거래 수가 다른 두 세계를 같은 세계인 척하게 된다. 그래서 대조군을 실제로 돌린 값을 쓴다.
     realized_return = (equity[-1] - initial_cash) / initial_cash * 100 if initial_cash > 0 else None
     costless_return = (costless_summary or {}).get("return_pct")
-    if costless_summary is None:
+    # `NULL` 은 「안 돌린 옛 실행」이고, `absent_reason` 이 실린 요약은 「돌렸는데 못 구했다」다.
+    # 둘을 뭉개면 터진 실행에 **소용없는 재실행**을 시킨다.
+    twin_absent = (costless_summary or {}).get("absent_reason") if costless_summary else None
+    if costless_summary is None or twin_absent:
         out.append(
             Metric(
                 key="cost_gap_pct",
@@ -392,7 +395,7 @@ def compute(
                 value=None,
                 unit="p",
                 derived_from="비용 0으로 다시 돌린 실행의 수익률 − 이 실행의 수익률",
-                absent_reason="대조군을 돌리지 않은 옛 실행입니다 — 다시 실행하면 채워집니다",
+                absent_reason=twin_absent or "대조군을 돌리지 않은 옛 실행입니다 — 다시 실행하면 채워집니다",
             )
         )
     elif costless_return is None or realized_return is None:

@@ -398,6 +398,23 @@ def test_cost_gap_derivation_names_both_worlds() -> None:
     check("이 실행 수익률을 적는다", "5.00%" in derived, True)
 
 
+def test_broken_twin_is_not_called_an_old_run() -> None:
+    """대조군이 **터진** 실행에 「옛 실행이니 다시 돌려라」고 하지 않는다 — 또 터진다."""
+    ms = compute(
+        equity_dt=dates(3),
+        equity=[1000.0, 1020.0, 1050.0],
+        trades=[_cost_trade(fee=1.5, slippage=5.0, tax=18.0)],
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0018,
+        costless_summary={"absent_reason": "대조군을 구하지 못했습니다 — 실행이 KeyError 으로 멈췄습니다"},
+    )
+    gap = by_key(ms, "cost_gap_pct")
+    check("격차 값 없음", gap.value, None)
+    check("사유가 실패를 말한다", "구하지 못했습니다" in (gap.absent_reason or ""), True)
+    check("「옛 실행」이라 하지 않는다", "옛 실행" in (gap.absent_reason or ""), False)
+
+
 def test_old_run_without_twin_is_absent_not_zero() -> None:
     """대조군을 안 돌린 옛 실행은 격차 0이 아니라 **모르는 것**이다."""
     ms = compute(

@@ -6,10 +6,27 @@ cd backend-service && APP_ENV=development uv run python tests/test_backtest_repo
 
 from __future__ import annotations
 
+import os
 import sys
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+
+# 서비스가 `core.logger` 를 타고 설정을 읽는다 — 다른 standalone 그물과 같은 더미를 세운다.
+for _name, _value in {
+    "BACKEND_SQL_DB_DRIVER": "postgresql+psycopg",
+    "BACKEND_SQL_DB_HOST": "localhost",
+    "BACKEND_SQL_DB_PORT": "5432",
+    "BACKEND_SQL_DB_NAME": "test",
+    "BACKEND_SQL_DB_USER": "test",
+    "BACKEND_SQL_DB_PASSWORD": "test",
+    "SFTP_HOST": "localhost",
+    "SFTP_PORT": "22",
+    "SFTP_USERNAME": "test",
+    "SFTP_PASSWORD": "test",
+    "JWT_SECRET": "test-secret",
+}.items():
+    os.environ.setdefault(_name, _value)
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND / "app"))

@@ -30,6 +30,9 @@ from services.backtest.grid import MAX_COMBOS, axes_from_spec, run_grid  # noqa:
 #: 스펙 §5 — 이 위로 가면 화면이 완료 예상을 띄워야 한다.
 BUDGET_SECONDS = 10.0
 BARS = 1500
+#: 재는 축과 표본 크기. 축은 이 전략이 선언한 범위 전체를 고르게 훑는다.
+SWEEP_PARAM = "ma_period"
+SAMPLE_CELLS = 40
 
 
 def _load(name: str):
@@ -60,9 +63,27 @@ def main() -> int:
     specs = list(module.STRATEGY.get("params") or [])
     # 훑지 않는 축은 **선언된 기본값**으로 채운다 — 안 채우면 전략이 KeyError 로 죽어
     # 「칸은 돌았는데 전부 실패」를 재는 꼴이 된다.
-    base_params = {spec["name"]: spec.get("default") for spec in specs if spec["name"] != "ma_period"}
-    axes = axes_from_spec(specs, {"ma_period": [5, 10, 20, 40, 60]})
+    base_params = {spec["name"]: spec.get("default") for spec in specs if spec["name"] != SWEEP_PARAM}
+    # **표본을 아무렇게나 고르면 안 된다.** 칸당 비용은 파라미터 **값**에 따라 다르다 —
+    # 실측: 같은 전략에서 5칸 6.76ms · 20칸 7.06ms · 40칸 8.21ms · 80칸 10.12ms 로, 훑는 값이
+    # 커질수록 칸이 비싸진다. 작은 표본을 상한 배율로 외삽하면 그 편차가 그대로 증폭된다.
+    #
+    # 그래서 **선언 범위 전체를 고르게 훑는다** — 이 전략이 실제로 받을 수 있는 값의 분포다.
+    axis = next(spec for spec in specs if spec["name"] == SWEEP_PARAM)
+    low, high = int(axis["min"]), int(axis["max"])
+    values = sorted({low + round(i * (high - low) / (SAMPLE_CELLS - 1)) for i in range(SAMPLE_CELLS)})
+    axes = axes_from_spec(specs, {SWEEP_PARAM: values})
     costs = CostModel(fee_rate=0.00015, slippage_rate=0.0005, sell_tax_rate=0.0018)
+
+    # 워밍업 — 첫 실행의 import·코드 캐시 비용을 측정에서 뺀다.
+    run_grid(
+        strategy=Strategy(module),
+        axes=axes_from_spec(specs, {SWEEP_PARAM: [values[len(values) // 2]]}),
+        base_params=base_params,
+        series=series,
+        initial_cash=1_000_000.0,
+        costs=costs,
+    )
 
     started = time.perf_counter()
     grid = run_grid(

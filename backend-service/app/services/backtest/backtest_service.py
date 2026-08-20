@@ -14,6 +14,7 @@ import json
 from types import SimpleNamespace
 
 from core.exceptions import BadRequestError, NotFoundError
+from core.logger import logger
 from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, quantize, run_single
 from services.backtest.grid import FREE_COSTS, axes_from_spec, run_grid
 from services.backtest.metrics import compute
@@ -197,8 +198,15 @@ class BacktestService:
                 initial_cash=initial_cash,
                 costs=FREE_COSTS,
             )
-        except Exception:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
-            return None
+        except Exception as exc:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
+            # **삼키지 않는다.** `NULL` 은 이 레포에서 「대조군을 안 돌린 옛 실행」을 뜻한다고
+            # 네 곳(마이그레이션·모델·스키마·프론트)이 못박았다. 터진 것을 그 `NULL` 로 두면
+            # 화면이 **다른 원인**을 말하고, 시키는 재실행은 같은 이유로 또 터진다.
+            logger.warning(f"대조군 실행이 실패했습니다 — {type(exc).__name__}")
+            return json.dumps(
+                {"absent_reason": f"대조군을 구하지 못했습니다 — 실행이 {type(exc).__name__} 으로 멈췄습니다"},
+                ensure_ascii=False,
+            )
         return json.dumps(self._costless_summary(costless, initial_cash), ensure_ascii=False)
 
     @staticmethod
@@ -208,7 +216,11 @@ class BacktestService:
         **거래 수를 함께 남긴다.** 비용은 현금을 깎아 체결 수량을 바꾸므로, 두 세계의 거래 수가
         다를 수 있다. 그 차이를 숨기면 「같은 매매를 했는데 비용만 다른 것」처럼 읽힌다.
         """
-        final_equity = result.equity[-1].equity if result.equity else initial_cash
+        # **자산곡선이 없으면 지어내지 않는다.** 시작 자금으로 채우면 「격차 0」인 요약이 DB 에
+        # 남아, 못 구한 것과 정말 0인 것이 같아진다.
+        if not result.equity:
+            return {"absent_reason": "대조군의 자산곡선이 비었습니다"}
+        final_equity = result.equity[-1].equity
         return {
             "final_equity": round(final_equity, 4),
             "return_pct": round((final_equity - initial_cash) / initial_cash * 100, 6) if initial_cash > 0 else None,
