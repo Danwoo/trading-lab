@@ -9,9 +9,11 @@
 // **검증 경계** — 리포트 조회 서비스를 세운다. 화면에 곡선이 그려지는지는 보지 않는다.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import { useBacktestBoard } from "@/hooks/bench/useBacktestBoard";
+import { GRID_RUN_FAILED_HEADLINE, curveZoneProvenance, gridZoneProvenance } from "@/lib/bench/boardProvenance";
+import { runBacktestGrid } from "@/services/backtest/backtestService";
 
 const selectReport = vi.fn();
 
@@ -66,5 +68,60 @@ describe("#232 `/bench?run=<id>` 로 오면 그 리포트가 열린다", () => {
     const { result } = renderHook(() => useBacktestBoard());
 
     await waitFor(() => expect(result.current.reportError).toBe("리포트를 불러오지 못했습니다"));
+  });
+});
+
+// #284 — 화면은 실패를 두 줄로 낸다: 자리 머리(`GRID_RUN_FAILED_HEADLINE`)와 그 아래 서버 사유
+// (`ImpactNotice` 의 `detail`). 훅이 사유로 머리와 같은 문장을 내면 한 화면에 두 번 선다.
+// 백엔드가 `{success: false}` 로 200 을 주면 `apiCall` 이 null 을 돌려주는 경로가 정확히 그 자리였다.
+describe("격자 실행이 사유 없이 실패한 경로", () => {
+  it("자리 머리의 문장을 사유가 되풀이하지 않는다", async () => {
+    vi.mocked(runBacktestGrid).mockResolvedValue(null as never);
+
+    const { result } = renderHook(() => useBacktestBoard());
+    await act(async () => {
+      await result.current.runGrid({} as never);
+    });
+
+    const head = gridZoneProvenance({
+      rosterState: "filled",
+      hasGrid: false,
+      isRunning: false,
+      runError: result.current.runError,
+    });
+    expect(head.kind === "unavailable" && head.reason).toBe(GRID_RUN_FAILED_HEADLINE);
+    expect(result.current.runError).not.toBeNull();
+    expect(result.current.runError).not.toContain(GRID_RUN_FAILED_HEADLINE);
+  });
+});
+
+// 칸 조회가 실패해 사유가 남은 뒤 격자를 다시 돌리면, 곡선 자리가 낡은 「리포트를 불러오지
+// 못했습니다」를 계속 말하고 **방금 실행의 실패는 어디에도 안 나온다** — 곡선 판정이
+// `reportError` 를 `runError` 보다 먼저 보기 때문이다.
+describe("앞선 리포트 실패가 남은 채 격자를 다시 돌리면", () => {
+  it("낡은 리포트 실패가 방금 실행의 실패를 가리지 않는다", async () => {
+    selectReport.mockRejectedValue(new Error("리포트를 불러오지 못했습니다"));
+    vi.mocked(runBacktestGrid).mockResolvedValue(null as never);
+
+    const { result } = renderHook(() => useBacktestBoard());
+    act(() => {
+      result.current.selectCell(11, "실행 #11");
+    });
+    await waitFor(() => expect(result.current.reportError).toBe("리포트를 불러오지 못했습니다"));
+
+    await act(async () => {
+      await result.current.runGrid({} as never);
+    });
+
+    const curve = curveZoneProvenance({
+      rosterState: "filled",
+      hasGrid: false,
+      isRunning: false,
+      runError: result.current.runError,
+      report: null,
+      isReportLoading: result.current.isReportLoading,
+      reportError: result.current.reportError,
+    });
+    expect(curve.kind === "unavailable" && curve.because).toBe("run-failed");
   });
 });

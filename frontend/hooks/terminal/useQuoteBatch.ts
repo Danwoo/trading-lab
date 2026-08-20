@@ -41,7 +41,7 @@ export function useQuoteBatch(symbols: Array<{ ticker: string; market: string }>
         // 이라 부르면 왜 비었는지가 화면에서 사라진다 (FR-021).
         const reasons = Object.values(result.unavailable);
         if (Object.keys(result.items).length === 0 && reasons.length > 0) {
-          setProvenance({ kind: "unavailable", reason: reasons[0] });
+          setProvenance({ kind: "unavailable", reason: reasons[0], because: "no-source" });
           return;
         }
         setProvenance({ kind: "live", source: result.source, asOf: result.asOf });
@@ -52,7 +52,7 @@ export function useQuoteBatch(symbols: Array<{ ticker: string; market: string }>
           setProvenance(PLACEHOLDER_PROVENANCE);
           return;
         }
-        setProvenance({ kind: "unavailable", reason: getApiErrorMessage(outcome.error) });
+        setProvenance({ kind: "unavailable", reason: getApiErrorMessage(outcome.error), because: "unreadable" });
       }
     }
 

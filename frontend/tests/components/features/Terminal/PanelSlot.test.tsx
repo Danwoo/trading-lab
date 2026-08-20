@@ -93,6 +93,18 @@ describe("PanelSlot — market 결측(출처 불문)과 진짜 시장 불명을 
     expect(screen.queryByText("시장 정보를 알 수 없는 종목입니다")).toBeNull();
   });
 
+  // #284 — 배지 「제공 안 됨」은 「사용자가 할 수 있는 것이 없다」는 뜻이다. 바로 아래 사유가
+  // 「채우면 열립니다」라고 말하는 자리에 그 배지를 붙이면 한 자리가 두 말을 한다.
+  it("배지가 「제공 안 됨」이라 부르지 않는다 — 채우면 열리는 자리다", async () => {
+    setSymbol({ ticker: "005930", market: "", name: "삼성전자" });
+    const definition = definitionOf({ capability: "candles" });
+    render(<PanelSlot instance={INSTANCE} definition={definition} region="UNKNOWN" {...NOOP} />);
+
+    await screen.findByText("이 종목에 등록된 시장 값이 비어 있습니다 — 시장을 채우면 이 패널이 열립니다.");
+    expect(screen.queryByText("제공 안 됨")).toBeNull();
+    expect(screen.getByText("고르면 채워집니다")).toBeTruthy();
+  });
+
   it("market 이 있지만 매핑에 없는 진짜 미지원 시장 → 기존 '시장 정보를 알 수 없는 종목입니다' 문구를 그대로 쓴다", async () => {
     setSymbol({ ticker: "XXXX", market: "OTC", name: "장외종목" });
     const definition = definitionOf({ capability: "candles" });

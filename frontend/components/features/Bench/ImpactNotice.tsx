@@ -31,6 +31,11 @@ interface Props {
   action?: React.ReactNode;
   /** 머리줄을 어느 칸으로 낼 것인가 (`ImpactTone`). 「받는 중」처럼 나쁜 소식이 아닌 상태는 조용히 낸다 */
   tone?: ImpactTone;
+  /**
+   * 화면판독기가 **즉시** 읽어야 하나 (`role="alert"`). **사용자가 방금 누른 것의 결과**일 때만 켠다 —
+   * 첫 로드 실패처럼 부르지 않은 알림까지 끼어들면 낭독이 시끄러워져 정작 누른 것의 답이 묻힌다.
+   */
+  announce?: boolean;
 }
 
 function Scope({ label, items }: { label: string; items: string[] }) {
@@ -51,9 +56,12 @@ function Scope({ label, items }: { label: string; items: string[] }) {
  *
  * 폭을 고정하지 않는다 — 부모를 채우고, 두 갈래는 자리가 나면 나란히 서고 좁아지면 쌓인다.
  */
-export function ImpactNotice({ headline, halted, running, detail, action, tone = "alert" }: Props) {
+export function ImpactNotice({ headline, halted, running, detail, action, tone = "alert", announce = false }: Props) {
   return (
-    <div className="w-full min-w-0 rounded-panel border border-line bg-bg-raised p-3">
+    <div
+      role={announce ? "alert" : undefined}
+      className="w-full min-w-0 rounded-panel border border-line bg-bg-raised p-3"
+    >
       <p className={cn("break-keep text-sm font-ui", TONE_CLASS[tone])}>{headline}</p>
 
       <dl className="mt-2 grid gap-2 sm:grid-cols-2">
