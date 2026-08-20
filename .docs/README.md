@@ -68,6 +68,7 @@ flowchart TD
 | [FastMCP 서버 개발](2-개발가이드/fastmcp-서버개발.md)                   | from_fastapi 로 REST→MCP tool 전 과정 — 결정·RPC 설계·추가 레시피·큐레이션 규칙·2단 인증·소비(에이전트/단발/SSE)·멀티서버·multi-agent 바인딩·테스트 (self-contained) |
 | [React/Next.js 프론트 개발](2-개발가이드/react-nextjs-프론트개발.md)    | Container·재사용 훅/컴포넌트·데이터흐름·인증 입문 (Next 16/Better Auth)                                                                                              |
 | [멀티에이전트 도메인 추가](guides/multi-agent-development.md)            | 새 투자 리서치 도메인·sub-agent 추가 절차 (도메인 모듈·registry·mcp_tools lockstep)                                                                                  |
+| [멀티에이전트 그래프 패키지](guides/multi-agent-plan-execute.md)         | `graphs/plan_execute/` 모듈 경계(무엇을 고치려면 어디를 여나) + 네임스페이스·topology 두 계약 (multi-agent 한정)                                                      |
 | [멀티에이전트 판단 Flow & 시연](guides/multi-agent-trace-walkthrough.md) | 그래프 노드별 판단 흐름(보안검사→clarify→plan→실행→재계획→답변)·라우팅 분기 + 시연 대본·공개 trace 링크 (multi-agent 한정)                                           |
 
 ### 기법 — `3-기법/`
