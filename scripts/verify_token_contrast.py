@@ -99,6 +99,7 @@ EXACT_ROLES: dict[str, str] = {
     "--ink-faint": NON_TEXT,
     # 상태색은 메시지·배지·테두리에만 온다 — 버튼 채움이 되지 않는다(§2.3).
     "--danger": INK_CONTENT,
+    "--caution": INK_CONTENT,
     "--success": INK_CONTENT,
 }
 
