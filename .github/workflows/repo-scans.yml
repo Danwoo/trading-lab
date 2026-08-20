@@ -261,8 +261,9 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_ad_numbering.py
 
-      # 로컬 기동 정의의 포트 위생 (#308) — 포트 강탈 명령(fuser -k·pkill·kill -9) 금지 +
-      # 프론트 포트 ↔ 전 서비스 CORS 기본값·BETTER_AUTH_URL lockstep
+      # 로컬 기동 정의의 포트 위생 (#308 #294) — 포트 강탈 명령(fuser -k·pkill·kill -9) 금지 +
+      # 프론트 포트 ↔ 전 서비스 CORS 기본값·BETTER_AUTH_URL lockstep +
+      # 로컬 DB 포트 ↔ .env.example·부트스트랩·스크립트 기본값 lockstep + 생태계 기본 포트(3000·5432) 금지
       - name: 기동 정의 포트 위생 검사
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_dev_port_hygiene.py

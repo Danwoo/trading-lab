@@ -1,9 +1,20 @@
 processes:
   # 로컬 Postgres (#166 S0) — 관계형 + pgvector(#160) 통합 단일 인스턴스.
   # docker 데몬 필요. 데이터는 named volume 에 영속(재기동해도 유지).
+  # 5432 는 Postgres 의 사실상 기본 포트라 그 머신의 다른 Postgres 와 겹친다 — 3000 이 남의
+  # 컨테이너를 물고 있던 것과 같은 함정이고(#308), DB 는 실패 모양이 더 나쁘다: 겹치면 기동이
+  # 막히거나 **남의 DB 에 붙어** 없는 스키마를 찾다 죽는다. 그래서 호스트 쪽만 5442 로 옮긴다
+  # (컨테이너 안쪽은 5432 그대로 — 이미지 기본값이라 바꿀 이유가 없다).
+  # 이 PORT 가 로컬 DB 포트의 SoT 다: 각 서비스 `app/.env.example` 의 `*_DB_PORT`,
+  # `frontend/.env.example` 의 `DATABASE_URL`, `scripts/bootstrap_local_env.py` 의
+  # `LOCAL_DB_ENDPOINT`, 로컬 DB 를 기본값으로 두는 스크립트가 같은 포트여야 하며 그 lockstep 은
+  # scripts/verify_dev_port_hygiene.py 가 검사한다. CI 서비스 컨테이너와 컨테이너 배포
+  # (compose.*.yaml)의 5432 는 격리된 네트워크 안쪽이라 이 값과 무관하다.
   postgres:
+    vars:
+      PORT: 5442
     command: >
-      docker run --rm --name fintech-pg -p 5432:5432
+      docker run --rm --name fintech-pg -p {{.PORT}}:5432
       -e POSTGRES_USER=fintech -e POSTGRES_PASSWORD=fintech
       -e POSTGRES_DB=fintech
       -v fintech-pg-data:/var/lib/postgresql/data
