@@ -3,6 +3,7 @@
 
 import { useId, useState } from "react";
 import { cn } from "./primitives/cn";
+import { ICON_HIT_AREA } from "./primitives/hitArea";
 import { Icon } from "./primitives/icons";
 
 /**
@@ -20,7 +21,7 @@ import { Icon } from "./primitives/icons";
  * 한 색으로 양쪽을 다 올릴 수 없다. 바탕을 얹으면 글자 대비를 안 깎고 반응만 더한다.
  */
 const ICON_BUTTON_CLASS =
-  "absolute right-2 top-1/2 -translate-y-1/2 rounded px-0.5 text-gray-500 " +
+  `${ICON_HIT_AREA} absolute right-2 top-1/2 -translate-y-1/2 rounded text-gray-500 ` +
   "hover:bg-gray-500/10 focus-visible:bg-gray-500/10 focus:outline-none";
 
 interface Props<T = any> {

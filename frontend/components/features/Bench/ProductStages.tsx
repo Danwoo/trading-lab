@@ -20,7 +20,9 @@ const TONE: Record<StageState, string> = {
 export function ProductStages() {
   return (
     <details className="min-w-0 border border-line px-3 py-2">
-      <summary className="cursor-pointer break-keep text-sm text-ink marker:text-ink-muted">
+      {/* 펼침 손잡이도 조작부다 — 글자 줄 높이(20px)만으로는 2.5.8 의 24 에 못 미친다.
+          `flex` 로 세우면 펼침 표식(marker)이 사라지므로 세로 여백으로만 올린다. */}
+      <summary className="min-h-6 cursor-pointer break-keep py-0.5 text-sm text-ink marker:text-ink-muted">
         이 제품이 지금 어디까지 왔나
       </summary>
 

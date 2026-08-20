@@ -9,6 +9,7 @@
 // 끌고 오지 않도록 `toastQueue.ts` 를 직접 import 한다 — toastQueue.ts:5-7 참고.
 
 import { useEffect, useSyncExternalStore } from "react";
+import { ICON_HIT_AREA } from "@/components/shared/ui/primitives/hitArea";
 import {
   dismissCurrent,
   getCurrentToast,
@@ -65,7 +66,7 @@ export function ToastNotification() {
         type="button"
         onClick={dismissCurrent}
         aria-label="알림 닫기"
-        className={`flex-shrink-0 rounded p-0.5 text-base leading-none ${style.text} opacity-60 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1`}
+        className={`${ICON_HIT_AREA} flex-shrink-0 rounded text-base leading-none ${style.text} opacity-60 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1`}
       >
         <span aria-hidden="true">×</span>
       </button>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Icon } from "@/components/shared/ui/primitives/icons";
 import { cn } from "@/components/shared/ui/primitives/cn";
+import { ICON_HIT_AREA, ICON_HIT_AREA_BOX } from "@/components/shared/ui/primitives/hitArea";
 import { useBenchSelectionStore } from "@/stores/shell/benchSelectionStore";
 import { type RailItem } from "@/constants/shell";
 
@@ -92,7 +93,12 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
             aria-pressed={expanded}
             aria-label={expanded ? `${item.label} 패널 좁히기` : `${item.label} 패널 넓히기`}
             onClick={onToggleExpanded}
-            className="hidden rounded p-1 text-ink-muted hover:bg-bg-raised hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted xl:block"
+            className={cn(
+              ICON_HIT_AREA_BOX,
+              // 표시 여부는 구간이 가른다(§21.6) — `hidden` 을 `xl:inline-flex` 가 덮는다.
+              // `-my-px` 는 24 짜리 표적이 머리 줄을 밀어 늘리지 않게 한다.
+              "-my-px hidden rounded text-ink-muted hover:bg-bg-raised hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted xl:inline-flex",
+            )}
           >
             <Icon name={expanded ? "arrowright" : "arrowleft"} size={14} />
           </button>
@@ -102,7 +108,10 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
           type="button"
           aria-label={`${item.label} 패널 닫기`}
           onClick={onClose}
-          className="rounded p-1 text-ink-muted hover:bg-bg-raised hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+          className={cn(
+            ICON_HIT_AREA,
+            "-my-px rounded text-ink-muted hover:bg-bg-raised hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
+          )}
         >
           <Icon name="close" size={14} />
         </button>
