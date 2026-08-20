@@ -7,17 +7,16 @@
 ## 파일 하나가 갖춰야 하는 것
 
 ```python
-STRATEGY = {  # ← 이 선언이 폼을 만든다
-    "key": "...",  # 저장된 봇이 이 전략을 가리키는 이름. 한 번 정하면 안 바꾼다
-    "name": "...",  # 화면에 보이는 이름
-    "timeframe": "1d",  # 이 전략이 보는 캔들 주기
-    "params": [...],  # 조절할 수 있는 값들
+STRATEGY = {           # ← 이 선언이 폼을 만든다
+    "key": "...",      # 저장된 봇이 이 전략을 가리키는 이름. 한 번 정하면 안 바꾼다
+    "name": "...",     # 화면에 보이는 이름
+    "timeframe": "1d", # 이 전략이 보는 캔들 주기
+    "params": [...],   # 조절할 수 있는 값들
 }
 
-
-def indicators(bars, params): ...  # 이 전략이 보는 값
-def entry(ctx): ...  # 산다고 판정하면 True
-def exit(ctx): ...  # 판다고 판정하면 True
+def indicators(bars, params): ...   # 이 전략이 보는 값
+def entry(ctx): ...                 # 산다고 판정하면 True
+def exit(ctx): ...                  # 판다고 판정하면 True
 ```
 
 전략 파일은 **아무것도 import 하지 않습니다.** `STRATEGY` 는 순수 데이터이고, 로더가 스키마로 검증해 어디가 왜 틀렸는지 알려 줍니다.
