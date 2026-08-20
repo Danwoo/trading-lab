@@ -38,13 +38,19 @@ export function FieldShell({ children, isInvalid, errorMessage, errorMessageId, 
   );
 }
 
-/** 모든 텍스트형 입력이 공유하는 기본 클래스 — TextBox 가 쓰던 것과 같다. */
+/**
+ * 모든 텍스트형 입력이 공유하는 기본 클래스.
+ *
+ * **바탕을 반드시 준다.** 종전에는 배경 클래스가 아예 없어 브라우저 기본(흰색)으로 떨어졌고,
+ * 그래서 이 입력이 다크 보드 위에서 흰 상자가 됐다. 대비 검사로는 안 잡힌다 — 흰 바탕에
+ * 다크 잉크는 대비가 **높기** 때문이다. 잡히는 것은 눈으로 볼 때뿐이다.
+ */
 export const FIELD_INPUT_CLASS =
-  "w-full rounded border px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500/40 " +
-  "read-only:cursor-default read-only:bg-gray-50 " +
-  "disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400";
+  "w-full rounded border bg-bg-panel px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted " +
+  "focus:outline-none focus:ring-2 focus:ring-line-strong " +
+  "read-only:cursor-default read-only:bg-bg-raised " +
+  "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted";
 
 export function fieldBorderClass(isInvalid: boolean): string {
-  return isInvalid ? "border-[#d9534f]" : "border-gray-300";
+  return isInvalid ? "border-danger" : "border-line";
 }

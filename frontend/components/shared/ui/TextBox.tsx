@@ -8,20 +8,19 @@ import { Icon } from "./primitives/icons";
 /**
  * 클리어·비밀번호 토글 아이콘의 클래스.
  *
- * **어두운 셸과 흰 `/admin` 양쪽에서 읽히는 색 하나**를 쓴다. 종전에는 `text-gray-400/500` 에
- * `hover:text-gray-600/700` 이었는데, hover 색이 밝은 바탕 전제라 어두운 셸에서는 **대비가
- * 1.57:1 로 떨어져 마우스를 올리면 아이콘이 사라졌다**.
+ * **토큰으로 잉크를 준다** — 셸이 선언한 테마를 따라간다. 종전에는 원시 색을 박았는데,
+ * `/admin` 셸이 `data-theme="light"` 를 선언하지 않아 토큰이 거기서도 다크로 풀렸기 때문이다.
+ * 그 결과 이 프리미티브가 다크 보드에서 재사용되자 **흰 상자**가 됐다(실측 2.54:1).
+ * 셸이 선언하게 고쳤으므로 두 테마가 같은 토큰으로 갈린다.
  *
- * 왜 토큰(`text-ink-*`)이 아닌가: `:root` 가 다크 기본이고 `/admin` 셸은 `bg-white` 인데
- * `data-theme="light"` 가 없다 — 토큰을 쓰면 흰 바탕에 다크 잉크가 얹혀 안 보인다.
- * 왜 `text-current` 도 아닌가: 이 래퍼에는 잉크가 없어 브라우저 기본색(검정)으로 떨어진다(실측).
+ * 왜 `text-current` 는 아닌가: 이 래퍼에는 잉크가 없어 브라우저 기본색(검정)으로 떨어진다(실측).
  *
  * hover 는 **색이 아니라 바탕**으로 준다. 색을 밝히면 어두운 데서 좋아지고 밝은 데서 나빠진다 —
  * 한 색으로 양쪽을 다 올릴 수 없다. 바탕을 얹으면 글자 대비를 안 깎고 반응만 더한다.
  */
 const ICON_BUTTON_CLASS =
-  "absolute right-2 top-1/2 -translate-y-1/2 rounded px-0.5 text-gray-500 " +
-  "hover:bg-gray-500/10 focus-visible:bg-gray-500/10 focus:outline-none";
+  "absolute right-2 top-1/2 -translate-y-1/2 rounded px-0.5 text-ink-muted " +
+  "hover:bg-bg-raised focus-visible:bg-bg-raised focus:outline-none";
 
 interface Props<T = any> {
   /** 객체 state 폼(useFormState 짝)의 필드 키. 네이티브 폼 화면에선 생략한다 — 아래 「두 모드」 참조. */
@@ -181,11 +180,11 @@ export function TextBox<T = any>({
       aria-describedby={isInvalid && errorMessage ? errorMessageId : undefined}
       style={{ height }}
       className={cn(
-        "w-full rounded border px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400",
-        "focus:outline-none focus:ring-2 focus:ring-blue-500/40",
-        "read-only:cursor-default read-only:bg-gray-50",
-        "disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400",
-        isInvalid ? "border-[#d9534f]" : "border-gray-300",
+        "w-full rounded border bg-bg-panel px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted",
+        "focus:outline-none focus:ring-2 focus:ring-line-strong",
+        "read-only:cursor-default read-only:bg-bg-raised",
+        "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted",
+        isInvalid ? "border-danger" : "border-line",
         showClearButton && value ? "pr-8" : "",
         showPasswordToggle ? "pr-8" : "",
         className,
@@ -226,7 +225,7 @@ export function TextBox<T = any>({
         )}
       </div>
       {isInvalid && errorMessage && (
-        <div id={errorMessageId} className="mt-1 self-start rounded bg-[#d9534f] p-2 text-xs leading-normal text-white">
+        <div id={errorMessageId} className="mt-1 self-start rounded bg-danger p-2 text-xs leading-normal text-bg-base">
           {errorMessage}
         </div>
       )}

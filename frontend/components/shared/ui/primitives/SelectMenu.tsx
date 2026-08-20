@@ -193,14 +193,14 @@ export function SelectMenu({
         {shown.map((entry) => (
           <span
             key={String(entry)}
-            className="inline-flex max-w-full items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5"
+            className="inline-flex max-w-full items-center gap-1 rounded bg-bg-raised px-1.5 py-0.5"
           >
             <span className="truncate">{labelFor(entry)}</span>
             {!readOnly && !disabled && (
               <button
                 type="button"
                 aria-label={`${labelFor(entry)} 제거`}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-ink-muted hover:text-ink"
                 onClick={(e) => {
                   e.stopPropagation();
                   onChange(selectedValues.filter((existing) => existing !== entry));
@@ -211,7 +211,7 @@ export function SelectMenu({
             )}
           </span>
         ))}
-        {hiddenCount > 0 && <span className="text-gray-500">+{hiddenCount}</span>}
+        {hiddenCount > 0 && <span className="text-ink-muted">+{hiddenCount}</span>}
       </span>
     );
   };
@@ -231,16 +231,16 @@ export function SelectMenu({
             aria-readonly={readOnly || undefined}
             style={{ height }}
             className={cn(
-              "flex w-full items-center justify-between gap-1 rounded border px-3 py-1.5 text-left text-sm text-gray-900",
-              "focus:outline-none focus:ring-2 focus:ring-blue-500/40",
-              "disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400",
-              readOnly ? "cursor-default bg-gray-50" : "cursor-pointer bg-white",
-              isInvalid ? "border-[#d9534f]" : "border-gray-300",
+              "flex w-full items-center justify-between gap-1 rounded border px-3 py-1.5 text-left text-sm text-ink",
+              "focus:outline-none focus:ring-2 focus:ring-line-strong",
+              "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted",
+              readOnly ? "cursor-default bg-bg-raised" : "cursor-pointer bg-bg-panel",
+              isInvalid ? "border-danger" : "border-line",
               clearVisible ? "pr-12" : "",
             )}
           >
             {renderTriggerContent()}
-            <span aria-hidden="true" className="shrink-0 text-gray-400">
+            <span aria-hidden="true" className="shrink-0 text-ink-muted">
               ▾
             </span>
           </button>
@@ -250,7 +250,7 @@ export function SelectMenu({
           <button
             type="button"
             aria-label="선택 지우기"
-            className="absolute right-7 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-7 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
             onClick={() => onChange(multiple ? [] : null)}
           >
             ×
@@ -262,7 +262,7 @@ export function SelectMenu({
         <PopoverPrimitive.Content
           align="start"
           sideOffset={4}
-          className="z-[1100] max-h-64 w-[var(--radix-popover-trigger-width)] overflow-auto rounded border border-gray-300 bg-white py-1 text-sm shadow-lg motion-safe:data-[state=open]:animate-dialog-fade-in motion-safe:data-[state=closed]:animate-dialog-fade-out"
+          className="z-[1100] max-h-64 w-[var(--radix-popover-trigger-width)] overflow-auto rounded border border-line bg-bg-panel py-1 text-sm shadow-lg motion-safe:data-[state=open]:animate-dialog-fade-in motion-safe:data-[state=closed]:animate-dialog-fade-out"
           onOpenAutoFocus={(e) => {
             // 검색이 있으면 입력으로, 없으면 목록으로 포커스를 옮긴다(Radix 기본 대상은 첫
             // 포커스 가능 요소라 항목 버튼으로 튀어 검색을 못 치는 경우가 생긴다).
@@ -284,7 +284,7 @@ export function SelectMenu({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                className="w-full rounded border border-line px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-line-strong"
               />
             </div>
           )}
@@ -301,7 +301,7 @@ export function SelectMenu({
             }}
             className="focus:outline-none"
           >
-            {visibleItems.length === 0 && <li className="px-3 py-2 text-gray-500">{noDataText}</li>}
+            {visibleItems.length === 0 && <li className="px-3 py-2 text-ink-muted">{noDataText}</li>}
             {visibleItems.map((item, index) => {
               const itemValue = readValue(item, valueExpr);
               const isSelected = multiple ? selectedValues.includes(itemValue) : itemValue === value;
@@ -318,18 +318,12 @@ export function SelectMenu({
                   onClick={() => commit(itemValue)}
                   className={cn(
                     "flex cursor-pointer items-center gap-2 px-3 py-1.5",
-                    index === activeIndex ? "bg-blue-50" : "",
-                    isSelected ? "font-medium text-blue-700" : "text-gray-900",
+                    index === activeIndex ? "bg-bg-raised" : "",
+                    isSelected ? "font-medium text-ink-strong" : "text-ink",
                   )}
                 >
                   {showSelectionControls && (
-                    <input
-                      type="checkbox"
-                      readOnly
-                      checked={isSelected}
-                      tabIndex={-1}
-                      className="h-4 w-4 accent-blue-600"
-                    />
+                    <input type="checkbox" readOnly checked={isSelected} tabIndex={-1} className="h-4 w-4" />
                   )}
                   {itemRender ? itemRender(item) : readLabel(item, displayExpr)}
                   {/* 선택 표시를 색·굵기로만 하지 않는다 — 체크 문자를 함께 둔다. */}
@@ -347,7 +341,7 @@ export function SelectMenu({
             <button
               type="button"
               onClick={commitCustomValue}
-              className="w-full px-3 py-1.5 text-left text-blue-700 hover:bg-blue-50"
+              className="w-full px-3 py-1.5 text-left text-ink-strong hover:bg-bg-raised"
             >
               &ldquo;{search.trim()}&rdquo; 추가
             </button>

@@ -88,19 +88,28 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   if (isEmbed === null || !loaded || authorized === null) return null;
 
+  // **관리 화면은 라이트다** — 그 사실을 선언한다.
+  //
+  // 토큰(`--ink`·`--bg-*`)은 `:root` 가 다크 기본이고 `[data-theme="light"]` 가 라이트다
+  // (`styles/globals.css:64,204`). 이 셸이 그 선언을 안 해서, 공용 프리미티브가 토큰을 못 쓰고
+  // 원시 색(`bg-white`·`text-gray-900`)을 박아 왔다 — 그 프리미티브가 다크 보드에서 재사용되자
+  // 흰 상자가 됐다. 선언 한 줄이 그 갈래를 없앤다.
+  //
   // iframe 내부: chrome 없이 페이지만 렌더 (탭 콘텐츠)
   if (isEmbed) {
     return (
       <>
         <style>{`nextjs-portal { display: none !important; }`}</style>
-        <div className="h-screen">{authorized ? children : null}</div>
+        <div data-theme="light" className="h-screen bg-bg-base text-ink">
+          {authorized ? children : null}
+        </div>
       </>
     );
   }
 
   // 메인 프레임: Header + Sidebar + MDI 탭 섀시
   return (
-    <div className="h-screen flex flex-col">
+    <div data-theme="light" className="h-screen flex flex-col bg-bg-base text-ink">
       <div className="flex-shrink-0">
         <Header isDrawerOpen={isDrawerOpen} setIsDrawerOpen={setIsDrawerOpen} />
       </div>
