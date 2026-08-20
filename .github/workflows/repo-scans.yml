@@ -407,6 +407,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_reason_redaction.py
 
+      # 바탕을 안 칠한 자리 (#281) — **대비 검사가 원리적으로 못 잡는** 구멍이다. 흰 바탕에
+      # 다크 잉크는 대비가 높아서 통과한다. 결함은 대비가 아니라 「바탕이 틀린 것」이다.
+      - name: 서피스 바탕 칠 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_surface_paints_background.py
+
       # 비텍스트 토큰을 글자에 쓰는 것 (#73 리드 결정 ㉡) — 위 두 그물 **사이**에 난 구멍이다.
       # 대비 검사는 「비텍스트니 검사 안 함」으로, 색 사용 검사는 「등록된 토큰이니 위반 아님」으로
       # 넘겨, 규격상 못 읽는 값이 글자로 새어 나간다(실측: PR #161). 검사 0건이면 실패.

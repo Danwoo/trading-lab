@@ -95,6 +95,12 @@ export function SelectMenu({
   const [activeIndex, setActiveIndex] = useState(0);
   const listId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  //  **포털은 테마 선언 밖으로 나간다.** Radix Portal 의 기본 컨테이너가 `document.body` 라,
+  //  `[data-theme="light"]` 를 셸 `<div>` 에 걸어 둔 `/admin` 에서 이 목록만 `:root`(다크)로
+  //  풀린다. 컨테이너를 셸 안으로 옮기면 조상의 `overflow` 에 잘릴 위험이 생기므로, **연 자리의
+  //  테마를 읽어 콘텐츠에 그대로 찍는다.** 없으면 안 찍고 `:root` 기본을 따른다.
+  const [openedTheme, setOpenedTheme] = useState<string | null>(null);
   const optionRefs = useRef<Array<HTMLLIElement | null>>([]);
 
   const selectedValues: any[] = multiple ? (Array.isArray(value) ? value : []) : [];
@@ -217,8 +223,15 @@ export function SelectMenu({
   };
 
   return (
-    <PopoverPrimitive.Root open={open} onOpenChange={(next) => !readOnly && !disabled && setOpen(next)}>
-      <div className="relative w-full" style={{ width }}>
+    <PopoverPrimitive.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (readOnly || disabled) return;
+        if (next) setOpenedTheme(anchorRef.current?.closest("[data-theme]")?.getAttribute("data-theme") ?? null);
+        setOpen(next);
+      }}
+    >
+      <div ref={anchorRef} className="relative w-full" style={{ width }}>
         <PopoverPrimitive.Trigger asChild>
           <button
             type="button"
@@ -260,6 +273,7 @@ export function SelectMenu({
 
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
+          data-theme={openedTheme ?? undefined}
           align="start"
           sideOffset={4}
           className="z-[1100] max-h-64 w-[var(--radix-popover-trigger-width)] overflow-auto rounded border border-line bg-bg-panel py-1 text-sm shadow-lg motion-safe:data-[state=open]:animate-dialog-fade-in motion-safe:data-[state=closed]:animate-dialog-fade-out"
