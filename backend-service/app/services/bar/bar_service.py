@@ -21,7 +21,7 @@ provider 를 모른다는 MD-AD-19 는 이 순서까지 포함한 말이다.
 
 import datetime as dt
 
-from core.calendar import sessions_between
+from core.calendar import market_local_naive, session_bounds, sessions_between
 from core.exceptions import BadRequestError, NotFoundError
 from providers.base import CREDENTIAL_MISSING_CODE, NOT_CANONICAL_CODE
 from repositories.bar.bar_repository import BarRepository
@@ -36,6 +36,11 @@ SYNTHESIZABLE_INTERVALS = (1, 5, 15, 30, 60)
 
 
 class BarService:
+    #: 접기용 분봉 조회 상한. 일봉 상한(`MAX_BARS`)만큼의 날을 접으려면 하루 390분 × 그 수인데,
+    #: 그것을 한 번에 읽으면 조회가 무거워진다. **모자라면 뒷날이 안 접히고 `mixed` 로 답한다** —
+    #: 조용히 틀린 값을 주는 것보다 「일부만 접었다」를 정직히 말하는 쪽이다.
+    MINUTE_FOLD_LIMIT = 200_000
+
     def __init__(self, bar_repository: BarRepository, capability_service: CapabilityService):
         self.bar_repository = bar_repository
         self.capability_service = capability_service
@@ -132,6 +137,7 @@ class BarService:
                 "limit": limit,
             }
         )
+        rows = self._fold_to_regular(market, instrument["instrument_id"], rows)
         source, adj_policy, asof = self._provenance(rows)
         return {
             "items": [self._to_item(row) for row in rows],
@@ -145,6 +151,61 @@ class BarService:
             "asof": asof,
             **_unavailable_fields(None if rows else self._empty_unavailable(args, market, symbol, "daily_bar", "일봉")),
         }
+
+    def _fold_to_regular(self, market: str, instrument_id: int, rows: list[dict]) -> list[dict]:
+        """분봉이 덮는 날의 일봉을 **정규장 창으로 접어** 갈아 끼운다 (#255 리드 결정 A′).
+
+        저장은 안 건드린다 — 소스 일봉은 그대로 두고 **물어볼 때** 접는다. 적재 시점에 접었다가
+        시계열이 날짜끼리 갈리고·장중 반쪽 캔들이 굳어 되돌린 자리다.
+
+        접지 **않는** 날이 셋이다:
+
+        - **세션이 아직 안 끝난 날** — 접으면 반쪽 캔들이 나온다
+        - **세션 경계를 못 믿는 날** — 수능일. 캘린더가 2021년 이후를 모른다(`session_bounds` 가 `None`)
+        - **정규장 창에 분봉이 없는 날** — 접을 것이 없다
+
+        안 접은 날은 소스 값과 `session_scope` 를 그대로 둔다. 한 구간에 두 종류가 섞이면
+        `_session_scope` 가 `mixed` 로 답한다 — 뭉개지 않는 것이 이 설계의 값이다.
+        """
+        if not rows:
+            return rows
+
+        now = market_local_naive(market, dt.datetime.now(dt.UTC))
+        foldable: dict[str, tuple[dt.datetime, dt.datetime]] = {}
+        for row in rows:
+            day = dt.date.fromisoformat(str(row["time"]))
+            bounds = session_bounds(market, day)
+            if bounds is None or now <= bounds[1]:
+                continue
+            foldable[row["time"]] = bounds
+        if not foldable:
+            return rows
+
+        spans = list(foldable.values())
+        minute_rows, _ = self.bar_repository.select_minute_bar_list(
+            {
+                "instrument_id": instrument_id,
+                "ts_from": min(start for start, _ in spans),
+                "ts_to": max(end for _, end in spans),
+                "limit": self.MINUTE_FOLD_LIMIT,
+            }
+        )
+        if not minute_rows:
+            return rows
+
+        by_day: dict[str, list[dict]] = {}
+        for minute in minute_rows:
+            by_day.setdefault(str(minute["time"])[:10], []).append(minute)
+
+        folded: list[dict] = []
+        for row in rows:
+            bounds = foldable.get(row["time"])
+            bar = fold_regular_session(by_day.get(row["time"], []), bounds) if bounds else None
+            if bar is None:
+                folded.append(row)
+                continue
+            folded.append({**row, **bar, "session_scope": "regular"})
+        return folded
 
     def select_minute_bar_list(self, args: dict) -> dict:
         market, symbol = args["market"].upper(), args["symbol"].upper()
@@ -284,6 +345,32 @@ class BarService:
             "unavailable_reason": reason,
             "unavailable_code": code,
         }
+
+
+def fold_regular_session(minute_items: list[dict], bounds: tuple[dt.datetime, dt.datetime]) -> dict | None:
+    """그 날의 1분봉을 **정규장 창만** 접어 일봉 하나로 만든다. 창 안에 아무것도 없으면 `None`.
+
+    소스 일봉이 08:01–20:00 을 덮는 종목이 있어(#255 실측: 표본 25종목 중 9종목) 그 종가로
+    체결하면 **정규장에서 낼 수 없는 가격**이 된다. 창 밖 분봉을 버리는 것이 이 함수의 일이다.
+
+    경계는 **양쪽 포함**이다 — 15:30 종가단일가 체결이 그 창의 마지막 값이라 빼면 종가가 바뀐다.
+    """
+    start, end = bounds
+    inside = [item for item in minute_items if start <= dt.datetime.fromisoformat(item["time"]) <= end]
+    if not inside:
+        return None
+    volume = sum(int(item["volume"]) for item in inside)
+    values = [item.get("trade_value") for item in inside]
+    return {
+        "time": start.date().isoformat(),
+        "open": inside[0]["open"],
+        "high": max(item["high"] for item in inside),
+        "low": min(item["low"] for item in inside),
+        "close": inside[-1]["close"],
+        "volume": volume,
+        # 거래대금은 합계다 — 하나라도 모르면 합계를 지어내지 않는다.
+        "trade_value": None if any(v is None for v in values) else sum(values),
+    }
 
 
 def synthesize_bars(items: list[dict], interval_min: int) -> list[dict]:

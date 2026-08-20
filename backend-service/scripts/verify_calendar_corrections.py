@@ -28,7 +28,7 @@ if str(_APP_DIR) not in sys.path:
 # `core.calendar` 는 `core.config` 를 안 탄다 — 설정 더미가 필요 없다.
 
 import exchange_calendars as xcals  # noqa: E402
-from core.calendar import EXTRA_CLOSURES  # noqa: E402
+from core.calendar import EXTRA_CLOSURES, UNRELIABLE_SESSION_BOUNDS  # noqa: E402
 
 
 def main() -> int:
@@ -84,8 +84,45 @@ def main() -> int:
                     f" 뺐습니다 — 보정이 과합니다"
                 )
 
+    # ── 「경계를 못 믿는 날」도 같은 질문을 받는다 ─────────────────────────
+    #
+    # 이 목록은 「접지 마라」는 표시다(#255 A′). 라이브러리가 나중에 수능일 지연을 반영하면
+    # 이 표는 **접을 수 있는 날을 막는 거짓**이 된다. 그래서 매번 되묻는다:
+    # 「라이브러리가 아직도 이 날을 평일과 같은 시각으로 여는가?」
+    if not UNRELIABLE_SESSION_BOUNDS:
+        print("::error::경계 보정 목록이 비어 있습니다 — 검사할 대상이 0건이라 fail-closed 종료")
+        return 1
+    bounds_checked = 0
+    for code, days in sorted(UNRELIABLE_SESSION_BOUNDS.items()):
+        try:
+            calendar = xcals.get_calendar(code)
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"{code}: 캘린더를 읽지 못했습니다 ({type(exc).__name__})")
+            continue
+        first, last = calendar.first_session.date(), calendar.last_session.date()
+        for day in sorted(days):
+            bounds_checked += 1
+            if not (first <= day <= last):
+                failures.append(f"{code} {day}: 캘린더 수록 범위({first}~{last}) 밖이라 아무 효과가 없습니다")
+                continue
+            if not calendar.is_session(day):
+                failures.append(f"{code} {day}: 라이브러리가 휴장으로 압니다 — 경계 보정이 아니라 휴장 보정 자리입니다")
+                continue
+            opened = calendar.session_open(day)
+            # 평일 개장과 같은 시각이면 라이브러리는 아직 지연을 모른다 = 보정이 유효하다.
+            normal = {calendar.session_open(ts.date()).time() for ts in calendar.sessions_in_range(day, day)}
+            typical = calendar.session_open(calendar.previous_session(day)).time()
+            if opened.time() != typical and normal:
+                failures.append(
+                    f"{code} {day}: 라이브러리가 이미 다른 개장 시각({opened.time()} UTC)을 압니다 —"
+                    f" 이 보정은 낡았으니 지우고 접기를 허용하세요 (exchange_calendars {xcals.__version__})"
+                )
+
     print(f"보정 대상 {checked}건 · 캘린더 {len(EXTRA_CLOSURES)}종 (exchange_calendars {xcals.__version__})")
     for code, days in sorted(EXTRA_CLOSURES.items()):
+        print(f"  {code}: {', '.join(str(day) for day in sorted(days))}")
+    print(f"경계를 못 믿는 날 {bounds_checked}건")
+    for code, days in sorted(UNRELIABLE_SESSION_BOUNDS.items()):
         print(f"  {code}: {', '.join(str(day) for day in sorted(days))}")
 
     if failures:
