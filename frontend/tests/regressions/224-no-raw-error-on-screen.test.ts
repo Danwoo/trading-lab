@@ -19,7 +19,9 @@ import { describe, expect, it } from "vitest";
 const FRONTEND_ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 
 /** 화면 문구가 만들어지는 계층 — 서버 라우트·로깅은 원문을 남겨야 하므로 대상이 아니다. */
-const SCANNED_DIRS = ["hooks", "components", "stores", "app/(main)"];
+// `app` 전체를 본다 — `app/(main)` 만 보면 **루트 에러 경계**(`app/error.tsx`)가 그물 밖이다.
+// 예외 원문이 화면으로 새기 가장 쉬운 자리가 하필 거기다.
+const SCANNED_DIRS = ["hooks", "components", "stores", "app"];
 
 /**
  * 예외에서 나온 값의 `.message` 를 읽는 모양 — `error.message`·`error?.response?.data?.message`·
@@ -40,11 +42,14 @@ const ALLOWED: Record<string, string> = {
   "components/shared/ui/TextBox.tsx": "DevExtreme 폼 검증 메시지다 — API 오류가 아니다",
 };
 
+/** 서버 라우트 — 이 그물의 선언대로 대상이 아니다 (로그에는 원문을 남겨야 한다). */
+const SKIP = new Set(["api"]);
+
 function walk(dir: string): string[] {
   const entries = fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : [];
   return entries.flatMap((entry) => {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) return walk(full);
+    if (entry.isDirectory()) return SKIP.has(entry.name) ? [] : walk(full);
     return /\.tsx?$/.test(entry.name) ? [full] : [];
   });
 }

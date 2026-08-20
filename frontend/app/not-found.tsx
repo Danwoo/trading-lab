@@ -7,7 +7,7 @@ import Link from "next/link";
  */
 export default function NotFound() {
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 text-center">
+    <main className="flex min-h-svh flex-col items-center justify-center gap-3 bg-bg-base p-6 text-center text-ink">
       <p className="text-sm text-ink-muted">주소를 찾지 못했습니다</p>
       <h1 className="break-keep text-lg font-medium text-ink">이 주소에 해당하는 화면이 없습니다.</h1>
       <p className="max-w-md break-keep text-sm text-ink-muted">

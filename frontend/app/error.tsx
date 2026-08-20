@@ -14,7 +14,10 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
   }, [error]);
 
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-3 p-6 text-center" role="alert">
+    <main
+      className="flex min-h-svh flex-col items-center justify-center gap-3 bg-bg-base p-6 text-center text-ink"
+      role="alert"
+    >
       <p className="text-sm text-danger">화면을 그리지 못했습니다</p>
       <h1 className="break-keep text-lg font-medium text-ink">이 화면이 멈췄습니다.</h1>
       <p className="max-w-md break-keep text-sm text-ink-muted">
