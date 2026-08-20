@@ -19,8 +19,8 @@
 // - 잰 조작부가 `MIN_MEASURED` 미만이면 실패한다 — 픽스처가 통째로 안 그려져도 "위반 0건"
 //   으로 초록이 되는 것을 막는다.
 // - 빠진 것들의 목록을 **그대로 단언**한다 — 2.5.8 예외(본문 문장 속 인라인 링크)와
-//   `sr-only`(화면에 없고 접근명만 내주는 상자) 둘 다. 규칙이 느슨해져 진짜 조작부를
-//   삼키면 그 자리에서 빨간불이 난다.
+//   「조작 대상 아님」(sr-only·aria-hidden) 둘 다. 규칙이 느슨해져 진짜 조작부를 삼키면
+//   그 자리에서 빨간불이 난다.
 //
 // ## 이 그물이 증명하지 않는 것
 //
@@ -80,9 +80,15 @@ const MIN_MEASURED = 40;
 /** 2.5.8 "Inline" 예외로 빠져도 되는 것 — 문장 속 링크뿐이다(폭마다 한 번씩). */
 const EXPECTED_EXEMPT = ["ROADMAP.md", "ROADMAP.md"];
 
-/** 화면에서 안 보이고 접근명만 내주는 것(`sr-only`) — 누르는 자리는 그것을 감싼 라벨이다.
+/** 사람이 그 자리를 눌러 쓰는 조작부가 아닌 것 — `sr-only`(접근명만 내주는 파일 입력)와
+ *  `aria-hidden`(DateBox 달력 팝업의 앵커). 누르는 자리는 각각 그것을 감싼 라벨과 달력 버튼이다.
  *  빠지는 자리를 **그대로 단언**한다: 이 규칙이 넓어져 진짜 조작부를 삼키면 목록이 달라진다. */
-const EXPECTED_SR_ONLY = ["FileUploader(선택 해제) @390", "FileUploader(선택 해제) @1440"];
+const EXPECTED_NOT_OPERABLE = [
+  "FileUploader(선택 해제) @390",
+  "DateBox(달력 열기) @390",
+  "FileUploader(선택 해제) @1440",
+  "DateBox(달력 열기) @1440",
+];
 
 interface Measured {
   fixture: string;
@@ -91,7 +97,7 @@ interface Measured {
   w: number;
   h: number;
   exempt: boolean;
-  srOnly: boolean;
+  notOperable: boolean;
 }
 
 afterEach(cleanup);
@@ -217,6 +223,12 @@ function renderFixtures(): Array<{ name: string; html: string }> {
     },
   ];
 
+  // jsdom 에는 `showPicker` 가 없어 DateBox 가 달력 버튼을 **아예 안 그린다** — 그러면 그 자리가
+  // 조용히 검사 밖으로 빠진다(픽스처를 더해도 소용없다). 실제 브라우저와 같은 조건으로 세운다.
+  if (typeof HTMLInputElement.prototype.showPicker !== "function") {
+    (HTMLInputElement.prototype as { showPicker?: () => void }).showPicker = () => {};
+  }
+
   return fixtures.map(({ name, node }) => {
     if (name === "GlobalTabs(탭 닫기)") {
       useTabStore.setState({ tabs: [{ id: "t1", title: "메뉴 관리", path: "/admin/menu" }], activeId: "t1" });
@@ -227,10 +239,18 @@ function renderFixtures(): Array<{ name: string; html: string }> {
     const trigger = document.querySelector('[aria-label="패널 메뉴"]');
     if (trigger) fireEvent.click(trigger);
     if (name === "FileUploader(선택 해제)") pickFile();
+    if (name === "DateBox(달력 열기)") requireControl("달력에서 고르기");
     const html = document.body.innerHTML;
     cleanup();
     return { name, html };
   });
+}
+
+/** 그 조작부가 실제로 그려졌는지 — 없으면 픽스처가 죽은 것이다(잰 것이 0개여도 통과하지 않게). */
+function requireControl(label: string): void {
+  if (!document.querySelector(`[aria-label="${label}"]`)) {
+    throw new Error(`픽스처에 「${label}」 조작부가 없다 — 그리는 조건이 바뀌었다`);
+  }
 }
 
 /** 파일 목록은 고른 뒤에만 그려진다 — 숨은 `input[type=file]` 에 파일 하나를 물린다. */
@@ -238,9 +258,7 @@ function pickFile(): void {
   const input = document.querySelector('input[type="file"]');
   if (!input) throw new Error("FileUploader 픽스처에 파일 입력이 없다");
   fireEvent.change(input, { target: { files: [new File(["x"], "분기보고서.pdf")] } });
-  if (!document.querySelector('[aria-label="분기보고서.pdf 선택 해제"]')) {
-    throw new Error("파일을 물렸는데 목록이 안 그려졌다 — 픽스처가 죽었다");
-  }
+  requireControl("분기보고서.pdf 선택 해제");
 }
 
 /** 이 레포의 Tailwind 설정으로 픽스처 HTML 에 필요한 CSS 를 실제로 생성한다. */
@@ -337,9 +355,11 @@ const MEASURE_SCRIPT = `
     const around = (parent.textContent || '').trim().replace(own, '').trim();
     return around.length > 0;
   }
-  // sr-only — 화면에는 없고 접근명만 내주는 상자(파일 입력이 대표적이다). 1×1 로 잘려
-  // 있으므로 크기를 요구할 대상이 아니다. 실제로 누르는 자리는 이것을 감싼 라벨이다.
-  function isScreenReaderOnly(el) {
+  // 사람이 그 자리를 눌러 쓰는 조작부가 아닌 것 — 두 갈래다.
+  // ㉠ sr-only: 화면에 없고 접근명만 내준다(파일 입력). 누르는 자리는 감싼 라벨이다.
+  // ㉡ aria-hidden: 접근성 트리 밖이다(DateBox 달력 팝업의 앵커 입력). 누르는 자리는 버튼이다.
+  function isNotOperable(el) {
+    if (el.closest('[aria-hidden="true"]')) return true;
     const style = getComputedStyle(el);
     const clip = (style.clip || '').split(' ').join('');
     return style.clipPath === 'inset(50%)' || clip === 'rect(0px,0px,0px,0px)';
@@ -358,7 +378,7 @@ const MEASURE_SCRIPT = `
         w: Math.round(rect.width * 10) / 10,
         h: Math.round(rect.height * 10) / 10,
         exempt: isInlineException(el),
-        srOnly: isScreenReaderOnly(el),
+        notOperable: isNotOperable(el),
       });
     }
   }
@@ -386,11 +406,11 @@ it("아이콘 조작부의 표적이 24×24 이상이다 (WCAG 2.5.8)", async ()
   // 통과가 "위반 없음"인지 "아무것도 안 봤음"인지 읽는 사람이 구분할 수 있게 남긴다.
   console.log(
     `[2.5.8] 픽스처 ${fixtures.length}개 × 폭 ${WIDTHS.join("·")} 에서 조작부 ${measured.length}개를 쟀다 ` +
-      `(인라인 예외 ${measured.filter((m) => m.exempt).length}개 · sr-only ${
-        measured.filter((m) => m.srOnly).length
+      `(인라인 예외 ${measured.filter((m) => m.exempt).length}개 · 조작 대상 아님 ${
+        measured.filter((m) => m.notOperable).length
       }개). 가장 작은 다섯:\n` +
       [...measured]
-        .filter((m) => !m.exempt && !m.srOnly)
+        .filter((m) => !m.exempt && !m.notOperable)
         .sort((a, b) => Math.min(a.w, a.h) - Math.min(b.w, b.h))
         .slice(0, 5)
         .map((m) => `  ${m.w}x${m.h} «${m.label}» — ${m.fixture}`)
@@ -412,10 +432,10 @@ it("아이콘 조작부의 표적이 24×24 이상이다 (WCAG 2.5.8)", async ()
 
   // 예외로 빠지는 것은 문장 속 인라인 링크뿐이어야 한다.
   expect(measured.filter((m) => m.exempt).map((m) => m.label)).toEqual(EXPECTED_EXEMPT);
-  expect(measured.filter((m) => m.srOnly).map((m) => m.fixture)).toEqual(EXPECTED_SR_ONLY);
+  expect(measured.filter((m) => m.notOperable).map((m) => m.fixture)).toEqual(EXPECTED_NOT_OPERABLE);
 
   const violations = measured
-    .filter((m) => !m.exempt && !m.srOnly && (m.w < 24 || m.h < 24))
+    .filter((m) => !m.exempt && !m.notOperable && (m.w < 24 || m.h < 24))
     .map((m) => `${m.w}x${m.h} «${m.label}» ${m.tag} — ${m.fixture}`);
   expect(violations, `24×24 미만인 조작부:\n${violations.join("\n")}`).toEqual([]);
   // Tailwind 컴파일 + 크롬 두 번 기동이라 기본 5초 안에 안 끝난다(전체 스위트 병렬 실행에서 실측).
