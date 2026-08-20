@@ -12,17 +12,29 @@
 위에 검은 상자가 놓인다. 실제로 이 PR 의 첫 판이 `/admin` 은 선언하고 회원가입 카드는 빠뜨려
 그 반례를 만들었다.
 
-**검사 축 셋**:
+그 뒷면에는 자리가 하나 더 있다. **포털은 셸 밖으로 나간다** — Radix Portal 의 기본 컨테이너가
+`document.body` 라, 셸 `<div>` 에 건 선언이 닿지 않고 `:root`(다크)가 남는다. 그래서 흰
+다이얼로그 안의 공용 입력이 검은 상자가 됐다(이 PR 의 두 번째 판이 만든 반례).
+
+**검사 축 넷**:
 
   ① 공용 입력 프리미티브(`components/shared/ui/**`)의 텍스트 입력 — 배경 토큰이 있어야 한다
   ② 전면을 덮는 자리(`h-screen`·`min-h-svh`·`h-[100dvh]` …) — 배경 토큰이 있어야 한다
   ③ 어두운 `.auth-backdrop` 안의 **밝은 카드** — `data-theme="light"` 를 선언해야 한다
+  ④ **포털 안에서 바탕을 칠하는 박스** — `data-theme` 과 잉크 토큰을 스스로 가져야 한다
+     (그 바탕이 `bg-white` 처럼 밝은 원시색이면 선언은 `light` 여야 한다 — 짝이 어긋나면 실패)
 
 축마다 검사 대상이 0건이면 실패한다. 면제는 **쓰이지 않으면 실패한다** — 낡은 예외가 조용히
 남아 있으면 그물이 무엇을 봐주는지 아무도 못 본다.
 
-**못 막는 것**: 축 ③ 은 밝은 카드를 `LIGHT_CARD_BG` 의 클래스로 알아본다. 다른 밝은 색을
-새로 쓰면 표식에 안 걸린다. 축 ② 도 표식(높이 클래스) 기반이라 JS 로 높이를 주면 안 걸린다.
+**못 막는 것**:
+
+  - 축 ③ 은 밝은 카드를 `LIGHT_CARD_BG` 의 클래스로 알아본다. 다른 밝은 색을 새로 쓰면 표식에
+    안 걸린다. 축 ② 도 표식(높이 클래스) 기반이라 JS 로 높이를 주면 안 걸린다.
+  - 축 ④ 는 포털 안에서 **처음** 바탕을 칠하는 요소 하나만 본다 — 그 안쪽은 이 선언을 상속하기
+    때문이다. 같은 포털에 형제로 두 번째 바탕 트리를 두면 그 트리는 안 본다.
+  - 클래스는 **소스에 그대로 적힌 문자열 리터럴**(따옴표·백틱)에서만 읽는다. 변수·헬퍼로 조립해
+    넘기면(`const c = base + size`) 어느 축도 못 본다.
 
     python3 scripts/verify_surface_paints_background.py
 """
@@ -62,8 +74,21 @@ FIELD_ROOTS: tuple[str, ...] = ("components/shared/ui",)
 #: 테마를 고른다), `type="file"` 은 `sr-only` 로 숨는다.
 UNPAINTED_INPUT = re.compile(r'type="(?:checkbox|radio|file)"')
 
+#: 글자색을 주는 토큰 클래스. 포털 박스는 이것도 있어야 한다 — 없으면 색 클래스를 안 가진
+#: 글자(라벨·제목)가 UA 기본 `canvastext` 로 떨어지고, 그 값은 `color-scheme` 을 따라가
+#: 다크에서 **흰색**이 된다(흰 다이얼로그 위 흰 글자).
+INK_TOKEN = re.compile(r"(?<![:\w-])text-ink(?:-strong|-muted)?\b")
+
 #: 어두운 `.auth-backdrop` 안의 밝은 카드 색. 축 ③ 의 표식이다.
 LIGHT_CARD_BG = re.compile(r"(?<![:\w-])bg-(?:white|\[#F0F1F2\])(?![\w-])", re.IGNORECASE)
+
+#: 축 ③·④ 가 요소를 훑을 때 쓰는 여는 태그 패턴 — `<div>` 뿐 아니라 컴포넌트(`<Popover.Content>`)
+#: 까지 받는다. 종전에는 `<div>` 만 봐서 같은 카드를 컴포넌트로 감싸면 표식 밖이었다.
+ANY_TAG = r"[A-Za-z][\w.]*"
+
+#: 포털을 여는 자리. 포털 콘텐츠는 `document.body` 에 붙어 셸의 `[data-theme]` 밖으로 나가므로
+#: **자기 모드를 스스로 선언해야 한다**.
+PORTAL_TAG = re.compile(rf"<({ANY_TAG}Portal)\b")
 
 #: 바탕을 안 칠해도 되는 자리와 그 이유. **쓰이지 않는 항목은 실패한다** — 낡은 면제는
 #: 「대상 0건이라 통과」와 같은 얼굴이다.
@@ -96,12 +121,18 @@ def _files(root: Path) -> list[Path]:
     return out
 
 
+#: 클래스가 실릴 만한 문자열 리터럴 — 큰따옴표·작은따옴표·백틱 셋 다. 종전에는 큰따옴표만
+#: 봐서, 이 레포가 실제로 쓰는 백틱 조립(`FormModal.tsx` 의 `className={`…`}`)이 통째로 축 ②
+#: 밖이었다.
+STRING_LITERAL = re.compile(r'"([^"\n]{4,400})"' r"|'([^'\n]{4,400})'" r"|`([^`]{4,400})`", re.S)
+
+
 def _class_strings(text: str) -> list[tuple[int, str]]:
     """클래스가 실릴 만한 문자열 리터럴들 — 줄 번호와 함께 (주석은 이미 걷힌 텍스트)."""
     out: list[tuple[int, str]] = []
-    for match in re.finditer(r'"([^"\n]{4,400})"', text):
+    for match in STRING_LITERAL.finditer(text):
         line = text.count("\n", 0, match.start()) + 1
-        out.append((line, match.group(1)))
+        out.append((line, next(group for group in match.groups() if group is not None)))
     return out
 
 
@@ -145,6 +176,8 @@ def main() -> int:
     input_checked = 0
     surface_checked = 0
     card_checked = 0
+    portal_checked = 0
+    portal_box_checked = 0
     allowed_used: set[str] = set()
 
     # ① 공용 입력 클래스 상수
@@ -211,7 +244,7 @@ def main() -> int:
         text = strip_comments(path.read_text(encoding="utf-8"))
         if "auth-backdrop" not in text:
             continue
-        for line, element in _jsx_elements(text, "div"):
+        for line, element in _jsx_elements(text, ANY_TAG):
             if not LIGHT_CARD_BG.search(element):
                 continue
             card_checked += 1
@@ -221,9 +254,53 @@ def main() -> int:
                     " — 그 안의 공용 입력이 다크로 풀려 검은 상자가 됩니다"
                 )
 
+    # ④ 포털 안에서 바탕을 칠하는 박스 — 자기 모드를 스스로 선언해야 한다.
+    #    대상은 목록이 아니라 **발견**으로 잡는다: `…Portal` 을 여는 자리 전수.
+    for path in _files(FRONT):
+        rel = str(path.relative_to(FRONT))
+        text = strip_comments(path.read_text(encoding="utf-8"))
+        for opening in PORTAL_TAG.finditer(text):
+            portal_checked += 1
+            name = opening.group(1)
+            closing = text.find(f"</{name}>", opening.end())
+            region = text[opening.end() : closing if closing != -1 else len(text)]
+            base_line = text.count("\n", 0, opening.end()) + 1
+            painted = next(
+                (
+                    (base_line + line - 1, element)
+                    for line, element in _jsx_elements(region, ANY_TAG)
+                    if BG_TOKEN.search(element) or LIGHT_CARD_BG.search(element)
+                ),
+                None,
+            )
+            if painted is None:
+                violations.append(
+                    f"{rel}:{base_line}: {name} 안에 바탕을 칠하는 박스가 없습니다"
+                    " — 표식이 바뀌었거나 바탕이 사라졌습니다 (fail-closed)"
+                )
+                continue
+            line, element = painted
+            portal_box_checked += 1
+            if "data-theme" not in element:
+                violations.append(
+                    f"{rel}:{line}: 포털 안의 박스가 `data-theme` 을 안 답니다"
+                    " — 포털은 셸의 테마 선언 밖(document.body)이라 :root(다크)로 풀립니다"
+                )
+            elif LIGHT_CARD_BG.search(element) and 'data-theme="light"' not in element:
+                violations.append(
+                    f'{rel}:{line}: 밝은 원시색 바탕인데 `data-theme="light"` 가 아닙니다'
+                    " — 바탕과 모드가 어긋나면 흰 상자 안에 검은 칸이 됩니다"
+                )
+            if not INK_TOKEN.search(element):
+                violations.append(
+                    f"{rel}:{line}: 포털 안의 박스가 잉크 토큰을 안 씁니다"
+                    " — 셸의 `text-ink` 가 포털에 안 닿아 글자가 UA 기본(다크에서 흰색)으로 떨어집니다"
+                )
+
     print(
         f"공유 입력 클래스 {shared_checked}건 · 공용 입력 요소 {input_checked}건 · "
-        f"전면 서피스 {surface_checked}건 · 인증 라이트 카드 {card_checked}건 검사"
+        f"전면 서피스 {surface_checked}건 · 인증 라이트 카드 {card_checked}건 · "
+        f"포털 {portal_checked}건(바탕 박스 {portal_box_checked}건) 검사"
         f" (frontend/**/*.tsx, 테스트·주석 제외 · 면제 {len(ALLOWED)}건)"
     )
 
@@ -234,6 +311,8 @@ def main() -> int:
             ("공용 입력 요소", input_checked),
             ("전면 서피스", surface_checked),
             ("인증 라이트 카드", card_checked),
+            ("포털", portal_checked),
+            ("포털 바탕 박스", portal_box_checked),
         )
         if count == 0
     ]
@@ -258,7 +337,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    print("위반 0건 — 전면 서피스·공용 입력이 자기 바탕을 칠하고, 밝은 카드가 자기 모드를 밝힙니다")
+    print("위반 0건 — 전면 서피스·공용 입력이 자기 바탕을 칠하고, 밝은 카드와 포털 박스가 자기 모드를 밝힙니다")
     return 0
 
 

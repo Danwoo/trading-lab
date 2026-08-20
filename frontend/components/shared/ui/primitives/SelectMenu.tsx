@@ -100,6 +100,8 @@ export function SelectMenu({
   //  `[data-theme="light"]` 를 셸 `<div>` 에 걸어 둔 `/admin` 에서 이 목록만 `:root`(다크)로
   //  풀린다. 컨테이너를 셸 안으로 옮기면 조상의 `overflow` 에 잘릴 위험이 생기므로, **연 자리의
   //  테마를 읽어 콘텐츠에 그대로 찍는다.** 없으면 안 찍고 `:root` 기본을 따른다.
+  //  다이얼로그 안에서 열릴 때도 이 한 줄이 답을 낸다 — 다이얼로그 박스가 자기 모드를 선언하므로
+  //  (primitives/dialog.tsx) 포털 안의 앵커가 `closest` 로 그 선언을 찾는다.
   const [openedTheme, setOpenedTheme] = useState<string | null>(null);
   const optionRefs = useRef<Array<HTMLLIElement | null>>([]);
 
@@ -276,7 +278,7 @@ export function SelectMenu({
           data-theme={openedTheme ?? undefined}
           align="start"
           sideOffset={4}
-          className="z-[1100] max-h-64 w-[var(--radix-popover-trigger-width)] overflow-auto rounded border border-line bg-bg-panel py-1 text-sm shadow-lg motion-safe:data-[state=open]:animate-dialog-fade-in motion-safe:data-[state=closed]:animate-dialog-fade-out"
+          className="z-[1100] max-h-64 w-[var(--radix-popover-trigger-width)] overflow-auto rounded border border-line bg-bg-panel py-1 text-sm text-ink shadow-lg motion-safe:data-[state=open]:animate-dialog-fade-in motion-safe:data-[state=closed]:animate-dialog-fade-out"
           onOpenAutoFocus={(e) => {
             // 검색이 있으면 입력으로, 없으면 목록으로 포커스를 옮긴다(Radix 기본 대상은 첫
             // 포커스 가능 요소라 항목 버튼으로 튀어 검색을 못 치는 경우가 생긴다).
@@ -361,8 +363,11 @@ export function SelectMenu({
             <button
               type="button"
               onClick={commitCustomValue}
-              className="w-full px-3 py-1.5 text-left text-ink-strong hover:bg-bg-raised"
+              // 이건 목록 항목이 아니라 **동작**이다. 선택된 항목도 `--ink-strong` 을 쓰므로
+              // 글자색만으로는 안 갈린다 — 구분선과 `+` 로 가른다(색에만 기대지 않는다).
+              className="flex w-full items-center gap-1.5 border-t border-line px-3 py-1.5 text-left text-ink-strong hover:bg-bg-raised"
             >
+              <span aria-hidden="true">+</span>
               &ldquo;{search.trim()}&rdquo; 추가
             </button>
           )}
