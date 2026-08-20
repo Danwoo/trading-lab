@@ -1,6 +1,23 @@
 import type * as React from "react";
 import { cn } from "@/components/shared/ui/primitives/cn";
 
+/**
+ * 머리줄이 갖는 세 칸. **오류와 정상 사이에 한 칸이 있어야** 그 사이 상태가 오류 쪽으로
+ * 뭉개지지 않는다 (디자인 시스템 §2.2).
+ *
+ * - `alert` — 지금 잘못됐다. 실패했거나 못 읽었다
+ * - `caution` — 잘못되진 않았는데 그대로 두면 안 된다. 사용자가 손댈 것이 이미 있다
+ * - `quiet` — 계획대로다. 「아직 안 온 것」·「받는 중」이 여기 온다
+ */
+export type ImpactTone = "alert" | "caution" | "quiet";
+
+/** 색은 토큰만 쓴다 — 이 표가 상태 → 색의 유일한 대응이다. */
+const TONE_CLASS: Record<ImpactTone, string> = {
+  alert: "text-danger",
+  caution: "text-caution",
+  quiet: "text-ink",
+};
+
 interface Props {
   /** 무슨 일이 일어났나. 한 줄로 */
   headline: string;
@@ -12,8 +29,8 @@ interface Props {
   detail?: string | null;
   /** 사용자가 지금 할 수 있는 것 (링크·버튼) */
   action?: React.ReactNode;
-  /** 붉은 머리로 낼 것인가. 「받는 중」처럼 나쁜 소식이 아닌 상태는 조용히 낸다 */
-  tone?: "alert" | "quiet";
+  /** 머리줄을 어느 칸으로 낼 것인가 (`ImpactTone`). 「받는 중」처럼 나쁜 소식이 아닌 상태는 조용히 낸다 */
+  tone?: ImpactTone;
 }
 
 function Scope({ label, items }: { label: string; items: string[] }) {
@@ -37,7 +54,7 @@ function Scope({ label, items }: { label: string; items: string[] }) {
 export function ImpactNotice({ headline, halted, running, detail, action, tone = "alert" }: Props) {
   return (
     <div className="w-full min-w-0 rounded-panel border border-line bg-bg-raised p-3">
-      <p className={cn("break-keep text-sm font-ui", tone === "alert" ? "text-danger" : "text-ink")}>{headline}</p>
+      <p className={cn("break-keep text-sm font-ui", TONE_CLASS[tone])}>{headline}</p>
 
       <dl className="mt-2 grid gap-2 sm:grid-cols-2">
         <Scope label="멈추는 것" items={halted} />

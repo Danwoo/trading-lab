@@ -29,6 +29,9 @@ const PATHS = [
  * `pending` 한 줄을 버튼 밑에 그대로 보인다. 준비가 끝나 `pending` 이 사라지면 이 줄도 함께
  * 사라진다. **눌렀는데 아무 일도 안 일어나는 것**이 이 화면에서 제일 나쁜 결과라 그것만은 막는다.
  *
+ * 그 한 줄은 **중립 잉크**로 적는다. 준비 중은 계획대로인 상태라 고장 난 것이 없고 사용자가 할
+ * 일도 없다 — 상태색을 쓰면 처음 온 사람이 제품을 고장으로 읽는다(디자인 시스템 §2.2).
+ *
  * 폭을 고정하지 않는다 — 자리가 있으면 나란히, 좁아지면 쌓인다.
  */
 export function BenchPaths() {
@@ -48,7 +51,7 @@ export function BenchPaths() {
             <span className="block break-keep text-sm font-ui text-ink">{path.title}</span>
             <span className="mt-0.5 block break-keep text-2xs text-ink-muted">{path.hint}</span>
             {rail?.pending && (
-              <span className="mt-1 block break-keep text-2xs text-danger">준비 중 — {rail.pending}</span>
+              <span className="mt-1 block break-keep text-2xs text-ink-muted">준비 중 — {rail.pending}</span>
             )}
           </button>
         );
