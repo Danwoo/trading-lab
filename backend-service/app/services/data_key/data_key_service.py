@@ -323,7 +323,8 @@ class DataKeyService:
             bars = await provider.fetch_daily(symbol, market, date_from, date_to)
         except HTTPError as exc:
             # 어댑터가 만든 사유는 사람이 읽을 문장이고 값을 담지 않는다 (`ProviderKeyMissing` 등).
-            return {"ok": False, "checked": True, "detail": str(exc)}
+            # 상태 코드를 옮겨 담은 사유(403 등)만 여기서 다음 행동까지 세워진다.
+            return {"ok": False, "checked": True, "detail": describe_provider_failure(exc, source)}
         except Exception as exc:  # noqa: BLE001 — 어떤 실패든 화면에 사유가 있어야 한다
             logger.warning(f"키 확인 호출 실패 — source={source} error={type(exc).__name__}")
             # 적재 이력과 **같은 변환**을 쓴다 — 403 이 사용자를 보내는 곳이 바로 이 화면이라,

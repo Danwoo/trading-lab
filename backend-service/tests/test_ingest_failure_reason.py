@@ -10,6 +10,14 @@
   ⑥ **우리 도메인 예외의 한국어 사유를 삼키지 않는다** (덮으면 main 보다 나빠진다)
   ⑦ 화면이 평문으로 그리므로 마크다운 강조 표기를 넣지 않는다
   ⑤ 적재 서비스가 실제로 이 변환을 태운다 (배선 확인)
+  ⑧ **저장되는 사유의 내용** — 배선이 아니라 `IngestService.run_job` 이 실제로 남긴 문자열을
+     본다. 배선만 보는 그물은 어댑터가 상태 코드를 먼저 눌러 담는 경로(`Alpaca 응답 상태 403`)를
+     놓친다 — 그 경로가 화면에 「무엇을 하면 되는지」 없는 줄을 남겼다 (#287)
+  ⑨ 어댑터 전수 — 상태 코드를 옮겨 담는 자리는 `http_status` 로 코드를 함께 넘긴다.
+     한 자리만 고치면 다음 어댑터가 같은 구멍을 다시 판다
+
+**경계** — 「영문 예외 클래스명 금지」는 상태 코드가 아는 실패에 대한 것이다. 아는 게 없는 실패
+(`④`)는 종류(`ValueError`)를 남기기로 한 결정(#251)이 있어 그 한 자리만 예외로 둔다.
 
 standalone 실행 겸용:
     cd backend-service && uv run python tests/test_ingest_failure_reason.py
@@ -75,6 +83,166 @@ def http_error(status: int) -> httpx.HTTPStatusError:
     request = httpx.Request("GET", URL)
     response = httpx.Response(status, request=request)
     return httpx.HTTPStatusError(f"Client error '{status}' for url '{URL}'", request=request, response=response)
+
+
+#: 화면에 남으면 안 되는 라이브러리 원문. `httpx` 가 상태 오류에 붙이는 영문 문장들이다.
+ENGLISH_RESIDUE = ("Client error", "Server error", "For more information check", "for url", "Traceback")
+
+#: 예외 클래스명 모양. 상태 코드가 아는 실패에는 하나도 없어야 한다.
+EXCEPTION_CLASS_NAME = re.compile(r"\b[A-Za-z]+(?:Error|Exception)\b")
+
+HANGUL = re.compile(r"[가-힣]")
+
+
+class _RecordingRepository:
+    """`_finish` 가 DB 로 넘기는 인자를 그대로 붙든다 — 저장될 값을 DB 없이 본다."""
+
+    def __init__(self) -> None:
+        self.saved: list[dict] = []
+
+    def update_ingest_run_status(self, args: dict) -> None:
+        self.saved.append(args)
+
+
+class _KeyStub:
+    def get_key(self, workspace_id, source):  # noqa: ANN001, ANN201
+        return "KEYID:SECRET"
+
+
+class _FailingProvider:
+    def __init__(self, exc: BaseException) -> None:
+        self.exc = exc
+        self.last_skipped: list[str] = []
+
+    async def list_instruments(self, market: str):  # noqa: ANN201
+        raise self.exc
+
+
+def stored_reason(exc: BaseException, source: str) -> str:
+    """그 예외로 적재 잡이 끝났을 때 `tn_ingest_run.failed_reason` 에 **실제로 적히는** 문자열."""
+    import asyncio  # noqa: PLC0415
+    import logging  # noqa: PLC0415
+
+    from services.ingest import ingest_service as ingest_mod  # noqa: PLC0415
+
+    repository = _RecordingRepository()
+    service = ingest_mod.IngestService(repository, _KeyStub())
+    original = ingest_mod.get_provider
+    ingest_mod.get_provider = lambda *_args, **_kwargs: _FailingProvider(exc)
+    logging.disable(logging.CRITICAL)
+    try:
+        asyncio.run(
+            service.run_job(
+                {
+                    "run_id": 1,
+                    "source": source,
+                    "job_kind": "instrument_master",
+                    "scope": "KOSPI",
+                    "workspace_id": 1,
+                }
+            )
+        )
+    finally:
+        logging.disable(logging.NOTSET)
+        ingest_mod.get_provider = original
+    return repository.saved[-1]["failed_reason"]
+
+
+def adapter_converted(source: str, status: int) -> BaseException:
+    """**실제 어댑터**가 그 상태 코드를 무엇으로 바꾸는지 — 손으로 지어낸 예외로 시험하지 않는다."""
+    import asyncio  # noqa: PLC0415
+
+    async def boom(*_args, **_kwargs):
+        raise http_error(status)
+
+    if source == "alpaca":
+        from providers.alpaca.adapter import AlpacaProvider  # noqa: PLC0415
+        from providers.alpaca.client import AlpacaClient  # noqa: PLC0415
+
+        AlpacaClient.bars = boom
+        import datetime as _dt  # noqa: PLC0415
+
+        call = AlpacaProvider("KEYID:SECRET").fetch_daily("AAPL", "NASDAQ", _dt.date(2026, 1, 1), _dt.date(2026, 1, 2))
+    elif source == "data_go_kr":
+        from providers.data_go_kr.adapter import DataGoKrProvider  # noqa: PLC0415
+        from providers.data_go_kr.client import DataGoKrClient  # noqa: PLC0415
+
+        DataGoKrClient.stock_price_pages = boom
+        call = DataGoKrProvider("SERVICEKEY").list_instruments("KOSPI")
+    else:
+        from providers.sec.adapter import SecProvider  # noqa: PLC0415
+        from providers.sec.client import SecClient  # noqa: PLC0415
+
+        SecClient.company_tickers_exchange = boom
+        call = SecProvider("trading-lab admin@example.com").list_instruments("NASDAQ")
+
+    try:
+        asyncio.run(call)
+    except BaseException as exc:  # noqa: BLE001
+        return exc
+    raise AssertionError(f"{source} 어댑터가 {status} 에 예외를 올리지 않았다")
+
+
+def check_stored_reasons() -> None:
+    """⑧ 배선이 아니라 **저장되는 문자열**을 본다 (DB·네트워크 없음)."""
+    cases = [
+        ("어댑터가 변환하지 않은 httpx", "toss", http_error(403)),
+        ("alpaca 가 변환한", "alpaca", adapter_converted("alpaca", 403)),
+        ("data_go_kr 이 변환한", "data_go_kr", adapter_converted("data_go_kr", 403)),
+        ("sec 이 변환한", "sec", adapter_converted("sec", 403)),
+    ]
+    for label, source, exc in cases:
+        reason = stored_reason(exc, source)
+        check(f"저장: {label} 403 — 소스 이름이 있다", source in reason, True)
+        check(f"저장: {label} 403 — 한국어다", HANGUL.search(reason) is not None, True)
+        check(f"저장: {label} 403 — 다음 행동을 말한다", "IP" in reason and "등록" in reason, True)
+        check(f"저장: {label} 403 — 상태 코드를 밝힌다", "HTTP 403" in reason, True)
+        check(f"저장: {label} 403 — URL 이 없다", has_url(reason), False)
+        check(f"저장: {label} 403 — 키가 없다", SECRET in reason, False)
+        check(
+            f"저장: {label} 403 — 영문 예외 클래스명이 없다",
+            EXCEPTION_CLASS_NAME.search(reason) is not None,
+            False,
+        )
+        for phrase in ENGLISH_RESIDUE:
+            check(f"저장: {label} 403 — 원문 「{phrase}」 이 없다", phrase in reason, False)
+
+    # 상태 코드가 아는 다른 실패도 같은 계층을 지난다
+    for status, word in ((400, "확인"), (401, "키를 다시"), (404, "종목 코드"), (503, "우리 쪽")):
+        reason = stored_reason(adapter_converted("alpaca", status), "alpaca")
+        check(f"저장: alpaca {status} — 다음 행동을 말한다", word in reason, True)
+        check(f"저장: alpaca {status} — 원문이 없다", "Client error" in reason or "Server error" in reason, False)
+
+    # 429 는 실패가 아니라 이어받을 지점이 있는 상태다 — 그 갈래도 사람 말로 끝난다
+    rate_limited = stored_reason(adapter_converted("alpaca", 429), "alpaca")
+    check("저장: 429 — 재개 지점을 남긴다", "재개 지점" in rate_limited, True)
+    check("저장: 429 — 영문 예외 클래스명이 없다", EXCEPTION_CLASS_NAME.search(rate_limited) is not None, False)
+
+    # 우리 도메인 예외는 자기 이름을 두 번 부르지 않는다
+    from providers.base import ProviderKeyMissing  # noqa: PLC0415
+
+    key_missing = stored_reason(ProviderKeyMissing("toss", "ID:SECRET 형식"), "toss")
+    check("저장: 키 없음 — 소스 이름이 한 번만", key_missing.count("toss"), 1)
+    check("저장: 키 없음 — .env 를 가리킨다", ".env" in key_missing, True)
+
+
+def check_adapters_carry_status() -> None:
+    """⑨ 상태 코드를 옮겨 담는 자리는 코드를 함께 넘긴다 — 새 어댑터가 같은 구멍을 다시 파지 않게."""
+    sites = 0
+    for adapter_file in sorted((_APP_DIR / "providers").glob("*/adapter.py")):
+        text = adapter_file.read_text(encoding="utf-8")
+        for block in re.findall(r"except httpx\.HTTPStatusError as exc:(.*?)(?=\n    (?:async )?def |\Z)", text, re.S):
+            if "ProviderResponseInvalid(" not in block:
+                continue
+            sites += 1
+            check(
+                f"{adapter_file.parent.name}: 상태 코드를 사유와 함께 넘긴다",
+                "http_status=exc.response.status_code" in block,
+                True,
+            )
+    check("상태 코드를 옮겨 담는 자리를 찾았다", sites > 0, True)
+    if sites == 0:
+        print("::error::어댑터에서 상태 코드 변환 자리를 하나도 못 찾았다 — 그물이 죽어 있다", file=sys.stderr)
 
 
 def main() -> int:
@@ -149,8 +317,11 @@ def main() -> int:
         text = (_APP_DIR / "providers" / adapter / "adapter.py").read_text(encoding="utf-8")
         check(f"{adapter}: 원문을 사유로 안 싣는다", "ProviderResponseInvalid(str(exc))" in text, False)
 
+    check_stored_reasons()
+    check_adapters_carry_status()
+
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과")
-    if CHECKED < 70:
+    if CHECKED < 140:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:

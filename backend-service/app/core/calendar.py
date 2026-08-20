@@ -29,6 +29,37 @@ CALENDAR_CODE_BY_MARKET: dict[str, str] = {
 }
 
 
+#: 라이브러리가 **세션 경계를 틀리게 아는** 날 (캘린더 코드 → 날짜들).
+#:
+#: 한국의 대학수학능력시험일은 KRX 개장이 1시간 늦고(10:00) 폐장도 1시간 늦다(16:30).
+#: `exchange_calendars` 4.13.2 의 `precomputed_csat_days` 는 **2020-12-03 에서 끊긴다** —
+#: 그 뒤 수능일을 물으면 평일과 같은 09:00 을 답한다. 실측:
+#:
+#:     2019-11-14 (수능) → KST 10:00   안다
+#:     2020-12-03 (수능) → KST 10:00   안다
+#:     2021-11-18 (수능) → KST 09:00   틀렸다
+#:     2023-11-16 (수능) → KST 09:00   틀렸다
+#:     2025-11-13 (수능) → KST 09:00   틀렸다
+#:
+#: **이 목록은 「접지 마라」는 표시이지 보정값이 아니다.** 우리가 아는 것은 「캘린더가 틀렸다」
+#: 까지이고, 그 날의 정확한 경계를 여기 적어 접으면 그 값이 또 하나의 주장이 된다. 못 믿는
+#: 날은 소스 일봉을 그대로 답하고 `session_scope` 를 `unknown` 으로 둔다 (#255 리드 결정 A′).
+#:
+#: 원본은 한국교육과정평가원의 수능 시행일 공고이고, `scripts/verify_calendar_corrections.py`
+#: 가 라이브러리가 나중에 고쳤는지 매번 되묻는다.
+UNRELIABLE_SESSION_BOUNDS: dict[str, frozenset[dt.date]] = {
+    "XKRX": frozenset(
+        {
+            dt.date(2021, 11, 18),  # 2022학년도 수능 — 개장 10:00 (라이브러리는 09:00)
+            dt.date(2022, 11, 17),  # 2023학년도 수능
+            dt.date(2023, 11, 16),  # 2024학년도 수능
+            dt.date(2024, 11, 14),  # 2025학년도 수능
+            dt.date(2025, 11, 13),  # 2026학년도 수능
+        }
+    ),
+}
+
+
 #: 라이브러리가 **거래일이라고 보지만 실제로는 휴장**인 날 (캘린더 코드 → 날짜들).
 #:
 #: `exchange_calendars` 는 한국의 그해 결정 사항을 늦게 반영한다. 그 차이는 조용하지 않다 —
@@ -127,6 +158,34 @@ def last_completed_session(market: str, asof: dt.datetime) -> dt.date | None:
     if previous is None:
         return None
     return _skip_closures(market, calendar.minute_to_session(previous, direction="previous").date())
+
+
+def unreliable_bounds(market: str) -> frozenset[dt.date]:
+    """이 시장에서 **세션 경계를 못 믿는** 날."""
+    return UNRELIABLE_SESSION_BOUNDS.get(calendar_code(market), frozenset())
+
+
+def session_bounds(market: str, day: dt.date) -> tuple[dt.datetime, dt.datetime] | None:
+    """그 날 정규장의 시작·끝을 **시장 현지 naive** 로 준다. 못 믿으면 `None`.
+
+    `None` 을 주는 경우는 셋이다 — 거래일이 아니거나, 캘린더 범위 밖이거나, 경계를 못 믿는 날
+    (`UNRELIABLE_SESSION_BOUNDS`)이다. 부르는 쪽은 `None` 을 「접지 마라」로 읽는다.
+    """
+    if day in unreliable_bounds(market) or day in extra_closures(market):
+        return None
+    calendar = get_market_calendar(market)
+    if not (calendar.first_session.date() <= day <= calendar.last_session.date()):
+        return None
+    if not calendar.is_session(day):
+        return None
+
+    # `session_open` 은 pandas Timestamp 를 준다 — DB 파라미터·비교에 그대로 실으면 드라이버마다
+    # 다르게 다뤄진다. 표준 `datetime` 으로 내려 계약을 하나로 둔다.
+    def _plain(value) -> dt.datetime:
+        naive = market_local_naive(market, value)
+        return dt.datetime(naive.year, naive.month, naive.day, naive.hour, naive.minute, naive.second)
+
+    return (_plain(calendar.session_open(day)), _plain(calendar.session_close(day)))
 
 
 def _skip_closures(market: str, day: dt.date | None) -> dt.date | None:

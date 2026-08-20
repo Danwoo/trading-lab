@@ -11,6 +11,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 
 import { IngestConsole } from "@/components/features/Terminal/IngestConsole";
+import { CREDENTIAL_MISSING_CODE } from "@/lib/terminal/marketDataError";
 import type { PanelData } from "@/types/terminal/provenance";
 
 const SYMBOL = { market: "KOSPI", ticker: "005930", name: "삼성전자" };
@@ -400,5 +401,118 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
     const history = section("적재").textContent ?? "";
     expect(history).toContain("종목 마스터에 없는 종목이라 건너뛰었습니다");
     expect(history).toContain("건너뜀 1");
+  });
+});
+
+// #288 — **화면의 위계는 행동할 수 있는 것 순이다.**
+//
+// 실측(로컬 기동, 로그인 후 시세 화면): 「지금 받을 수 있는 것」 16줄 대 「막혀 있는 것」 84줄.
+// 처음 온 사람이 먼저 읽는 것이 「안 되는 61가지」였다. 사유를 감추지 않되, 다 펴 두지 않는다.
+//
+// **검증 경계** — jsdom 은 닫힌 `<details>` 의 내용을 숨기지 않는다(textContent 로 그대로 읽힌다).
+// 그래서 여기서는 **접힘 상태(`open`)와 어디에 속하는가**만 단언하고, 실제로 안 보이는지는
+// 브라우저로 확인한다.
+const NO_KEY = "Alpaca API 키가 등록되지 않았습니다";
+const NO_PRICE = "SEC 는 가격 데이터를 제공하지 않습니다";
+const NO_ORDERBOOK = "이 소스는 호가를 제공하지 않습니다";
+
+/** 열린 것 1 · 키로 풀리는 것 2(사유 1종) · 구조적으로 막힌 것 3(사유 2종). */
+function mixedBlocked() {
+  return panel<unknown[]>({
+    data: [
+      { source: "toss", market: "KOSPI", dataKind: "daily_bar", available: true, reason: null },
+      {
+        source: "alpaca",
+        market: "NASDAQ",
+        dataKind: "daily_bar",
+        available: false,
+        reason: NO_KEY,
+        code: CREDENTIAL_MISSING_CODE,
+      },
+      {
+        source: "alpaca",
+        market: "NYSE",
+        dataKind: "daily_bar",
+        available: false,
+        reason: NO_KEY,
+        code: CREDENTIAL_MISSING_CODE,
+      },
+      { source: "sec", market: "NASDAQ", dataKind: "daily_bar", available: false, reason: NO_PRICE, code: null },
+      { source: "sec", market: "NYSE", dataKind: "daily_bar", available: false, reason: NO_PRICE, code: null },
+      { source: "sec", market: "AMEX", dataKind: "orderbook", available: false, reason: NO_ORDERBOOK, code: null },
+    ],
+  });
+}
+
+function summaryOf(reason: string): HTMLElement {
+  return screen.getByText(new RegExp(reason), { selector: "summary" });
+}
+
+function detailsOf(reason: string): HTMLDetailsElement {
+  const found = summaryOf(reason).closest("details");
+  if (found === null) throw new Error(`「${reason}」이 <details> 안에 있지 않다`);
+  return found as HTMLDetailsElement;
+}
+
+/** 구조적으로 막힌 것을 담은 접힌 자리. */
+function blockedSection(): HTMLDetailsElement {
+  const found = screen.getByText(/^막혀 있는 것/).closest("details");
+  if (found === null) throw new Error("「막혀 있는 것」이 <details> 가 아니다");
+  return found as HTMLDetailsElement;
+}
+
+describe("#288 막힌 것이 화면을 덮지 않는다", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("「막혀 있는 것」은 접힌 채 시작하고, 접힌 채로도 건수와 사유 수가 읽힌다", () => {
+    given({ capabilities: mixedBlocked(), symbol: null });
+    render(<IngestConsole />);
+
+    const section = blockedSection();
+    expect(section.open).toBe(false);
+    const summary = section.querySelector("summary")?.textContent ?? "";
+    expect(summary).toContain("3건");
+    expect(summary).toContain("2가지 이유");
+  });
+
+  it("키를 넣으면 열리는 것은 접힌 자리 밖에 선다 — 오늘 손댈 수 있는 유일한 항목이라", () => {
+    given({ capabilities: mixedBlocked(), symbol: null });
+    render(<IngestConsole />);
+
+    const fixable = summaryOf(NO_KEY);
+    expect(screen.getByRole("list", { name: "키를 넣으면 열리는 것" }).contains(fixable)).toBe(true);
+    expect(blockedSection().contains(fixable)).toBe(false);
+    // 구조적으로 못 하는 것은 접힌 자리 안에 남는다 — 감추는 게 아니라 뒤로 보낸다.
+    expect(blockedSection().contains(summaryOf(NO_PRICE))).toBe(true);
+    expect(blockedSection().contains(summaryOf(NO_ORDERBOOK))).toBe(true);
+  });
+
+  it("사유별 대상 목록은 사유 안에서 편다 — 접힌 채로도 건수는 읽힌다", async () => {
+    given({ capabilities: mixedBlocked(), symbol: null });
+    render(<IngestConsole />);
+
+    const reason = detailsOf(NO_KEY);
+    expect(reason.open).toBe(false);
+    expect(summaryOf(NO_KEY).textContent).toContain("(2건)");
+    expect(reason.textContent).toContain("alpaca · NASDAQ · 일봉");
+
+    const user = userEvent.setup();
+    await user.click(summaryOf(NO_KEY));
+    expect(reason.open).toBe(true);
+    await user.click(summaryOf(NO_KEY));
+    expect(reason.open).toBe(false);
+  });
+
+  it("머리글이 「막힌 이유 N가지」로 시작하지 않는다 — 셈은 접힌 자리가 진다", () => {
+    given({ capabilities: mixedBlocked(), symbol: null });
+    render(<IngestConsole />);
+
+    const text = section("소스").textContent ?? "";
+    expect(text).toContain("6건 중 1건 사용 가능");
+    expect(text).toContain("2건은 키를 넣으면 열립니다");
+    expect(text).not.toContain("가지 이유로 막혀 있습니다");
   });
 });

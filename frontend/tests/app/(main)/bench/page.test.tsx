@@ -23,6 +23,8 @@ const BENCH_PATH_RAIL_IDS = ["bot", "agent"] as const;
 import { selectBotList } from "@/services/bot/botService";
 import { selectIngestRunList } from "@/services/terminal/ingestService";
 import type { IngestRunOut } from "@/schemas/terminal/ingest";
+import { FRESHNESS_TONE } from "@/components/features/Bench/QuoteFreshnessBanner";
+import type { QuoteFreshnessKind } from "@/hooks/bench/useQuoteFreshness";
 
 vi.mock("@/services/bot/botService", () => ({ selectBotList: vi.fn(), selectBot: vi.fn() }));
 vi.mock("@/services/terminal/ingestService", () => ({ selectIngestRunList: vi.fn() }));
@@ -398,5 +400,145 @@ describe("패널에서 고르면 보드가 그 지점을 표시한다 (§20.2 �
 
     expect(firstRegion("내 봇").textContent).toContain("봇 알파");
     expect(firstRegion("격자").textContent).not.toContain("봇 알파");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #285 — 오류가 아닌 것을 오류색으로 그리지 않는다.
+//
+// 색은 클래스가 아니라 **뜻**을 나른다. 「아직 안 온 것」(준비 중·첫 적재 전)과 「그대로 두면
+// 안 되는 것」(낡음)과 「지금 잘못된 것」(적재 실패·못 읽음)이 같은 빨강으로 나오면 둘이 동시에
+// 망가진다 — 처음 온 사람은 제품을 고장으로 읽고, 진짜 오류가 났을 때 그 빨강이 안 두드러진다.
+//
+// jsdom 은 CSS 를 적용하지 않으므로 여기서 재는 것은 **어느 토큰 클래스가 붙었나**다. 그
+// 클래스가 실제로 무슨 색으로 그려지는지는 브라우저 실측과 `verify_token_contrast.py` 가 맡고,
+// 원시 색(`text-red-500` 등)이 새로 들어오는 것은 `verify_color_token_usage.py` 가 막는다.
+// ---------------------------------------------------------------------------
+
+/** 실패로 끝난 캔들 적재 하나 — 성공분이 하나도 없으면 「한 번도 성공 못 했다」다 */
+function failedRun(day: string): IngestRunOut {
+  return {
+    ...succeededRun(day),
+    run_id: 9,
+    status: "failed",
+    written_rows: 0,
+    failed_reason: "소스가 응답하지 않았습니다",
+  };
+}
+
+/** 신선도 갈래를 각각 만드는 법 + 그 갈래가 받아야 할 색 토큰(`null` 이면 상태색이 없어야 한다). */
+const FRESHNESS_COLOR_CASES: {
+  kind: QuoteFreshnessKind;
+  arrange: () => void;
+  expected: string | null;
+  settle: string;
+}[] = [
+  {
+    kind: "fresh",
+    arrange: () => givenBackend({ runs: [succeededRun(TODAY)] }),
+    expected: null,
+    settle: "오늘 적재본입니다",
+  },
+  {
+    kind: "stale",
+    arrange: () => givenBackend({ runs: [succeededRun("2026-08-14")] }),
+    expected: "text-caution",
+    settle: "하루 낡음",
+  },
+  {
+    kind: "never-run",
+    arrange: () => givenBackend({ runs: [] }),
+    expected: null,
+    settle: "한 번도 돌리지 않았습니다",
+  },
+  {
+    kind: "never-succeeded",
+    arrange: () => givenBackend({ runs: [failedRun("2026-08-14")] }),
+    expected: "text-danger",
+    settle: "한 번도 성공하지 못했습니다",
+  },
+  {
+    kind: "unreadable",
+    arrange: () => givenBackend({ runs: null }),
+    expected: "text-danger",
+    settle: "확인하지 못했습니다",
+  },
+];
+
+describe("#285 상태 → 색 토큰", () => {
+  it("대응표가 신선도 갈래 전수를 덮는다 — 갈래가 늘면 여기서 멈춘다", () => {
+    // 표는 `Record<QuoteFreshnessKind, …>` 라 갈래를 늘리면 타입이 먼저 막고, 채워 넣더라도
+    // 이 건수가 어긋나 빨개진다. 0건이면 실패다.
+    const kinds = Object.keys(FRESHNESS_TONE);
+    expect(kinds.length).toBe(6);
+
+    // 사다리는 「얼마나 비었나」가 아니라 **「무엇이 잘못됐나」**로 오른다.
+    expect(FRESHNESS_TONE).toEqual({
+      checking: "quiet",
+      fresh: "quiet",
+      "never-run": "quiet",
+      stale: "caution",
+      "never-succeeded": "alert",
+      unreadable: "alert",
+    });
+  });
+
+  it("색을 실제로 재 보는 갈래가 0건이 아니다", () => {
+    expect(FRESHNESS_COLOR_CASES.length).toBe(5);
+  });
+
+  it.each(FRESHNESS_COLOR_CASES)("$kind 배너는 $expected 로 그려진다", async ({ arrange, expected, settle }) => {
+    arrange();
+    render(<BenchPage />);
+
+    const banner = screen.getByRole("region", { name: "시세 신선도" });
+    await waitFor(() => expect(banner.textContent).toContain(settle));
+
+    for (const token of ["text-danger", "text-caution"]) {
+      const hits = banner.querySelectorAll(`[class*="${token}"]`).length;
+      if (token === expected) expect(hits).toBeGreaterThan(0);
+      else expect(hits).toBe(0);
+    }
+  });
+
+  it("적재를 한 번도 안 돌린 첫 화면에는 오류색이 하나도 없다 (#285 완료 조건)", async () => {
+    givenBackend({ runs: [], bots: [] });
+    const { container } = render(<BenchPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole("region", { name: "시세 신선도" }).textContent).toContain("한 번도 돌리지 않았습니다"),
+    );
+    await waitFor(() => expect(firstRegion("내 봇").textContent).toContain("아직 만든 봇이 없습니다"));
+
+    expect(container.querySelectorAll('[class*="text-danger"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[class*="border-danger"]')).toHaveLength(0);
+  });
+
+  it("「준비 중」은 중립 잉크다 — 계획대로인 상태를 고장으로 그리지 않는다", () => {
+    render(<BenchPage />);
+
+    const pendingPaths = BENCH_PATH_RAIL_IDS.filter(
+      (railId) => RAIL_ITEMS.find((item) => item.id === railId)?.pending !== undefined,
+    );
+    expect(pendingPaths.length).toBeGreaterThan(0);
+
+    for (const railId of pendingPaths) {
+      const label = railId === "bot" ? /봇 만들기/ : /에이전트에게 맡기기/;
+      const line = within(screen.getByRole("button", { name: label })).getByText(/^준비 중 —/);
+      expect(line.className).toContain("text-ink-muted");
+      expect(line.className).not.toContain("text-danger");
+    }
+  });
+
+  it("배지의 「하루 낡음」도 오류색이 아니다", async () => {
+    givenBackend({ runs: [succeededRun("2026-08-14")] });
+    render(<BenchPage />);
+
+    const banner = screen.getByRole("region", { name: "시세 신선도" });
+    await waitFor(() => expect(banner.textContent).toContain("하루 낡음"));
+
+    const mark = within(banner).getByText(/하루 낡음$/);
+    expect(mark.className).toContain("text-caution");
+    expect(mark.className).not.toContain("text-danger");
   });
 });

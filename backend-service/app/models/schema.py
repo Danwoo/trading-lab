@@ -469,6 +469,9 @@ class BacktestRun(Base):
     data_snapshot_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     adj_policy: Mapped[str] = mapped_column(String(30), nullable=False, server_default="unadjusted")
     cost_assumptions: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    #: 같은 조합을 **비용 0으로 다시 돌린** 요약 (SC-007 「미반영 vs 반영을 나란히」).
+    #: `NULL` 은 「격차가 0」이 아니라 **「대조군을 안 돌린 옛 실행」**이다 — 화면이 그 둘을 가른다.
+    costless_summary: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     period_from: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     period_to: Mapped[datetime.date] = mapped_column(Date, nullable=False)
     initial_cash: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
