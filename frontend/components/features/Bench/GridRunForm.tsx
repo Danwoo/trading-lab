@@ -26,13 +26,11 @@ export function GridRunForm({
   bots,
   controller,
   isRunning,
-  runError,
   onRun,
 }: {
   bots: BotOut[] | null;
   controller: GridRunFormController;
   isRunning: boolean;
-  runError: string | null;
   onRun: (input: BacktestGridIn) => void;
 }) {
   const { strategy, axes, form, formError, botDetailError, comboCount } = controller;
@@ -171,9 +169,11 @@ export function GridRunForm({
         )}
       </div>
 
-      {(formError ?? runError) && (
+      {/* 실행 실패는 이 자리가 아니라 격자 자리의 머리(`BoardZone` 의 사유)가 말한다 —
+          머리가 「아직 돌리지 않았습니다」인데 폼 아래에만 실패가 뜨면 한 자리가 두 말을 한다. */}
+      {formError && (
         <p role="alert" className="break-keep border border-danger p-2 text-sm text-ink">
-          {formError ?? runError}
+          {formError}
         </p>
       )}
     </form>

@@ -183,6 +183,7 @@ describe("#2 ④ 「키가 아직 없다」만 임시 데이터로 덮는다", (
       expect(provenanceForUnavailable("상류가 응답하지 않습니다", code)).toEqual({
         kind: "unavailable",
         reason: "상류가 응답하지 않습니다",
+        because: "no-source",
       });
     }
   });

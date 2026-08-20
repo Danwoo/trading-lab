@@ -27,7 +27,11 @@ function renderFrame(reason: string | null) {
     <PanelFrame
       instance={INSTANCE}
       definition={DEFINITION}
-      provenance={reason === null ? { kind: "loaded", source: "적재본", asOf: null } : { kind: "unavailable", reason }}
+      provenance={
+        reason === null
+          ? { kind: "loaded", source: "적재본", asOf: null }
+          : { kind: "unavailable", reason, because: "no-source" }
+      }
       onToggleCollapse={() => {}}
       onClose={() => {}}
     >
@@ -58,7 +62,7 @@ describe("PanelFrame — 사유가 떠도 자식은 살아 있다", () => {
       <PanelFrame
         instance={{ ...INSTANCE, collapsed: true }}
         definition={DEFINITION}
-        provenance={{ kind: "unavailable", reason: "소스가 없습니다" }}
+        provenance={{ kind: "unavailable", reason: "소스가 없습니다", because: "no-source" }}
         onToggleCollapse={() => {}}
         onClose={() => {}}
       >

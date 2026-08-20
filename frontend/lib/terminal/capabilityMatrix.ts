@@ -13,14 +13,18 @@ const CAPABILITY_MATRIX: Record<PanelCapability, RegionMatrix> = {
   quote: { KR: AVAILABLE, US: AVAILABLE },
   orderbook: {
     KR: AVAILABLE,
-    US: { available: false, reason: "미국 심층 호가는 확보된 소스가 없습니다" },
+    US: { available: false, reason: "미국 심층 호가는 확보된 소스가 없습니다", because: "no-source" },
   },
   financials: { KR: AVAILABLE, US: AVAILABLE },
   disclosure: { KR: AVAILABLE, US: AVAILABLE },
   news: { KR: AVAILABLE, US: AVAILABLE },
   flow: {
     KR: AVAILABLE,
-    US: { available: false, reason: "미국에는 투자자별 수급 개념이 없습니다 — 기관 보유·공매도 잔고로 대체 예정" },
+    US: {
+      available: false,
+      reason: "미국에는 투자자별 수급 개념이 없습니다 — 기관 보유·공매도 잔고로 대체 예정",
+      because: "no-source",
+    },
   },
   peers: { KR: AVAILABLE, US: AVAILABLE },
   positions: { KR: AVAILABLE, US: AVAILABLE },
@@ -29,7 +33,11 @@ const CAPABILITY_MATRIX: Record<PanelCapability, RegionMatrix> = {
   aiConsole: { KR: AVAILABLE, US: AVAILABLE },
 };
 
-const UNKNOWN_REGION_VERDICT: CapabilityVerdict = { available: false, reason: "시장 정보를 알 수 없는 종목입니다" };
+const UNKNOWN_REGION_VERDICT: CapabilityVerdict = {
+  available: false,
+  reason: "시장 정보를 알 수 없는 종목입니다",
+  because: "no-source",
+};
 
 /**
  * 시장을 **모르는데** 그 자리가 종목에 매여 있지도 않을 때의 판정 — 봇 상태처럼 종목이 아니라

@@ -65,7 +65,7 @@ export function useQuoteFreshness(): QuoteFreshness {
     if (runs.isLoading || runs.provenance.kind === "placeholder") {
       return {
         kind: "checking",
-        provenance: { kind: "unavailable", reason: "시세 적재 상태를 확인하고 있습니다" },
+        provenance: { kind: "unavailable", reason: "시세 적재 상태를 확인하고 있습니다", because: "checking" },
         staleness: null,
         running: false,
         failedReason: null,
@@ -76,7 +76,7 @@ export function useQuoteFreshness(): QuoteFreshness {
       const reason = runs.provenance.kind === "unavailable" ? runs.provenance.reason : "적재 이력을 읽지 못했습니다";
       return {
         kind: "unreadable",
-        provenance: { kind: "unavailable", reason },
+        provenance: { kind: "unavailable", reason, because: "unreadable" },
         staleness: null,
         running: false,
         failedReason: runs.error ? redactReason(getApiErrorMessage(runs.error)) : null,
@@ -89,7 +89,7 @@ export function useQuoteFreshness(): QuoteFreshness {
     if (candleRuns.length === 0) {
       return {
         kind: "never-run",
-        provenance: { kind: "unavailable", reason: "캔들 적재를 아직 한 번도 돌리지 않았습니다" },
+        provenance: { kind: "unavailable", reason: "캔들 적재를 아직 한 번도 돌리지 않았습니다", because: "not-run" },
         staleness: null,
         running: false,
         failedReason: null,
@@ -105,6 +105,7 @@ export function useQuoteFreshness(): QuoteFreshness {
         provenance: {
           kind: "unavailable",
           reason: running ? "첫 적재가 아직 끝나지 않았습니다" : "성공한 캔들 적재가 없습니다",
+          because: running ? "checking" : "not-run",
         },
         staleness: null,
         running,

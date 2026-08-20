@@ -46,6 +46,16 @@ describe("#224 화면에 나가는 API 에러 문구", () => {
     }
   });
 
+  // #284 곁가지 — 500 은 **서버가 응답한 것**이다. 「응답하지 못했다」로 옮기면 연결 실패와
+  // 같은 말이 되는데, 그 둘은 사용자가 할 일이 다르다(연결 확인 vs 서버가 고쳐질 때까지 대기).
+  it("500 을 「응답이 없다」로 말하지 않는다 — 연결 실패와 다른 사건이다", () => {
+    const serverError = getApiErrorMessage(axiosLike(500, {}));
+
+    expect(serverError).not.toContain("응답하지 못했");
+    expect(serverError).toContain("오류");
+    expect(serverError).not.toBe(getApiErrorMessage({ message: "Network Error" }));
+  });
+
   it("400 은 서버가 준 한국어 안내를 그대로 쓴다", () => {
     expect(getApiErrorMessage(axiosLike(400, { detail: "종목 코드를 확인해 주세요" }))).toBe(
       "종목 코드를 확인해 주세요",

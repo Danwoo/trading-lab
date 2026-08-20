@@ -42,6 +42,7 @@ export function useRealtimeQuote(): PanelData<Quote> {
         provenance: {
           kind: "unavailable",
           reason: state.error ? getApiErrorMessage(state.error) : "실시간 시세를 가져오지 못했습니다",
+          because: "unreadable",
         },
       };
     case "idle":

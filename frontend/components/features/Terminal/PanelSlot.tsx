@@ -54,6 +54,7 @@ const NEEDS_SYMBOL_VERDICT: CapabilityVerdict = {
 const MARKET_MISSING_VERDICT: CapabilityVerdict = {
   available: false,
   reason: "이 종목에 등록된 시장 값이 비어 있습니다 — 시장을 채우면 이 패널이 열립니다.",
+  because: "no-source",
 };
 
 /**

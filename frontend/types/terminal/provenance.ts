@@ -1,6 +1,6 @@
 /**
- * `unavailable` 이 `reason` 을 타입으로 요구한다 — FR-021(이유 없는 빈 화면 금지)을
- * 컴파일 단계에서 강제하는 수단이다.
+ * `unavailable` 이 `reason`(왜 비었나)과 `because`(어떤 종류의 빔인가)를 둘 다 타입으로
+ * 요구한다 — FR-021(이유 없는 빈 화면 금지)을 컴파일 단계에서 강제하는 수단이다.
  */
 export type Provenance =
   | { kind: "live" | "loaded"; source: string; asOf: string | null }
@@ -10,14 +10,31 @@ export type Provenance =
    * 패널 제목까지 밀어낸다(실측) — 그래서 자리를 나눈다. 긴 쪽은 `PanelFrame` 이 안내줄로 낸다.
    */
   | { kind: "placeholder"; source: string; note?: string; hint?: string }
-  /**
-   * `because` 는 **배지가 무엇이라 부를지**를 정한다 — 사유 문장은 길어 배지에 못 넣고,
-   * 문구를 보고 가르면 문구만 바뀌어도 판정이 조용히 갈린다.
-   *
-   * 안 붙이면 종전대로 「제공 안 됨」이다. `not-chosen` 은 「고르면 채워집니다」로 —
-   * 첫 진입에서 이것이 화면을 덮으면 아직 아무것도 안 골랐을 뿐인데 고장 난 것처럼 보인다.
-   */
-  | { kind: "unavailable"; reason: string; because?: "not-chosen" };
+  | { kind: "unavailable"; reason: string; because: UnavailableBecause };
+
+/**
+ * **왜 비었나의 축** — 배지가 무엇이라 부를지를 정한다. 사유 문장은 길어 배지에 못 넣고,
+ * 문구를 보고 가르면 문구만 바뀌어도 판정이 조용히 갈린다.
+ *
+ * - `not-chosen` 「고르면 채워집니다」 — 아직 아무것도 안 골랐다
+ * - `checking` 「확인 중」 — 물어봤고 답을 기다린다. 아직 아무것도 주장하지 않는다
+ * - `not-run` 「아직 실행 안 함」 — 돌릴 수 있는데 아직 안 돌렸다
+ * - `run-failed` 「실행 실패」 — 돌렸고 실패했다. 「아직 안 돌렸다」와 할 일이 다르다
+ * - `empty` 「대상 없음」 — 읽었고 0건이었다
+ * - `unreadable` 「못 읽음」 — 못 읽었다. 0건인지 아닌지 **모른다**
+ * - `no-source` 「제공 안 됨」 — 줄 소스가 없다. 사용자가 할 수 있는 것이 없다
+ *
+ * **생략할 수 없다.** 기본값을 두면 새로 생기는 자리가 조용히 「제공 안 됨」이 되어,
+ * 동작하는 자리에 「제공 안 됨」이 붙는 일이 되풀이된다(#284).
+ */
+export type UnavailableBecause =
+  | "not-chosen"
+  | "checking"
+  | "not-run"
+  | "run-failed"
+  | "empty"
+  | "unreadable"
+  | "no-source";
 
 export interface PanelData<T> {
   data: T | null;

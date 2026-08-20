@@ -10,7 +10,7 @@
 // 둘 다 DOM 에 있다 — 그래서 「무엇이 보이나」가 아니라 **「어느 배치에 무엇이 들어 있나」**와
 // 그 배치를 여닫는 클래스를 단언한다.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import BenchPage from "@/app/(main)/bench/page";
@@ -20,12 +20,17 @@ import { RAIL_ITEMS } from "@/constants/shell";
 
 /** 보드가 내놓는 두 갈래의 목적지 (`BenchPaths` 의 PATHS 와 같은 순서). */
 const BENCH_PATH_RAIL_IDS = ["bot", "agent"] as const;
-import { selectBotList } from "@/services/bot/botService";
+import { selectBot, selectBotList } from "@/services/bot/botService";
+import { runBacktestGrid } from "@/services/backtest/backtestService";
 import { selectIngestRunList } from "@/services/terminal/ingestService";
 import type { IngestRunOut } from "@/schemas/terminal/ingest";
 
 vi.mock("@/services/bot/botService", () => ({ selectBotList: vi.fn(), selectBot: vi.fn() }));
 vi.mock("@/services/terminal/ingestService", () => ({ selectIngestRunList: vi.fn() }));
+vi.mock("@/services/backtest/backtestService", () => ({
+  runBacktestGrid: vi.fn(),
+  selectBacktestReport: vi.fn(),
+}));
 
 const TODAY = "2026-08-15";
 
@@ -293,6 +298,72 @@ describe("봇 목록 실패 — 「0개」로 뭉개지 않는다", () => {
     expect(text).not.toContain("요청을 처리하지 못했습니다");
     // 원인(`detail`)은 맨 뒤 — 영향 범위 다음이다.
     expect(text.indexOf("멈추는 것")).toBeLessThan(text.indexOf("봇 목록을 불러오지 못했습니다"));
+  });
+});
+
+// #291 — 실행이 500 으로 실패했는데 자리 머리가 「아직 돌리지 않았습니다 — 골라 실행하면…」
+// 이었다. 이미 한 일을 다시 하라고 안내한 것이다. 판정 자체는 `lib/bench/boardProvenance`
+// 단위 테스트가 전수로 잡고, 여기서는 **그 판정이 실제 실행 경로를 타고 자리 머리까지 가는지**를 본다.
+describe("격자 실행 실패 — 자리 머리가 「아직 안 돌렸다」로 되돌아가지 않는다", () => {
+  /** 훑을 축이 하나 있는 봇 하나 — 폼이 실행 가능한 최소 상태 */
+  function givenRunnableBot() {
+    givenBackend({ bots: [{ bot_id: 1, bot_nm: "봇 알파", bot_role: "READONLY", use_at: "Y" }] });
+    vi.mocked(selectBot).mockResolvedValue({
+      bot_id: 1,
+      bot_nm: "봇 알파",
+      bot_role: "READONLY",
+      use_at: "Y",
+      strategies: [
+        {
+          bot_strategy_id: 1,
+          strategy_key: "pullback",
+          params: {},
+          param_sources: {},
+          weight: null,
+          sort_order: 0,
+          missing_reason: null,
+          form: {
+            key: "pullback",
+            name: "눌림목",
+            fields: [{ name: "window", label: "기간", control: "number", default: 20, min: 5, max: 60 }],
+          },
+        },
+      ],
+    } as never);
+    // 폼이 `/bench?bot=<id>` 를 읽어 봇을 집는다 — 드롭다운을 열지 않고 실행까지 간다.
+    window.history.replaceState({}, "", "/bench?bot=1");
+  }
+
+  afterEach(() => window.history.replaceState({}, "", "/bench"));
+
+  it("실패하면 머리가 사유를 말한다 — 「골라 실행하세요」가 아니다", async () => {
+    givenRunnableBot();
+    vi.mocked(runBacktestGrid).mockRejectedValue({ response: { status: 500, data: {} } });
+    render(<BenchPage />);
+
+    await waitFor(() => expect(firstRegion("격자").textContent).toContain("아직 돌리지 않았습니다"));
+    const symbol = screen.getAllByPlaceholderText("005930 또는 AAPL")[0];
+    fireEvent.change(symbol, { target: { value: "005930" } });
+    fireEvent.submit(screen.getAllByRole("form", { name: "격자 실행" })[0]);
+
+    await waitFor(() => expect(firstRegion("격자").textContent).toContain("격자 실행이 실패했습니다"));
+    expect(firstRegion("격자").textContent).not.toContain("아직 돌리지 않았습니다");
+    // 곡선도 같은 실패를 안다 — 「격자를 실행하면 곡선이 그려집니다」는 이미 한 일이다.
+    expect(firstRegion("곡선").textContent).toContain("격자 실행이 실패해 고를 칸이 없습니다");
+  });
+
+  it("같은 사유를 한 자리에서 두 번 말하지 않는다", async () => {
+    givenRunnableBot();
+    vi.mocked(runBacktestGrid).mockRejectedValue({ response: { status: 500, data: {} } });
+    render(<BenchPage />);
+
+    await waitFor(() => expect(firstRegion("격자").textContent).toContain("아직 돌리지 않았습니다"));
+    fireEvent.change(screen.getAllByPlaceholderText("005930 또는 AAPL")[0], { target: { value: "005930" } });
+    fireEvent.submit(screen.getAllByRole("form", { name: "격자 실행" })[0]);
+
+    await waitFor(() => expect(firstRegion("격자").textContent).toContain("서버에서 오류가 발생했습니다"));
+    const text = firstRegion("격자").textContent ?? "";
+    expect(text.split("서버에서 오류가 발생했습니다")).toHaveLength(2);
   });
 });
 
