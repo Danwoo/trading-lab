@@ -5,6 +5,10 @@
 칸마다 대조군을 한 번 더 돌게 만들었으므로, 그 상한이 여전히 예산 안인지 **실측으로** 답해야
 한다. 이 스크립트가 그 답을 재현 가능하게 만든다.
 
+**이 검사는 도는 기계의 속도를 잰다.** 개발 노트북과 CI 러너가 다르고, 그것이 의도다 — 느린
+기계에서 예산을 넘으면 그 기계에서 빨간불이 나야 한다. 실측 차이가 실제로 판정을 갈랐다:
+같은 상한(2000칸)이 노트북에서 7.8초, CI 러너에서 13.0초였다.
+
     cd backend-service && APP_ENV=development uv run python scripts/verify_grid_cost_budget.py
 """
 
@@ -80,7 +84,7 @@ def main() -> int:
     ok = sum(1 for cell in grid.cells if cell.ok)
     twins = sum(1 for cell in grid.cells if cell.costless is not None)
     print(f"칸 {cells}개(성공 {ok}) · 봉 {BARS} · 대조군 {twins}개 → {elapsed:.3f}초 (칸당 {per_cell * 1000:.2f}ms)")
-    print(f"상한 {MAX_COMBOS}칸 환산 {at_cap:.1f}초 · 예산 {BUDGET_SECONDS}초")
+    print(f"상한 {MAX_COMBOS}칸 환산 {at_cap:.1f}초 · 예산 {BUDGET_SECONDS}초 (여유 {BUDGET_SECONDS - at_cap:.1f}초)")
 
     if ok != cells:
         reasons = {cell.failed_reason for cell in grid.cells if not cell.ok}
