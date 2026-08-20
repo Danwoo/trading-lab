@@ -208,6 +208,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: npx tsc --noEmit
 
+      # 죽은 코드(아무도 안 부르는 파일·export·의존성)가 늘어나지 않게 상한으로 잠근다 (#286).
+      # 축별 수가 상한과 **정확히 같아야** 통과한다 — 걷어낸 PR 은 상한도 함께 내린다.
+      # 상한을 넘든 밑돌든 빨간불이므로, 통과가 "0건"인지 "안 봤음"인지 헷갈릴 자리가 없다.
+      # knip 버전은 스크립트가 박아 두고 npx 로 받는다(node_modules 에 안 얹는다 — 이 검사가
+      # 자기 자신을 미사용 의존성으로 세는 것을 피한다).
+      - name: 죽은 코드 상한
+        if: ${{ !cancelled() }}
+        run: node scripts/check-dead-code.js
+
   # ── 격리 유지: deleteUserCascade 실제 삭제 경로 회귀 (#280 · #357 리뷰 [B]) ──
   # backend-service 의 verify_no_orphan_personal_workspaces.py(#280)는 감사 SQL 자신의
   # 정밀도·재현율만 보고 deleteUserCascade(TypeScript)는 호출하지 않는다 — 그 함수를 되돌려도
