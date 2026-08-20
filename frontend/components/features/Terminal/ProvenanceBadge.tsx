@@ -79,7 +79,8 @@ interface ProvenanceBadgeProps {
   provenance: Provenance | null;
   /**
    * 적재본이 낡았다는 판정 (`lib/terminal/staleness.ts`). 주면 `loaded` 배지 끝에 「하루 낡음」이
-   * 경고색으로 붙는다 — 화면 결정 §21.5 「조용히 낡은 값으로 계속 굴리지 않는다」가 여기서 보인다.
+   * 주의색(`--caution`)으로 붙는다 — 화면 결정 §21.5 「조용히 낡은 값으로 계속 굴리지 않는다」가
+   * 여기서 보인다. 오류색이 아닌 이유는 낡음이 고장이 아니기 때문이다 (디자인 시스템 §2.2).
    * 낡음을 재려면 「지금」이 필요한데 그것은 렌더가 아니라 호출자가 아는 것이라 값으로 받는다.
    */
   staleness?: StalenessNote | null;
@@ -123,7 +124,7 @@ export function ProvenanceBadge({
           <LoadedIcon />
           {provenance.source}
           {timestamp ? ` · ${timestamp}` : ""}
-          {staleness && <span className="text-danger">· {staleness.label}</span>}
+          {staleness && <span className="text-caution">· {staleness.label}</span>}
         </span>
       );
     }

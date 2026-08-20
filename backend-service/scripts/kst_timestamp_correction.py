@@ -35,7 +35,7 @@ import psycopg
 # 대상 테이블은 frontend 스키마(Prisma 소유)라 커넥션 search_path 를 그쪽으로 돌린다.
 # 쿼리 파라미터 값 안의 `=` 는 반드시 `%3D` 로 인코딩한다 — 날것의 `=` 는 libpq URI 파서가
 # "extra key/value separator" 로 거절해 접속 전에 죽는다.
-DB_URL_DEFAULT = "postgresql://fintech:fintech@localhost:5432/fintech?options=-csearch_path%3Dfrontend"
+DB_URL_DEFAULT = "postgresql://fintech:fintech@localhost:5442/fintech?options=-csearch_path%3Dfrontend"
 
 # alembic/versions/0006_kst_write_shift_correction.py 와 반드시 같은 값을 쓴다 — 갈리면 감사·스냅샷이
 # 실제 마이그레이션이 보정하는 행과 다른 행을 본다.

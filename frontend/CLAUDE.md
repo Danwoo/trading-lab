@@ -94,6 +94,13 @@ Backend exception_handler → {detail: "한글 메시지", status: 4xx/5xx}
 - **수집된 테스트가 0건이면 실패한다** (`passWithNoTests: false`). `--passWithNoTests` 를 붙이면 이 방어가 사라지므로 붙이지 않는다 — 검사 대상이 0건인데 초록인 상태는 이 레포에서 실제로 사고를 냈다.
 - 게이트: CI `test: frontend` (`.github/workflows/frontend-ci.yml`, `on.paths` 에 `frontend/**`) + pre-commit `vitest` 훅. pre-commit 훅은 `frontend/node_modules` 가 없으면 SKIP 하므로(eslint·tsc 훅과 같은 동작) **권위 있는 게이트는 CI 쪽**이다.
 
+## 죽은 코드 상한 (knip)
+
+`scripts/check-dead-code.js` 가 knip 을 돌려 축별 건수를 `CEILINGS` 와 **정확히 대조**한다 (넘어도 밑돌아도 빨간불 — 걷어낸 PR 은 상한을 함께 내린다). CI 스텝은 `test: frontend` 의 「죽은 코드 상한」.
+
+- **knip 의 「미사용」을 그대로 지우지 마라.** 이 레포의 소비자 상당수가 TS import 그래프 밖에 있다 — 워크플로가 `node` 로 실행하는 `scripts/*.js`, 파이썬 그물이 경로로 열어 정규식으로 파싱하는 상수(`schemas/terminal/ingest.ts` 의 `DATA_KINDS` ↔ `backend-service/scripts/verify_capability_kind_lockstep.py`), prisma 가 문자열로 지정하는 생성기(`prisma/table-generator.cjs`). 지우면 그 그물이 **조용히 죽는다**.
+- 그런 소비자는 `knip.jsonc` 에 **이유 한 줄과 함께** `entry`/`ignore`/`ignoreDependencies` 로 선언한다. 「안 쓰이지만 남긴다」는 판정은 선언하지 않는다 — 목록에 그대로 두고 상한이 잠근다.
+
 ---
 
 ## Anti-patterns 체크리스트 (작업 중 즉시 회피)

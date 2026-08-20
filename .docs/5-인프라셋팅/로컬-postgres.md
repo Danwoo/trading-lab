@@ -28,7 +28,7 @@
 
 ```bash
 cd frontend
-DATABASE_URL="postgresql://fintech:fintech@localhost:5432/fintech?schema=public" \
+DATABASE_URL="postgresql://fintech:fintech@localhost:5442/fintech?schema=public" \
   npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
 #  → DROP TABLE "alembic_version"; DROP TABLE "tn_board"; … 파이썬 12개
 #  같은 명령을 ?schema=frontend 로 하면 "This is an empty migration."
@@ -53,7 +53,7 @@ DATABASE_URL="postgresql://fintech:fintech@localhost:5432/fintech?schema=public"
 
 `process-compose.yaml` 에 두 프로세스가 추가됐다:
 
-- **`postgres`** — `pgvector/pgvector:pg16` 컨테이너(`fintech-pg`), 포트 5432, user/pass/db 모두
+- **`postgres`** — `pgvector/pgvector:pg16` 컨테이너(`fintech-pg`), 호스트 포트 5442 (컨테이너 안쪽은 5432), user/pass/db 모두
   `fintech`. 데이터는 named volume `fintech-pg-data` 에 영속(재기동해도 유지). `pg_isready`
   readiness probe 가 healthy 를 판정한다.
 - **`db-migrate`** — postgres 가 healthy 해지면 1회 실행. backend·devactivity·file 세 서비스가
@@ -107,7 +107,7 @@ python3 scripts/bootstrap_local_env.py     # stdlib 전용 — uv 없이 동작
 BACKEND_SQL_DB_DRIVER=postgresql+psycopg
 BACKEND_SQL_DB_ODBC_DRIVER=
 BACKEND_SQL_DB_HOST=localhost
-BACKEND_SQL_DB_PORT=5432
+BACKEND_SQL_DB_PORT=5442
 BACKEND_SQL_DB_NAME=fintech
 BACKEND_SQL_DB_USER=fintech
 BACKEND_SQL_DB_PASSWORD=fintech
@@ -125,7 +125,7 @@ frontend 는 Prisma(driver adapter `@prisma/adapter-pg`)로 자기 소유 테이
 `.env.example` 이 이미 로컬 Postgres 를 가리키므로 부트스트랩 결과를 그대로 쓰면 된다:
 
 ```dotenv
-DATABASE_URL="postgresql://fintech:fintech@localhost:5432/fintech?schema=frontend"
+DATABASE_URL="postgresql://fintech:fintech@localhost:5442/fintech?schema=frontend"
 ```
 
 끝의 `?schema=frontend` 가 Prisma 소유 스키마를 정하는 SoT 다(위 「DB 구성」). 이 값을 `public` 으로
@@ -144,12 +144,23 @@ process-compose up                         # 3) postgres → healthy → db-migr
 가 없어 서비스가 config 검증에서 즉시 죽고, 2 를 건너뛰면 `db-migrate` 의 `npm run dev:prisma:push`
 가 실패해 이 프로세스에 의존하는 backend·devactivity·file·frontend 가 기동하지 않는다.
 
-`frontend` 프로세스는 :3010 을 쓴다 — 3000 은 Node 기본 포트라 다른 프로젝트와 겹치기 때문이다(#308).
-이 포트의 SoT 는 `process-compose.yaml` 의 frontend `PORT` 이고, 전 backend 서비스의
-`CORS_ALLOW_ORIGINS` 기본값과 `frontend/.env.example` 의 `BETTER_AUTH_URL` 이 같은 포트를 쓴다
-(`python3 scripts/verify_dev_port_hygiene.py` 가 이 lockstep 과 「남의 포트를 죽이는 명령이 없는지」를
-검사한다). 포트를 옮기려면 그 셋을 함께 옮기고, 이미 만들어 둔 `.env.development` 의 `BETTER_AUTH_URL`
-도 같이 맞춘다(`.env.*` 는 gitignore 대상이라 각자 로컬에서 바꾼다).
+### 포트 — 기본 포트를 피한다
+
+기본 포트는 그 머신의 다른 프로젝트와 겹친다. 이 스택은 둘 다 피해 놓았고, **각 포트의 SoT 는
+`process-compose.yaml` 의 그 프로세스 `vars.PORT` 하나뿐**이다:
+
+| 프로세스 | 로컬 포트 | 피한 기본 포트 | 같이 움직여야 하는 곳 |
+|---|---|---|---|
+| `frontend` | 3010 | 3000 (Node, #308) | 전 backend 서비스 `app/core/config.py` 의 `CORS_ALLOW_ORIGINS` 기본값 · `frontend/.env.example` 의 `BETTER_AUTH_URL` |
+| `postgres` | 5442 | 5432 (Postgres, #294) | 각 서비스 `app/.env.example` 의 `*_DB_PORT` · `frontend/.env.example` 의 `DATABASE_URL` · `scripts/bootstrap_local_env.py` 의 `LOCAL_DB_ENDPOINT` · 로컬 DB 를 기본값으로 두는 스크립트(`backend-service/scripts/kst_timestamp_correction.py`) |
+
+`python3 scripts/verify_dev_port_hygiene.py` 가 이 두 lockstep 과 「남의 포트를 죽이는 명령이
+없는지」를 검사한다. 포트를 옮기려면 SoT 와 위 목록을 함께 옮기고, 이미 만들어 둔
+`.env.development` 도 같이 맞춘다(`.env.*` 는 gitignore 대상이라 각자 로컬에서 바꾼다).
+
+DB 는 **컨테이너 안쪽 포트가 5432 그대로**이고 `-p 5442:5432` 로 호스트 쪽만 옮긴 것이다 —
+CI 서비스 컨테이너와 컨테이너 배포(`compose.*.yaml`)의 5432 는 격리된 네트워크 안쪽이라 이
+값과 무관하다.
 
 프로세스별로 포트가 점유돼 있으면 그 프로세스는 바인딩 실패로 죽는다 — 점유자를 죽이지 않는다.
 이전 인스턴스가 포트를 물고 있으면 `ss -ltnp` 로 그 PID 가 자기 것인지 확인한 뒤 직접 정리한다.
@@ -216,7 +227,7 @@ doc-search 의 워크스페이스 문서 색인(pgvector)도 이 로컬 Postgres
 ```dotenv
 # doc-search-mcp-service/app/.env.development
 DOC_VECTOR_DB_HOST=localhost
-DOC_VECTOR_DB_PORT=5432
+DOC_VECTOR_DB_PORT=5442
 DOC_VECTOR_DB_NAME=fintech
 DOC_VECTOR_DB_USER=fintech
 DOC_VECTOR_DB_PASSWORD=fintech

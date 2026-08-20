@@ -49,7 +49,7 @@ GUARD = "redactReason"
 #: fail-closed 핀 — 검사한 자리가 조용히 줄지 않게 박는다.
 #: 이 스크립트를 그냥 돌려 나온 수다 (손으로 세면 계층을 빠뜨린다 — 실제로 hooks 2곳을 빠뜨려
 #: 8 로 박혔고, 그동안 자리 2곳이 사라져도 초록이었다).
-EXPECTED_SITES = 10
+EXPECTED_SITES = 11
 SKIP_DIRS = {"node_modules", ".next", "dist", "build"}
 
 
