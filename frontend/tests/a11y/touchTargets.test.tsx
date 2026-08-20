@@ -51,6 +51,7 @@ import { ToastNotification } from "@/components/shared/Feedback/ToastNotificatio
 import { showToast } from "@/components/shared/Feedback/toastQueue";
 import { GlobalTabs } from "@/components/shared/Layout/GlobalTabs";
 import { ProductPanel } from "@/components/shared/Layout/ProductPanel";
+import { DateBox } from "@/components/shared/ui/DateBox";
 import { FileUploader } from "@/components/shared/ui/FileUploader";
 import { TextBox } from "@/components/shared/ui/TextBox";
 import { SelectMenu } from "@/components/shared/ui/primitives/SelectMenu";
@@ -137,6 +138,12 @@ function renderFixtures(): Array<{ name: string; html: string }> {
       // 없으므로 렌더 뒤에 실제로 파일을 하나 물린다(아래 `pickFile`).
       name: "FileUploader(선택 해제)",
       node: <FileUploader />,
+    },
+    {
+      // 달력 열기 버튼은 `TextBox` 의 지우기와 **같은 공용 클래스**(FIELD_ICON_BUTTON_CLASS)를
+      // 쓴다 — 그 클래스가 통째로 흔들리면 두 자리가 같이 무너지므로 둘 다 잰다.
+      name: "DateBox(달력 열기)",
+      node: <DateBox fieldName="from" value="2026-08-20" onValueChanged={() => {}} />,
     },
     {
       name: "TextBox(지우기·비밀번호)",

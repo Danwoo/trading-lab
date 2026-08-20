@@ -137,6 +137,16 @@ export function useGridRunForm(): GridRunFormController {
       setFormError("종목을 적으세요 — 적재된 캔들이 있는 종목이어야 합니다.");
       return null;
     }
+    // 못 읽은 날짜·금액은 프리미티브가 값을 비워 올린다 — 그 빈 값이 여기서 0 이나 옛 날짜로
+    // 둔갑하지 않게 막는다. 시작 자금은 성과의 분모라 0 이면 격자 전 칸이 뜻을 잃는다.
+    if (!form.period_from || !form.period_to) {
+      setFormError("구간을 YYYY-MM-DD 로 다 적으세요.");
+      return null;
+    }
+    if (form.initial_cash === null || !(form.initial_cash > 0)) {
+      setFormError("시작 자금을 0보다 크게 적으세요 — 성과를 재는 분모입니다.");
+      return null;
+    }
     if (enabledAxes.length === 0) {
       setFormError("훑을 축을 하나 이상 켜세요 — 격자 실행은 축이 있어야 합니다.");
       return null;
@@ -150,7 +160,7 @@ export function useGridRunForm(): GridRunFormController {
       symbol: form.symbol.trim().toUpperCase(),
       period_from: form.period_from,
       period_to: form.period_to,
-      initial_cash: form.initial_cash ?? 0,
+      initial_cash: form.initial_cash,
       bot_id: botId,
       sweep: Object.fromEntries(enabledAxes.map((axis) => [axis.field.name, sweepValues(axis.field, axis.steps)])),
     };

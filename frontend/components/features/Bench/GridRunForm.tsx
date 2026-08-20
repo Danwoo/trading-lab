@@ -79,10 +79,12 @@ export function GridRunForm({
           />
         </label>
         <label className="flex min-w-0 flex-col gap-1">
-          <span className="break-keep text-2xs text-ink-muted">시작 자금</span>
+          <span className="break-keep text-2xs text-ink-muted">시작 자금 (원)</span>
           <NumberBox
             fieldName="initial_cash"
             value={form.initial_cash}
+            format="#,##0원"
+            groupDigits
             onValueChanged={(name, value) => controller.changeField(name, value)}
           />
         </label>

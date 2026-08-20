@@ -29,8 +29,9 @@
 크롬이 재는 그물의 몫이다. 여기서 세는 것은 「소스만 보고 아이콘 전용이라고 단정할 수 있는
 자리」이고, #289 가 놓친 두 자리가 정확히 그 모양이었다(자식이 `×` 한 글자).
 
-`className` 이 같은 파일의 상수를 가리키면(`className={NAV_BUTTON_CLASS}`) 그 상수 정의까지
-따라가 본다 — 안 그러면 상수로 묶은 자리가 통째로 위반으로 잡힌다.
+`className` 이 상수를 가리키면(`className={NAV_BUTTON_CLASS}`) 그 상수 정의까지 따라간다 —
+**다른 파일에 있어도** 따라가고, 상수가 상수를 물면 사슬 끝까지 간다. 안 그러면 공용 클래스로
+묶은 자리가 통째로 위반으로 잡힌다.
 
 ## allowlist — 이미 24 이상인 자리
 
@@ -181,20 +182,34 @@ def identifier(open_tag: str, text: str) -> str:
     return text or "icon"
 
 
-def hit_area_consts(src: str) -> set[str]:
-    """같은 파일에서 `ICON_HIT_AREA` 를 품은 클래스 상수 이름들."""
-    names: set[str] = set()
-    for match in re.finditer(r"const\s+([A-Za-z_$][\w$]*)\s*=", src):
-        body = src[match.end() : src.find(";", match.end())]
-        if HIT_AREA_CLASS in body:
-            names.add(match.group(1))
+def covering_names(sources: list[str]) -> set[str]:
+    """표적 클래스를 실어 나르는 이름들 — 상수를 거쳐 전달되는 사슬을 끝까지 따라간다.
+
+    `FIELD_ICON_BUTTON_CLASS = `${ICON_HIT_AREA} …`` 처럼 **다른 파일의 상수**로 묶인 자리가
+    있어서 파일 안만 보면 그 자리가 통째로 위반으로 잡힌다.
+    """
+    names = {HIT_AREA_CLASS, HIT_AREA_BOX_CLASS}
+    definitions: list[tuple[str, str]] = []
+    for src in sources:
+        for match in re.finditer(r"const\s+([A-Za-z_$][\w$]*)\s*=", src):
+            end = src.find(";", match.end())
+            definitions.append((match.group(1), src[match.end() : end if end > 0 else len(src)]))
+
+    grew = True
+    while grew:
+        grew = False
+        for name, body in definitions:
+            if name in names:
+                continue
+            if any(re.search(rf"\b{re.escape(known)}\b", body) for known in names):
+                names.add(name)
+                grew = True
     return names
 
 
-def scan_file(path: Path) -> list[tuple[str, bool]]:
+def scan_file(path: Path, covering: set[str]) -> list[tuple[str, bool]]:
     """(식별자, 표적 클래스가 걸렸는가) 목록."""
     src = strip_comments(path.read_text(encoding="utf-8"))
-    covering = {HIT_AREA_CLASS, HIT_AREA_BOX_CLASS} | hit_area_consts(src)
     found: list[tuple[str, bool]] = []
     for tag in CONTROL_TAGS:
         for match in re.finditer("<" + re.escape(tag) + r"(?=[\s/>])", src):
@@ -229,11 +244,20 @@ def main() -> int:
         _fail(f"훑을 `.tsx` 가 없습니다 — 경로가 바뀌었습니까? ({', '.join(SCAN_ROOTS)})")
         return 1
 
+    # 클래스 상수는 `.ts` 에도 산다(`hitArea.ts`) — 이름 수집은 확장자를 넓혀서 한다.
+    sources = [
+        strip_comments(p.read_text(encoding="utf-8"))
+        for root in SCAN_ROOTS
+        for suffix in ("*.ts", "*.tsx")
+        for p in (FRONTEND / root).rglob(suffix)
+    ]
+    covering = covering_names(sources)
+
     covered: list[str] = []
     uncovered: list[str] = []
     for path in files:
         rel = path.relative_to(FRONTEND).as_posix()
-        for ident, has_hit in scan_file(path):
+        for ident, has_hit in scan_file(path, covering):
             key = f"{rel}::{ident}"
             (covered if has_hit else uncovered).append(key)
 

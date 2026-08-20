@@ -3,26 +3,8 @@
 
 import { useId, useState } from "react";
 import { cn } from "./primitives/cn";
-import { ICON_HIT_AREA } from "./primitives/hitArea";
+import { FIELD_ICON_BUTTON_CLASS } from "./primitives/FieldShell";
 import { Icon } from "./primitives/icons";
-
-/**
- * 클리어·비밀번호 토글 아이콘의 클래스.
- *
- * **어두운 셸과 흰 `/admin` 양쪽에서 읽히는 색 하나**를 쓴다. 종전에는 `text-gray-400/500` 에
- * `hover:text-gray-600/700` 이었는데, hover 색이 밝은 바탕 전제라 어두운 셸에서는 **대비가
- * 1.57:1 로 떨어져 마우스를 올리면 아이콘이 사라졌다**.
- *
- * 왜 토큰(`text-ink-*`)이 아닌가: `:root` 가 다크 기본이고 `/admin` 셸은 `bg-white` 인데
- * `data-theme="light"` 가 없다 — 토큰을 쓰면 흰 바탕에 다크 잉크가 얹혀 안 보인다.
- * 왜 `text-current` 도 아닌가: 이 래퍼에는 잉크가 없어 브라우저 기본색(검정)으로 떨어진다(실측).
- *
- * hover 는 **색이 아니라 바탕**으로 준다. 색을 밝히면 어두운 데서 좋아지고 밝은 데서 나빠진다 —
- * 한 색으로 양쪽을 다 올릴 수 없다. 바탕을 얹으면 글자 대비를 안 깎고 반응만 더한다.
- */
-const ICON_BUTTON_CLASS =
-  `${ICON_HIT_AREA} absolute right-2 top-1/2 -translate-y-1/2 rounded text-gray-500 ` +
-  "hover:bg-gray-500/10 focus-visible:bg-gray-500/10 focus:outline-none";
 
 interface Props<T = any> {
   /** 객체 state 폼(useFormState 짝)의 필드 키. 네이티브 폼 화면에선 생략한다 — 아래 「두 모드」 참조. */
@@ -207,7 +189,7 @@ export function TextBox<T = any>({
           <button
             type="button"
             aria-label="지우기"
-            className={ICON_BUTTON_CLASS}
+            className={FIELD_ICON_BUTTON_CLASS}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onValueChanged?.(fieldName as keyof T, "")}
           >
@@ -218,7 +200,7 @@ export function TextBox<T = any>({
           <button
             type="button"
             aria-label={passwordVisible ? "비밀번호 숨기기" : "비밀번호 표시"}
-            className={ICON_BUTTON_CLASS}
+            className={FIELD_ICON_BUTTON_CLASS}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => setPasswordVisible((v) => !v)}
           >
