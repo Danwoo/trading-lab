@@ -100,11 +100,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   // 흰 상자가 됐다. 선언 한 줄이 그 갈래를 없앤다.
   //
   // iframe 내부: chrome 없이 페이지만 렌더 (탭 콘텐츠)
+  //
+  // **탭 본문은 앱 배경이 아니라 패널이다.** 이 안의 상세 폼은 자기 바탕을 안 칠해서, 공용
+  // 입력의 그릇이 여기까지 그대로 내려온다(실측: 입력 위로 투명한 조상 23개). 여기를
+  // `--bg-base` 로 두면 그 입력의 채움(`--bg-base`)과 **같은 색**이 된다. 앱 배경은 아래
+  // 메인 프레임 섀시가 칠하고, 탭 본문은 그 위에 얹힌 패널이라 `--bg-panel` 이 맞다.
   if (isEmbed) {
     return (
       <>
         <style>{`nextjs-portal { display: none !important; }`}</style>
-        <div data-theme="light" className="h-screen bg-bg-base text-ink">
+        <div data-theme="light" className="h-screen bg-bg-panel text-ink">
           {authorized ? children : null}
         </div>
       </>
