@@ -19,9 +19,14 @@ import {
   type BenchSelection,
   type BenchSelectionKind,
 } from "@/stores/shell/benchSelectionStore";
-import { ROSTER_UNKNOWN, curveZoneProvenance, gridZoneProvenance, type RosterState } from "@/lib/bench/boardProvenance";
+import {
+  GRID_RUN_FAILED_HEADLINE,
+  curveZoneProvenance,
+  gridZoneProvenance,
+  rosterZoneProvenance,
+  type RosterState,
+} from "@/lib/bench/boardProvenance";
 import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
-import type { Provenance } from "@/types/terminal/provenance";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import { ProductStages } from "@/components/features/Bench/ProductStages";
 
@@ -124,12 +129,7 @@ export default function Page() {
     reportError: board.reportError,
   });
 
-  const rosterProvenance: Provenance =
-    rosterState === "loading"
-      ? { kind: "unavailable", reason: ROSTER_UNKNOWN.loading, because: "checking" }
-      : rosterState === "empty"
-        ? { kind: "unavailable", reason: "아직 만든 봇이 없습니다", because: "empty" }
-        : roster.provenance;
+  const rosterProvenance = rosterZoneProvenance(rosterState, roster.provenance);
 
   const gridZone = (
     <BoardZone
@@ -140,10 +140,11 @@ export default function Page() {
       notice={
         board.runError !== null ? (
           <ImpactNotice
-            headline="격자 실행이 실패했습니다"
+            headline={GRID_RUN_FAILED_HEADLINE}
             halted={board.grid !== null ? ["새 격자"] : ["격자", "곡선·지표·거래"]}
             running={board.grid !== null ? ["앞선 격자의 칸 고르기"] : ["봇 만들기", "시세 보기"]}
             detail={board.runError}
+            announce
           />
         ) : undefined
       }

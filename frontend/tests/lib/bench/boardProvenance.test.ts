@@ -8,7 +8,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import { curveZoneProvenance, gridZoneProvenance, type RosterState } from "@/lib/bench/boardProvenance";
+import {
+  GRID_RUN_FAILED_HEADLINE,
+  curveZoneProvenance,
+  gridZoneProvenance,
+  rosterZoneProvenance,
+  type RosterState,
+} from "@/lib/bench/boardProvenance";
 
 const ROSTER_STATES: RosterState[] = ["loading", "unreadable", "empty", "filled"];
 
@@ -36,10 +42,23 @@ describe("격자 자리", () => {
 
     expect(provenance).toEqual({
       kind: "unavailable",
-      reason: "격자 실행이 실패했습니다 — 캔들이 없습니다 — 적재를 먼저 돌리세요",
+      reason: GRID_RUN_FAILED_HEADLINE,
       because: "run-failed",
     });
     expect(JSON.stringify(provenance)).not.toContain("아직 돌리지 않았습니다");
+  });
+
+  // 이 사유는 화면에서 알림(`ImpactNotice`)의 **머리줄**로 나가고 서버 사유는 그 알림의
+  // `detail` 이 맨 뒤에 낸다(§21.5). 여기에 서버 사유를 섞으면 한 화면에 두 번 선다.
+  it("실패 사유에 서버 문구를 섞지 않는다 — 원인은 알림 맨 뒤가 낸다", () => {
+    const provenance = gridZoneProvenance({
+      rosterState: "filled",
+      hasGrid: false,
+      ...IDLE,
+      runError: "캔들이 없습니다 — 적재를 먼저 돌리세요",
+    });
+
+    expect(provenance.kind === "unavailable" && provenance.reason).not.toContain("캔들이 없습니다");
   });
 
   it("앞선 격자가 남아 있어도 방금 실패를 덮지 않는다", () => {
@@ -196,5 +215,37 @@ describe("곡선 자리", () => {
         reportError: null,
       }),
     ).toEqual({ kind: "loaded", source: "실행 #42", asOf: "2026-08-19T18:00:00" });
+  });
+});
+
+// 「내 봇」 자리도 같은 축을 쓴다 — 격자·곡선만 잡고 이 자리를 빼면 사슬이 한 칸 열린 채 남는다.
+describe("「내 봇」 자리", () => {
+  const READ = { kind: "loaded", source: "봇 목록", asOf: null } as const;
+  const UNREADABLE = { kind: "unavailable", reason: "봇 목록을 불러오지 못했습니다", because: "unreadable" } as const;
+
+  it("아직 안 왔으면 「확인 중」이다 — 「대상 없음」이 아니다", () => {
+    const provenance = rosterZoneProvenance("loading", READ);
+
+    expect(provenance).toEqual({
+      kind: "unavailable",
+      reason: "봇 목록을 확인하고 있습니다",
+      because: "checking",
+    });
+  });
+
+  it("읽었고 0건이면 「대상 없음」이다", () => {
+    expect(rosterZoneProvenance("empty", READ)).toEqual({
+      kind: "unavailable",
+      reason: "아직 만든 봇이 없습니다",
+      because: "empty",
+    });
+  });
+
+  it("못 읽은 것을 「대상 없음」으로 접지 않는다 — 훅의 출처를 그대로 낸다", () => {
+    expect(rosterZoneProvenance("unreadable", UNREADABLE)).toEqual(UNREADABLE);
+  });
+
+  it("봇이 있으면 훅이 만든 출처가 그대로 자리의 출처다", () => {
+    expect(rosterZoneProvenance("filled", READ)).toEqual(READ);
   });
 });

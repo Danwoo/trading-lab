@@ -1,5 +1,13 @@
 import type { Provenance, UnavailableBecause } from "@/types/terminal/provenance";
 
+/**
+ * 격자 실행이 실패했을 때 **화면에 실제로 나가는 머리 문장**. 자리의 사유이자 알림(`ImpactNotice`)의
+ * 머리줄이라 한 자리에 둔다 — 두 벌로 두면 한쪽만 고쳐져 배지와 알림이 다른 말을 한다.
+ *
+ * 서버 사유는 여기 붙이지 않는다. 원인은 알림의 `detail` 이 맨 뒤에 낸다(화면 결정 §21.5).
+ */
+export const GRID_RUN_FAILED_HEADLINE = "격자 실행이 실패했습니다";
+
 /** 봇 목록이 지금 어떤 상태인가 — 「못 읽음」·「불러오는 중」을 「없음」과 가른다. */
 export type RosterState = "loading" | "unreadable" | "empty" | "filled";
 
@@ -48,10 +56,13 @@ export interface GridZoneInput {
  *
  * 「돌고 있다」는 격자가 아직 없을 때만 머리가 말한다 — 앞선 격자가 깔린 채 재실행 중이면
  * 그 칸들은 여전히 참이라 자리는 적재본으로 남는다.
+ *
+ * 실패의 사유는 `GRID_RUN_FAILED_HEADLINE` 그대로다 — 부르는 쪽이 그것을 알림 머리로 내고
+ * 서버 사유는 알림 맨 뒤(`detail`)에 붙인다.
  */
 export function gridZoneProvenance({ rosterState, hasGrid, isRunning, runError }: GridZoneInput): Provenance {
   if (runError !== null) {
-    return { kind: "unavailable", reason: `격자 실행이 실패했습니다 — ${runError}`, because: "run-failed" };
+    return { kind: "unavailable", reason: GRID_RUN_FAILED_HEADLINE, because: "run-failed" };
   }
   if (hasGrid) {
     return { kind: "loaded", source: "백테스트 격자", asOf: null };
@@ -122,4 +133,21 @@ export function curveZoneProvenance({
     };
   }
   return { kind: "unavailable", reason: CURVE_EMPTY_REASON[rosterState], because: ROSTER_BECAUSE[rosterState] };
+}
+
+/**
+ * 「내 봇」 자리의 출처 (#284).
+ *
+ * 「봇이 0개다」는 **읽고 나서야** 할 수 있는 말이라 로스터 상태가 그대로 빔의 종류가 된다.
+ * `filled`·`unreadable` 은 훅이 만든 출처(`useBotRoster`)를 그대로 쓴다 — 못 읽은 사유는
+ * 훅이 알고, 이 함수는 「아직 안 왔다」·「0건이다」만 갈라 준다.
+ */
+export function rosterZoneProvenance(rosterState: RosterState, fromRoster: Provenance): Provenance {
+  if (rosterState === "loading") {
+    return { kind: "unavailable", reason: ROSTER_UNKNOWN.loading, because: "checking" };
+  }
+  if (rosterState === "empty") {
+    return { kind: "unavailable", reason: "아직 만든 봇이 없습니다", because: "empty" };
+  }
+  return fromRoster;
 }

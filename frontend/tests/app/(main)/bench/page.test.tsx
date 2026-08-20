@@ -258,6 +258,9 @@ describe("봇 목록 실패 — 「0개」로 뭉개지 않는다", () => {
     await waitFor(() => expect(zone.textContent).toContain("읽지 못했습니다"));
     expect(zone.textContent).not.toContain("아직 만든 봇이 없습니다");
     expect(zone.textContent).toContain("멈추는 것");
+    // 첫 로드 실패는 사용자가 부른 것이 아니다 — 낭독에 끼어들지 않고 자리에 남는다
+    // (누른 것의 결과인 격자 실행 실패와 갈린다).
+    expect(zone.querySelector('[role="alert"]')).toBeNull();
   });
 
   it("못 읽었을 때 격자·곡선·시작하는 길도 「없다」고 말하지 않는다", async () => {
@@ -355,6 +358,24 @@ describe("격자 실행 실패 — 자리 머리가 「아직 안 돌렸다」�
     expect(firstRegion("격자").textContent).toContain("멈추는 것");
     // 곡선도 같은 실패를 안다 — 「격자를 실행하면 곡선이 그려집니다」는 이미 한 일이다.
     expect(firstRegion("곡선").textContent).toContain("격자 실행이 실패해 고를 칸이 없습니다");
+  });
+
+  // 사용자가 방금 「격자 실행」을 눌렀다 — 그 결과가 화면에만 뜨고 낭독되지 않으면
+  // 화면판독기 사용자는 눌린 것이 어떻게 됐는지 모른다. 폼 아래 `role="alert"` 를 걷어내며
+  // 이 경로가 한 번 사라졌었다.
+  it("방금 누른 실행의 실패는 화면판독기가 즉시 읽는다", async () => {
+    givenRunnableBot();
+    vi.mocked(runBacktestGrid).mockRejectedValue({ response: { status: 500, data: {} } });
+    render(<BenchPage />);
+
+    await waitFor(() => expect(firstRegion("격자").textContent).toContain("아직 돌리지 않았습니다"));
+    fireEvent.change(screen.getAllByPlaceholderText("005930 또는 AAPL")[0], { target: { value: "005930" } });
+    fireEvent.submit(screen.getAllByRole("form", { name: "격자 실행" })[0]);
+
+    await waitFor(() => expect(firstRegion("격자").querySelector('[role="alert"]')).not.toBeNull());
+    const alert = firstRegion("격자").querySelector('[role="alert"]');
+    expect(alert!.textContent).toContain("격자 실행이 실패했습니다");
+    expect(alert!.textContent).toContain("서버에서 오류가 발생했습니다");
   });
 
   it("같은 사유를 한 자리에서 두 번 말하지 않는다", async () => {

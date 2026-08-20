@@ -43,10 +43,13 @@ export function useBacktestBoard(): BacktestBoard {
   const runGrid = useCallback(async (input: BacktestGridIn) => {
     setIsRunning(true);
     setRunError(null);
+    // 앞선 칸 조회의 실패는 새 실행을 누른 순간 낡은 소식이다 — 남겨 두면 곡선 자리가
+    // 그것을 계속 말하고 방금 실행의 결과가 뒤에 가려진다.
+    setReportError(null);
     try {
       const result = await runBacktestGrid(input);
-      // 사유는 자리 머리가 「격자 실행이 실패했습니다 — 」를 앞에 붙여 낸다. 여기서 같은
-      // 문장을 다시 쓰면 한 줄에 두 번 붙는다(`{success: false}` 200 → `apiCall` 이 null).
+      // 사유는 자리 머리(`GRID_RUN_FAILED_HEADLINE`) 아래에 그대로 붙는다. 여기서 같은 문장을
+      // 다시 쓰면 한 화면에 두 번 선다(`{success: false}` 200 → `apiCall` 이 null).
       if (result === null) throw new Error("서버가 실패를 알렸고 사유는 주지 않았습니다");
       setGrid(result);
       // 새 격자는 새 지형이다 — 옛 격자의 칸을 가리키던 리포트를 남겨 두면 화면이 거짓말한다.

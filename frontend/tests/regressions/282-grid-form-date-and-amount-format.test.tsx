@@ -56,7 +56,7 @@ function renderForm(overrides: Partial<GridRunFormState> = {}) {
       changeAxisSteps: vi.fn(),
       buildInput: vi.fn(() => null),
     };
-    return <GridRunForm bots={[]} controller={controller} isRunning={false} runError={null} onRun={vi.fn()} />;
+    return <GridRunForm bots={[]} controller={controller} isRunning={false} onRun={vi.fn()} />;
   }
 
   render(<Harness />);
