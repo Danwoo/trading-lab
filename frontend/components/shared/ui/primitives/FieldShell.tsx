@@ -49,12 +49,22 @@ export function FieldShell({ children, isInvalid, errorMessage, errorMessageId, 
  * 그래서 이 입력이 다크 보드 위에서 흰 상자가 됐다. 대비 검사로는 안 잡힌다 — 흰 바탕에
  * 다크 잉크는 대비가 **높기** 때문이다. 잡히는 것은 눈으로 볼 때뿐이다.
  *
- * **그 바탕은 `--bg-base` 다 — 이 레포에서 입력을 담는 그릇이 절대 쓰지 않는 유일한 표면
- * 토큰이기 때문이다.** 입력이 실제로 놓이는 그릇을 전수 조사하면 `--bg-panel`(BoardZone·
- * 로그인 카드·SelectMenu 팝오버), `--bg-raised`(IngestConsole 구역), 라이트 `#FFFFFF`
- * (/admin 다이얼로그)·`#F0F1F2`(회원가입 카드)뿐이고 `--bg-base` 는 없다. 그래서 채움이
- * 그릇과 같은 색이 되는 자리가 생기지 않는다 — `--bg-panel` 을 쓰면 BoardZone 위에서,
- * `--bg-raised` 를 쓰면 IngestConsole 구역 위에서 각각 1.00:1 이 된다.
+ * **그 바탕은 `--bg-base` 이고, 그것이 성립하려면 입력을 담는 그릇이 전부 패널 층이어야 한다.**
+ * 이 두 줄은 한 짝이다 — 한쪽만 지키면 채움과 그릇이 같은 색이 되는 자리가 남는다.
+ *
+ * 브라우저(`getComputedStyle`)로 실제 그릇을 재면 `--bg-panel`(BotForm·BoardZone·로그인
+ * 카드·SelectMenu 팝오버·`/admin` 탭 본문), `--bg-raised`(IngestConsole 구역), 라이트
+ * `#FFFFFF`(다이얼로그)·`#F0F1F2`(회원가입 카드)다. `--bg-base` 는 **앱 배경 전용**이라
+ * 그릇으로 안 나타나고, 그래서 채움이 그릇과 겹치지 않는다.
+ *
+ * 이 짝이 실제로 깨졌던 자리가 둘 있다. `--bg-panel` 을 채움으로 쓰면 BotForm·BoardZone
+ * 위에서 1.00:1 이 되고(그래서 여기를 내렸다), `/admin` 탭 셸이 `--bg-base` 를 칠하던 판에는
+ * 그 안의 상세 폼이 1.00:1 이 됐다(`app/admin/layout.tsx` 가 탭 본문을 `--bg-panel` 로 옮겨
+ * 닫았다 — 그 폼은 자기 바탕을 안 칠해서 그릇이 셸까지 내려온다).
+ *
+ * **정적 그물은 이 짝의 앞쪽만 본다.** `scripts/verify_surface_paints_background.py` 축 ⑤ 가
+ * 「채움이 그릇 역할 토큰인가」를 잡지만, 「그릇이 앱 배경 층인가」는 담는 관계를 따라가야
+ * 알 수 있어 못 본다. 입력을 새 화면에 놓을 때는 그 화면이 패널을 칠하는지 눈으로 확인하라.
  *
  * 방향도 두 모드에서 같다 — `--bg-base` 는 다크·라이트 양쪽에서 `--bg-panel` 보다 어두워
  * 언제나 「파인 자리」로 읽힌다(`--bg-raised` 는 다크에서 밝고 라이트에서 어두워 방향이
