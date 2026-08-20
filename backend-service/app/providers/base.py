@@ -38,10 +38,15 @@ class ProviderResponseInvalid(BadGatewayError):
     노출 메시지는 별도).
 
     **상류 텍스트가 우리 도메인 객체로 들어오는 유일한 통로**라서, 데이터 소스 키를 여기서 지운다
-    — 이 `detail` 은 API 응답 `detail` 과 `tn_ingest_run.failed_reason` 으로 그대로 흘러간다."""
+    — 이 `detail` 은 API 응답 `detail` 과 `tn_ingest_run.failed_reason` 으로 그대로 흘러간다.
 
-    def __init__(self, detail: str):
+    응답 **상태 코드**를 옮겨 온 것이라면 `http_status` 로 그 코드를 함께 넘긴다. 「다음에 무엇을
+    하면 되나」(403 이면 IP 허용)를 아는 것은 코드이고, 그 문장을 세우는 곳은 `providers/failure.py`
+    한 곳이다 — 코드를 여기서 문장으로 눌러 버리면 그 조언이 화면까지 오지 못한다."""
+
+    def __init__(self, detail: str, *, http_status: int | None = None):
         self.detail = redact_secrets(detail)
+        self.http_status = http_status
         super().__init__(f"공급자 응답이 유효하지 않습니다: {self.detail}")
 
 

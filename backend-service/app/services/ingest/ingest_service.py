@@ -82,9 +82,12 @@ class IngestService:
             logger.warning(f"적재 잡 {run_id} 한도 소진 — 재개 지점 {exc.cursor}")
             return {"status": "rate_limited", "cursor": exc.cursor}
         except (ProviderKeyMissing, ProviderResponseInvalid, BadRequestError) as exc:
-            await self._finish(run_id, "failed", failed_reason=str(exc)[:1000])
+            # 우리 예외라고 그대로 적지 않는다 — 어댑터가 상태 코드를 옮겨 담은 사유는 무엇이
+            # 일어났는지에서 멈춘다(`공급자 응답이 유효하지 않습니다: Alpaca 응답 상태 403`).
+            reason = redact_secrets(describe_provider_failure(exc, source))[:1000]
+            await self._finish(run_id, "failed", failed_reason=reason)
             logger.warning(f"적재 잡 {run_id} 실패: {exc}")
-            return {"status": "failed", "failed_reason": str(exc)}
+            return {"status": "failed", "failed_reason": reason}
         except Exception as exc:  # noqa: BLE001 — 잡 하나의 실패가 워커를 죽이지 않게 한다
             logger.exception(f"INGEST_JOB_ERROR run_id={run_id} source={source}")
             # 어댑터가 변환하지 못하고 그대로 올라온 예외다. **원문을 화면에 싣지 않는다** —
