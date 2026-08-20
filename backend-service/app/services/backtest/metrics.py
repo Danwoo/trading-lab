@@ -407,24 +407,16 @@ def compute(
             )
         )
     else:
-        # 거래 수가 갈리면 두 세계는 **같은 매매를 한 것이 아니다.** 그 사실을 유도 문구가 말한다.
-        traded = len(trades)
-        costless_traded = costless_summary.get("trade_count")
-        same_trades = costless_traded == traded
+        # **판정 신호는 두 세계가 같다** — 전략은 현금을 보지 않는다(engine 의 ctx 에 현금·포지션이
+        # 없다). 갈리는 것은 체결 **수량**이고, 그래서 끝난 자산이 다르다. 거래 **건수**로 갈림을
+        # 말하는 분기는 지금 엔진에서 켜질 수 없어 두지 않는다 — 자금배분이 들어오는 날 다시 본다.
         out.append(
             Metric(
                 key="cost_gap_pct",
                 label="비용을 안 냈다면 (격차)",
                 value=costless_return - realized_return,
                 unit="p",
-                derived_from=(
-                    f"비용 0으로 다시 돌린 실행 {costless_return:.2f}% − 이 실행 {realized_return:.2f}%"
-                    + (
-                        ""
-                        if same_trades
-                        else f" (대조군은 거래가 {costless_traded}건, 이 실행은 {traded}건 — 비용이 체결 수량을 바꿔 같은 매매가 아니다)"
-                    )
-                ),
+                derived_from=f"비용 0으로 다시 돌린 실행 {costless_return:.2f}% − 이 실행 {realized_return:.2f}%",
             )
         )
 

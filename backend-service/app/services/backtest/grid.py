@@ -176,21 +176,32 @@ def run_grid(
                 initial_cash=initial_cash,
                 costs=costs,
             )
-            # 대조군. 같은 `rows` 를 다시 쓰므로 DB 를 한 번도 더 읽지 않는다
-            # (실측: 1,500봉 한 칸이 0.6ms — 두 번 도는 값이 무시할 만하다).
-            costless = run_single(
-                strategy=strategy,
-                params=params,
-                series=series,
-                rows=rows,
-                initial_cash=initial_cash,
-                costs=FREE_COSTS,
+            cells.append(
+                Cell(params=params, result=result, costless=_costless(strategy, params, series, rows, initial_cash))
             )
-            cells.append(Cell(params=params, result=result, costless=costless))
         except Exception as exc:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
             cells.append(Cell(params=params, result=RunResult(), failed_reason=str(exc)[:500]))
 
     return Grid(axes=axes, cells=cells, base_params=dict(base_params))
+
+
+def _costless(strategy: Strategy, params: dict, series: BarSeries, rows, initial_cash: float) -> RunResult | None:
+    """같은 조합을 **비용 0으로** 다시 돌린다. 같은 `rows` 를 재사용하므로 DB 를 더 읽지 않는다.
+
+    **대조군 사고가 이 칸을 죽이지 않는다.** 비용을 낸 세계의 결과는 이미 나왔고, 못 구한 것은
+    견줄 상대뿐이다 — 실패하면 `None` 을 주고 화면이 「모른다」로 답한다.
+    """
+    try:
+        return run_single(
+            strategy=strategy,
+            params=params,
+            series=series,
+            rows=rows,
+            initial_cash=initial_cash,
+            costs=FREE_COSTS,
+        )
+    except Exception:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
+        return None
 
 
 def axes_from_spec(param_specs: list[dict], sweep: dict[str, list]) -> tuple[Axis, ...]:

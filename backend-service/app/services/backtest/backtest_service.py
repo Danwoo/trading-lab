@@ -154,22 +154,16 @@ class BacktestService:
         )
 
         try:
+            # `rows()` 는 호출마다 행 지향 리스트를 새로 만드는 팩토리다 — **한 번 만들어 재사용한다**
+            # (engine.BarSeries.rows 가 호출자 책임으로 못박은 계약).
+            rows = series.rows()
             result = run_single(
                 strategy=strategy,
                 params=params,
                 series=series,
-                rows=series.rows(),
+                rows=rows,
                 initial_cash=float(args["initial_cash"]),
                 costs=costs,
-            )
-            costless = run_single(
-                strategy=strategy,
-                params=params,
-                series=series,
-                # `rows` 를 다시 만들지 않는다 — 대조군은 같은 캔들 위에서 돈다.
-                rows=series.rows(),
-                initial_cash=float(args["initial_cash"]),
-                costs=FREE_COSTS,
             )
             written = self._persist(run_id, result)
             self.backtest_repository.finish_run(
@@ -177,9 +171,9 @@ class BacktestService:
                     "run_id": run_id,
                     "status": "succeeded",
                     "failed_reason": None,
-                    "costless_summary": json.dumps(
-                        self._costless_summary(costless, float(args["initial_cash"])), ensure_ascii=False
-                    ),
+                    # **대조군 사고가 이 실행을 죽이지 않는다.** 비용을 낸 세계의 결과는 이미 나왔고,
+                    # 못 구한 것은 견줄 상대뿐이다 — `NULL` 이 「모른다」를 뜻하는 규약 그대로 둔다.
+                    "costless_summary": self._costless_json(strategy, params, series, rows, args),
                 }
             )
         except Exception as exc:  # noqa: BLE001
@@ -190,6 +184,22 @@ class BacktestService:
             raise
 
         return {"run_id": run_id, "status": "succeeded", **written}
+
+    def _costless_json(self, strategy, params: dict, series: BarSeries, rows, args: dict) -> str | None:
+        """대조군을 돌려 요약 JSON 을 만든다. 실패하면 `None` — 이 실행의 결과는 건드리지 않는다."""
+        initial_cash = float(args["initial_cash"])
+        try:
+            costless = run_single(
+                strategy=strategy,
+                params=params,
+                series=series,
+                rows=rows,
+                initial_cash=initial_cash,
+                costs=FREE_COSTS,
+            )
+        except Exception:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
+            return None
+        return json.dumps(self._costless_summary(costless, initial_cash), ensure_ascii=False)
 
     @staticmethod
     def _costless_summary(result: RunResult, initial_cash: float) -> dict:

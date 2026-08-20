@@ -184,25 +184,39 @@ function ratePercent(rate: number): string {
 /**
  * **이 성과가 무엇을 치르고 남은 것인가** — 비용 미반영 세계와 나란히 (SC-007).
  *
- * 나눗셈이 아니라 **다시 돌린 결과**다. 비용은 현금을 깎아 체결 수량 자체를 바꾸므로, 두 세계는
- * 거래 수부터 다를 수 있다 — 그 사실을 숨기면 「같은 매매를 했는데 비용만 다른 것」으로 읽힌다.
+ * 나눗셈이 아니라 **다시 돌린 결과**다. 판정 신호는 두 세계가 같지만(전략은 현금을 안 본다)
+ * 비용이 현금을 깎아 **체결 수량**이 달라지므로, 끝난 자산은 나눗셈으로 복원되지 않는다.
  */
-function CostComparison({ run, tradeCount }: { run: RunSummaryOut; tradeCount: number }) {
+function CostComparison({
+  run,
+  finalEquity,
+}: {
+  run: RunSummaryOut;
+  /** 이 실행이 실제로 끝낸 자산 — 자산곡선의 마지막 점. 없으면 그릴 것이 없다. */
+  finalEquity: number | null;
+}) {
   const twin = run.costless_summary;
 
   if (twin === null) {
+    // 아직 도는 실행은 **아직 안 채워진 것**이지 옛 실행이 아니다 — 재실행을 권하면 안 된다.
     return (
       <p className="break-keep text-2xs text-ink-muted">
-        비용 미반영 대비 격차 — 대조군을 돌리지 않은 옛 실행입니다. 다시 실행하면 채워집니다.
+        비용 미반영 대비 —{" "}
+        {run.status === "running" || run.status === "queued"
+          ? "실행이 끝나면 채워집니다."
+          : "대조군을 돌리지 않은 옛 실행입니다. 다시 실행하면 채워집니다."}
       </p>
     );
   }
+  if (finalEquity === null) {
+    return <p className="break-keep text-2xs text-ink-muted">비용 미반영 대비 — 자산곡선이 없어 견줄 수 없습니다.</p>;
+  }
 
-  const sameTrades = twin.trade_count === tradeCount;
+  const won = (value: number) => Math.round(value).toLocaleString("ko-KR");
   return (
     <table className="min-w-0 text-2xs">
       <caption className="break-keep pb-1 text-left text-2xs text-ink-muted">
-        비용 미반영 대비 — 같은 조합을 비용 0으로 다시 돌린 결과입니다
+        비용 미반영 대비 — 같은 조합을 비용 0으로 다시 돌린 결과입니다 (시작 자금 {won(run.initial_cash)}원)
       </caption>
       <thead>
         <tr className="text-ink-muted">
@@ -220,26 +234,17 @@ function CostComparison({ run, tradeCount }: { run: RunSummaryOut; tradeCount: n
           <th scope="row" className="pr-3 text-left font-normal text-ink-muted">
             끝난 자산
           </th>
-          <td className="pr-3 text-right tabular-nums">{Math.round(run.initial_cash).toLocaleString("ko-KR")} →</td>
-          <td className="text-right tabular-nums">{Math.round(twin.final_equity).toLocaleString("ko-KR")}</td>
+          <td className="pr-3 text-right tabular-nums">{won(finalEquity)}</td>
+          <td className="text-right tabular-nums">{won(twin.final_equity)}</td>
         </tr>
         <tr>
           <th scope="row" className="pr-3 text-left font-normal text-ink-muted">
-            거래 수
+            차이
           </th>
-          <td className="pr-3 text-right tabular-nums">{tradeCount}건</td>
-          <td className={cn("text-right tabular-nums", sameTrades ? "" : "text-danger")}>{twin.trade_count}건</td>
+          <td className="pr-3 text-right tabular-nums text-ink-muted">—</td>
+          <td className="text-right tabular-nums">{won(twin.final_equity - finalEquity)}</td>
         </tr>
       </tbody>
-      {!sameTrades && (
-        <tfoot>
-          <tr>
-            <td colSpan={3} className="break-keep pt-1 text-ink-muted">
-              거래 수가 다릅니다 — 비용이 현금을 깎아 체결 수량이 갈렸습니다. 같은 매매를 한 두 세계가 아닙니다.
-            </td>
-          </tr>
-        </tfoot>
-      )}
     </table>
   );
 }
@@ -289,7 +294,10 @@ export function RunReportView({ report }: { report: RunReportOut }) {
             <h3 className="break-keep text-sm font-ui text-ink-strong">판정 지표</h3>
             <MetricsList metrics={report.metrics} />
             <div className="mt-2 min-w-0 overflow-x-auto">
-              <CostComparison run={run} tradeCount={report.trades.length} />
+              <CostComparison
+                run={run}
+                finalEquity={report.equity.length > 0 ? report.equity[report.equity.length - 1].equity : null}
+              />
             </div>
             <p className="mt-1 break-keep text-2xs text-ink-muted">
               샤프는 무위험수익률 0 가정의 참고용입니다 — 순서가 곧 판정 순서입니다 (낙폭이 먼저).

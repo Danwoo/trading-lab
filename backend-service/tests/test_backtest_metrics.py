@@ -382,8 +382,8 @@ def test_cost_gap_is_the_rerun_difference() -> None:
     check("비용 격차", by_key(ms, "cost_gap_pct").value, 3.0, tol=1e-9)
 
 
-def test_cost_gap_says_when_the_two_worlds_traded_differently() -> None:
-    """거래 수가 갈리면 유도 문구가 그 사실을 말한다 — 같은 매매를 한 것이 아니다."""
+def test_cost_gap_derivation_names_both_worlds() -> None:
+    """유도 문구가 **두 수익률을 다 적는다** — 어디서 온 격차인지 화면이 그대로 읽는다."""
     ms = compute(
         equity_dt=dates(3),
         equity=[1000.0, 1020.0, 1050.0],
@@ -391,9 +391,11 @@ def test_cost_gap_says_when_the_two_worlds_traded_differently() -> None:
         round_trip_cost_rate=0.0,
         initial_cash=1000.0,
         sell_tax_rate=0.0018,
-        costless_summary={"final_equity": 1080.0, "return_pct": 8.0, "trade_count": 4},
+        costless_summary={"final_equity": 1080.0, "return_pct": 8.0, "trade_count": 1},
     )
-    check("체결이 갈린 것을 밝힌다", "같은 매매가 아니다" in (by_key(ms, "cost_gap_pct").derived_from or ""), True)
+    derived = by_key(ms, "cost_gap_pct").derived_from or ""
+    check("대조군 수익률을 적는다", "8.00%" in derived, True)
+    check("이 실행 수익률을 적는다", "5.00%" in derived, True)
 
 
 def test_old_run_without_twin_is_absent_not_zero() -> None:
