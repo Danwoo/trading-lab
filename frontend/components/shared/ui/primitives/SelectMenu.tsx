@@ -250,7 +250,9 @@ export function SelectMenu({
               // 포커스 표시는 globals.css 의 `:focus-visible` outline 한 자리가 정본이다.
               "flex w-full items-center justify-between gap-1 rounded border px-3 py-1.5 text-left text-sm text-ink",
               "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted",
-              readOnly ? "cursor-default bg-bg-raised" : "cursor-pointer bg-bg-panel",
+              // 채움은 `FIELD_INPUT_CLASS` 와 같은 규칙이다 — 기본은 `--bg-base`(입력을 담는
+              // 그릇이 안 쓰는 유일한 표면 토큰), 못 고치는 상태는 `--bg-raised`.
+              readOnly ? "cursor-default bg-bg-raised" : "cursor-pointer bg-bg-base",
               isInvalid ? "border-danger" : "border-line",
               clearVisible ? "pr-12" : "",
             )}
@@ -341,7 +343,7 @@ export function SelectMenu({
                   className={cn(
                     "flex cursor-pointer items-center gap-2 px-3 py-1.5",
                     // 목록이 `focus:outline-none` 으로 정본 outline 을 눌러 두므로, 키보드 위치는
-                    // **이 표시 하나뿐**이다. 바탕만으로는 `--bg-raised` on `--bg-panel` 1.35:1 이라
+                    // **이 표시 하나뿐**이다. 바탕만으로는 `--bg-raised` on `--bg-panel` 1.09:1 이라
                     // 눈에 안 띈다 — 비텍스트 3:1 을 넘는 선(`--ink-muted`)을 함께 두른다.
                     index === activeIndex ? "bg-bg-raised ring-1 ring-inset ring-ink-muted" : "",
                     isSelected ? "font-medium text-ink-strong" : "text-ink",

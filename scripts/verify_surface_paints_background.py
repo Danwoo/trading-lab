@@ -16,13 +16,19 @@
 `document.body` 라, 셸 `<div>` 에 건 선언이 닿지 않고 `:root`(다크)가 남는다. 그래서 흰
 다이얼로그 안의 공용 입력이 검은 상자가 됐다(이 PR 의 두 번째 판이 만든 반례).
 
-**검사 축 넷**:
+마지막 자리는 **바탕을 칠했는데 틀린 색으로 칠한** 것이다. 채움이 `--bg-panel` 이던 판에서
+`/bench` 격자 폼의 조작부가 그것을 담은 `BoardZone`(`--bg-panel`)과 **1.00:1** 이 됐다.
+축 ① 은 「바탕이 있는가」만 보므로 초록이었고, 대비 검사는 토큰 쌍만 보고 화면의 겹침을 몰라
+역시 초록이었다. 축 ⑤ 가 그 자리다.
+
+**검사 축 다섯**:
 
   ① 공용 입력 프리미티브(`components/shared/ui/**`)의 텍스트 입력 — 배경 토큰이 있어야 한다
   ② 전면을 덮는 자리(`h-screen`·`min-h-svh`·`h-[100dvh]` …) — 배경 토큰이 있어야 한다
   ③ 어두운 `.auth-backdrop` 안의 **밝은 카드** — `data-theme="light"` 를 선언해야 한다
   ④ **포털 안에서 바탕을 칠하는 박스** — `data-theme` 과 잉크 토큰을 스스로 가져야 한다
      (그 바탕이 `bg-white` 처럼 밝은 원시색이면 선언은 `light` 여야 한다 — 짝이 어긋나면 실패)
+  ⑤ 입력의 **기본 채움**이 그릇의 역할을 가진 토큰이면 안 된다 (`CONTAINER_ROLE_TOKENS`)
 
 축마다 검사 대상이 0건이면 실패한다. 면제는 **쓰이지 않으면 실패한다** — 낡은 예외가 조용히
 남아 있으면 그물이 무엇을 봐주는지 아무도 못 본다.
@@ -35,6 +41,15 @@
     때문이다. 같은 포털에 형제로 두 번째 바탕 트리를 두면 그 트리는 안 본다.
   - 클래스는 **소스에 그대로 적힌 문자열 리터럴**(따옴표·백틱)에서만 읽는다. 변수·헬퍼로 조립해
     넘기면(`const c = base + size`) 어느 축도 못 본다.
+  - 축 ④ 의 `data-theme` 판정은 **그 자리에 표현식이 있는가**까지다. `data-theme={x ?? undefined}`
+    처럼 런타임에 값이 없으면 속성을 아예 안 내보내는 형태도 「선언했다」로 읽는다
+    (`SelectMenu` 의 앵커가 그 형태이고, 그 자리에서는 그것이 의도한 동작이다). 속성이 실제로
+    붙는지는 브라우저에서만 확인된다.
+  - 축 ⑤ 는 **토큰의 역할**로 판정한다 — 담는 관계를 따라가지 않는다. 그래서 그릇이 역할표
+    밖의 색(원시 hex·새 토큰)을 쓰면 그 그릇과의 겹침은 못 본다. `CONTAINER_ROLE_TOKENS` 는
+    디자인 시스템 §1.1 의 역할표를 손으로 옮긴 것이라, 표가 바뀌면 여기도 따라가야 한다.
+  - 축 ⑤ 는 `SelectMenu` 의 **트리거 버튼**을 안 본다 — `<input>` 이 아니고 공유 상수도 안 쓰며,
+    채움이 `readOnly ? … : …` 삼항이라 「기본」이 문자열만으로는 안 갈린다.
 
     python3 scripts/verify_surface_paints_background.py
 """
@@ -100,6 +115,25 @@ PORTAL_TAG = re.compile(rf"<({ANY_TAG}Portal)\b")
 ALLOWED: dict[str, str] = {
     "components/features/Common/Auth/Login.tsx": "`.auth-backdrop` 이 globals.css 에서 칠한다",
 }
+
+#: **그릇의 역할을 가진 표면 토큰** — 디자인 시스템 §1.1 이 `--bg-panel` 에 「패널·사이드바·
+#: 상단바」를, `--bg-raised` 에 「hover·선택 행」을 적었다. 둘 다 **입력을 담는 쪽**의 역할이라,
+#: 입력의 기본 채움이 이 중 하나면 그 입력은 자기 그릇과 같은 색이 되는 자리가 반드시 생긴다.
+#: 실제로 그랬다 — 채움이 `bg-bg-panel` 이던 판에서 `/bench` 격자 폼의 조작부가 그것을 담은
+#: `BoardZone`(`bg-bg-panel`)과 1.00:1 이 됐고, 남는 단서는 `--line` 1.24:1 하나였다.
+#:
+#: 이 축이 **파일을 가로질러** 성립하는 이유: 담는 관계(`BoardZone` 은 `BoardZone.tsx`, 담기는
+#: 입력은 `GridRunForm.tsx`)를 정적으로 따라가는 대신, **토큰의 역할**로 판정하기 때문이다.
+#: 그릇 역할의 토큰을 입력이 기본 채움으로 쓰지 않으면 겹칠 그릇 자체가 없다.
+CONTAINER_ROLE_TOKENS = {
+    "bg-bg-panel": "디자인 시스템 §1.1 — 패널·사이드바·상단바",
+    "bg-bg-raised": "디자인 시스템 §1.1 — hover·선택 행",
+}
+
+#: 변형 접두사가 **없는** 배경 토큰 = 그 요소의 기본 상태 채움. `read-only:bg-bg-raised` 처럼
+#: 상태에 묶인 것은 기본 채움이 아니므로 축 ⑤ 의 대상이 아니다(그 상태에서는 「못 고치는 칸」이
+#: 그릇과 같은 색이어도 무방하다 — 오히려 배경에 잠기는 것이 의도다).
+DEFAULT_BG_TOKEN = re.compile(r"(?<![:\w-])bg-(bg-base|bg-panel|bg-raised)\b")
 
 SKIP_DIRS = {"node_modules", ".next", "dist", "build", "tests"}
 
@@ -178,6 +212,7 @@ def main() -> int:
 
     violations: list[str] = []
     shared_checked = 0
+    fill_checked = 0
     input_checked = 0
     surface_checked = 0
     card_checked = 0
@@ -202,6 +237,21 @@ def main() -> int:
                 violations.append(
                     f"{rel}: {name} 에 배경 토큰이 없습니다 — 입력칸이 브라우저 기본(흰색)으로 떨어집니다"
                 )
+            # ⑤ 그 채움이 **그릇의 토큰**이면 안 된다.
+            defaults = {match.group(0) for match in DEFAULT_BG_TOKEN.finditer(block.group(1))}
+            if len(defaults) > 1:
+                violations.append(
+                    f"{rel}: {name} 의 기본 채움이 {len(defaults)}개입니다({' · '.join(sorted(defaults))})"
+                    " — 어느 것이 기본인지 정할 수 없어 축 ⑤ 를 못 돌립니다 (fail-closed)"
+                )
+            for token in sorted(defaults):
+                fill_checked += 1
+                if token in CONTAINER_ROLE_TOKENS:
+                    violations.append(
+                        f"{rel}: {name} 의 기본 채움이 `{token}` 입니다"
+                        f" — 그릇의 역할을 가진 토큰입니다({CONTAINER_ROLE_TOKENS[token]})."
+                        " 그 그릇 안에 놓이면 입력이 자기 그릇과 같은 색(1.00:1)이 됩니다"
+                    )
 
     # ① 공용 프리미티브의 텍스트 입력 — 상수를 쓰든 직접 쓰든 바탕이 있어야 한다.
     #    상수만 보면 사본을 든 프리미티브가 사각지대로 남는다(실제로 TextBox 가 그랬다).
@@ -222,6 +272,15 @@ def main() -> int:
                         continue
                     input_checked += 1
                     if BG_TOKEN.search(element):
+                        # ⑤ 직접 칠하는 입력도 그릇의 토큰을 기본 채움으로 쓰면 안 된다.
+                        for match in DEFAULT_BG_TOKEN.finditer(element):
+                            fill_checked += 1
+                            if match.group(0) in CONTAINER_ROLE_TOKENS:
+                                violations.append(
+                                    f"{rel}:{line}: <{tag}> 의 기본 채움이 `{match.group(0)}` 입니다"
+                                    f" — 그릇의 역할을 가진 토큰입니다({CONTAINER_ROLE_TOKENS[match.group(0)]})."
+                                    " 그 그릇 안에 놓이면 입력이 자기 그릇과 같은 색(1.00:1)이 됩니다"
+                                )
                         continue
                     if uses_shared and "FIELD_INPUT_CLASS" in element:
                         continue
@@ -269,9 +328,24 @@ def main() -> int:
         for opening in PORTAL_TAG.finditer(text):
             portal_checked += 1
             name = opening.group(1)
-            closing = text.find(f"</{name}>", opening.end())
-            region = text[opening.end() : closing if closing != -1 else len(text)]
             base_line = text.count("\n", 0, opening.end()) + 1
+            # 닫는 태그를 못 찾으면 영역이 **파일 끝까지** 열려, 이 포털과 무관한 박스를 그
+            # 포털의 것으로 읽는다. 자기닫힘(`<XPortal />`)이거나 같은 이름이 중첩된 경우다 —
+            # 조용히 넓히지 말고 fail-closed 로 끝낸다.
+            closing = text.find(f"</{name}>", opening.end())
+            if closing == -1:
+                violations.append(
+                    f"{rel}:{base_line}: {name} 의 닫는 태그를 못 찾았습니다"
+                    " — 자기닫힘이거나 표식이 바뀌었습니다. 영역을 못 정하면 검사할 수 없습니다 (fail-closed)"
+                )
+                continue
+            if PORTAL_TAG.search(text, opening.end(), closing):
+                violations.append(
+                    f"{rel}:{base_line}: {name} 영역 안에 포털이 또 열립니다"
+                    " — 중첩된 포털은 영역 경계를 어긋나게 합니다 (fail-closed)"
+                )
+                continue
+            region = text[opening.end() : closing]
             painted = next(
                 (
                     (base_line + line - 1, element)
@@ -306,6 +380,7 @@ def main() -> int:
 
     print(
         f"공유 입력 클래스 {shared_checked}건 · 공용 입력 요소 {input_checked}건 · "
+        f"입력 기본 채움 {fill_checked}건 · "
         f"전면 서피스 {surface_checked}건 · 인증 라이트 카드 {card_checked}건 · "
         f"포털 {portal_checked}건(바탕 박스 {portal_box_checked}건) 검사"
         f" (frontend/**/*.tsx, 테스트·주석 제외 · 면제 {len(ALLOWED)}건)"
@@ -315,6 +390,7 @@ def main() -> int:
         name
         for name, count in (
             ("공유 입력 클래스", shared_checked),
+            ("입력 기본 채움", fill_checked),
             ("공용 입력 요소", input_checked),
             ("전면 서피스", surface_checked),
             ("인증 라이트 카드", card_checked),
