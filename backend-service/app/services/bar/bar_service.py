@@ -152,7 +152,9 @@ class BarService:
             **_unavailable_fields(None if rows else self._empty_unavailable(args, market, symbol, "daily_bar", "일봉")),
         }
 
-    def _fold_to_regular(self, market: str, instrument_id: int, rows: list[dict]) -> list[dict]:
+    def _fold_to_regular(
+        self, market: str, instrument_id: int, rows: list[dict], now: dt.datetime | None = None
+    ) -> list[dict]:
         """분봉이 덮는 날의 일봉을 **정규장 창으로 접어** 갈아 끼운다 (#255 리드 결정 A′).
 
         저장은 안 건드린다 — 소스 일봉은 그대로 두고 **물어볼 때** 접는다. 적재 시점에 접었다가
@@ -170,7 +172,9 @@ class BarService:
         if not rows:
             return rows
 
-        now = market_local_naive(market, dt.datetime.now(dt.UTC))
+        # 「지금」을 주입받는다 — 안 그러면 이 판정이 **도는 벽시계**에 매달려, 같은 코드가
+        # 시각에 따라 다르게 답한다(그물이 오후에만 붉어진다).
+        now = now if now is not None else market_local_naive(market, dt.datetime.now(dt.UTC))
         foldable: dict[str, tuple[dt.datetime, dt.datetime]] = {}
         for row in rows:
             day = dt.date.fromisoformat(str(row["time"]))
@@ -204,7 +208,20 @@ class BarService:
             if bar is None:
                 folded.append(row)
                 continue
-            folded.append({**row, **bar, "session_scope": "regular"})
+            # **출처는 값이 온 곳이다.** 접힌 봉의 값은 분봉에서 왔으므로 `source`·`adj_policy`·
+            # `ingested_at` 도 분봉 것이어야 한다 — 일봉 것을 남겨 두면 「toss 일봉」이라 말하면서
+            # 실제로는 sample 분봉을 접은 값을 줄 수 있다 (FR-019).
+            origin = by_day[row["time"]][0]
+            folded.append(
+                {
+                    **row,
+                    **bar,
+                    "source": origin.get("source"),
+                    "adj_policy": origin.get("adj_policy"),
+                    "ingested_at": origin.get("ingested_at"),
+                    "session_scope": "regular",
+                }
+            )
         return folded
 
     def select_minute_bar_list(self, args: dict) -> dict:
@@ -347,17 +364,36 @@ class BarService:
         }
 
 
+#: 접기 전에 요구하는 **가장자리 여유**. 개장 직후·폐장 직전 이 안에 분봉이 있어야 「그 날을
+#: 덮는다」로 본다.
+#:
+#: 개장·폐장 단일가 체결은 거래되는 종목이면 거의 항상 찍히므로 0분으로 둘 수도 있지만, 거래가
+#: 희박한 종목이 첫 몇 분을 건너뛰는 경우가 있어 여유를 준다. 반대로 크게 벌리면 **반쪽 적재를
+#: 통과시킨다** — 이 함수가 막아야 하는 것이 정확히 그것이다.
+EDGE_TOLERANCE_MIN = 5
+
+
 def fold_regular_session(minute_items: list[dict], bounds: tuple[dt.datetime, dt.datetime]) -> dict | None:
-    """그 날의 1분봉을 **정규장 창만** 접어 일봉 하나로 만든다. 창 안에 아무것도 없으면 `None`.
+    """그 날의 1분봉을 **정규장 창만** 접어 일봉 하나로 만든다. 그 날을 안 덮으면 `None`.
 
     소스 일봉이 08:01–20:00 을 덮는 종목이 있어(#255 실측: 표본 25종목 중 9종목) 그 종가로
     체결하면 **정규장에서 낼 수 없는 가격**이 된다. 창 밖 분봉을 버리는 것이 이 함수의 일이다.
 
     경계는 **양쪽 포함**이다 — 15:30 종가단일가 체결이 그 창의 마지막 값이라 빼면 종가가 바뀐다.
+
+    **「하나라도 있으면 접는다」가 아니다.** 반쪽만 적재된 날(임의 구간 적재·중단된 적재·조회
+    상한에 걸려 잘린 날)을 접으면 그 반쪽의 종가가 `regular` 라는 이름을 달고 백테스트의 체결가가
+    된다 — 이 함수가 존재하는 이유와 정면으로 어긋난다. 그래서 **가장자리가 닿는지**를 본다:
+    안 닿으면 `None` 을 주고, 부르는 쪽이 소스 값과 `unknown` 을 그대로 둔다.
     """
     start, end = bounds
     inside = [item for item in minute_items if start <= dt.datetime.fromisoformat(item["time"]) <= end]
     if not inside:
+        return None
+    margin = dt.timedelta(minutes=EDGE_TOLERANCE_MIN)
+    if dt.datetime.fromisoformat(inside[0]["time"]) > start + margin:
+        return None
+    if dt.datetime.fromisoformat(inside[-1]["time"]) < end - margin:
         return None
     volume = sum(int(item["volume"]) for item in inside)
     values = [item.get("trade_value") for item in inside]

@@ -97,6 +97,8 @@ def daily(day: str, close: float, scope: str = "unknown") -> dict:
 def main() -> int:
     #: 지난 거래일 — 세션이 확실히 끝난 날이라 「도는 세션」 축과 섞이지 않는다.
     past = "2026-08-19"
+    #: 「지금」의 고정값. 벽시계를 쓰면 이 그물이 돌린 시각에 따라 뒤집힌다.
+    after_close = dt.datetime.fromisoformat(f"{past}T16:00")
     bounds = session_bounds("KOSPI", dt.date.fromisoformat(past))
     check("지난 거래일의 경계를 안다", bounds is not None, True)
 
@@ -116,29 +118,60 @@ def main() -> int:
     check("거래량은 창 안 합", bar["volume"], 30)
     check("창 밖 999 가 안 샌다", 999 in (bar["high"], bar["low"], bar["close"]), False)
 
-    # 거래대금은 하나라도 모르면 지어내지 않는다
-    partial = [dict(minutes[1]), dict(minutes[2])]
+    # 거래대금은 하나라도 모르면 지어내지 않는다 (가장자리는 닿는 온전한 하루로 잰다)
+    partial = [dict(item) for item in minutes[1:4]]
     partial[0]["trade_value"] = None
     check("거래대금 일부 결측 → None", fold_regular_session(partial, bounds)["trade_value"], None)
 
-    # ② 세션이 안 끝난 날은 안 접는다 — 오늘을 넣어 확인한다
-    today = dt.date.today().isoformat()
-    svc, repo = service([minute(today, "09:00", o=1, h=1, low=1, c=1)])
-    out = svc._fold_to_regular("KOSPI", 7, [daily(today, 500.0)])
-    check("도는 세션은 안 접힌다", out[0]["close"], 500.0)
-    check("도는 세션은 unknown 그대로", out[0]["session_scope"], "unknown")
+    # ② 세션이 안 끝난 날은 안 접는다
+    #
+    # **「지금」을 고정값으로 준다.** 벽시계(`dt.date.today()`)에 매달면 이 축이 돌린 시각에 따라
+    # 뒤집힌다 — CI 러너는 UTC 라 06:30Z 뒤에는 KST 15:30 을 넘겨 「안 접힘」 단언이 깨진다.
+    # 주말에 돌리면 `session_bounds` 가 `None` 이라 **아무것도 재지 않은 채** 통과한다.
+    full_day = [minute(past, "09:00", o=1, h=1, low=1, c=1), minute(past, "15:30", o=2, h=2, low=2, c=2)]
+    for label, when, expect_close, expect_scope in (
+        ("장중", dt.datetime.fromisoformat(f"{past}T12:00"), 500.0, "unknown"),
+        ("폐장 직전", dt.datetime.fromisoformat(f"{past}T15:29"), 500.0, "unknown"),
+        ("폐장 직후", dt.datetime.fromisoformat(f"{past}T15:31"), 2, "regular"),
+    ):
+        svc, _ = service(full_day)
+        out = svc._fold_to_regular("KOSPI", 7, [daily(past, 500.0)], now=when)
+        check(f"{label}: 종가", out[0]["close"], expect_close)
+        check(f"{label}: 구간 표기", out[0]["session_scope"], expect_scope)
 
     # ③ 세션 경계를 못 믿는 날(수능)은 안 접는다
     csat = sorted(unreliable_bounds("KOSPI"))[-1].isoformat()
     check("수능일은 경계를 안 준다", session_bounds("KOSPI", dt.date.fromisoformat(csat)), None)
     svc, repo = service([minute(csat, "10:00", o=1, h=1, low=1, c=1)])
-    out = svc._fold_to_regular("KOSPI", 7, [daily(csat, 700.0)])
+    out = svc._fold_to_regular("KOSPI", 7, [daily(csat, 700.0)], now=after_close)
     check("수능일은 안 접힌다", out[0]["close"], 700.0)
     check("수능일에는 분봉을 읽지도 않는다", repo.calls, [])
 
+    # ②-b 반쪽만 적재된 날은 안 접는다 — 「하나라도 있으면 접는다」가 이 그물의 존재 이유를 뚫는다
+    for label, mins in (
+        (
+            "앞부분만(09:00~11:00)",
+            [minute(past, "09:00", o=1, h=1, low=1, c=1), minute(past, "11:00", o=9, h=9, low=9, c=9)],
+        ),
+        (
+            "뒷부분만(13:00~15:30)",
+            [minute(past, "13:00", o=1, h=1, low=1, c=1), minute(past, "15:30", o=9, h=9, low=9, c=9)],
+        ),
+        ("가운데 한 건만", [minute(past, "12:00", o=9, h=9, low=9, c=9)]),
+    ):
+        svc, _ = service(mins)
+        out = svc._fold_to_regular("KOSPI", 7, [daily(past, 400.0)], now=after_close)
+        check(f"반쪽 적재({label})는 안 접힌다", out[0]["close"], 400.0)
+        check(f"반쪽 적재({label})는 unknown", out[0]["session_scope"], "unknown")
+
+    # ②-c 접힌 봉은 **값이 온 곳**을 출처로 말한다 — 일봉 출처를 남기면 거짓이 된다
+    svc, _ = service([dict(m, source="sample", adj_policy="raw") for m in full_day])
+    out = svc._fold_to_regular("KOSPI", 7, [daily(past, 500.0)], now=after_close)
+    check("접힌 봉의 출처는 분봉 것", out[0]["source"], "sample")
+
     # ④ 분봉이 없는 날은 소스 값 그대로
     svc, repo = service([])
-    out = svc._fold_to_regular("KOSPI", 7, [daily(past, 300.0)])
+    out = svc._fold_to_regular("KOSPI", 7, [daily(past, 300.0)], now=after_close)
     check("분봉 0건이면 소스 값", out[0]["close"], 300.0)
     check("분봉 0건이면 unknown 그대로", out[0]["session_scope"], "unknown")
 
@@ -154,7 +187,7 @@ def main() -> int:
     check("섞이면 mixed", BarService._session_scope(out), "mixed")
 
     print(f"검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과")
-    if CHECKED < 18:
+    if CHECKED < 30:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:
