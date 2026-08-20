@@ -32,7 +32,7 @@ export const ROADMAP_URL = "https://github.com/Danwoo/trading-lab/blob/main/ROAD
 export const PRODUCT_STAGES: readonly ProductStage[] = [
   { id: "build", label: "봇 만들기", state: "now" },
   { id: "load", label: "시세 적재", state: "now" },
-  { id: "verify", label: "과거로 검증", state: "next", note: "백테스트 엔진이 격자·곡선을 채웁니다" },
+  { id: "verify", label: "과거로 검증", state: "now", note: "격자를 돌리면 조합마다 곡선·지표·거래가 남습니다" },
   { id: "paper", label: "모의계좌 주문", state: "next", note: "모의·실계좌가 같은 API 인 증권사부터" },
   { id: "live", label: "실주문 승격", state: "later", note: "백테스트·검증을 통과한 전략만" },
   {

@@ -122,6 +122,14 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
     expect(zone.textContent).not.toContain("READONLY");
   });
 
+  it("제품이 없다고 말하는 것은 실제로 없는 것뿐이다 — 백테스트는 왔다", async () => {
+    render(<BenchPage />);
+
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("검증(백테스트)과 굴리기(주문)는 아직 없습니다");
+    expect(text).toContain("과거 데이터로 검증하는 자리입니다");
+  });
+
   it("길을 둘 준다 — 「봇 만들기」와 「에이전트에게 맡기기」 (§21.4)", () => {
     render(<BenchPage />);
 
