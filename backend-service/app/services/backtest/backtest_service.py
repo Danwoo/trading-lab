@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 from core.exceptions import BadRequestError, NotFoundError
 from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, quantize, run_single
-from services.backtest.grid import axes_from_spec, run_grid
+from services.backtest.grid import FREE_COSTS, axes_from_spec, run_grid
 from services.backtest.metrics import compute
 
 # 스펙 §8.5.1 — 위탁수수료 0.15% 는 **10배 오차**였고 그 오차가 "연 비용 원금의 145%" 경고를
@@ -162,16 +162,48 @@ class BacktestService:
                 initial_cash=float(args["initial_cash"]),
                 costs=costs,
             )
+            costless = run_single(
+                strategy=strategy,
+                params=params,
+                series=series,
+                # `rows` 를 다시 만들지 않는다 — 대조군은 같은 캔들 위에서 돈다.
+                rows=series.rows(),
+                initial_cash=float(args["initial_cash"]),
+                costs=FREE_COSTS,
+            )
             written = self._persist(run_id, result)
-            self.backtest_repository.finish_run({"run_id": run_id, "status": "succeeded", "failed_reason": None})
+            self.backtest_repository.finish_run(
+                {
+                    "run_id": run_id,
+                    "status": "succeeded",
+                    "failed_reason": None,
+                    "costless_summary": json.dumps(
+                        self._costless_summary(costless, float(args["initial_cash"])), ensure_ascii=False
+                    ),
+                }
+            )
         except Exception as exc:  # noqa: BLE001
             # 실패도 남긴다 — 「돌렸는데 아무것도 없다」와 「실패했다」는 다른 상태다.
             self.backtest_repository.finish_run(
-                {"run_id": run_id, "status": "failed", "failed_reason": str(exc)[:1000]}
+                {"run_id": run_id, "status": "failed", "failed_reason": str(exc)[:1000], "costless_summary": None}
             )
             raise
 
         return {"run_id": run_id, "status": "succeeded", **written}
+
+    @staticmethod
+    def _costless_summary(result: RunResult, initial_cash: float) -> dict:
+        """대조군(비용 0) 실행의 요약 — 화면이 「미반영」 쪽 열에 쓰는 값.
+
+        **거래 수를 함께 남긴다.** 비용은 현금을 깎아 체결 수량을 바꾸므로, 두 세계의 거래 수가
+        다를 수 있다. 그 차이를 숨기면 「같은 매매를 했는데 비용만 다른 것」처럼 읽힌다.
+        """
+        final_equity = result.equity[-1].equity if result.equity else initial_cash
+        return {
+            "final_equity": round(final_equity, 4),
+            "return_pct": round((final_equity - initial_cash) / initial_cash * 100, 6) if initial_cash > 0 else None,
+            "trade_count": len(result.trades),
+        }
 
     def _persist(self, run_id: int, result: RunResult) -> dict:
         """엔진 산출물을 네 테이블 + 현금 원장에 넣는다."""
@@ -301,6 +333,14 @@ class BacktestService:
                         "run_id": run_id,
                         "status": "succeeded" if failed_reason is None else "failed",
                         "failed_reason": failed_reason,
+                        "costless_summary": (
+                            json.dumps(
+                                self._costless_summary(cell.costless, float(args["initial_cash"])),
+                                ensure_ascii=False,
+                            )
+                            if failed_reason is None and cell.costless is not None
+                            else None
+                        ),
                     }
                 )
             except Exception as exc:  # noqa: BLE001
@@ -499,6 +539,7 @@ class BacktestService:
             round_trip_cost_rate=round_trip,
             initial_cash=float(run["initial_cash"]),
             sell_tax_rate=float(costs.get("sell_tax_rate") or 0),
+            costless_summary=run.get("costless_summary"),
         )
 
         return {
@@ -516,6 +557,7 @@ class BacktestService:
                 "period_from": str(run["period_from"]),
                 "period_to": str(run["period_to"]),
                 "initial_cash": float(run["initial_cash"]),
+                "costless_summary": run.get("costless_summary"),
                 "status": run["status"],
                 "failed_reason": run["failed_reason"],
                 "finished_dt": str(run["finished_dt"]) if run["finished_dt"] else None,

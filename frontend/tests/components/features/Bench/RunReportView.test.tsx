@@ -44,6 +44,7 @@ function report(overrides: Partial<RunReportOut> = {}): RunReportOut {
       period_from: "2026-01-02",
       period_to: "2026-03-31",
       initial_cash: 1000000,
+      costless_summary: { final_equity: 1080000, return_pct: 8, trade_count: 3 },
       status: "succeeded",
       failed_reason: null,
       finished_dt: null,
@@ -161,6 +162,34 @@ describe("RunReportView", () => {
     render(<RunReportView report={noCosts} />);
 
     expect(document.body.textContent ?? "").toContain("비용 가정 — 기록되지 않았습니다");
+  });
+
+  it("비용 미반영 세계를 나란히 놓는다 — 격차가 수치로 보인다 (SC-007)", () => {
+    render(<RunReportView report={report()} />);
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("비용 미반영 대비");
+    expect(text).toContain("1,080,000");
+    expect(text).toContain("반영");
+    expect(text).toContain("미반영");
+  });
+
+  it("거래 수가 갈리면 「같은 매매가 아니다」를 말한다", () => {
+    const diverged = report();
+    diverged.run = { ...diverged.run, costless_summary: { final_equity: 1080000, return_pct: 8, trade_count: 9 } };
+    render(<RunReportView report={diverged} />);
+
+    expect(document.body.textContent ?? "").toContain("거래 수가 다릅니다");
+  });
+
+  it("대조군이 없는 옛 실행은 격차 0인 척하지 않는다", () => {
+    const old = report();
+    old.run = { ...old.run, costless_summary: null };
+    render(<RunReportView report={old} />);
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("대조군을 돌리지 않은 옛 실행입니다");
+    expect(text).not.toContain("미반영 대비 —");
   });
 
   it("실패한 실행은 지표를 지어내지 않고 사유를 낸다", () => {

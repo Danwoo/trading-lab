@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createEquityChart, type EquityChartHandle, type EquityChartPoint } from "@/lib/bench/equityChart";
 import { downsampleLttb, drawdownRatios } from "@/lib/bench/equityMath";
-import type { MetricOut, RunReportOut, TradeOut } from "@/schemas/backtest/backtest";
+import type { MetricOut, RunReportOut, RunSummaryOut, TradeOut } from "@/schemas/backtest/backtest";
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { redactReason } from "@/utils/common/errors/redactReason";
 
@@ -182,6 +182,69 @@ function ratePercent(rate: number): string {
 }
 
 /**
+ * **이 성과가 무엇을 치르고 남은 것인가** — 비용 미반영 세계와 나란히 (SC-007).
+ *
+ * 나눗셈이 아니라 **다시 돌린 결과**다. 비용은 현금을 깎아 체결 수량 자체를 바꾸므로, 두 세계는
+ * 거래 수부터 다를 수 있다 — 그 사실을 숨기면 「같은 매매를 했는데 비용만 다른 것」으로 읽힌다.
+ */
+function CostComparison({ run, tradeCount }: { run: RunSummaryOut; tradeCount: number }) {
+  const twin = run.costless_summary;
+
+  if (twin === null) {
+    return (
+      <p className="break-keep text-2xs text-ink-muted">
+        비용 미반영 대비 격차 — 대조군을 돌리지 않은 옛 실행입니다. 다시 실행하면 채워집니다.
+      </p>
+    );
+  }
+
+  const sameTrades = twin.trade_count === tradeCount;
+  return (
+    <table className="min-w-0 text-2xs">
+      <caption className="break-keep pb-1 text-left text-2xs text-ink-muted">
+        비용 미반영 대비 — 같은 조합을 비용 0으로 다시 돌린 결과입니다
+      </caption>
+      <thead>
+        <tr className="text-ink-muted">
+          <th scope="col" className="pr-3 text-left font-normal" />
+          <th scope="col" className="pr-3 text-right font-normal">
+            반영
+          </th>
+          <th scope="col" className="text-right font-normal">
+            미반영
+          </th>
+        </tr>
+      </thead>
+      <tbody className="text-ink">
+        <tr>
+          <th scope="row" className="pr-3 text-left font-normal text-ink-muted">
+            끝난 자산
+          </th>
+          <td className="pr-3 text-right tabular-nums">{Math.round(run.initial_cash).toLocaleString("ko-KR")} →</td>
+          <td className="text-right tabular-nums">{Math.round(twin.final_equity).toLocaleString("ko-KR")}</td>
+        </tr>
+        <tr>
+          <th scope="row" className="pr-3 text-left font-normal text-ink-muted">
+            거래 수
+          </th>
+          <td className="pr-3 text-right tabular-nums">{tradeCount}건</td>
+          <td className={cn("text-right tabular-nums", sameTrades ? "" : "text-danger")}>{twin.trade_count}건</td>
+        </tr>
+      </tbody>
+      {!sameTrades && (
+        <tfoot>
+          <tr>
+            <td colSpan={3} className="break-keep pt-1 text-ink-muted">
+              거래 수가 다릅니다 — 비용이 현금을 깎아 체결 수량이 갈렸습니다. 같은 매매를 한 두 세계가 아닙니다.
+            </td>
+          </tr>
+        </tfoot>
+      )}
+    </table>
+  );
+}
+
+/**
  * 격자에서 고른 한 조합의 리포트 (#203) — 곡선·낙폭, 판정 지표, 거래목록이 **그 조합으로**
  * 바뀌는 자리다 (전파 규칙 §2.3).
  */
@@ -225,6 +288,9 @@ export function RunReportView({ report }: { report: RunReportOut }) {
           <section aria-label="판정 지표" className="min-w-0">
             <h3 className="break-keep text-sm font-ui text-ink-strong">판정 지표</h3>
             <MetricsList metrics={report.metrics} />
+            <div className="mt-2 min-w-0 overflow-x-auto">
+              <CostComparison run={run} tradeCount={report.trades.length} />
+            </div>
             <p className="mt-1 break-keep text-2xs text-ink-muted">
               샤프는 무위험수익률 0 가정의 참고용입니다 — 순서가 곧 판정 순서입니다 (낙폭이 먼저).
             </p>

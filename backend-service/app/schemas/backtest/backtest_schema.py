@@ -130,6 +130,9 @@ class RunSummaryOut(BaseModel):
     period_from: str
     period_to: str
     initial_cash: float
+    #: 같은 조합을 비용 0으로 다시 돌린 요약. `None` 은 「격차 0」이 아니라 **대조군을 안 돌린
+    #: 옛 실행**이다 — 화면이 그 둘을 갈라 말한다 (SC-007).
+    costless_summary: dict[str, Any] | None
     status: str
     failed_reason: str | None
     finished_dt: str | None

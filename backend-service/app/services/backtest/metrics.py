@@ -151,6 +151,7 @@ def compute(
     round_trip_cost_rate: float,
     initial_cash: float,
     sell_tax_rate: float,
+    costless_summary: dict | None,
 ) -> list[Metric]:
     """스펙 D-Q2 의 순서대로 지표를 낸다.
 
@@ -158,6 +159,7 @@ def compute(
     슬리피지 + 증권거래세)로, 「거래당 평균 수익이 비용을 먹고도 남나」를 답하는 데 쓴다.
     `initial_cash`·`sell_tax_rate` 는 비용 지표가 무엇으로 나누고 무엇을 기록으로 인정할지를
     가른다 — 기본값을 두지 않는 것은 안 넘기면 조용히 틀린 값이 나오기 때문이다.
+    `costless_summary` 는 같은 조합을 비용 0으로 다시 돌린 결과다(없으면 `None`).
     """
     out: list[Metric] = []
 
@@ -374,6 +376,57 @@ def compute(
                     absent_reason="시작 자금이 0 이하라 나눌 수 없습니다",
                 )
             )
+
+    # ── 미반영 대비 격차 — **차별화 축 1** (SC-007) ─────────────────────
+    #
+    # 제품 정의 §6 SC-007: 「비용·제약 미반영 vs 반영 격차를 **수치로 나란히**」. 치른 비용 한 값은
+    # 그 격차가 아니다 — 비용은 현금을 깎아 **체결 수량 자체를 바꾸므로**, 나눗셈으로 흉내내면
+    # 거래 수가 다른 두 세계를 같은 세계인 척하게 된다. 그래서 대조군을 실제로 돌린 값을 쓴다.
+    realized_return = (equity[-1] - initial_cash) / initial_cash * 100 if initial_cash > 0 else None
+    costless_return = (costless_summary or {}).get("return_pct")
+    if costless_summary is None:
+        out.append(
+            Metric(
+                key="cost_gap_pct",
+                label="비용을 안 냈다면 (격차)",
+                value=None,
+                unit="p",
+                derived_from="비용 0으로 다시 돌린 실행의 수익률 − 이 실행의 수익률",
+                absent_reason="대조군을 돌리지 않은 옛 실행입니다 — 다시 실행하면 채워집니다",
+            )
+        )
+    elif costless_return is None or realized_return is None:
+        out.append(
+            Metric(
+                key="cost_gap_pct",
+                label="비용을 안 냈다면 (격차)",
+                value=None,
+                unit="p",
+                derived_from="비용 0으로 다시 돌린 실행의 수익률 − 이 실행의 수익률",
+                absent_reason="시작 자금이 0 이하라 수익률을 낼 수 없습니다",
+            )
+        )
+    else:
+        # 거래 수가 갈리면 두 세계는 **같은 매매를 한 것이 아니다.** 그 사실을 유도 문구가 말한다.
+        traded = len(trades)
+        costless_traded = costless_summary.get("trade_count")
+        same_trades = costless_traded == traded
+        out.append(
+            Metric(
+                key="cost_gap_pct",
+                label="비용을 안 냈다면 (격차)",
+                value=costless_return - realized_return,
+                unit="p",
+                derived_from=(
+                    f"비용 0으로 다시 돌린 실행 {costless_return:.2f}% − 이 실행 {realized_return:.2f}%"
+                    + (
+                        ""
+                        if same_trades
+                        else f" (대조군은 거래가 {costless_traded}건, 이 실행은 {traded}건 — 비용이 체결 수량을 바꿔 같은 매매가 아니다)"
+                    )
+                ),
+            )
+        )
 
     # ── 5급: 샤프 (참고용) ────────────────────────────────────────────
     # 무위험수익률은 0 고정이고 화면이 그 사실을 밝힌다 (스펙 D-Q2).

@@ -61,6 +61,7 @@ EXPECTED: dict[str, set[str]] = {
         "period_from",
         "period_to",
         "initial_cash",
+        "costless_summary",
         "status",
     },
     "tn_backtest_equity": {"run_id", "dt", "equity", "cash", "position_count", "gross_exposure"},

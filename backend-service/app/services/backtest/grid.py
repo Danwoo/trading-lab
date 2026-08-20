@@ -36,6 +36,9 @@ from itertools import product
 
 from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, run_single
 
+#: 대조군의 비용 — **미반영 세계**. 이 하나가 SC-007 「반영 vs 미반영을 나란히」의 다른 한쪽이다.
+FREE_COSTS = CostModel(fee_rate=0.0, slippage_rate=0.0, sell_tax_rate=0.0)
+
 # 한 번에 도는 조합 수 상한. 스펙 §5 의 예산(실행·전체 재계산 >10s 는 완료 예상 표시)을
 # 넘지 않게 하는 안전핀이지, 성능 목표가 아니다. 넘으면 **조용히 자르지 않고** 던진다 —
 # 「전부 돌려봤다」고 말할 수 없는 결과를 그렇게 말하는 것이 §8.5.2 의 자기모순이다.
@@ -74,6 +77,9 @@ class Cell:
     params: dict
     result: RunResult
     failed_reason: str | None = None
+    #: 같은 조합을 **비용 0으로 다시 돌린** 결과. 「비용을 안 냈다면 얼마였나」를 나눗셈으로
+    #: 흉내내면 틀린다 — 비용이 현금을 깎아 체결 수량 자체가 달라지므로, 거래 수까지 갈린다.
+    costless: RunResult | None = None
 
     @property
     def ok(self) -> bool:
@@ -170,7 +176,17 @@ def run_grid(
                 initial_cash=initial_cash,
                 costs=costs,
             )
-            cells.append(Cell(params=params, result=result))
+            # 대조군. 같은 `rows` 를 다시 쓰므로 DB 를 한 번도 더 읽지 않는다
+            # (실측: 1,500봉 한 칸이 0.6ms — 두 번 도는 값이 무시할 만하다).
+            costless = run_single(
+                strategy=strategy,
+                params=params,
+                series=series,
+                rows=rows,
+                initial_cash=initial_cash,
+                costs=FREE_COSTS,
+            )
+            cells.append(Cell(params=params, result=result, costless=costless))
         except Exception as exc:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
             cells.append(Cell(params=params, result=RunResult(), failed_reason=str(exc)[:500]))
 
