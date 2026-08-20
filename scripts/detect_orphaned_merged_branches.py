@@ -42,24 +42,18 @@ class Candidate:
     head_ref: str
     base_ref: str
     merged_at: str
-    orphan_commits: list[tuple[str, str]] = field(
-        default_factory=list
-    )  # (sha, subject)
+    orphan_commits: list[tuple[str, str]] = field(default_factory=list)  # (sha, subject)
 
 
 def _run(cmd: list[str]) -> str:
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:
-        raise RuntimeError(
-            f"명령 실패({result.returncode}): {' '.join(cmd)}\n{result.stderr}"
-        )
+        raise RuntimeError(f"명령 실패({result.returncode}): {' '.join(cmd)}\n{result.stderr}")
     return result.stdout
 
 
 def _infer_repo() -> str:
-    out = _run(
-        ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]
-    )
+    out = _run(["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
     return out.strip()
 
 
@@ -146,17 +140,11 @@ def find_candidates(repo: str, limit: int) -> tuple[list[dict], list[Candidate]]
 def _format_report(repo: str, examined: int, candidates: list[Candidate]) -> str:
     lines = [f"검사한 머지 PR: {examined}건 (레포: {repo})"]
     if not candidates:
-        lines.append(
-            "후보 0건 — 위 {}건을 전부 살펴봤고 고립 신호가 없었다.".format(examined)
-        )
+        lines.append(f"후보 0건 — 위 {examined}건을 전부 살펴봤고 고립 신호가 없었다.")
         return "\n".join(lines)
-    lines.append(
-        f"후보 {len(candidates)}건 — 브랜치 내용이 다른 경로로 이미 착륙했는지는 사람이 확인해야 한다:"
-    )
+    lines.append(f"후보 {len(candidates)}건 — 브랜치 내용이 다른 경로로 이미 착륙했는지는 사람이 확인해야 한다:")
     for c in candidates:
-        lines.append(
-            f"\n  PR #{c.pr_number} — head={c.head_ref} (base={c.base_ref}, merged={c.merged_at})"
-        )
+        lines.append(f"\n  PR #{c.pr_number} — head={c.head_ref} (base={c.base_ref}, merged={c.merged_at})")
         lines.append(f"    머지 후 이 브랜치에 커밋 {len(c.orphan_commits)}개:")
         for sha, subject in c.orphan_commits:
             lines.append(f"      {sha[:9]}  {subject}")
@@ -164,15 +152,9 @@ def _format_report(repo: str, examined: int, candidates: list[Candidate]) -> str
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument(
-        "--repo", default=None, help="OWNER/NAME (생략 시 gh repo view 로 추론)"
-    )
-    parser.add_argument(
-        "--limit", type=int, default=300, help="조회할 머지 PR 최대 개수 (기본 300)"
-    )
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--repo", default=None, help="OWNER/NAME (생략 시 gh repo view 로 추론)")
+    parser.add_argument("--limit", type=int, default=300, help="조회할 머지 PR 최대 개수 (기본 300)")
     args = parser.parse_args()
 
     repo = args.repo or _infer_repo()

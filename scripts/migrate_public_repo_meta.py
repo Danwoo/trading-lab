@@ -102,9 +102,7 @@ class GhError(RuntimeError):
 
 
 def gh(*args: str, check: bool = True) -> str:
-    result = subprocess.run(
-        ["gh", *args], cwd=REPO_ROOT, capture_output=True, text=True, check=False
-    )
+    result = subprocess.run(["gh", *args], cwd=REPO_ROOT, capture_output=True, text=True, check=False)
     if check and result.returncode != 0:
         raise GhError(f"gh {' '.join(args)} 실패: {result.stderr.strip()}")
     return result.stdout
@@ -210,9 +208,7 @@ def target_migrated_markers(target: str) -> dict[str, int]:
 
 
 # ── 이관 ─────────────────────────────────────────────────────────────────────
-def migrate_labels(
-    source: str, target: str, execute: bool
-) -> tuple[int, int, int, int]:
+def migrate_labels(source: str, target: str, execute: bool) -> tuple[int, int, int, int]:
     """(조회, 생성, 갱신, 그대로)."""
     wanted = source_labels(source)
     existing = target_labels(target)
@@ -238,10 +234,7 @@ def migrate_labels(
                     "-f",
                     f"description={description}",
                 )
-        elif (
-            current["color"] != color
-            or (current.get("description") or "") != description
-        ):
+        elif current["color"] != color or (current.get("description") or "") != description:
             print(f"  ~ 라벨 갱신  {name}  #{current['color']} → #{color}")
             updated += 1
             if execute:
@@ -262,9 +255,7 @@ def migrate_labels(
     return len(wanted), created, updated, same
 
 
-def migrate_milestones(
-    source: str, target: str, execute: bool
-) -> tuple[int, int, int, dict[str, int]]:
+def migrate_milestones(source: str, target: str, execute: bool) -> tuple[int, int, int, dict[str, int]]:
     """(조회, 생성, 그대로, 제목→대상 번호 대조표).
 
     드라이런에서는 새로 만들 마일스톤의 대상 번호를 알 수 없다. 그 자리는 대조표에서 빼고
@@ -332,11 +323,7 @@ def migrate_issues(
         shown = (
             f"마일스톤 {milestone}"
             if milestone and target_milestone
-            else (
-                f"마일스톤 {milestone} (드라이런 — 대상 번호 미정)"
-                if milestone
-                else "마일스톤 없음"
-            )
+            else (f"마일스톤 {milestone} (드라이런 — 대상 번호 미정)" if milestone else "마일스톤 없음")
         )
         print(f"  + 이슈 생성  #{number} {issue['title'][:60]}")
         print(f"      라벨 {len(labels)}개 · {shown}")
@@ -368,9 +355,7 @@ def migrate_issues(
     return len(issues), created, skipped, mapping
 
 
-def close_source_issues(
-    source: str, issues: list[dict], target: str, execute: bool
-) -> int:
+def close_source_issues(source: str, issues: list[dict], target: str, execute: bool) -> int:
     closed = 0
     for issue in issues:
         number = issue["number"]
@@ -391,19 +376,11 @@ def close_source_issues(
 
 # ── 본체 ─────────────────────────────────────────────────────────────────────
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="공개 레포 이사 — 라벨·마일스톤·열린 이슈를 옮긴다"
-    )
+    parser = argparse.ArgumentParser(description="공개 레포 이사 — 라벨·마일스톤·열린 이슈를 옮긴다")
     parser.add_argument("--target", required=True, help="대상 레포 `owner/repo` (필수)")
-    parser.add_argument(
-        "--source", default=None, help="출처 레포 `owner/repo` (기본: 이 레포)"
-    )
-    parser.add_argument(
-        "--execute", action="store_true", help="실제로 만든다 (기본은 드라이런)"
-    )
-    parser.add_argument(
-        "--include-closed", action="store_true", help="닫힌 이슈도 옮긴다 (기본 꺼짐)"
-    )
+    parser.add_argument("--source", default=None, help="출처 레포 `owner/repo` (기본: 이 레포)")
+    parser.add_argument("--execute", action="store_true", help="실제로 만든다 (기본은 드라이런)")
+    parser.add_argument("--include-closed", action="store_true", help="닫힌 이슈도 옮긴다 (기본 꺼짐)")
     parser.add_argument(
         "--allow-no-issues",
         action="store_true",
@@ -416,55 +393,39 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    source = (
-        args.source
-        or gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip()
-    )
+    source = args.source or gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip()
     if not source:
         return fail("출처 레포를 판정할 수 없다 — `--source owner/repo` 로 명시하라")
     if source == args.target:
         return fail(f"출처와 대상이 같다 ({source}) — 자기 자신으로 이사할 수 없다")
 
-    mode = (
-        "실행 (실제로 만든다)" if args.execute else "드라이런 (아무것도 만들지 않는다)"
-    )
+    mode = "실행 (실제로 만든다)" if args.execute else "드라이런 (아무것도 만들지 않는다)"
     print(f"== 공개 레포 이사: {source} → {args.target} ==")
     print(f"  · 모드: {mode}")
 
     try:
         gh("api", f"repos/{args.target}", "-q", ".full_name")
     except GhError as error:
-        return fail(
-            f"대상 레포에 접근할 수 없다 ({args.target}) — 먼저 리드가 레포를 만들어야 한다. {error}"
-        )
+        return fail(f"대상 레포에 접근할 수 없다 ({args.target}) — 먼저 리드가 레포를 만들어야 한다. {error}")
 
     try:
         print("\n-- 1. 라벨 --")
-        label_seen, label_new, label_upd, label_same = migrate_labels(
-            source, args.target, args.execute
-        )
-        print(
-            f"  · 출처 라벨 {label_seen}개 — 생성 {label_new} · 갱신 {label_upd} · 그대로 {label_same}"
-        )
+        label_seen, label_new, label_upd, label_same = migrate_labels(source, args.target, args.execute)
+        print(f"  · 출처 라벨 {label_seen}개 — 생성 {label_new} · 갱신 {label_upd} · 그대로 {label_same}")
         if label_seen == 0:
             return fail("출처 라벨 0건 — 조회가 깨졌다 (fail-closed)")
 
         print("\n-- 2. 마일스톤 --")
-        ms_seen, ms_new, ms_same, ms_numbers = migrate_milestones(
-            source, args.target, args.execute
-        )
+        ms_seen, ms_new, ms_same, ms_numbers = migrate_milestones(source, args.target, args.execute)
         print(f"  · 출처 마일스톤 {ms_seen}개 — 생성 {ms_new} · 그대로 {ms_same}")
         if ms_seen == 0:
             return fail("출처 마일스톤 0건 — 조회가 깨졌다 (fail-closed)")
 
-        print(
-            f"\n-- 3. 이슈 ({'열림+닫힘' if args.include_closed else '열린 것만'}) --"
-        )
+        print(f"\n-- 3. 이슈 ({'열림+닫힘' if args.include_closed else '열린 것만'}) --")
         issues = source_issues(source, args.include_closed)
         if not issues and not args.allow_no_issues:
             return fail(
-                "옮길 이슈 0건 — 조회가 깨졌을 수 있다. 정말 0건이면 "
-                "`--allow-no-issues` 로 명시하라 (fail-closed)"
+                "옮길 이슈 0건 — 조회가 깨졌을 수 있다. 정말 0건이면 `--allow-no-issues` 로 명시하라 (fail-closed)"
             )
         issue_seen, issue_new, issue_skip, mapping = migrate_issues(
             source, args.target, issues, ms_numbers, args.execute
@@ -487,9 +448,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print("  (없음)")
 
-    print(
-        f"\n== 집계: 라벨 {label_seen} · 마일스톤 {ms_seen} · 이슈 {issue_seen} 을 검사했다 =="
-    )
+    print(f"\n== 집계: 라벨 {label_seen} · 마일스톤 {ms_seen} · 이슈 {issue_seen} 을 검사했다 ==")
     if not args.execute:
         print(
             "== 드라이런 종료 — 아무것도 만들지 않았다 ==\n"

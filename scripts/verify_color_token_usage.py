@@ -136,17 +136,12 @@ PALETTE_COLORS = (
 )
 # 색을 받는 유틸리티 접두. `to` 를 포함하므로 앞에 `\b` 를 두어 낱말 중간(`photo-black`)을 피한다.
 COLOR_PREFIXES = (
-    "bg|text|border|ring|ring-offset|divide|outline|from|via|to|fill|stroke|"
-    "shadow|accent|caret|decoration|placeholder"
+    "bg|text|border|ring|ring-offset|divide|outline|from|via|to|fill|stroke|shadow|accent|caret|decoration|placeholder"
 )
 
-PALETTE_UTILITY = re.compile(
-    rf"\b(?:{COLOR_PREFIXES})-(?:{PALETTE_COLORS})-(?:50|[1-9]00|950)\b"
-)
+PALETTE_UTILITY = re.compile(rf"\b(?:{COLOR_PREFIXES})-(?:{PALETTE_COLORS})-(?:50|[1-9]00|950)\b")
 MONOCHROME_UTILITY = re.compile(rf"\b(?:{COLOR_PREFIXES})-(?:black|white)\b")
-HEX_LITERAL = re.compile(
-    r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-zA-Z_-])"
-)
+HEX_LITERAL = re.compile(r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-zA-Z_-])")
 
 STRING_LITERAL = re.compile(r"\"[^\"\n]*\"|'[^'\n]*'|`[^`]*`", re.S)
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
@@ -185,9 +180,7 @@ def find_violations(source: str) -> dict[str, list[str]]:
     if monochrome:
         found["흑백 유틸리티"] = monochrome
 
-    hexes = sorted(
-        {h for s in STRING_LITERAL.findall(code) for h in HEX_LITERAL.findall(s)}
-    )
+    hexes = sorted({h for s in STRING_LITERAL.findall(code) for h in HEX_LITERAL.findall(s)})
     if hexes:
         found["hex 리터럴"] = hexes
 
@@ -199,22 +192,13 @@ def main() -> int:
     if missing_roots:
         for root in missing_roots:
             _fail(f"스캔 대상 디렉터리가 없습니다: frontend/{root}")
-        _fail(
-            "경로가 바뀌었을 수 있습니다 — 이 스크립트의 SCAN_ROOTS 를 함께 고치세요."
-        )
+        _fail("경로가 바뀌었을 수 있습니다 — 이 스크립트의 SCAN_ROOTS 를 함께 고치세요.")
         return 1
 
-    files = sorted(
-        path
-        for root in SCAN_ROOTS
-        for suffix in SCAN_SUFFIXES
-        for path in (FRONTEND / root).rglob(suffix)
-    )
+    files = sorted(path for root in SCAN_ROOTS for suffix in SCAN_SUFFIXES for path in (FRONTEND / root).rglob(suffix))
 
     if len(files) < MIN_SCANNED_FILES:
-        _fail(
-            f"소스 파일을 {len(files)}건 수집했습니다 (하한 {MIN_SCANNED_FILES}) — fail-closed 종료"
-        )
+        _fail(f"소스 파일을 {len(files)}건 수집했습니다 (하한 {MIN_SCANNED_FILES}) — fail-closed 종료")
         _fail(
             "파일이 이동·삭제됐거나 스캔 경로가 현실과 어긋났을 수 있습니다. "
             "정당한 삭제라면 MIN_SCANNED_FILES 도 함께 내리세요."
@@ -249,9 +233,7 @@ def main() -> int:
     stale_clean = [p for p in stale_clean if p not in stale_missing]
 
     if stale_missing:
-        _fail(
-            f"allowlist 에 적힌 파일이 없습니다 {len(stale_missing)}건 — 항목을 지우세요:"
-        )
+        _fail(f"allowlist 에 적힌 파일이 없습니다 {len(stale_missing)}건 — 항목을 지우세요:")
         for path in stale_missing:
             _fail(f"  · {path}")
         ok = False
@@ -276,18 +258,13 @@ def main() -> int:
             )
             _fail(f"  · {path} — {detail}")
         _fail(
-            "색은 frontend/styles/globals.css 의 토큰만 씁니다 "
-            "(디자인 시스템 .docs/4-아키텍처/디자인-시스템.md §1·§8)."
+            "색은 frontend/styles/globals.css 의 토큰만 씁니다 (디자인 시스템 .docs/4-아키텍처/디자인-시스템.md §1·§8)."
         )
         ok = False
 
     if ok:
-        print(
-            f"판정: 등록되지 않은 위반 0건 (allowlist {len(ALLOWLIST)}건 제외, 상한 {ALLOWLIST_CAP})"
-        )
-        print(
-            "allowlist 는 #73 S2~S5 가 줄인다 — 줄일 때 ALLOWLIST_CAP 도 함께 내린다."
-        )
+        print(f"판정: 등록되지 않은 위반 0건 (allowlist {len(ALLOWLIST)}건 제외, 상한 {ALLOWLIST_CAP})")
+        print("allowlist 는 #73 S2~S5 가 줄인다 — 줄일 때 ALLOWLIST_CAP 도 함께 내린다.")
     return 0 if ok else 1
 
 

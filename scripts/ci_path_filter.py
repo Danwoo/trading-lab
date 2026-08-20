@@ -94,9 +94,7 @@ def parse_patterns(text: str) -> list[str]:
     return patterns
 
 
-def decide(
-    patterns: list[str], changed: list[str] | None
-) -> tuple[bool, list[tuple[str, str]]]:
+def decide(patterns: list[str], changed: list[str] | None) -> tuple[bool, list[tuple[str, str]]]:
     """(돌릴지, 무는 (패턴, 파일) 목록) 을 낸다. `changed` 가 None 이면 모르는 것 → 돌린다."""
     if not patterns:
         raise PatternError("패턴이 0건 — 그대로 두면 전 잡이 조용히 skip 된다")
@@ -122,9 +120,7 @@ def main(argv: list[str]) -> int:
     patterns = parse_patterns(os.environ.get("FILTER_PATTERNS", ""))
     changed: list[str] | None = None
     if not unknown:
-        changed = [
-            line.strip() for line in sys.stdin.read().splitlines() if line.strip()
-        ]
+        changed = [line.strip() for line in sys.stdin.read().splitlines() if line.strip()]
         if not changed:
             print(
                 "::warning::변경 파일 0건 — 판정 불가로 보고 전 잡을 돌린다 (fail-closed)",

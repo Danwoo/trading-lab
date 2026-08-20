@@ -114,9 +114,7 @@ def _job_blocks(text: str) -> dict[str, str]:
 def _on_block(text: str) -> str:
     lines = text.splitlines()
     try:
-        start = next(
-            i for i, line in enumerate(lines) if line.rstrip().startswith("on:")
-        )
+        start = next(i for i, line in enumerate(lines) if line.rstrip().startswith("on:"))
     except StopIteration:
         return ""
     body: list[str] = []
@@ -154,9 +152,7 @@ def main() -> int:
         checked += 1
         actual = re.match(glob_to_regex(pattern), path) is not None
         if actual != expected:
-            failures.append(
-                f"글롭: {pattern!r} ← {path!r} 기대 {expected} 실제 {actual}"
-            )
+            failures.append(f"글롭: {pattern!r} ← {path!r} 기대 {expected} 실제 {actual}")
 
     for pattern in REJECTED_PATTERNS:
         checked += 1
@@ -239,13 +235,10 @@ def main() -> int:
             checked += 1
             if f"needs: {FILTER_JOB}" not in body or FILTER_IF not in body:
                 failures.append(
-                    f"배선: {name} 의 잡 `{job_id}` 이 판정을 안 읽는다 "
-                    f"(`needs: {FILTER_JOB}` + `if: {FILTER_IF}`)"
+                    f"배선: {name} 의 잡 `{job_id}` 이 판정을 안 읽는다 (`needs: {FILTER_JOB}` + `if: {FILTER_IF}`)"
                 )
 
-    print(
-        f"케이스 {checked}건 검사 · 워크플로 {len(FILTERED_WORKFLOWS)}개 · 패턴 {total_patterns}건"
-    )
+    print(f"케이스 {checked}건 검사 · 워크플로 {len(FILTERED_WORKFLOWS)}개 · 패턴 {total_patterns}건")
     if checked == 0 or total_patterns == 0:
         _fail("검사 0건 — 통과가 아니라 실패다 (fail-closed)")
         return 1

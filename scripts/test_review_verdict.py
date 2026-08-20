@@ -97,10 +97,7 @@ def main() -> int:
                 print(f"FAIL [payload {desc}] {key} 가 비었다")
                 failures += 1
         if payload.get("conclusion") != want_conclusion:
-            print(
-                f"FAIL [payload {desc}] conclusion: got {payload.get('conclusion')!r}, "
-                f"want {want_conclusion!r}"
-            )
+            print(f"FAIL [payload {desc}] conclusion: got {payload.get('conclusion')!r}, want {want_conclusion!r}")
             failures += 1
         joined = payload.get("title", "") + "\n" + payload.get("summary", "")
         for bit in want_bits:
@@ -113,10 +110,7 @@ def main() -> int:
     for verdict, conclusion in rv.CHECK_CONCLUSION.items():
         code, _ = rv.judge(verdict)
         if (code == 0) != (conclusion == "success"):
-            print(
-                f"FAIL judge({verdict!r})={code} 인데 표는 {conclusion!r} — "
-                "초록 판정이 표와 어긋난다"
-            )
+            print(f"FAIL judge({verdict!r})={code} 인데 표는 {conclusion!r} — 초록 판정이 표와 어긋난다")
             failures += 1
 
     total = len(CASES) + len(PAYLOAD_CASES) + 1 + len(rv.CHECK_CONCLUSION)

@@ -71,34 +71,21 @@ OTHER = "other"
 
 def classify_job(annotations):
     """실패 잡 하나를 (분류, 근거 한 줄) 로 판정한다."""
-    failure_msgs = [
-        a.get("message", "")
-        for a in annotations
-        if a.get("annotation_level") == "failure"
-    ]
+    failure_msgs = [a.get("message", "") for a in annotations if a.get("annotation_level") == "failure"]
     if not failure_msgs:
         return OTHER, "failure annotation 0건 — 동결을 증명할 수 없다 (fail-closed)"
     if all(m == FREEZE_SIGNATURE for m in failure_msgs):
         return FROZEN, f"동결 서명 정확 일치 ({len(failure_msgs)}건)"
     has_unable = any(m.startswith(UNABLE_PREFIX) for m in failure_msgs)
-    rest_ok = all(
-        m == GENERIC_EXIT or m.startswith(UNABLE_PREFIX) for m in failure_msgs
-    )
+    rest_ok = all(m == GENERIC_EXIT or m.startswith(UNABLE_PREFIX) for m in failure_msgs)
     if has_unable and rest_ok:
         return SHADOW, "동결의 여파 (verdict unable + exit code 1)"
     unmatched = [
-        m
-        for m in failure_msgs
-        if m != FREEZE_SIGNATURE
-        and m != GENERIC_EXIT
-        and not m.startswith(UNABLE_PREFIX)
+        m for m in failure_msgs if m != FREEZE_SIGNATURE and m != GENERIC_EXIT and not m.startswith(UNABLE_PREFIX)
     ]
     if unmatched:
         return OTHER, f"동결 서명 밖의 failure annotation: {unmatched[0][:120]!r}"
-    return OTHER, (
-        "허용 조합 밖 (unable 없는 exit code 1, 또는 동결·일반 종료 혼합) — "
-        "동결로 증명되지 않는다"
-    )
+    return OTHER, ("허용 조합 밖 (unable 없는 exit code 1, 또는 동결·일반 종료 혼합) — 동결로 증명되지 않는다")
 
 
 def decide(run_attempt, jobs):
@@ -106,9 +93,7 @@ def decide(run_attempt, jobs):
     lines = [f"입력: run_attempt={run_attempt} · 잡 {len(jobs)}건"]
 
     if not isinstance(run_attempt, int) or run_attempt < 1:
-        lines.append(
-            f"판정: skip — run_attempt 가 비정상 값 {run_attempt!r} (fail-closed)"
-        )
+        lines.append(f"판정: skip — run_attempt 가 비정상 값 {run_attempt!r} (fail-closed)")
         return "skip", lines
     if not jobs:
         lines.append("판정: skip — 잡 목록 0건, 아무것도 못 봤다 (fail-closed)")
@@ -121,14 +106,10 @@ def decide(run_attempt, jobs):
         if conclusion in ("success", "skipped", "neutral"):
             continue
         if conclusion != "failure":
-            lines.append(
-                f"판정: skip — 잡 {name!r} 이 미지 상태 {conclusion!r} (fail-closed)"
-            )
+            lines.append(f"판정: skip — 잡 {name!r} 이 미지 상태 {conclusion!r} (fail-closed)")
             return "skip", lines
         if job.get("annotations") is None:
-            lines.append(
-                f"판정: skip — 잡 {name!r} 의 annotation 조회 실패 (fail-closed)"
-            )
+            lines.append(f"판정: skip — 잡 {name!r} 의 annotation 조회 실패 (fail-closed)")
             return "skip", lines
         failed.append((name, job["annotations"]))
 
@@ -141,9 +122,7 @@ def decide(run_attempt, jobs):
         kind, reason = classify_job(annotations)
         lines.append(f"잡 {name!r}: {kind} — {reason}")
         if kind == OTHER:
-            lines.append(
-                "판정: skip — 동결 서명 밖의 실패가 섞여 있다. 재실행하면 진짜 실패를 덮는다"
-            )
+            lines.append("판정: skip — 동결 서명 밖의 실패가 섞여 있다. 재실행하면 진짜 실패를 덮는다")
             return "skip", lines
         if kind == FROZEN:
             frozen_count += 1

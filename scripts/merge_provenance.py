@@ -189,11 +189,7 @@ def reproduce_squash_body(commits) -> str:
 
 def _core_from(commits) -> str:
     """커밋 메시지 조립부 — **머지 커밋은 뺀다** (GitHub 이 그렇게 한다, PR #55 실측)."""
-    messages = [
-        (c.get("message") or "").rstrip()
-        for c in (commits or [])
-        if isinstance(c, dict) and not _is_merge(c)
-    ]
+    messages = [(c.get("message") or "").rstrip() for c in (commits or []) if isinstance(c, dict) and not _is_merge(c)]
     if not messages:
         return ""
     if len(messages) == 1:
@@ -203,11 +199,7 @@ def _core_from(commits) -> str:
 
 def describe_author(commits, head_ref) -> str:
     """작성 축 — 커밋 신원에서 읽는다. 형식 판독의 SoT 는 `review_route` 하나다."""
-    emails = [
-        (c or {}).get("author_email") or ""
-        for c in (commits or [])
-        if isinstance(c, dict)
-    ]
+    emails = [(c or {}).get("author_email") or "" for c in (commits or []) if isinstance(c, dict)]
     if not emails:
         return UNKNOWN
     identity = review_route.identify_author(emails, head_ref or "")
@@ -239,9 +231,7 @@ def provenance_line(payload) -> str:
     author = describe_author(payload.get("commits"), payload.get("head_ref"))
     if payload.get("pr_author_is_bot"):
         author = "봇"
-    reviewer = describe_reviewer(
-        payload.get("reviewer_model") or "", payload.get("reviewer_tier") or ""
-    )
+    reviewer = describe_reviewer(payload.get("reviewer_model") or "", payload.get("reviewer_tier") or "")
     merged = MERGED_BY.get(payload.get("merged_by") or "", UNKNOWN)
     return f"작성: {author} · 리뷰: {reviewer} · 머지: {merged}"
 

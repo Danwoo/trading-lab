@@ -4,24 +4,65 @@ from pydantic import BaseModel, Field
 
 
 class BacktestRunIn(BaseModel):
-    """단일 실행 입력. 격자가 기본(D-Q1)이라 이 경로는 격자의 한 칸을 다시 보는 자리다."""
+    """단일 실행 입력. 격자가 기본(D-Q1)이라 이 경로는 격자의 한 칸을 다시 보는 자리다.
 
-    strategy_key: str = Field(..., max_length=40)
-    params: dict[str, Any] = Field(default_factory=dict)
-    market: str = Field(..., max_length=20)
-    symbol: str = Field(..., max_length=20)
-    period_from: str = Field(..., max_length=10)
-    period_to: str = Field(..., max_length=10)
-    initial_cash: float = Field(..., gt=0)
-    costs: dict[str, float] | None = None
-    bot_id: int | None = None
-    parent_run_id: int | None = None
+    각 필드의 형식은 **아래 `description` 이 정본**이다 — 그 문장이 OpenAPI 와 422 응답으로
+    그대로 나간다 (#292).
+    """
+
+    strategy_key: str = Field(
+        ...,
+        max_length=40,
+        description="전략 id — 등록된 전략의 키만 받습니다. 무엇이 지금 있는지는 "
+        "GET /bot/strategy-catalog 가 답합니다.",
+        examples=["sma_cross"],
+    )
+    params: dict[str, Any] = Field(
+        default_factory=dict,
+        description="전략 파라미터 — 이름 → 값. 그 전략이 선언한 이름만 받습니다(선언에 없는 이름은 거부). "
+        "비우면 전략의 기본값.",
+    )
+    market: str = Field(
+        ..., max_length=20, description="시장 코드 하나 (예: 'KOSPI', 'KOSDAQ', 'NASDAQ').", examples=["KOSPI"]
+    )
+    symbol: str = Field(..., max_length=20, description="종목 코드 하나. 시장은 market 에 따로 적습니다.")
+    # 예시에 **구체적인 날짜를 적지 않는다** — 작성일이 굳어 반년 뒤 OpenAPI 가 낡은 날짜를 정답처럼 제시한다.
+    period_from: str = Field(
+        ...,
+        max_length=10,
+        description="검증 시작일 (YYYY-MM-DD). 적재된 캔들이 있는 구간만 돕니다 — 없으면 그 구간은 빈 채로 나옵니다.",
+    )
+    period_to: str = Field(
+        ..., max_length=10, description="검증 종료일 (YYYY-MM-DD). 시작일보다 앞이면 훑을 봉이 없습니다."
+    )
+    initial_cash: float = Field(
+        ...,
+        gt=0,
+        description="시작 자금 (원). 0 보다 커야 합니다 — 성과율의 분모라 0 이면 아무 지표도 못 냅니다.",
+        examples=[10000000],
+    )
+    costs: dict[str, float] | None = Field(
+        default=None,
+        description="비용 가정 — fee_rate(수수료율) · slippage_rate(슬리피지율) · sell_tax_rate(매도세율) 중 "
+        "덮어쓸 것만. 전부 비율이라 0.0015 가 0.15% 입니다. 비우면 기본 가정.",
+    )
+    bot_id: int | None = Field(default=None, description="이 실행을 매달 봇 id. 비우면 어느 봇에도 안 달립니다.")
+    parent_run_id: int | None = Field(
+        default=None,
+        description="다시 보는 실행이면 그 원본 run_id. 계보로 이어져 「몇 번째 시도인가」가 남습니다. "
+        "새 탐색이면 비웁니다.",
+    )
 
 
 class BacktestGridIn(BacktestRunIn):
     """격자 실행 입력. `sweep` 은 파라미터 이름 → 훑을 값 목록이다 (grid.axes_from_spec)."""
 
-    sweep: dict[str, list[Any]] = Field(..., min_length=1)
+    sweep: dict[str, list[Any]] = Field(
+        ...,
+        min_length=1,
+        description="훑을 축 — 파라미터 이름 → 값 목록. 최소 한 축은 있어야 하고, 이름은 그 전략이 "
+        '선언한 것만 받습니다. 예: {"fast": [5, 10], "slow": [20, 60]}',
+    )
 
 
 class RunCreatedOut(BaseModel):

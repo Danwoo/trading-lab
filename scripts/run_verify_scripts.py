@@ -35,9 +35,7 @@ from pathlib import Path
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(add_help=True)
-    parser.add_argument(
-        "scripts_dir", help="verify_*.py 가 있는 디렉터리 (보통 scripts)"
-    )
+    parser.add_argument("scripts_dir", help="verify_*.py 가 있는 디렉터리 (보통 scripts)")
     parser.add_argument(
         "--skip",
         action="append",
@@ -56,35 +54,23 @@ def main(argv: list[str]) -> int:
     found_names = {f.name for f in found}
 
     if not found:
-        print(
-            f"::error::{scripts_dir} 에서 verify_*.py 를 0건 수집했습니다 — fail-closed 종료"
-        )
-        print(
-            "::error::파일이 이동·삭제됐거나 이름 규칙이 바뀌었을 수 있습니다. 확인하세요."
-        )
+        print(f"::error::{scripts_dir} 에서 verify_*.py 를 0건 수집했습니다 — fail-closed 종료")
+        print("::error::파일이 이동·삭제됐거나 이름 규칙이 바뀌었을 수 있습니다. 확인하세요.")
         return 1
 
     # 규칙 3 — 낡은 제외 목록은 조용히 넘기지 않는다.
     stale = sorted(set(args.skip) - found_names)
     if stale:
-        print(
-            f"::error::--skip 으로 지정한 파일이 {scripts_dir} 에 없습니다: {', '.join(stale)}"
-        )
-        print(
-            "::error::이름이 바뀌었거나 삭제된 것입니다. 워크플로의 --skip 목록을 갱신하세요."
-        )
+        print(f"::error::--skip 으로 지정한 파일이 {scripts_dir} 에 없습니다: {', '.join(stale)}")
+        print("::error::이름이 바뀌었거나 삭제된 것입니다. 워크플로의 --skip 목록을 갱신하세요.")
         return 1
 
     files = [f for f in found if f.name not in set(args.skip)]
     if not files:
-        print(
-            f"::error::{scripts_dir} 의 verify_*.py 가 --skip 으로 전부 빠졌습니다 — fail-closed 종료"
-        )
+        print(f"::error::{scripts_dir} 의 verify_*.py 가 --skip 으로 전부 빠졌습니다 — fail-closed 종료")
         return 1
 
-    print(
-        f"수집한 검증 스크립트 {len(files)}개 (전체 {len(found)}개 중 {len(args.skip)}개 제외):"
-    )
+    print(f"수집한 검증 스크립트 {len(files)}개 (전체 {len(found)}개 중 {len(args.skip)}개 제외):")
     for f in files:
         print(f"  - {f.name}")
     if args.skip:
@@ -99,9 +85,7 @@ def main(argv: list[str]) -> int:
             failed.append(f.name)
         print()
 
-    print(
-        f"검사한 스크립트 {len(files)}개 중 {len(files) - len(failed)}개 통과, {len(failed)}개 실패"
-    )
+    print(f"검사한 스크립트 {len(files)}개 중 {len(files) - len(failed)}개 통과, {len(failed)}개 실패")
     if failed:
         print(f"::error::실패한 스크립트: {', '.join(failed)}")
         return 1

@@ -157,10 +157,7 @@ def _alias_binding(code: str, end: int) -> bool:
     if not re.search(r"\b(const|let|var)$", before):
         return False
     close = _matching_brace(code, brace)
-    return (
-        close is not None
-        and re.match(r"\s*=[^=]", code[close + 1 : close + 4]) is not None
-    )
+    return close is not None and re.match(r"\s*=[^=]", code[close + 1 : close + 4]) is not None
 
 
 def _pattern_root(code: str, at: int) -> int | None:
@@ -217,9 +214,9 @@ def sites(text: str) -> list[tuple[int, bool, str]]:
     for match in FIELD.finditer(code):
         tail = code[match.end() : match.end() + 4]
         # 타입 선언(`x: T` · `x?: T`)만 제외한다. `??` 는 읽는 자리다.
-        if (
-            re.match(r"\s*\?\s*:", tail) or re.match(r"\s*:(?!\s*\w+\s*[,}])", tail)
-        ) and not _alias_binding(code, match.end()):
+        if (re.match(r"\s*\?\s*:", tail) or re.match(r"\s*:(?!\s*\w+\s*[,}])", tail)) and not _alias_binding(
+            code, match.end()
+        ):
             continue
         line = code.count("\n", 0, match.start()) + 1
         around = code[max(0, match.start() - 70) : match.end() + 70]
@@ -241,11 +238,7 @@ def main() -> int:
         ):
             continue
         # 테스트는 일부러 원문을 다룬다 — 화면으로 나가는 자리가 아니다.
-        if (
-            "tests" in path.parts
-            or path.name.endswith(".test.ts")
-            or path.name.endswith(".test.tsx")
-        ):
+        if "tests" in path.parts or path.name.endswith(".test.ts") or path.name.endswith(".test.tsx"):
             continue
         for line, guarded, around in sites(path.read_text(encoding="utf-8")):
             where = f"{path.relative_to(REPO_ROOT)}:{line}"
@@ -255,14 +248,10 @@ def main() -> int:
 
     print(f"사유를 읽는 자리 {len(found)}곳 검사 (frontend/**/*.ts·tsx, 테스트 제외)")
     if not found:
-        print(
-            "::error::자리를 0건 찾았습니다 — 필드 이름이 바뀌었을 수 있습니다 (fail-closed)"
-        )
+        print("::error::자리를 0건 찾았습니다 — 필드 이름이 바뀌었을 수 있습니다 (fail-closed)")
         return 1
     if len(found) < EXPECTED_SITES:
-        print(
-            f"::error::자리가 {len(found)}곳뿐입니다 (기대 {EXPECTED_SITES}곳) — 검사가 줄었습니다"
-        )
+        print(f"::error::자리가 {len(found)}곳뿐입니다 (기대 {EXPECTED_SITES}곳) — 검사가 줄었습니다")
         for where in found:
             print(f"::error::  본 자리: {where}")
         return 1
@@ -270,9 +259,7 @@ def main() -> int:
         print(f"::error::가림을 안 지나는 자리 {len(unguarded)}곳")
         for line in unguarded:
             print(f"::error::  {line}")
-        print(
-            "::error::저장 시점 방어는 소급되지 않는다 — 읽는 자리마다 redactReason 안에 있어야 한다."
-        )
+        print("::error::저장 시점 방어는 소급되지 않는다 — 읽는 자리마다 redactReason 안에 있어야 한다.")
         return 1
 
     print("위반 0건 — 사유를 읽는 자리가 전부 가림 안에 있다")

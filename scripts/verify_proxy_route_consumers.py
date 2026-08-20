@@ -60,9 +60,7 @@ KNOWN_ORPHANS = {
 
 WILDCARD = "\x00"
 
-CONST_LITERAL = re.compile(
-    r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*[\"'`]([^\"'`]*)[\"'`]\s*;"
-)
+CONST_LITERAL = re.compile(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*[\"'`]([^\"'`]*)[\"'`]\s*;")
 # 문자열·템플릿 리터럴 중 프록시 경로가 될 수 있는 것 — `/api/...` 로 시작하거나 `${X}` 로 시작.
 URL_LIKE = re.compile(r"[\"'`]((?:/api/|\$\{)[^\"'`]*)[\"'`]")
 TEMPLATE_SLOT = re.compile(r"\$\{([^}]*)\}")
@@ -84,14 +82,10 @@ def resolve_urls(source: str) -> set[str]:
     consts = collect_const_literals([source])
     urls: set[str] = set()
     for raw in URL_LIKE.findall(source):
-        resolved = TEMPLATE_SLOT.sub(
-            lambda m: consts.get(m.group(1).strip(), WILDCARD), raw
-        )
+        resolved = TEMPLATE_SLOT.sub(lambda m: consts.get(m.group(1).strip(), WILDCARD), raw)
         # 중첩 상수(상수가 상수를 참조)를 한 번 더 푼다. 깊이는 실사용상 2면 충분하고,
         # 더 깊으면 못 푼 채로 남아 와일드카드가 되므로 거짓 통과가 아니라 느슨한 통과다.
-        resolved = TEMPLATE_SLOT.sub(
-            lambda m: consts.get(m.group(1).strip(), WILDCARD), resolved
-        )
+        resolved = TEMPLATE_SLOT.sub(lambda m: consts.get(m.group(1).strip(), WILDCARD), resolved)
         if resolved.startswith("/api/external/"):
             urls.add(resolved)
     return urls
@@ -104,7 +98,7 @@ def segments(path: str) -> list[str]:
 def matches(route_segs: list[str], consumer_segs: list[str]) -> bool:
     if len(route_segs) != len(consumer_segs):
         return False
-    for route_seg, consumer_seg in zip(route_segs, consumer_segs):
+    for route_seg, consumer_seg in zip(route_segs, consumer_segs, strict=False):
         route_dynamic = route_seg.startswith("[") and route_seg.endswith("]")
         consumer_dynamic = WILDCARD in consumer_seg
         if route_dynamic or consumer_dynamic:
@@ -116,26 +110,18 @@ def matches(route_segs: list[str], consumer_segs: list[str]) -> bool:
 
 def main() -> int:
     if not ROUTE_ROOT.is_dir():
-        print(
-            f"::error::프록시 라우트 디렉터리가 없습니다: {ROUTE_ROOT.relative_to(REPO_ROOT)}"
-        )
+        print(f"::error::프록시 라우트 디렉터리가 없습니다: {ROUTE_ROOT.relative_to(REPO_ROOT)}")
         return 1
     if not SERVICE_ROOT.is_dir():
-        print(
-            f"::error::서비스 디렉터리가 없습니다: {SERVICE_ROOT.relative_to(REPO_ROOT)}"
-        )
+        print(f"::error::서비스 디렉터리가 없습니다: {SERVICE_ROOT.relative_to(REPO_ROOT)}")
         return 1
 
     route_files = sorted(ROUTE_ROOT.rglob("route.ts"))
     service_files = sorted(SERVICE_ROOT.rglob("*.ts"))
 
     if len(route_files) < MIN_ROUTES:
-        print(
-            f"::error::프록시 라우트를 {len(route_files)}건 수집했습니다 (하한 {MIN_ROUTES}) — fail-closed 종료"
-        )
-        print(
-            "::error::경로가 바뀌었거나 라우트가 대량 삭제됐을 수 있습니다. 확인하세요."
-        )
+        print(f"::error::프록시 라우트를 {len(route_files)}건 수집했습니다 (하한 {MIN_ROUTES}) — fail-closed 종료")
+        print("::error::경로가 바뀌었거나 라우트가 대량 삭제됐을 수 있습니다. 확인하세요.")
         return 1
     if len(service_files) < MIN_SERVICE_FILES:
         print(
@@ -148,9 +134,7 @@ def main() -> int:
         consumer_urls |= resolve_urls(path.read_text(encoding="utf-8"))
 
     if not consumer_urls:
-        print(
-            "::error::서비스에서 /api/external 경로를 0건 풀었습니다 — 파서가 형식 변화를 못 따라간 것입니다"
-        )
+        print("::error::서비스에서 /api/external 경로를 0건 풀었습니다 — 파서가 형식 변화를 못 따라간 것입니다")
         return 1
 
     consumer_segments = [segments(url) for url in sorted(consumer_urls)]
@@ -170,18 +154,14 @@ def main() -> int:
     orphan_set = set(orphans)
     stale = sorted(KNOWN_ORPHANS - orphan_set)
     if stale:
-        print(
-            f"::error::KNOWN_ORPHANS 에 적힌 라우트가 더는 고아가 아닙니다 {len(stale)}건 — 예외를 지우세요"
-        )
+        print(f"::error::KNOWN_ORPHANS 에 적힌 라우트가 더는 고아가 아닙니다 {len(stale)}건 — 예외를 지우세요")
         for path in stale:
             print(f"::error::  {path}")
         return 1
 
     unexpected = sorted(orphan_set - KNOWN_ORPHANS)
     if unexpected:
-        print(
-            f"::error::소비자가 없는 프록시 라우트 {len(unexpected)}건 — 라우트를 지우거나 서비스에서 부르세요"
-        )
+        print(f"::error::소비자가 없는 프록시 라우트 {len(unexpected)}건 — 라우트를 지우거나 서비스에서 부르세요")
         for path in unexpected:
             print(f"::error::  {path}")
         return 1

@@ -83,9 +83,7 @@ check(
 )
 
 # ── ② 반대 방향 — 체인의 모든 후보가 실패하면 여전히 unable ─────────────────────
-out = summarize(
-    "kimi claude", [("kimi", 21, TUI_FAIL), ("claude", 21, "리뷰 워크트리 생성 실패")]
-)
+out = summarize("kimi claude", [("kimi", 21, TUI_FAIL), ("claude", 21, "리뷰 워크트리 생성 실패")])
 check("② 전부 실패 → 판정 낸 모델 없음", out["effective"], "")
 check("② 전부 실패 → 체인 소진", out["failure_kind"], "chain-exhausted")
 check("② 전부 실패 → 폴백 아님", out["fallback"], "no")
@@ -95,9 +93,7 @@ check(
     out["unable_reason"].endswith("fail-closed(리뷰 불가)"),
     True,
 )
-check(
-    "② 전부 실패 → 막힌 지점에 후보별 사유가 실린다", TUI_FAIL in out["stuck_at"], True
-)
+check("② 전부 실패 → 막힌 지점에 후보별 사유가 실린다", TUI_FAIL in out["stuck_at"], True)
 
 # 체인이 한 명뿐이어도(claude 작성 → 폴백 없음) 기동 실패는 unable 로 끝난다
 out = summarize("claude", [("claude", 21, TUI_FAIL)])
@@ -111,9 +107,7 @@ out = summarize(
 )
 check("③ fatal 은 체인을 끊는다", out["failure_kind"], "confirmed")
 check("③ fatal 은 기동 실패로 집계되지 않는다", out["startup_failed"], "")
-check(
-    "③ fatal 의 막힌 지점에 사유가 실린다", "Orca 경로 불가용" in out["stuck_at"], True
-)
+check("③ fatal 의 막힌 지점에 사유가 실린다", "Orca 경로 불가용" in out["stuck_at"], True)
 
 out = summarize("kimi claude", [("kimi", 30, "남은 예산 부족")])
 check("③ 예산 소진은 체인을 끊는다", out["failure_kind"], "budget")
@@ -181,15 +175,11 @@ def run_cli(argv: list[str], stdin_text: str) -> tuple[int, str]:
 
 
 code, out_text = run_cli(["review_chain.py", "step"], f"kimi\t21\t{TUI_FAIL}\n")
-check(
-    "CLI step — 기동 실패는 계속", (code, out_text), (0, "kind=startup\ncontinue=yes\n")
-)
+check("CLI step — 기동 실패는 계속", (code, out_text), (0, "kind=startup\ncontinue=yes\n"))
 code, out_text = run_cli(["review_chain.py", "step"], "kimi\t1\tOrca 불가용\n")
 check("CLI step — 확정 실패는 중단", (code, out_text), (0, "kind=fatal\ncontinue=no\n"))
 code, out_text = run_cli(["review_chain.py", "step"], "")
-check(
-    "CLI step — 이력이 비면 fail-closed", (code, "continue=no" in out_text), (1, True)
-)
+check("CLI step — 이력이 비면 fail-closed", (code, "continue=no" in out_text), (1, True))
 code, out_text = run_cli(
     ["review_chain.py", "summarize", "kimi claude"],
     f"kimi\t21\t{TUI_FAIL}\nclaude\t0\t\n",

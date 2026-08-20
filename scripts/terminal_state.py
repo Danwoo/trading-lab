@@ -145,8 +145,7 @@ def main(argv: list[str]) -> int:
     needle = argv[2] if len(argv) > 2 else ""
     if mode not in ("ready", "pending", "accepted") or (mode != "ready" and not needle):
         print(
-            "usage: terminal_state.py ready|pending <needle>|accepted <needle> "
-            "< terminal-read.json",
+            "usage: terminal_state.py ready|pending <needle>|accepted <needle> < terminal-read.json",
             file=sys.stderr,
         )
         return 2

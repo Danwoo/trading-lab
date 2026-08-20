@@ -37,9 +37,7 @@ ORIGIN_REF = "origin/main"
 FETCH_TIMEOUT_SECONDS = 20
 
 
-def _git(
-    *args: str, check: bool = True, timeout: float | None = None
-) -> subprocess.CompletedProcess[str]:
+def _git(*args: str, check: bool = True, timeout: float | None = None) -> subprocess.CompletedProcess[str]:
     # 자격증명 프롬프트로 멈추지 않게 한다 — 인증이 필요한 원격이면 물어보지 말고 실패해야 한다
     # (기동 스크립트 안에서 도는 검사라 사람 입력을 기다리면 그대로 멈춘다).
     return subprocess.run(
@@ -65,27 +63,15 @@ def parse_revision(source: str, label: str) -> tuple[str | None, tuple[str, ...]
         value = None
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             target, value = node.target.id, node.value
-        elif (
-            isinstance(node, ast.Assign)
-            and len(node.targets) == 1
-            and isinstance(node.targets[0], ast.Name)
-        ):
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             target, value = node.targets[0].id, node.value
-        if (
-            target == "revision"
-            and isinstance(value, ast.Constant)
-            and isinstance(value.value, str)
-        ):
+        if target == "revision" and isinstance(value, ast.Constant) and isinstance(value.value, str):
             revision = value.value
         elif target == "down_revision":
             if isinstance(value, ast.Constant) and isinstance(value.value, str):
                 downs = (value.value,)
             elif isinstance(value, (ast.Tuple, ast.List)):
-                downs = tuple(
-                    e.value
-                    for e in value.elts
-                    if isinstance(e, ast.Constant) and isinstance(e.value, str)
-                )
+                downs = tuple(e.value for e in value.elts if isinstance(e, ast.Constant) and isinstance(e.value, str))
     return revision, downs
 
 
@@ -105,9 +91,7 @@ def heads(graph: dict[str, tuple[str, ...]]) -> list[str]:
     return sorted(set(graph) - referenced)
 
 
-def stale_problems(
-    local: dict[str, tuple[str, ...]], origin: dict[str, tuple[str, ...]]
-) -> list[str]:
+def stale_problems(local: dict[str, tuple[str, ...]], origin: dict[str, tuple[str, ...]]) -> list[str]:
     """체크아웃이 origin/main 의 head 리비전을 포함하지 않으면 위반."""
     problems: list[str] = []
     for origin_head in heads(origin):
@@ -124,18 +108,12 @@ def _local_sources() -> dict[str, str]:
     directory = REPO_ROOT / VERSIONS_DIR
     if not directory.is_dir():
         return {}
-    return {
-        str(p.relative_to(REPO_ROOT)): p.read_text()
-        for p in sorted(directory.glob("*.py"))
-    }
+    return {str(p.relative_to(REPO_ROOT)): p.read_text() for p in sorted(directory.glob("*.py"))}
 
 
 def _origin_sources() -> dict[str, str] | None:
     """origin/main 의 versions/ 소스 (참조가 없으면 None)."""
-    if (
-        _git("rev-parse", "--verify", "--quiet", ORIGIN_REF, check=False).returncode
-        != 0
-    ):
+    if _git("rev-parse", "--verify", "--quiet", ORIGIN_REF, check=False).returncode != 0:
         return None
     listed = _git("ls-tree", "-r", "--name-only", ORIGIN_REF, "--", VERSIONS_DIR)
     sources: dict[str, str] = {}
@@ -165,18 +143,14 @@ def _fetch() -> None:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--fetch", action="store_true", help="검사 전에 origin/main 참조를 갱신한다"
-    )
+    parser.add_argument("--fetch", action="store_true", help="검사 전에 origin/main 참조를 갱신한다")
     args = parser.parse_args(argv)
 
     if args.fetch:
         try:
             _fetch()
         except (subprocess.SubprocessError, OSError) as exc:
-            print(
-                f"  ! git fetch 실행 자체가 실패했다 (이미 있는 참조로 계속한다): {exc}"
-            )
+            print(f"  ! git fetch 실행 자체가 실패했다 (이미 있는 참조로 계속한다): {exc}")
 
     local_sources = _local_sources()
     local = build_graph(local_sources)

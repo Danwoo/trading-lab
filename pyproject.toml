@@ -1,0 +1,14 @@
+# 루트 아래 파이썬(`scripts/`·`strategies/`)의 lint·format 설정.
+#
+# 이것이 없는 동안 ruff 는 기본값(88)을 썼는데 서비스 폴더는 각자 120 이라, 레포가 안내하는
+# `pre-commit run --all` 이 수렴하지 않았다 — 그대로 실행하면 무관한 49개 파일이 바뀌었다.
+# 값은 `backend-service/pyproject.toml` 과 맞춘다 (리드 결정 2026-08-20).
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["F", "I", "FAST", "W", "E", "B", "UP"]
+ignore = [
+    "E501",    # 줄 길이는 formatter 가 맡는다
+    "E402",    # 스크립트가 sys.path 를 세운 뒤 import 하는 모양을 허용
+]

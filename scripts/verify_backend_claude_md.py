@@ -74,8 +74,7 @@ def check_service(service: str, reference_common: str) -> list[str]:
         problems.append(f"{prefix}: 공통부가 {REFERENCE_SERVICE} 와 다름")
     if "\n## " in own:
         problems.append(
-            f"{prefix}: 마커 위 개별부에 `## ` 섹션이 있음 "
-            "(개별부는 서비스 맥락 블록만 — 규율 섹션은 공통부로)"
+            f"{prefix}: 마커 위 개별부에 `## ` 섹션이 있음 (개별부는 서비스 맥락 블록만 — 규율 섹션은 공통부로)"
         )
     return problems
 
@@ -84,9 +83,7 @@ def main() -> int:
     reference_path = REPO_ROOT / REFERENCE_SERVICE / "CLAUDE.md"
     reference_split = split_at_marker(reference_path.read_text())
     if reference_split is None:
-        print(
-            f"{REFERENCE_SERVICE}/CLAUDE.md: 공통부 마커가 없거나 2개 이상 — 대조 불가"
-        )
+        print(f"{REFERENCE_SERVICE}/CLAUDE.md: 공통부 마커가 없거나 2개 이상 — 대조 불가")
         return 1
     reference_common = reference_split[1]
 
@@ -99,10 +96,7 @@ def main() -> int:
             f"{REPO_ROOT} 에서 아무것도 못 찾았다 (경로 규약 변경?). 검사할 게 없으면 실패다."
         )
         return 1
-    problems = [
-        f"{s}: app/main.py 미발견 (삭제·이름변경?)"
-        for s in sorted(set(EXPECTED_SERVICES) - set(services))
-    ]
+    problems = [f"{s}: app/main.py 미발견 (삭제·이름변경?)" for s in sorted(set(EXPECTED_SERVICES) - set(services))]
     for service in services:
         problems.extend(check_service(service, reference_common))
 
@@ -115,9 +109,7 @@ def main() -> int:
             "반영하고, 새 backend 서비스면 그 공통부를 그대로 복사해 CLAUDE.md 를 만드세요."
         )
         return 1
-    print(
-        f"backend CLAUDE.md OK — 서비스 {len(services)}개의 공통부가 {REFERENCE_SERVICE} 와 동일"
-    )
+    print(f"backend CLAUDE.md OK — 서비스 {len(services)}개의 공통부가 {REFERENCE_SERVICE} 와 동일")
     return 0
 
 

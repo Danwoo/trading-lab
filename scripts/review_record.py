@@ -128,9 +128,7 @@ _INLINE_CODE = re.compile(r"(`+)[\s\S]*?\1")
 # 그 판독이 봇 PR 의 자동 머지 arm 조건 ④ 를 연다.
 _TITLE_FORMS = (
     re.compile(r"\bbump\s+\S+\s+from\s+(?P<old>\S+)\s+to\s+(?P<new>\S+)"),
-    re.compile(
-        r"\bupdate\s+\S+\s+requirement\s+from\s+(?P<old>\S+)\s+to\s+(?P<new>\S+)"
-    ),
+    re.compile(r"\bupdate\s+\S+\s+requirement\s+from\s+(?P<old>\S+)\s+to\s+(?P<new>\S+)"),
 )
 # 동사와 무관하게 「A 에서 B 로」 꼴을 세는 자 — 제목에 상승이 몇 개 실렸는지 본다.
 _ANY_VERSION_PAIR = re.compile(r"\bfrom\s+\S+\s+to\s+\S+")
@@ -199,10 +197,7 @@ def is_trusted_author(comment) -> bool:
     """
     if comment.get("author_association") in TRUSTED_ASSOCIATIONS:
         return True
-    return (
-        comment.get("user_type") == "Bot"
-        and _normalize_login(comment.get("user_login")) in TRUSTED_BOT_LOGINS
-    )
+    return comment.get("user_type") == "Bot" and _normalize_login(comment.get("user_login")) in TRUSTED_BOT_LOGINS
 
 
 def _bot_reviews_for_head(reviews, head_sha):
@@ -328,11 +323,7 @@ def scan_refs(body) -> dict:
         opened = _FENCE.match(line)
         if fence is not None:
             # 닫는 것은 같은 문자로 여는 길이 이상일 때만 (중첩 펜스 보호)
-            if (
-                opened
-                and opened.group("mark")[0] == fence[0]
-                and len(opened.group("mark")) >= len(fence)
-            ):
+            if opened and opened.group("mark")[0] == fence[0] and len(opened.group("mark")) >= len(fence):
                 fence = None
             drop()
             continue
@@ -428,17 +419,14 @@ def read_risk(refs, dropped=()):
     쓴다 — 버린 자리에 후보가 있었으면 그것이 진짜 선언이었을 수 있으므로 low 를 미선언으로
     접는다 (버린 것이 고위험 이슈였는데 저위험 이슈만 남는 경우가 fail-open 이다).
     """
-    unknown = sorted(
-        set(dropped) - {r.get("number") for r in refs if isinstance(r, dict)}
-    )
+    unknown = sorted(set(dropped) - {r.get("number") for r in refs if isinstance(r, dict)})
 
     def fold(risk, evidence, excluded):
         if unknown and risk != "high":
             listed = ", ".join(f"#{n}" for n in unknown)
             return (
                 "undeclared",
-                f"{evidence} · 코드·인용에서 버린 참조 후보({listed}) — 선언이었을 수 있어 "
-                "미선언으로 접는다",
+                f"{evidence} · 코드·인용에서 버린 참조 후보({listed}) — 선언이었을 수 있어 미선언으로 접는다",
                 excluded,
             )
         return risk, evidence, excluded
@@ -473,9 +461,7 @@ def read_risk(refs, dropped=()):
 
     evidence = ", ".join(notes)
     if not verdicts:
-        return fold(
-            "undeclared", f"{evidence} — 이슈 참조 0건, 위험도 판독 불가", excluded
-        )
+        return fold("undeclared", f"{evidence} — 이슈 참조 0건, 위험도 판독 불가", excluded)
     if "high" in verdicts:
         return fold("high", evidence, excluded)
     if "undeclared" in verdicts:
@@ -529,8 +515,7 @@ def judge_author_identity(payload) -> dict:
     if reviewer not in REVIEWER_VENDORS:
         return {
             **result,
-            "block": f"리뷰어 벤더 미상({reviewer!r}) — 자기리뷰 여부를 판정할 수 없다 "
-            "(fail-closed)",
+            "block": f"리뷰어 벤더 미상({reviewer!r}) — 자기리뷰 여부를 판정할 수 없다 (fail-closed)",
         }
 
     identity = review_route.identify_author(emails, payload.get("head_ref") or "")
@@ -591,9 +576,7 @@ def decide_arm(payload) -> dict:
     """자동 머지 arm 여부 — 조건 ②③④ 를 판정한다 (① 게이트는 `gate` 서브커맨드가 맡는다)."""
     head_sha = payload.get("head_sha") or ""
     marker_sha = payload.get("marker_sha") or ""
-    risk, evidence, excluded_prs = read_risk(
-        payload.get("issue_refs") or [], payload.get("dropped_refs") or []
-    )
+    risk, evidence, excluded_prs = read_risk(payload.get("issue_refs") or [], payload.get("dropped_refs") or [])
     bump = classify_bump(payload.get("pr_title"))
     identity = judge_author_identity(payload)
     base = {
@@ -633,8 +616,7 @@ def decide_arm(payload) -> dict:
     if not bot_reviews or bot_reviews[-1].get("state") != "APPROVED":
         return {
             **base,
-            "reason": "현재 head 에 대한 봇 승인 리뷰 없음 (조건 ② 미충족 — "
-            "리뷰 게시 실패 또는 push 로 낡음)",
+            "reason": "현재 head 에 대한 봇 승인 리뷰 없음 (조건 ② 미충족 — 리뷰 게시 실패 또는 push 로 낡음)",
         }
 
     if identity["block"]:
@@ -665,18 +647,11 @@ def decide_arm(payload) -> dict:
     # *낮은* 것이 아니다 — 그 자리는 fail-closed 로 남긴다. 완화의 대상은 「선언을 빠뜨렸다」
     # 뿐이고, 「알 수 없다」는 종전대로 사람 경로다.
     lookup_failed = "조회 실패" in (evidence or "")
-    if (
-        risk == "undeclared"
-        and not lookup_failed
-        and not payload.get("pr_author_is_bot")
-    ):
+    if risk == "undeclared" and not lookup_failed and not payload.get("pr_author_is_bot"):
         return {
             **base,
             "arm": True,
-            "reason": (
-                f"위험도 미선언 ({evidence}) + 봇 승인 — arm "
-                "(미선언은 저위험으로 본다 · 리드 결정 2026-08-18)"
-            ),
+            "reason": (f"위험도 미선언 ({evidence}) + 봇 승인 — arm (미선언은 저위험으로 본다 · 리드 결정 2026-08-18)"),
         }
     if payload.get("pr_author_is_bot"):
         if bump is None:
@@ -720,9 +695,7 @@ def decide_delegate(payload) -> dict:
             f"{' · source=manual(사람이 타이핑한 한 줄일 수 있다)' if payload.get('manual') else ''}"
         )
     elif payload.get("marker_sha") != payload.get("head_sha"):
-        reasons.append(
-            "① 마커가 현재 head 의 것이 아님 — 낡은 판정으로는 머지하지 않는다"
-        )
+        reasons.append("① 마커가 현재 head 의 것이 아님 — 낡은 판정으로는 머지하지 않는다")
 
     if gate_state != "pass":
         reasons.append(
@@ -741,13 +714,10 @@ def decide_delegate(payload) -> dict:
     # (그물이 못박은 계약), 미선언을 이유로 그 문을 열면 major 의존성 상승이 위임으로 샌다.
     _lookup_failed = "조회 실패" in (arm.get("risk_evidence") or "")
     _bot = bool(payload.get("pr_author_is_bot"))
-    _risk_ok = arm["risk"] == "low" or (
-        arm["risk"] == "undeclared" and not _lookup_failed and not _bot
-    )
+    _risk_ok = arm["risk"] == "low" or (arm["risk"] == "undeclared" and not _lookup_failed and not _bot)
     if not _risk_ok:
         reasons.append(
-            f"③ 저위험 확정 아님 (위험도: {arm['risk']} — {arm['risk_evidence']}) — "
-            "미선언·고위험은 사람 경로다"
+            f"③ 저위험 확정 아님 (위험도: {arm['risk']} — {arm['risk_evidence']}) — 미선언·고위험은 사람 경로다"
         )
 
     # `decide_arm` 이 막은 것은 **항상** 함께 싣는다. 승인 부재·자기리뷰 차단·sha 형식 불량은
@@ -798,9 +768,7 @@ def judge_gate(records, *, final: bool = False):
 
 def _gate_main(argv) -> int:
     final = "--final" in argv
-    records = gate_lib.parse_check_runs(
-        sys.stdin.read() if not sys.stdin.isatty() else ""
-    )
+    records = gate_lib.parse_check_runs(sys.stdin.read() if not sys.stdin.isatty() else "")
     state, lines = judge_gate(records, final=final)
     for line in lines:
         print(line)
@@ -831,10 +799,7 @@ def main(argv) -> int:
     elif command == "delegate":
         json.dump(decide_delegate(payload), sys.stdout, ensure_ascii=False)
     else:
-        print(
-            f"::error::알 수 없는 서브커맨드: {command!r} "
-            "(record|scan-refs|arm|delegate|gate)"
-        )
+        print(f"::error::알 수 없는 서브커맨드: {command!r} (record|scan-refs|arm|delegate|gate)")
         return 1
     print()
     return 0

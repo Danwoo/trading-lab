@@ -22,10 +22,7 @@ OTHER = "b" * 40
 def marker(sha=HEAD, verdict="merge_ok", model="kimi", manual=False, tier=None):
     tail = " source=manual" if manual else ""
     tier_field = f" tier={tier}" if tier else ""
-    return (
-        f"<!-- cross-review v1 model={model}{tier_field} "
-        f"verdict={verdict} sha={sha}{tail} -->"
-    )
+    return f"<!-- cross-review v1 model={model}{tier_field} verdict={verdict} sha={sha}{tail} -->"
 
 
 def comment(
@@ -122,11 +119,7 @@ RECORD_CASES = [
         "비-멤버 사람 코멘트는 봇 축이 열려도 여전히 막힌다  (공격 ①)",
         {
             "head_sha": HEAD,
-            "comments": [
-                comment(
-                    marker(), association="NONE", login="stranger", user_type="User"
-                )
-            ],
+            "comments": [comment(marker(), association="NONE", login="stranger", user_type="User")],
             "existing_reviews": [],
         },
         {"post_review": False, "arm_candidate": False, "marker_sha": None},
@@ -646,9 +639,7 @@ ARM_CASES = [
             "pr_author_login": "dependabot[bot]",
             "pr_title": "build(deps): bump pyjwt from 2.12.1 to 2.13.0 in /template-mcp-service",
             "issue_refs": [],
-            "commit_author_emails": [
-                "49699333+dependabot[bot]@users.noreply.github.com"
-            ],
+            "commit_author_emails": ["49699333+dependabot[bot]@users.noreply.github.com"],
         },
         {"arm": True, "bot_bump": "non-major", "self_vendor": False},
     ),
@@ -658,9 +649,7 @@ ARM_CASES = [
             "pr_author_is_bot": True,
             "pr_title": "build(deps): bump cryptography from 48.0.1 to 50.0.0 in /market-data-mcp-service",
             "issue_refs": [],
-            "commit_author_emails": [
-                "49699333+dependabot[bot]@users.noreply.github.com"
-            ],
+            "commit_author_emails": ["49699333+dependabot[bot]@users.noreply.github.com"],
         },
         {"arm": False, "bot_bump": "major"},
     ),
@@ -670,9 +659,7 @@ ARM_CASES = [
             "pr_author_is_bot": True,
             "pr_title": "build(deps): bump the pip group with 3 updates",
             "issue_refs": [],
-            "commit_author_emails": [
-                "49699333+dependabot[bot]@users.noreply.github.com"
-            ],
+            "commit_author_emails": ["49699333+dependabot[bot]@users.noreply.github.com"],
         },
         {"arm": False, "bot_bump": None},
     ),
@@ -696,13 +683,10 @@ ARM_CASES = [
             "pr_author_is_bot": True,
             "pr_author_login": "dependabot[bot]",
             "pr_title": (
-                "build(deps): update uvicorn[standard] requirement "
-                "from ~=0.47.0 to ~=0.52.1 in /backend-service"
+                "build(deps): update uvicorn[standard] requirement from ~=0.47.0 to ~=0.52.1 in /backend-service"
             ),
             "issue_refs": [],
-            "commit_author_emails": [
-                "49699333+dependabot[bot]@users.noreply.github.com"
-            ],
+            "commit_author_emails": ["49699333+dependabot[bot]@users.noreply.github.com"],
         },
         {"arm": True, "bot_bump": "non-major", "self_vendor": False},
     ),
@@ -711,13 +695,10 @@ ARM_CASES = [
         {
             "pr_author_is_bot": True,
             "pr_title": (
-                "build(deps): update psycopg[binary] requirement "
-                "from ~=3.2.13 to ~=4.0.1 in /multi-agent-service"
+                "build(deps): update psycopg[binary] requirement from ~=3.2.13 to ~=4.0.1 in /multi-agent-service"
             ),
             "issue_refs": [],
-            "commit_author_emails": [
-                "49699333+dependabot[bot]@users.noreply.github.com"
-            ],
+            "commit_author_emails": ["49699333+dependabot[bot]@users.noreply.github.com"],
         },
         {"arm": False, "bot_bump": "major"},
     ),
@@ -725,14 +706,9 @@ ARM_CASES = [
         "봇 PR 묶음 제목(실물 #114) → 형식 밖이라 arm 금지  (공격 ⑥ fail-closed)",
         {
             "pr_author_is_bot": True,
-            "pr_title": (
-                "build(deps): bump the non-major group across 10 directories "
-                "with 19 updates"
-            ),
+            "pr_title": ("build(deps): bump the non-major group across 10 directories with 19 updates"),
             "issue_refs": [],
-            "commit_author_emails": [
-                "49699333+dependabot[bot]@users.noreply.github.com"
-            ],
+            "commit_author_emails": ["49699333+dependabot[bot]@users.noreply.github.com"],
         },
         {"arm": False, "bot_bump": None},
     ),
@@ -766,33 +742,27 @@ TITLE_CASES = [
     # ── ② 새 형식 `update X requirement from ~=A to ~=B` — extras 대괄호 + 제약 연산자 ──
     (
         "새 형식 patch 상승 — extras 대괄호 (실물 #118)",
-        "build(deps): update uvicorn[standard] requirement "
-        "from ~=0.47.0 to ~=0.52.1 in /backend-service",
+        "build(deps): update uvicorn[standard] requirement from ~=0.47.0 to ~=0.52.1 in /backend-service",
         "non-major",
     ),
     (
         "새 형식 minor 상승 — extras 대괄호 (실물 #115)",
-        "build(deps): update alembic[tz] requirement "
-        "from ~=1.18.4 to ~=1.19.1 in /backend-service",
+        "build(deps): update alembic[tz] requirement from ~=1.18.4 to ~=1.19.1 in /backend-service",
         "non-major",
     ),
     (
         "새 형식 minor 상승 — major 자리 3 유지 (실물 #122)",
-        "build(deps): update psycopg[binary] requirement "
-        "from ~=3.2.13 to ~=3.3.4 in /multi-agent-service",
+        "build(deps): update psycopg[binary] requirement from ~=3.2.13 to ~=3.3.4 in /multi-agent-service",
         "non-major",
     ),
     (
-        "새 형식 major 상승 — 실물 #122 의 버전만 major 넘게 바꾼 변형 "
-        "(새 형식 major 실물은 아직 열린 적 없다)",
-        "build(deps): update psycopg[binary] requirement "
-        "from ~=3.2.13 to ~=4.0.1 in /multi-agent-service",
+        "새 형식 major 상승 — 실물 #122 의 버전만 major 넘게 바꾼 변형 (새 형식 major 실물은 아직 열린 적 없다)",
+        "build(deps): update psycopg[binary] requirement from ~=3.2.13 to ~=4.0.1 in /multi-agent-service",
         "major",
     ),
     (
         "새 형식 — 제약 연산자 없는 버전도 읽는다 (실물 #115 에서 `~=` 만 뗀 변형)",
-        "build(deps): update alembic[tz] requirement "
-        "from 1.18.4 to 2.0.0 in /backend-service",
+        "build(deps): update alembic[tz] requirement from 1.18.4 to 2.0.0 in /backend-service",
         "major",
     ),
     # ── 못 읽는 제목은 그대로 못 읽어야 한다 (fail-closed — arm 거부로 이어진다) ──
@@ -823,8 +793,7 @@ TITLE_CASES = [
     ),
     (
         "범위 제약 — major 가 하나로 안 정해진다 (지어낸 제목: 범위 실물은 아직 없다)",
-        "build(deps): update requests requirement "
-        "from >=2.0,<3.0 to >=2.0,<4.0 in /backend-service",
+        "build(deps): update requests requirement from >=2.0,<3.0 to >=2.0,<4.0 in /backend-service",
         None,
     ),
     (
@@ -1210,9 +1179,7 @@ def main() -> int:
 
     for desc, override, expected in ARM_CASES:
         total += 1
-        check_subset(
-            rr.decide_arm({**ARM_BASE, **override}), expected, f"arm: {desc}", failures
-        )
+        check_subset(rr.decide_arm({**ARM_BASE, **override}), expected, f"arm: {desc}", failures)
 
     for desc, title, expected in TITLE_CASES:
         total += 1
@@ -1260,15 +1227,10 @@ def main() -> int:
         total += 1
         got = rr.decide_delegate({**DELEGATE_BASE, **override})
         if got["allow"] != expect_allow:
-            failures.append(
-                f"delegate: {desc}: allow 기대 {expect_allow} ≠ 실제 {got['allow']} "
-                f"({got['reasons']})"
-            )
+            failures.append(f"delegate: {desc}: allow 기대 {expect_allow} ≠ 실제 {got['allow']} ({got['reasons']})")
             continue
         if needle and not any(needle in r for r in got["reasons"]):
-            failures.append(
-                f"delegate: {desc}: 사유에 {needle!r} 이 없다 ({got['reasons']})"
-            )
+            failures.append(f"delegate: {desc}: 사유에 {needle!r} 이 없다 ({got['reasons']})")
         # 허용은 사유 0건, 거부는 사유 1건 이상 — 둘이 어긋나면 코멘트가 비거나 거짓이 된다
         if bool(got["reasons"]) == got["allow"]:
             failures.append(f"delegate: {desc}: allow 와 사유 목록이 어긋난다 ({got})")
@@ -1285,8 +1247,7 @@ def main() -> int:
     )
     if len(multi["reasons"]) < 3:
         failures.append(
-            f"delegate: 조건 셋이 동시에 깨졌는데 사유가 {len(multi['reasons'])}건뿐이다 "
-            f"({multi['reasons']})"
+            f"delegate: 조건 셋이 동시에 깨졌는데 사유가 {len(multi['reasons'])}건뿐이다 ({multi['reasons']})"
         )
 
     for desc, records, final, expected_state in GATE_CASES:

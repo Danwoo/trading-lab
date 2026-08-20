@@ -64,14 +64,10 @@ SCAN_TARGETS: list[ScanTarget] = [
 ALLOWLIST: list[tuple[str, str, str]] = []
 
 # (20|21)xx + 유효 월·일만 — 연도 뒤 아무 숫자나 날짜로 오독하지 않는다 (volume 19840000 등).
-_ISO_DATE = re.compile(
-    r"(?<!\d)(?:20|21)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)"
-)
+_ISO_DATE = re.compile(r"(?<!\d)(?:20|21)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?!\d)")
 # 왼쪽 경계만 비숫자 요구 — "D20260620-…" 같은 접두 식별자와 "20250314000123" 같은
 # 날짜+일련 연접은 잡고, "0320000310" 처럼 숫자열 중간에서 우연히 날짜로 읽히는 것은 제외.
-_COMPACT_DATE = re.compile(
-    r"(?<!\d)(?:20|21)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])"
-)
+_COMPACT_DATE = re.compile(r"(?<!\d)(?:20|21)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])")
 _YEAR_RANGE = range(2000, 2200)
 
 
@@ -79,15 +75,9 @@ def _docstring_ids(tree: ast.AST) -> set[int]:
     """모듈·클래스·함수 독스트링 Constant 노드의 id 집합 — 설명 문서는 검사 대상이 아니다."""
     ids: set[int] = set()
     for node in ast.walk(tree):
-        if isinstance(
-            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
-        ):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
             body = getattr(node, "body", [])
-            if (
-                body
-                and isinstance(body[0], ast.Expr)
-                and isinstance(body[0].value, ast.Constant)
-            ):
+            if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
                 if isinstance(body[0].value.value, str):
                     ids.add(id(body[0].value))
     return ids
@@ -100,21 +90,11 @@ def _field_year_literals(tree: ast.AST) -> list[tuple[int, str]]:
         if not isinstance(node, ast.Call):
             continue
         func = node.func
-        name = (
-            func.id
-            if isinstance(func, ast.Name)
-            else func.attr
-            if isinstance(func, ast.Attribute)
-            else None
-        )
+        name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
         if name != "Field":
             continue
         for arg in [*node.args, *[kw.value for kw in node.keywords]]:
-            if (
-                isinstance(arg, ast.Constant)
-                and isinstance(arg.value, int)
-                and arg.value in _YEAR_RANGE
-            ):
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, int) and arg.value in _YEAR_RANGE:
                 hits.append(
                     (
                         arg.lineno,
@@ -127,11 +107,7 @@ def _field_year_literals(tree: ast.AST) -> list[tuple[int, str]]:
 def _string_date_literals(tree: ast.AST, skip_ids: set[int]) -> list[tuple[int, str]]:
     hits: list[tuple[int, str]] = []
     for node in ast.walk(tree):
-        if (
-            not isinstance(node, ast.Constant)
-            or not isinstance(node.value, str)
-            or id(node) in skip_ids
-        ):
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str) or id(node) in skip_ids:
             continue
         for pattern, label in (
             (_ISO_DATE, "ISO 날짜"),
@@ -150,13 +126,7 @@ def _allowed(relative_path: str, description: str) -> bool:
 
 
 def _match(target: ScanTarget) -> list[Path]:
-    return sorted(
-        {
-            path
-            for path in REPO_ROOT.glob(target.glob)
-            if path.is_file() and "__pycache__" not in path.parts
-        }
-    )
+    return sorted({path for path in REPO_ROOT.glob(target.glob) if path.is_file() and "__pycache__" not in path.parts})
 
 
 def _service_of(path: Path) -> str:
@@ -169,8 +139,7 @@ def main() -> int:
     matched: dict[str, list[Path]] = {t.label: _match(t) for t in SCAN_TARGETS}
 
     breakdown = " · ".join(
-        f"{t.label} {len(matched[t.label])}개"
-        f"/{len({_service_of(p) for p in matched[t.label]})}서비스"
+        f"{t.label} {len(matched[t.label])}개/{len({_service_of(p) for p in matched[t.label]})}서비스"
         for t in SCAN_TARGETS
     )
     print(f"절대 날짜 스캔 대상 — {breakdown}")
@@ -203,9 +172,7 @@ def main() -> int:
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
         except SyntaxError as exc:
-            violations.append(
-                f"{relative}:{exc.lineno}: 파싱 불가 (SyntaxError: {exc.msg})"
-            )
+            violations.append(f"{relative}:{exc.lineno}: 파싱 불가 (SyntaxError: {exc.msg})")
             continue
         skip_ids = _docstring_ids(tree)
         for lineno, description in [
@@ -219,12 +186,8 @@ def main() -> int:
         print(f"절대 날짜 리터럴 위반 {len(violations)}건 (스캔 {len(files)}개 파일):")
         for violation in violations:
             print(f"  - {violation}")
-        print(
-            "낡을 값은 조회 시점 상대 계산으로 바꾼다 (선례: #268 days_ago, #228 now_kst 기반 상한)."
-        )
-        print(
-            "안 움직이는 과거 사실이면 이 스크립트의 ALLOWLIST 에 사유와 함께 등록한다."
-        )
+        print("낡을 값은 조회 시점 상대 계산으로 바꾼다 (선례: #268 days_ago, #228 now_kst 기반 상한).")
+        print("안 움직이는 과거 사실이면 이 스크립트의 ALLOWLIST 에 사유와 함께 등록한다.")
         return 1
     # 라벨을 손으로 쓰지 않는다 — 손으로 쓴 문구는 대상이 줄어도 그대로라 읽는 사람을 속인다
     # (#402: schemas 19개가 통째로 안 읽혔는데 출력은 여전히 "(clients·schemas)" 였다).

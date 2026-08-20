@@ -134,9 +134,7 @@ NON_COLOR_PREFIXES = (
 # (`.auth-backdrop` 인증 배경)은 모드와 무관하게 어두운 팔레트로 그려진다. 그래서 라이트 벌의
 # 곱집합에서는 뺀다. 빼는 것을 조용히 하지 않으려고 벌마다 제외 건수를 출력한다.
 # `--ink-primary` 는 소비자가 사라져 #73 S5 가 지웠다 — 남은 셋은 그 배경이 아직 쓴다.
-LEGACY_TOKENS = frozenset(
-    {"--slate-void", "--slate-panel", "--slate-line", "--signal-warn"}
-)
+LEGACY_TOKENS = frozenset({"--slate-void", "--slate-panel", "--slate-line", "--signal-warn"})
 
 # 화면이 실제로 띄우는 네 벌. 각 벌은 `:root` 위에 뒤 선택자를 순서대로 겹쳐 만든다
 # (CSS 캐스케이드 그대로 — globals.css 의 선택자 순서와 같아야 한다).
@@ -289,16 +287,12 @@ def run_reference_cases() -> bool:
     for label, foreground, background, expected in REFERENCE_CASES:
         fg, bg = parse_hex(foreground), parse_hex(background)
         if fg is None or bg is None:
-            _fail(
-                f"기준 케이스의 색을 읽지 못했습니다: {label} ({foreground} / {background})"
-            )
+            _fail(f"기준 케이스의 색을 읽지 못했습니다: {label} ({foreground} / {background})")
             ok = False
             continue
         actual = contrast_ratio(fg, bg)
         agrees = abs(actual - expected) < 0.005
-        print(
-            f"  {'OK ' if agrees else '불일치'} {label}: 계산 {actual:.2f}:1 / 기대 {expected:.2f}:1"
-        )
+        print(f"  {'OK ' if agrees else '불일치'} {label}: 계산 {actual:.2f}:1 / 기대 {expected:.2f}:1")
         if not agrees:
             _fail(
                 f"기준 케이스 불일치 — {label}: 계산 {actual:.4f}:1 이 기대 {expected:.2f}:1 과 다릅니다. "
@@ -343,9 +337,7 @@ def classify(tokens: dict[str, str]) -> tuple[dict[str, Rgb], dict[str, str], bo
         ok = False
 
     if unclassified:
-        _fail(
-            f"분류표에 없는 색 토큰 {len(unclassified)}건 — 곱집합에서 조용히 빠집니다:"
-        )
+        _fail(f"분류표에 없는 색 토큰 {len(unclassified)}건 — 곱집합에서 조용히 빠집니다:")
         for name in unclassified:
             _fail(f"  · {name}")
         _fail(
@@ -384,31 +376,20 @@ def check_set(
         print(f"  {role} {len(names)}건{suffix}: {', '.join(names) or '없음'}")
 
     if len(colors) < MIN_COLOR_TOKENS:
+        _fail(f"{label}: 색 토큰을 {len(colors)}건 수집했습니다 (하한 {MIN_COLOR_TOKENS}) — fail-closed 종료")
         _fail(
-            f"{label}: 색 토큰을 {len(colors)}건 수집했습니다 (하한 {MIN_COLOR_TOKENS}) — fail-closed 종료"
-        )
-        _fail(
-            "토큰이 이동·삭제됐거나 값 형식이 바뀌었을 수 있습니다. "
-            "정당한 삭제라면 MIN_COLOR_TOKENS 도 함께 내리세요."
+            "토큰이 이동·삭제됐거나 값 형식이 바뀌었을 수 있습니다. 정당한 삭제라면 MIN_COLOR_TOKENS 도 함께 내리세요."
         )
         return 0, [], False
 
     combinations: list[tuple[str, str]] = [
-        (fg, bg)
-        for role in INK_ROLES
-        for fg in names_by_role[role]
-        for bg in names_by_role[SURFACE]
+        (fg, bg) for role in INK_ROLES for fg in names_by_role[role] for bg in names_by_role[SURFACE]
     ]
-    combinations += [
-        (fg, bg)
-        for fg in names_by_role[INK_ANY]
-        for bg in names_by_role[CONTROL_SURFACE]
-    ]
+    combinations += [(fg, bg) for fg in names_by_role[INK_ANY] for bg in names_by_role[CONTROL_SURFACE]]
 
     if len(combinations) < MIN_COMBINATIONS_PER_SET:
         _fail(
-            f"{label}: 검사할 조합이 {len(combinations)}건입니다 "
-            f"(하한 {MIN_COMBINATIONS_PER_SET}) — fail-closed 종료"
+            f"{label}: 검사할 조합이 {len(combinations)}건입니다 (하한 {MIN_COMBINATIONS_PER_SET}) — fail-closed 종료"
         )
         _fail("분류가 한쪽으로 쏠렸는지 확인하세요.")
         return len(combinations), [], False
@@ -447,14 +428,13 @@ def print_ink_ladder(sets: dict[str, dict[str, str]]) -> None:
         pairs = [
             f"{a} ↔ {b}: {contrast_ratio(x, y):.2f}:1"  # type: ignore[arg-type]
             for (a, x), (b, y) in zip(
-                list(zip(ladder, values))[:-1], list(zip(ladder, values))[1:]
+                list(zip(ladder, values, strict=True))[:-1],
+                list(zip(ladder, values, strict=True))[1:],
+                strict=True,
             )
         ]
         print(f"  {label}: " + " · ".join(pairs))
-    print(
-        "  라벨·표 헤더는 --ink-muted 가 받는다(리드 결정 ㉡). --ink-faint 는 비텍스트 전용이라 "
-        "이 사다리에 없다."
-    )
+    print("  라벨·표 헤더는 --ink-muted 가 받는다(리드 결정 ㉡). --ink-faint 는 비텍스트 전용이라 이 사다리에 없다.")
     print()
 
 
@@ -463,9 +443,7 @@ def main(argv: list[str]) -> int:
 
     if not GLOBALS_CSS.is_file():
         _fail(f"토큰 정의 파일이 없습니다: {GLOBALS_CSS.relative_to(REPO_ROOT)}")
-        _fail(
-            "경로가 바뀌었을 수 있습니다 — 이 스크립트의 GLOBALS_CSS 를 함께 고치세요."
-        )
+        _fail("경로가 바뀌었을 수 있습니다 — 이 스크립트의 GLOBALS_CSS 를 함께 고치세요.")
         return 1
 
     css = GLOBALS_CSS.read_text(encoding="utf-8")
@@ -506,29 +484,18 @@ def main(argv: list[str]) -> int:
     total_combinations = 0
     all_violations: list[tuple[str, str, str, float]] = []
     for label, tokens in sets.items():
-        count, violations, set_ok = check_set(
-            label, tokens, include_legacy_by_label[label]
-        )
+        count, violations, set_ok = check_set(label, tokens, include_legacy_by_label[label])
         total_combinations += count
         all_violations += [(label, fg, bg, r) for fg, bg, r in violations]
         ok = ok and set_ok
 
-    print(
-        f"검사한 조합 {total_combinations}건 (벌 {len(sets)}개 합) · "
-        f"AA({AA_TEXT}:1) 미달 {len(all_violations)}건"
-    )
+    print(f"검사한 조합 {total_combinations}건 (벌 {len(sets)}개 합) · AA({AA_TEXT}:1) 미달 {len(all_violations)}건")
 
     if all_violations:
         print(f"::warning::AA({AA_TEXT}:1) 미달 조합 {len(all_violations)}건:")
         for label, fg_name, bg_name, ratio in all_violations:
-            large_ok = (
-                "큰 글씨(3:1)는 통과"
-                if ratio >= AA_LARGE_TEXT
-                else "큰 글씨(3:1)도 미달"
-            )
-            print(
-                f"::warning::  [{label}] {fg_name} on {bg_name} — {ratio:.2f}:1 ({large_ok})"
-            )
+            large_ok = "큰 글씨(3:1)는 통과" if ratio >= AA_LARGE_TEXT else "큰 글씨(3:1)도 미달"
+            print(f"::warning::  [{label}] {fg_name} on {bg_name} — {ratio:.2f}:1 ({large_ok})")
 
     if all_violations and FAIL_ON_AA_VIOLATION and not report_only:
         _fail(f"AA 미달 조합 {len(all_violations)}건 — 토큰 값을 고치세요")

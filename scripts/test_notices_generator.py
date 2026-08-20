@@ -51,9 +51,7 @@ APACHE_HEADING = gen.APACHE_HEADING
 
 def variant_text(index: int) -> str:
     """변형마다 다른 라이선스 원문 (내용이 다르면 다른 변형으로 묶여야 한다)."""
-    return (
-        f"Apache License\n   Version 2.0 — fixture variant {index}\n   (본문 {index})"
-    )
+    return f"Apache License\n   Version 2.0 — fixture variant {index}\n   (본문 {index})"
 
 
 def make_scan(
@@ -141,8 +139,7 @@ def make_document() -> str:
         "",
         "## 2. 그 외 permissive 라이선스 (1개)",
         "",
-        f"{PROSE_MARK} — 1개 중 1개는 npm 배포본에 원문을 동봉하고, 1개는 `package.json` 의 "
-        "선언만 있다.",
+        f"{PROSE_MARK} — 1개 중 1개는 npm 배포본에 원문을 동봉하고, 1개는 `package.json` 의 선언만 있다.",
         "",
         "### 예외 — 원문 파일 없이 선언만 있는 패키지 (1개)",
         "",
@@ -190,10 +187,7 @@ def expect_problem(name: str, run, site: str) -> list[str]:
     except checker.Problem as problem:
         if site in str(problem):
             return []
-        return [
-            f"{name}: Problem 이 다른 자리에서 났다 — 기대 {site!r} / 실제 "
-            f"{str(problem)[:120]!r}"
-        ]
+        return [f"{name}: Problem 이 다른 자리에서 났다 — 기대 {site!r} / 실제 {str(problem)[:120]!r}"]
     return [f"{name}: Problem 이 나야 하는데 조용히 성공했다"]
 
 
@@ -210,10 +204,7 @@ def run_cases() -> tuple[list[str], int]:
         # ① 라운드트립 — 실측이 그대로 문서에 박힌다.
         cases += 1
         total = len(scan)
-        if (
-            f"프로덕션 의존성 {total}개" not in built
-            or f"§1·§2 가 그 {total}개고" not in built
-        ):
+        if f"프로덕션 의존성 {total}개" not in built or f"§1·§2 가 그 {total}개고" not in built:
             failures.append(f"① 총계 {total} 이 최상단 두 자리에 박히지 않았다")
         if updated <= 0:
             failures.append(f"① 갱신 구간 수가 {updated} 이다 — 0건은 통과가 아니다")
@@ -222,9 +213,7 @@ def run_cases() -> tuple[list[str], int]:
         cases += 1
         again, _ = gen.build(built, scan)
         if again != built:
-            failures.append(
-                "② 같은 실측으로 두 번 돌렸는데 결과가 달라졌다 (멱등 아님)"
-            )
+            failures.append("② 같은 실측으로 두 번 돌렸는데 결과가 달라졌다 (멱등 아님)")
 
         # ③ 사람 산문 보존 — §3 은 바이트 그대로, 산문 표식도 남는다.
         cases += 1
@@ -332,8 +321,7 @@ def run_cases() -> tuple[list[str], int]:
         cases += 1
         doubled = built.replace(
             "### 예외 — 원문 파일 없이 선언만 있는 패키지",
-            "원문 파일 없이 선언만 있는 패키지 (9개)\n\n"
-            "### 예외 — 원문 파일 없이 선언만 있는 패키지",
+            "원문 파일 없이 선언만 있는 패키지 (9개)\n\n### 예외 — 원문 파일 없이 선언만 있는 패키지",
             1,
         )
         failures += expect_problem(
@@ -345,9 +333,7 @@ def run_cases() -> tuple[list[str], int]:
         # ⑬-b 절 밖의 중복도 잡는다 — 총계는 문서 전역에서 1회여야 한다. 절 안에 같은 문장이
         # 또 생기면 최상단만 갱신되고 그 문장은 낡은 숫자로 남는다(검사기와도 갈린다).
         cases += 1
-        echoed = built.replace(
-            "## 3. 번들 정적 자산", "프로덕션 의존성 1개\n\n## 3. 번들 정적 자산", 1
-        )
+        echoed = built.replace("## 3. 번들 정적 자산", "프로덕션 의존성 1개\n\n## 3. 번들 정적 자산", 1)
         failures += expect_problem(
             "⑬-b 앵커 2회(절 밖)",
             lambda: gen.build(echoed, scan),
@@ -372,11 +358,7 @@ def run_cases() -> tuple[list[str], int]:
         # 지워도 초록이 남는다 — 실제로 그랬다(PR #31 리뷰).
         cases += 1
         unresolved = {
-            package: (
-                {"licenses": entry["licenses"]}
-                if package.startswith("perm-")
-                else dict(entry)
-            )
+            package: ({"licenses": entry["licenses"]} if package.startswith("perm-") else dict(entry))
             for package, entry in scan.items()
         }
         failures += expect_problem(
@@ -414,9 +396,7 @@ def main() -> int:
     failures, cases = run_cases()
     print(f"수집한 케이스 {cases}개 (하한 {MIN_CASES})")
     if cases < MIN_CASES:
-        print(
-            f"::error::케이스를 {cases}개만 수집했습니다 — 하한 {MIN_CASES} 미만 (fail-closed)"
-        )
+        print(f"::error::케이스를 {cases}개만 수집했습니다 — 하한 {MIN_CASES} 미만 (fail-closed)")
         return 1
     if failures:
         print(f"\n실패 {len(failures)}건:")

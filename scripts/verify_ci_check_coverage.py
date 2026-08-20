@@ -62,8 +62,7 @@ WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 # 검사 단위가 아닌 것 — 이유를 적는다. 실재하지 않으면 실패한다.
 EXEMPT: dict[str, str] = {
     "scripts/verify_alembic_head_freshness.py": (
-        "판정 함수를 제공하는 라이브러리 — 실행 주체는 "
-        "backend-service/tests/test_alembic_head_freshness.py 다 (#387)."
+        "판정 함수를 제공하는 라이브러리 — 실행 주체는 backend-service/tests/test_alembic_head_freshness.py 다 (#387)."
     ),
     "frontend/scripts/check-deps-sync.js": (
         "frontend/package.json 의 pretest·predev 훅이 부른다 — `npm test` 스텝이 돌 때 "
@@ -233,18 +232,10 @@ def collect_coverage() -> tuple[Coverage, int]:
                     idx = next(i for i, t in enumerate(tokens) if t.endswith(runner))
                     args = tokens[idx + 1 :]
                     positional = [a for a in args if not a.startswith("-")]
-                    skips = {
-                        args[i + 1]
-                        for i, a in enumerate(args)
-                        if a == "--skip" and i + 1 < len(args)
-                    }
+                    skips = {args[i + 1] for i, a in enumerate(args) if a == "--skip" and i + 1 < len(args)}
                     if not positional:
                         continue
-                    target = (
-                        (REPO_ROOT / cwd / positional[0])
-                        if cwd
-                        else (REPO_ROOT / positional[0])
-                    )
+                    target = (REPO_ROOT / cwd / positional[0]) if cwd else (REPO_ROOT / positional[0])
                     for f in sorted(target.glob(pattern)):
                         if f.name in skips:
                             continue
@@ -293,9 +284,7 @@ def main() -> int:
     inventory = sorted({u for files in inventory_by_axis.values() for u in files})
 
     print(f"워크플로 {workflow_count}개 파싱 · run 블록 {len(cov.commands)}개")
-    print(
-        f"레포의 검증 단위 {len(inventory)}개 · CI 가 실행하는 파일 {len(cov.files)}개"
-    )
+    print(f"레포의 검증 단위 {len(inventory)}개 · CI 가 실행하는 파일 {len(cov.files)}개")
     print("인벤토리 축별 수집 (축마다 하한 — #402):")
     for parent_glob, child_glob, minimum in INVENTORY_AXES:
         label = axis_label(parent_glob, child_glob)
@@ -304,9 +293,7 @@ def main() -> int:
 
     # fail-closed: 아무것도 안 봤으면 통과가 아니다.
     if workflow_count == 0 or not cov.commands:
-        _fail(
-            "워크플로 또는 run 블록을 0건 수집했습니다 — 파싱이 깨졌거나 파일이 사라졌습니다"
-        )
+        _fail("워크플로 또는 run 블록을 0건 수집했습니다 — 파싱이 깨졌거나 파일이 사라졌습니다")
         return 1
     if not inventory:
         _fail("검증 단위를 0건 수집했습니다 — 글롭이 현실과 어긋났습니다")
@@ -330,9 +317,7 @@ def main() -> int:
     # 예외 목록이 낡지 않았는지 (지정한 파일이 실재해야 한다)
     for path, reason in sorted(EXEMPT.items()):
         if not (REPO_ROOT / path).is_file():
-            _fail(
-                f"EXEMPT 에 적힌 파일이 없습니다: {path} — 예외 목록이 낡았습니다 ({reason})"
-            )
+            _fail(f"EXEMPT 에 적힌 파일이 없습니다: {path} — 예외 목록이 낡았습니다 ({reason})")
             ok = False
 
     missing = [u for u in inventory if u not in cov.files and u not in EXEMPT]
@@ -340,9 +325,7 @@ def main() -> int:
         _fail(f"어느 워크플로에서도 실행되지 않는 검증 단위 {len(missing)}건:")
         for u in missing:
             _fail(f"  · {u}")
-        _fail(
-            "스위트 잡에 배선하거나, 검사 단위가 아니라면 EXEMPT 에 이유와 함께 적으세요."
-        )
+        _fail("스위트 잡에 배선하거나, 검사 단위가 아니라면 EXEMPT 에 이유와 함께 적으세요.")
         ok = False
 
     joined = "\n".join(cov.commands)
@@ -358,9 +341,7 @@ def main() -> int:
         f"판정: 검증 단위 {len(inventory)}건 중 배선 {len(inventory) - len(missing) - exempt_count}건 · "
         f"예외 {exempt_count}건 · 미배선 {len(missing)}건"
     )
-    print(
-        f"판정: 명명 검사 {len(NAMED_COMMANDS)}건 중 배선 {len(NAMED_COMMANDS) - len(missing_cmds)}건"
-    )
+    print(f"판정: 명명 검사 {len(NAMED_COMMANDS)}건 중 배선 {len(NAMED_COMMANDS) - len(missing_cmds)}건")
     if ok:
         print("모든 검증 단위가 CI 에 배선돼 있습니다.")
     return 0 if ok else 1

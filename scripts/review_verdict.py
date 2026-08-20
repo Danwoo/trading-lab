@@ -137,8 +137,7 @@ def check_payload(verdict):
         "needs_changes": (
             "리뷰가 수정을 요구했다. PR 의 판정 코멘트(리뷰 본문)를 읽고 고쳐 push 하면 "
             "재리뷰가 돈다. 머지를 실제로 막는 것은 기록기가 남긴 네이티브 "
-            "CHANGES_REQUESTED 리뷰다 — 이 체크는 그 사실의 가시화다.\n\n"
-            + DEADLOCK_EXIT
+            "CHANGES_REQUESTED 리뷰다 — 이 체크는 그 사실의 가시화다.\n\n" + DEADLOCK_EXIT
         ),
         "unable": (
             "판정을 못 냈다 — 통과도 실패도 아니라 사람 판단으로 넘긴다. 원인과 조치는 "

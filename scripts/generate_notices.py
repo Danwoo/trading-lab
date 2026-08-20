@@ -121,9 +121,7 @@ def substitute(text: str, pattern: str, what: str, *replacements: str) -> str:
     """앵커의 캡처 그룹을 순서대로 갈아 끼운다 (앵커 밖의 산문은 건드리지 않는다)."""
     match = one(pattern, text, what)
     if len(match.groups()) != len(replacements):
-        raise Problem(
-            f"{what}: 캡처 {len(match.groups())}개 · 치환값 {len(replacements)}개"
-        )
+        raise Problem(f"{what}: 캡처 {len(match.groups())}개 · 치환값 {len(replacements)}개")
     rebuilt = match.group(0)
     # 뒤에서부터 갈아야 앞 그룹 치환이 뒤 그룹의 오프셋을 흔들지 않는다.
     for index in range(len(replacements), 0, -1):
@@ -142,20 +140,13 @@ def license_text(entry: dict, package: str) -> str:
             f"{package}: 라이선스 원문 파일이 없다 ({path!r}) — §1 은 원문을 실어야 하는 절이라 "
             "본문 없이 만들 수 없다. 사람이 업스트림에서 확인해야 한다"
         )
-    return (
-        Path(path)
-        .read_text(encoding="utf-8", errors="replace")
-        .replace("\r\n", "\n")
-        .strip()
-    )
+    return Path(path).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").strip()
 
 
 def classify(scanned: dict[str, dict]) -> tuple[dict[str, list[str]], list[str]]:
     """(§1 절 제목 → 패키지 목록, §2 패키지 목록). 분류표에 없는 라이선스는 Problem."""
     by_heading: dict[str, list[str]] = {heading: [] for heading, _ in SECTION1_GROUPS}
-    license_to_heading = {
-        spdx: heading for heading, spdxs in SECTION1_GROUPS for spdx in spdxs
-    }
+    license_to_heading = {spdx: heading for heading, spdxs in SECTION1_GROUPS for spdx in spdxs}
     section2: list[str] = []
     unknown: dict[str, list[str]] = {}
 
@@ -170,10 +161,7 @@ def classify(scanned: dict[str, dict]) -> tuple[dict[str, list[str]], list[str]]
             unknown.setdefault(name, []).append(package)
 
     if unknown:
-        detail = " · ".join(
-            f"{name}: {', '.join(packages[:5])}"
-            for name, packages in sorted(unknown.items())
-        )
+        detail = " · ".join(f"{name}: {', '.join(packages[:5])}" for name, packages in sorted(unknown.items()))
         raise Problem(
             f"분류표에 없는 라이선스 {len(unknown)}종이 실측에 나왔다 — {detail}. "
             "permissive 로 흘려보내지 않는다: 사람이 판단해 SECTION1_GROUPS 에 절을 만들거나 "
@@ -189,9 +177,7 @@ def classify(scanned: dict[str, dict]) -> tuple[dict[str, list[str]], list[str]]
     return by_heading, section2
 
 
-def apache_variants(
-    packages: list[str], scanned: dict[str, dict]
-) -> list[tuple[list[str], str]]:
+def apache_variants(packages: list[str], scanned: dict[str, dict]) -> list[tuple[list[str], str]]:
     """라이선스 원문이 같은 것끼리 묶는다 → [(패키지 목록, 원문)] (개수 내림차순)."""
     groups: dict[str, list[str]] = {}
     for package in packages:
@@ -220,9 +206,7 @@ def split_name_version(package: str) -> tuple[str, str]:
     return name, version
 
 
-def table_rows(
-    packages: list[str], scanned: dict[str, dict], with_license: bool
-) -> str:
+def table_rows(packages: list[str], scanned: dict[str, dict], with_license: bool) -> str:
     rows = []
     for package in packages:
         name, version = split_name_version(package)
@@ -256,20 +240,15 @@ def split_sections(text: str) -> tuple[str, dict[str, str], list[str]]:
     """(머리말, {절 번호: 본문}, 절 번호 순서). 검사기와 같은 `## N. ` 머리로 가른다."""
     marks = [m.start() for m in re.finditer(r"^## (\d)\. ", text, re.MULTILINE)]
     if len(marks) != 3:
-        raise Problem(
-            f"절 머리(`## N. `)를 {len(marks)}개 찾았다 — 기대 3개 (§1·§2·§3)"
-        )
+        raise Problem(f"절 머리(`## N. `)를 {len(marks)}개 찾았다 — 기대 3개 (§1·§2·§3)")
     head = text[: marks[0]]
     bodies = [
-        text[start : marks[index + 1] if index + 1 < len(marks) else len(text)]
-        for index, start in enumerate(marks)
+        text[start : marks[index + 1] if index + 1 < len(marks) else len(text)] for index, start in enumerate(marks)
     ]
     return head, {"1": bodies[0], "2": bodies[1], "3": bodies[2]}, ["1", "2", "3"]
 
 
-def rewrite_section1(
-    section: str, by_heading: dict[str, list[str]], scanned: dict[str, dict]
-) -> tuple[str, int]:
+def rewrite_section1(section: str, by_heading: dict[str, list[str]], scanned: dict[str, dict]) -> tuple[str, int]:
     """§1 — Apache 변형 블록과 나머지 절의 표 행. 절 제목·설명 산문은 보존한다."""
     starts = [m.start() for m in re.finditer(r"^### ", section, re.MULTILINE)]
     if len(starts) != len(SECTION1_GROUPS):
@@ -309,23 +288,18 @@ def rewrite_section1(
             chunk = chunk[:first] + render_variants(variants) + chunk[last:]
             updated += 3
         else:
-            chunk = replace_table(
-                chunk, f"§1 {heading} 표", table_rows(packages, scanned, False)
-            )
+            chunk = replace_table(chunk, f"§1 {heading} 표", table_rows(packages, scanned, False))
             updated += 1
         chunks[index] = chunk
     return preamble + "".join(chunks), updated
 
 
-def rewrite_section2(
-    section: str, packages: list[str], scanned: dict[str, dict]
-) -> tuple[str, int]:
+def rewrite_section2(section: str, packages: list[str], scanned: dict[str, dict]) -> tuple[str, int]:
     """§2 — 머리 개수·본문 서술 숫자·예외 표·나머지 표. 도입 산문은 보존한다."""
     without_file = [
         package
         for package in packages
-        if not scanned[package].get("licenseFile")
-        or not Path(scanned[package]["licenseFile"]).is_file()
+        if not scanned[package].get("licenseFile") or not Path(scanned[package]["licenseFile"]).is_file()
     ]
     with_file = [package for package in packages if package not in set(without_file)]
 
@@ -385,9 +359,7 @@ def rewrite_section2(
     # 예외 표는 `<details>` 앞, 나머지 표는 그 안이다 (검사기가 같은 경계로 읽는다).
     head, marker, tail = section.partition("<details>")
     if not marker:
-        raise Problem(
-            "§2 에 `<details>` 가 없다 — 예외 표와 나머지 표의 경계가 사라졌다"
-        )
+        raise Problem("§2 에 `<details>` 가 없다 — 예외 표와 나머지 표의 경계가 사라졌다")
     head = replace_table(head, "§2 예외 표", table_rows(without_file, scanned, True))
     tail = replace_table(tail, "§2 나머지 표", table_rows(with_file, scanned, True))
     return head + marker + tail, 8
@@ -396,9 +368,7 @@ def rewrite_section2(
 def build(text: str, scanned: dict[str, dict]) -> tuple[str, int]:
     """실측을 반영한 문서 전문과, 갱신한 구간 수."""
     if len(scanned) < MIN_PACKAGES:
-        raise Problem(
-            f"실측이 {len(scanned)}개다 — 하한 {MIN_PACKAGES} 미만 (스캔 범위가 어긋났다)"
-        )
+        raise Problem(f"실측이 {len(scanned)}개다 — 하한 {MIN_PACKAGES} 미만 (스캔 범위가 어긋났다)")
     by_heading, section2_packages = classify(scanned)
 
     head, sections, order = split_sections(text)
@@ -412,9 +382,7 @@ def build(text: str, scanned: dict[str, dict]) -> tuple[str, int]:
         head = substitute(head, pattern, what, str(len(scanned)))
 
     sections["1"], updated1 = rewrite_section1(sections["1"], by_heading, scanned)
-    sections["2"], updated2 = rewrite_section2(
-        sections["2"], section2_packages, scanned
-    )
+    sections["2"], updated2 = rewrite_section2(sections["2"], section2_packages, scanned)
     # §3 은 손대지 않는다 — npm 스캔 범위 밖이고, 검사기 축 ④ 가 저장소 파일과 대조한다.
     return head + "".join(sections[key] for key in order), 2 + updated1 + updated2
 
@@ -459,9 +427,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     print(f"  · 실측 {len(scanned)}개 ← {source}")
-    print(
-        f"  · 갱신 대상 구간 {updated}개 (총계 · §1 절 {len(SECTION1_GROUPS)}개 · §2)"
-    )
+    print(f"  · 갱신 대상 구간 {updated}개 (총계 · §1 절 {len(SECTION1_GROUPS)}개 · §2)")
 
     if rebuilt == current:
         print(f"{args.notices.name} 는 이미 실측과 같습니다 (변경 없음).")
@@ -477,9 +443,7 @@ def main(argv: list[str] | None = None) -> int:
                 lineterm="",
             )
         )
-        print(
-            f"::error::{args.notices.name} 가 실측과 어긋났습니다 (diff {len(diff)}줄):"
-        )
+        print(f"::error::{args.notices.name} 가 실측과 어긋났습니다 (diff {len(diff)}줄):")
         for line in diff[:40]:
             print(f"::error::  {line[:300]}")
         if len(diff) > 40:

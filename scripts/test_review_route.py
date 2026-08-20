@@ -83,8 +83,7 @@ CASES = [
             "reviewer": "none",
             "author_kind": "mixed",
             "author_models": "claude,kimi",
-            "identity_note": "복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, "
-            "판정 라벨 미부착(사람 경로)",
+            "identity_note": "복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, 판정 라벨 미부착(사람 경로)",
         },
     ),
     (
@@ -118,8 +117,7 @@ CASES = [
             "author_kind": "human",
             "author_models": "",
             "label_allowed": False,
-            "identity_note": "에이전트 신원 없음 — 사람 저자 취급, "
-            "판정 라벨 미부착(사람 경로)",
+            "identity_note": "에이전트 신원 없음 — 사람 저자 취급, 판정 라벨 미부착(사람 경로)",
         },
     ),
     (
@@ -175,8 +173,7 @@ CASES = [
             "author_tier": None,
             "author_kind": "agent",
             "author_models": "claude",
-            "identity_note": "claude 작성 티어 혼재(opus,sonnet) — "
-            "티어 미상 처리 (폴백 리뷰 시 판정 라벨 미부착)",
+            "identity_note": "claude 작성 티어 혼재(opus,sonnet) — 티어 미상 처리 (폴백 리뷰 시 판정 라벨 미부착)",
         },
     ),
     (
@@ -209,10 +206,7 @@ CASES = [
         "fix-42-kimi",
         ["low"],
         False,
-        {
-            "identity_note": "브랜치명(kimi)과 커밋 신원(claude) 불일치 — "
-            "§6.1 일관성 점검 실패, 커밋 신원 우선"
-        },
+        {"identity_note": "브랜치명(kimi)과 커밋 신원(claude) 불일치 — §6.1 일관성 점검 실패, 커밋 신원 우선"},
     ),
     (
         "목록 밖 에이전트형 이메일 → 관측 문구를 남긴다",
@@ -223,8 +217,7 @@ CASES = [
         {
             "author_kind": "agent",
             "label_allowed": False,
-            "identity_note": "목록 밖 에이전트형 이메일 관측: "
-            "Claude-Opus-Agent@noreply.local",
+            "identity_note": "목록 밖 에이전트형 이메일 관측: Claude-Opus-Agent@noreply.local",
         },
     ),
     (

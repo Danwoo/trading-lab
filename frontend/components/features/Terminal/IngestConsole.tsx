@@ -56,6 +56,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+export type BlockedGroup = { reason: string; fixable: boolean; targets: string[] };
+
 /**
  * 막힌 조합을 **사유로 묶는다.**
  *
@@ -66,7 +68,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
  * 것이고, 나머지는 그 소스가 원래 안 주는 것이라 읽고 넘어갈 자리다.
  */
 export function groupBlockedByReason(rows: MarketCapability[]) {
-  const groups = new Map<string, { reason: string; fixable: boolean; targets: string[] }>();
+  const groups = new Map<string, BlockedGroup>();
 
   for (const row of rows) {
     const reason = row.reason ?? "사유가 기록되지 않았습니다";
@@ -122,7 +124,32 @@ export function groupAvailableByMarket(rows: MarketCapability[]) {
     .sort((a, b) => a.market.localeCompare(b.market));
 }
 
-/** 소스 가용성 — 무엇이 지금 되고, 안 되는 것은 왜 안 되는지. */
+/**
+ * 사유 한 줄과 그 대상 목록.
+ *
+ * 대상은 소스 × 시장 × 종류 조합마다 한 줄이라 사유 하나가 수십 건을 달고 온다 — 다 펴 두면
+ * 화면이 텍스트 벽이 된다. 접어 두되 **건수는 접힌 채로도 요약에서 읽힌다.**
+ */
+function BlockedReason({ group, tone }: { group: BlockedGroup; tone: string }) {
+  return (
+    <details className="min-w-0">
+      <summary className={cn("min-w-0 cursor-pointer break-keep marker:text-ink-muted", tone)}>
+        {group.reason} <span className="text-ink-muted">({group.targets.length}건)</span>
+      </summary>
+      {/* 사유는 **서버가 정본**이다 — env 항목명과 발급 경로까지 완전한 문장으로 온다.
+        프론트가 같은 안내를 다시 만들면 서버가 아는 항목명과 갈린다. */}
+      <p className="mt-0.5 min-w-0 break-words font-mono text-2xs text-ink-muted">{group.targets.join(", ")}</p>
+    </details>
+  );
+}
+
+/**
+ * 소스 가용성 — 무엇이 지금 되고, 안 되는 것은 왜 안 되는지.
+ *
+ * 순서는 **행동할 수 있는 것부터**다: 지금 받을 수 있는 것 → 키를 넣으면 열리는 것 →
+ * 그 밖에 막힌 것(접어 둔다). 막힌 사유를 감추는 것이 아니라, 처음 온 사람이 먼저 읽는 것이
+ * 「안 되는 것들」이 되지 않게 한다.
+ */
 function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; loading: boolean }) {
   if (rows === null) {
     // 「못 읽었다」와 「비어 있다」는 다르다 — 앞의 것은 고쳐야 할 일이라 색으로 갈라 둔다.
@@ -139,19 +166,17 @@ function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; load
   const blocked = rows.filter((row) => !row.available);
   const open = groupAvailableByMarket(rows.filter((row) => row.available));
   const groups = groupBlockedByReason(blocked);
-  const fixableCount = groups.filter((group) => group.fixable).reduce((sum, group) => sum + group.targets.length, 0);
+  const fixable = groups.filter((group) => group.fixable);
+  const stuck = groups.filter((group) => !group.fixable);
+  const countOf = (list: BlockedGroup[]) => list.reduce((sum, group) => sum + group.targets.length, 0);
+  const fixableCount = countOf(fixable);
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <p className="break-keep text-2xs text-ink-muted">
         {rows.length}건 중 <span className="text-ink">{rows.length - blocked.length}건</span> 사용 가능
-        {blocked.length > 0 && (
-          <>
-            {" "}
-            · {blocked.length}건은 아래 {groups.length}가지 이유로 막혀 있습니다
-            {fixableCount > 0 && <> (그중 {fixableCount}건은 키를 넣으면 열립니다)</>}
-          </>
-        )}
+        {blocked.length > 0 && <> · {blocked.length}건은 막혀 있습니다</>}
+        {fixableCount > 0 && <> (그중 {fixableCount}건은 키를 넣으면 열립니다)</>}
       </p>
       {open.length > 0 && (
         <>
@@ -166,22 +191,34 @@ function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; load
           </ul>
         </>
       )}
-      {groups.length > 0 && (
+      {/* 키가 없어 막힌 것만 접힌 자리 **밖**에 둔다 — 사용자가 오늘 손댈 수 있는 유일한 항목이다. */}
+      {fixable.length > 0 && (
         <>
-          <p className="break-keep text-2xs text-ink-muted">막혀 있는 것</p>
-          <ul aria-label="막힌 이유" className="flex min-w-0 flex-col gap-1.5">
-            {/* 사유는 **서버가 정본**이다 — env 항목명과 발급 경로까지 완전한 문장으로 온다.
-              프론트가 같은 안내를 다시 만들면 서버가 아는 항목명과 갈린다. */}
-            {groups.map((group) => (
-              <li key={group.reason} className="flex min-w-0 flex-col gap-0.5 text-2xs">
-                <p className={cn("min-w-0 break-keep", group.fixable ? "text-danger" : "text-ink-muted")}>
-                  {group.reason} <span className="text-ink-muted">({group.targets.length}건)</span>
-                </p>
-                <p className="min-w-0 break-words font-mono text-2xs text-ink-muted">{group.targets.join(", ")}</p>
+          <p className="break-keep text-2xs text-ink">
+            키를 넣으면 열리는 것 <span className="text-ink-muted">({fixableCount}건)</span>
+          </p>
+          <ul aria-label="키를 넣으면 열리는 것" className="flex min-w-0 flex-col gap-0.5">
+            {fixable.map((group) => (
+              <li key={group.reason} className="min-w-0 text-2xs">
+                <BlockedReason group={group} tone="text-danger" />
               </li>
             ))}
           </ul>
         </>
+      )}
+      {stuck.length > 0 && (
+        <details className="min-w-0">
+          <summary className="min-w-0 cursor-pointer break-keep text-2xs text-ink-muted marker:text-ink-muted">
+            막혀 있는 것 {countOf(stuck)}건 · {stuck.length}가지 이유
+          </summary>
+          <ul aria-label="막힌 이유" className="mt-0.5 flex min-w-0 flex-col gap-0.5">
+            {stuck.map((group) => (
+              <li key={group.reason} className="min-w-0 text-2xs">
+                <BlockedReason group={group} tone="text-ink-muted" />
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );

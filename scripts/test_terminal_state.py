@@ -70,8 +70,7 @@ def check_call_order_contract(screens: list[dict]) -> list[str]:
     return [
         f"{s['name']}: pending 과 accepted 가 동시에 참이다 — 판정이 서로를 배제하지 못한다"
         for s in screens
-        if ts.input_pending(s["tail"], s["needle"])
-        and ts.prompt_accepted(s["tail"], s["needle"])
+        if ts.input_pending(s["tail"], s["needle"]) and ts.prompt_accepted(s["tail"], s["needle"])
     ]
 
 
@@ -83,13 +82,9 @@ def check_differential(sequences: list[dict], screens: list[dict]) -> list[str]:
         fired = old_signal_fires(seq["base"], seq["samples"])
         agent = seq["agent"]
         if agent == "claude" and fired:
-            failures.append(
-                f"{seq['name']}: 종전 신호가 claude 에서 섰다 — 이 픽스처는 버그 재현이 아니다"
-            )
+            failures.append(f"{seq['name']}: 종전 신호가 claude 에서 섰다 — 이 픽스처는 버그 재현이 아니다")
         if agent == "kimi" and not fired:
-            failures.append(
-                f"{seq['name']}: 종전 신호가 kimi 에서 안 섰다 — kimi 경로 근거가 무너진다"
-            )
+            failures.append(f"{seq['name']}: 종전 신호가 kimi 에서 안 섰다 — kimi 경로 근거가 무너진다")
         by_agent[agent] = by_agent.get(agent, False) or fired
     for agent in ("claude", "kimi"):
         if agent not in by_agent:
@@ -99,9 +94,7 @@ def check_differential(sequences: list[dict], screens: list[dict]) -> list[str]:
     for screen in screens:
         if screen["agent"] == "claude" and screen["expect"]["ready"]:
             if not ts.agent_ready(screen["tail"]):
-                failures.append(
-                    f"{screen['name']}: 새 준비 판정이 claude 화면에서 안 선다"
-                )
+                failures.append(f"{screen['name']}: 새 준비 판정이 claude 화면에서 안 선다")
     return failures
 
 
@@ -117,42 +110,28 @@ def main() -> int:
     for screen in screens:
         per_agent[screen["agent"]] = per_agent.get(screen["agent"], 0) + 1
 
-    print(
-        f"수집한 화면 {len(screens)}건 (하한 {MIN_SCREENS}) · 커서 수열 {len(sequences)}건 (하한 {MIN_SEQUENCES})"
-    )
+    print(f"수집한 화면 {len(screens)}건 (하한 {MIN_SCREENS}) · 커서 수열 {len(sequences)}건 (하한 {MIN_SEQUENCES})")
     for agent in sorted(per_agent):
         floor = MIN_PER_AGENT.get(agent)
-        print(
-            f"  · {agent}: {per_agent[agent]}건" + (f" (하한 {floor})" if floor else "")
-        )
+        print(f"  · {agent}: {per_agent[agent]}건" + (f" (하한 {floor})" if floor else ""))
     for screen in screens:
-        print(
-            f"  - {screen['name']} (latestCursor={screen['latestCursor']}, {len(screen['tail'])}줄)"
-        )
+        print(f"  - {screen['name']} (latestCursor={screen['latestCursor']}, {len(screen['tail'])}줄)")
 
     failures: list[str] = []
     if len(screens) < MIN_SCREENS:
-        failures.append(
-            f"화면을 {len(screens)}건만 수집했습니다 (하한 {MIN_SCREENS}) — fail-closed"
-        )
+        failures.append(f"화면을 {len(screens)}건만 수집했습니다 (하한 {MIN_SCREENS}) — fail-closed")
     if len(sequences) < MIN_SEQUENCES:
-        failures.append(
-            f"커서 수열을 {len(sequences)}건만 수집했습니다 (하한 {MIN_SEQUENCES}) — fail-closed"
-        )
+        failures.append(f"커서 수열을 {len(sequences)}건만 수집했습니다 (하한 {MIN_SEQUENCES}) — fail-closed")
     for agent, floor in MIN_PER_AGENT.items():
         if per_agent.get(agent, 0) < floor:
-            failures.append(
-                f"{agent} 화면이 {per_agent.get(agent, 0)}건입니다 (하한 {floor}) — fail-closed"
-            )
+            failures.append(f"{agent} 화면이 {per_agent.get(agent, 0)}건입니다 (하한 {floor}) — fail-closed")
 
     failures += check_screens(screens)
     failures += check_call_order_contract(screens)
     failures += check_differential(sequences, screens)
 
     print()
-    print(
-        f"판정 {len(screens) * len(MODES)}건 대조 · 차등 수열 {len(sequences)}건 대조"
-    )
+    print(f"판정 {len(screens) * len(MODES)}건 대조 · 차등 수열 {len(sequences)}건 대조")
     if failures:
         for f in failures:
             print(f"::error::{f}")

@@ -7,14 +7,24 @@ brokerage account. Open source and self-hosted. Not a service you sign up for.
 
 ## What works today
 
-Log in and ask an investment question. A multi-agent pipeline gathers data from six financial
-MCP servers and answers **with sources attached** — every number traces back to the tool call that
-produced it, and unsourced figures are blocked.
+**Build a bot, then test it on past data.** Describe entry and exit rules in a form (or in a
+readable strategy file), sweep a parameter grid, and every combination comes back with an equity
+curve, drawdown, trade list, and ranked metrics. Costs are not hidden: the report states the fee,
+slippage and transaction-tax assumptions it ran under, and what those costs actually took out of the
+result.
+
+**Load your own market data.** Point the ingest console at a source, watch the run history, and see
+per-source capability — what you can pull now, what is blocked, and which blocks a key would unlock.
+
+**Ask an investment question.** A multi-agent pipeline gathers data from six financial MCP servers
+and answers **with sources attached** — every number traces back to the tool call that produced it,
+and unsourced figures are blocked.
 
 Also working: watchlists, portfolios and holdings, a NAV time series, research documents, file
 upload over SFTP, a weekly email summary, and an admin area.
 
-**Bots, backtesting, and live trading are not built yet.** That's where this is going — see
+**Not built yet: running bots live.** No intraday signal engine, no order placement — the order path
+is closed at the code level and only a strategy that passed verification will ever be promoted. See
 [ROADMAP.md](ROADMAP.md) for the order.
 
 ## Run it
