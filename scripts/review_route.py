@@ -28,9 +28,7 @@ CODEX_TIERS = ("gpt-5.6-terra",)
 VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS}
 # 줄 전체가 신원이어야 한다. 앞뒤 공백을 다듬지 않는다 — 다듬으면 원본 grep 앵커보다
 # 관대해지고, 그 관대함이 label_allowed(게이트 입력)를 사람에서 에이전트로 뒤집는다.
-_IDENTITY = re.compile(
-    r"^(?P<vendor>claude|kimi|codex)(?:-(?P<tier>[a-z0-9.\-]+))?-agent@noreply\.local\Z"
-)
+_IDENTITY = re.compile(r"^(?P<vendor>claude|kimi|codex)(?:-(?P<tier>[a-z0-9.\-]+))?-agent@noreply\.local\Z")
 # 미상 신원 관측은 접미만 본다 — 앞 공백은 통과하고 뒤 공백은 못 통과한다
 _AGENTISH = re.compile(r"-agent@noreply\.local\Z", re.I)
 _BRANCH = re.compile(r"^fix-[0-9]+-(?P<vendor>claude|kimi|codex)\Z")
@@ -65,14 +63,10 @@ def _identity_note(
     if author_kind == "agent" and identity_source == "commit-email":
         if branch_vendor and branch_vendor != author_models:
             parts.append(
-                f"브랜치명({branch_vendor})과 커밋 신원({author_models}) 불일치 — "
-                "§6.1 일관성 점검 실패, 커밋 신원 우선"
+                f"브랜치명({branch_vendor})과 커밋 신원({author_models}) 불일치 — §6.1 일관성 점검 실패, 커밋 신원 우선"
             )
     elif author_kind == "mixed":
-        parts.append(
-            "복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, "
-            "판정 라벨 미부착(사람 경로)"
-        )
+        parts.append("복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, 판정 라벨 미부착(사람 경로)")
     elif identity_source == "branch-name":
         parts.append(
             "커밋에 에이전트 신원 없음 — 브랜치명 단독 판별 "
@@ -113,10 +107,7 @@ def identify_author(emails, head_ref):
     vendors, claude_tiers_seen, unknown_agentish = set(), set(), []
     for raw in emails:
         m = _IDENTITY.match(raw)
-        if m and (
-            m.group("tier") is None
-            or m.group("tier") in VENDOR_TIERS[m.group("vendor")]
-        ):
+        if m and (m.group("tier") is None or m.group("tier") in VENDOR_TIERS[m.group("vendor")]):
             vendors.add(m.group("vendor"))
             if m.group("vendor") == "claude":
                 claude_tiers_seen.add(m.group("tier") or "unknown")
@@ -199,11 +190,7 @@ def decide(emails, head_ref, issue_risks, codex_on):
         candidates = ["claude", "kimi"] + (["codex"] if codex_on else [])
         reviewer = next((c for c in candidates if c not in vendors), "none")
 
-    label_allowed = (
-        author_kind == "agent"
-        and identity_source == "commit-email"
-        and not unknown_agentish
-    )
+    label_allowed = author_kind == "agent" and identity_source == "commit-email" and not unknown_agentish
 
     return {
         "reviewer": reviewer,

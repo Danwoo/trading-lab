@@ -81,8 +81,7 @@ def read_identities(commits) -> dict:
         identity = review_route._IDENTITY.match(email)
         if identity and (
             identity.group("tier") is None
-            or identity.group("tier")
-            in review_route.VENDOR_TIERS[identity.group("vendor")]
+            or identity.group("tier") in review_route.VENDOR_TIERS[identity.group("vendor")]
         ):
             known.add(identity.group("vendor"))
         elif review_route._AGENTISH.search(email):

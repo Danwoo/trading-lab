@@ -35,12 +35,8 @@ def main(argv: list[str]) -> int:
     files = sorted(tests_dir.glob("test_*.py"))
 
     if not files:
-        print(
-            f"::error::{tests_dir} 에서 test_*.py 를 0건 수집했습니다 — fail-closed 종료"
-        )
-        print(
-            "::error::파일이 이동·삭제됐거나 이름 규칙이 바뀌었을 수 있습니다. 확인하세요."
-        )
+        print(f"::error::{tests_dir} 에서 test_*.py 를 0건 수집했습니다 — fail-closed 종료")
+        print("::error::파일이 이동·삭제됐거나 이름 규칙이 바뀌었을 수 있습니다. 확인하세요.")
         return 1
 
     print(f"수집한 테스트 파일 {len(files)}개:")
@@ -56,9 +52,7 @@ def main(argv: list[str]) -> int:
             failed.append(f.name)
         print()
 
-    print(
-        f"검사한 파일 {len(files)}개 중 {len(files) - len(failed)}개 통과, {len(failed)}개 실패"
-    )
+    print(f"검사한 파일 {len(files)}개 중 {len(files) - len(failed)}개 통과, {len(failed)}개 실패")
     if failed:
         print(f"::error::실패한 파일: {', '.join(failed)}")
         return 1

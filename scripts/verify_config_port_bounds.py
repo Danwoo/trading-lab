@@ -57,9 +57,7 @@ def _field_call_bounds(value: ast.expr | None) -> dict[str, int | None]:
     for keyword in value.keywords:
         if keyword.arg in LOWER_BOUNDS or keyword.arg in UPPER_BOUNDS:
             constant = keyword.value
-            bounds[keyword.arg] = (
-                constant.value if isinstance(constant, ast.Constant) else None
-            )
+            bounds[keyword.arg] = constant.value if isinstance(constant, ast.Constant) else None
     return bounds
 
 
@@ -74,9 +72,7 @@ def check_service(path: Path, problems: list[str]) -> int:
     try:
         tree = ast.parse(path.read_text(), filename=str(path))
     except SyntaxError as exc:
-        problems.append(
-            f"{prefix}: 파싱 불가 (SyntaxError: {exc.msg}, line {exc.lineno})"
-        )
+        problems.append(f"{prefix}: 파싱 불가 (SyntaxError: {exc.msg}, line {exc.lineno})")
         return 0
     settings = _settings_class(tree)
     if settings is None:

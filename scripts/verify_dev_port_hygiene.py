@@ -52,9 +52,7 @@ _PROCESS_HEADER_RE = re.compile(r"^  (?P<name>[A-Za-z0-9_-]+):\s*$")
 _PORT_VAR_RE = re.compile(r"^\s+PORT:\s*(?P<port>\d+)\s*$")
 _COMMAND_KEY_RE = re.compile(r"^\s+command:")
 _LOCALHOST_ORIGIN_RE = re.compile(r"^http://localhost:(?P<port>\d+)/?$")
-_BETTER_AUTH_URL_RE = re.compile(
-    r'^BETTER_AUTH_URL="?http://localhost:(?P<port>\d+)/?"?\s*$'
-)
+_BETTER_AUTH_URL_RE = re.compile(r'^BETTER_AUTH_URL="?http://localhost:(?P<port>\d+)/?"?\s*$')
 
 
 def _is_comment(line: str) -> bool:
@@ -68,9 +66,7 @@ def check_no_port_kill(problems: list[str]) -> tuple[int, int]:
     for name in STARTUP_DEFINITIONS:
         path = REPO_ROOT / name
         if not path.is_file():
-            problems.append(
-                f"{name}: 기동 정의 파일 없음 (이름 변경·삭제? 목록을 갱신할 것)"
-            )
+            problems.append(f"{name}: 기동 정의 파일 없음 (이름 변경·삭제? 목록을 갱신할 것)")
             continue
         files_checked += 1
         for lineno, line in enumerate(path.read_text().splitlines(), start=1):
@@ -156,9 +152,7 @@ def _cors_default_origins(path: Path, service: str, problems: list[str]) -> list
     try:
         tree = ast.parse(path.read_text(), filename=str(path))
     except SyntaxError as exc:
-        problems.append(
-            f"{prefix}: 파싱 불가 (SyntaxError: {exc.msg}, line {exc.lineno})"
-        )
+        problems.append(f"{prefix}: 파싱 불가 (SyntaxError: {exc.msg}, line {exc.lineno})")
         return []
     settings = next(
         (n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Settings"),

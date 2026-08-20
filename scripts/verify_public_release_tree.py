@@ -360,12 +360,8 @@ DENYLIST_BLOBS: dict[str, str] = {
     "74dd05354f19f964580c7137bd93f833db3f1e16": (
         "frontend/public/bg2.png — bg1.png 의 알파 153 판본, 같은 제3자 자산 (#360)"
     ),
-    "ba0c0aee6af978b1683685305dbdf7079b479d3c": (
-        "frontend/public/logo-svg.png — 출처 불명 (#359 에서 제거)"
-    ),
-    "2fe222a7e300a4d427d0f0b007282cab49461aa8": (
-        "frontend/public/favicon.ico(구판) — 출처 불명 (#359 에서 교체)"
-    ),
+    "ba0c0aee6af978b1683685305dbdf7079b479d3c": ("frontend/public/logo-svg.png — 출처 불명 (#359 에서 제거)"),
+    "2fe222a7e300a4d427d0f0b007282cab49461aa8": ("frontend/public/favicon.ico(구판) — 출처 불명 (#359 에서 교체)"),
 }
 
 # ── (3) 자산 출처 등록부 ────────────────────────────────────────────────────────
@@ -569,9 +565,7 @@ def _b64_anchor(magic: bytes) -> str:
 
 
 # D2 앵커 — 4글자 미만(= 3바이트 미만 매직)은 앵커가 안 나와 제외된다.
-_INLINE_B64_ANCHORS = sorted(
-    {a for a in map(_b64_anchor, (m for m, _ in ASSET_MAGICS)) if a}
-)
+_INLINE_B64_ANCHORS = sorted({a for a in map(_b64_anchor, (m for m, _ in ASSET_MAGICS)) if a})
 
 # ── 공백 처리 — 「브라우저가 실제로 하는 것」과 글자 단위로 맞춘다 (#406 ① 재수정, PR #409 리뷰) ──
 # 페이로드에서 공백을 배제하면 **MIME 표준 76컬럼 wrap 한 줄로 규칙 A·B 가 전부 뚫린다** —
@@ -674,13 +668,7 @@ MIN_BARE_B64_RUN_CHARS = 64
 # 넓히지만, 산문에는 base64 알파벳 밖 문장부호(`.`·`,`)가 곧바로 나와 매치가 거기서 끊긴다 —
 # 오탐 실측치는 독스트링 「인라인 자산」 절에 적었다.
 DATA_URI_B64_RE = re.compile(
-    _B64_MARKER
-    + r","
-    + r"(?P<payload>"
-    + _B64_ATOM
-    + r"{"
-    + str(MIN_B64_PAYLOAD_CHARS)
-    + r",}={0,2})",
+    _B64_MARKER + r"," + r"(?P<payload>" + _B64_ATOM + r"{" + str(MIN_B64_PAYLOAD_CHARS) + r",}={0,2})",
     re.IGNORECASE,
 )
 # ── 퍼센트/원문 페이로드의 **끝**을 어떻게 정하나 (PR #409 4라운드 — 차단급 처방) ──────
@@ -946,9 +934,7 @@ def _decode_b64(payload: str, minimum: int = MIN_B64_PAYLOAD_CHARS) -> bytes | N
     최소 길이는 **공백을 뺀 실제 base64 글자 수**로 잰다. 정규식의 `{16,}` 는 공백까지 세므로
     그것만 믿으면 「공백 15개 + 글자 1개」가 통과한다.
     """
-    payload = urllib.parse.unquote_to_bytes(payload).decode(
-        "latin-1"
-    )  # = isomorphic decode
+    payload = urllib.parse.unquote_to_bytes(payload).decode("latin-1")  # = isomorphic decode
     payload = strip_chars(payload, B64_STRIP_CHARS)
     if len(payload) < minimum:
         return None
@@ -1002,9 +988,7 @@ def _data_uri_bodies(text: str) -> list[tuple[int, int]]:
     return sorted((scheme, body) for body, scheme in bodies.items())
 
 
-def _payload_end(
-    text: str, scheme: int, body: int, unterminated: dict[str, int]
-) -> int:
+def _payload_end(text: str, scheme: int, body: int, unterminated: dict[str, int]) -> int:
     """페이로드가 끝나는 위치 — **컨테이너가 닫히는 자리**다 (위 「페이로드의 끝」 주석).
 
     컨테이너를 알아본 경우 **본문을 여는 콤마가 그 컨테이너 안에 있어야** 한다. 밖이면 그
@@ -1028,9 +1012,7 @@ def _payload_end(
         if end < 0:
             unterminated[closer] = scheme
             return -1
-        return (
-            end if end >= body else -1
-        )  # 콤마가 컨테이너 밖이면 이 문자열의 URI 가 아니다
+        return end if end >= body else -1  # 콤마가 컨테이너 밖이면 이 문자열의 URI 가 아니다
     # 컨테이너를 못 알아본 자리 — 종전의 보수적 문자군으로 끊는다.
     stop = _BARE_TERMINATOR_RE.search(text, body)
     return stop.start() if stop else len(text)
@@ -1189,8 +1171,7 @@ def check(entries: list[Entry]) -> tuple[list[str], dict[str, int], list[str]]:
     for entry in entries:
         if entry.sha in DENYLIST_BLOBS:
             violations.append(
-                f"{entry.path}: 제거 대상 blob 재유입 — {DENYLIST_BLOBS[entry.sha]} "
-                f"(blob {entry.sha[:8]})"
+                f"{entry.path}: 제거 대상 blob 재유입 — {DENYLIST_BLOBS[entry.sha]} (blob {entry.sha[:8]})"
             )
 
     # (2) 자격증명 — 경로
@@ -1222,10 +1203,7 @@ def check(entries: list[Entry]) -> tuple[list[str], dict[str, int], list[str]]:
 
     # (3) 자산 출처 등록
     assets = [
-        entry
-        for entry in entries
-        if not is_text(entry.data)
-        or Path(entry.path).suffix.lower() in ASSET_EXTENSIONS
+        entry for entry in entries if not is_text(entry.data) or Path(entry.path).suffix.lower() in ASSET_EXTENSIONS
     ]
     for entry in assets:
         registered = allow_by_path.get(entry.path)
@@ -1290,10 +1268,7 @@ def run(entries: list[Entry], symlinks: int, source_label: str) -> int:
         ("D2 base64 앵커", counts["inline_anchors"]),
     ):
         if value == 0:
-            print(
-                f"공개 배포 트리 게이트 실패: {label} 0건 — 검사가 존재하지 않는 상태다 "
-                f"[{source_label}]"
-            )
+            print(f"공개 배포 트리 게이트 실패: {label} 0건 — 검사가 존재하지 않는 상태다 [{source_label}]")
             return 1
 
     summary = (
@@ -1315,9 +1290,7 @@ def run(entries: list[Entry], symlinks: int, source_label: str) -> int:
         print(f"공개 배포 트리 위반 {len(violations)}건 [{source_label}] — {summary}:")
         for violation in violations:
             print(f"  - {violation}")
-        print(
-            "공개 push 는 되돌릴 수 없다. 위반을 해소하기 전에는 내보내지 않는다 (#360)."
-        )
+        print("공개 push 는 되돌릴 수 없다. 위반을 해소하기 전에는 내보내지 않는다 (#360).")
         return 1
 
     print(f"공개 배포 트리 통과 [{source_label}] — {summary}, 위반 0건")

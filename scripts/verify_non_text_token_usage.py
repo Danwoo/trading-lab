@@ -45,16 +45,12 @@ def non_text_tokens() -> list[str]:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
-    exact = [
-        name for name, role in module.EXACT_ROLES.items() if role == module.NON_TEXT
-    ]
+    exact = [name for name, role in module.EXACT_ROLES.items() if role == module.NON_TEXT]
     prefixes = [p for p, role in module.PREFIX_ROLES if role == module.NON_TEXT]
     return sorted(set(exact)), sorted(set(prefixes))
 
 
-def tailwind_names(
-    tokens: list[str], prefixes: list[str]
-) -> tuple[set[str], list[str]]:
+def tailwind_names(tokens: list[str], prefixes: list[str]) -> tuple[set[str], list[str]]:
     """CSS 변수명(`--ink-faint`) → Tailwind 유틸 조각(`ink-faint`)."""
     return {t.lstrip("-") for t in tokens}, [p.lstrip("-") for p in prefixes]
 
@@ -72,9 +68,7 @@ def scan() -> tuple[int, list[str], set[str], list[str], re.Pattern[str]]:
     pattern = re.compile(
         # 임의 변형(`data-[state=open]:` · `group-[&_p]:` · `supports-[grid]:`)도 마디로 인정한다 —
         # 이 레포에 실재하는 패턴이고, 첫 판은 이것도 못 잡았다.
-        r"(?:^|[\s\"'`])(?:!?[a-z0-9-]+(?:\[[^\]]*\])?:)*!?("
-        + "|".join(TEXT_PREFIXES)
-        + r")([a-z0-9-]+)"
+        r"(?:^|[\s\"'`])(?:!?[a-z0-9-]+(?:\[[^\]]*\])?:)*!?(" + "|".join(TEXT_PREFIXES) + r")([a-z0-9-]+)"
     )
 
     problems: list[str] = []
@@ -82,17 +76,13 @@ def scan() -> tuple[int, list[str], set[str], list[str], re.Pattern[str]]:
     for directory in SCAN_DIRS:
         for path in sorted((FRONTEND / directory).rglob("*.tsx")):
             checked += 1
-            for lineno, line in enumerate(
-                path.read_text(encoding="utf-8").splitlines(), 1
-            ):
+            for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
                 for _prefix, name in pattern.findall(line):
                     base = name.split("/")[0]
                     hit = base in names or any(base.startswith(p) for p in prefixes)
                     if hit:
                         rel = path.relative_to(FRONTEND)
-                        problems.append(
-                            f"{rel}:{lineno} — 비텍스트 토큰을 글자에 썼습니다: --{base}"
-                        )
+                        problems.append(f"{rel}:{lineno} — 비텍스트 토큰을 글자에 썼습니다: --{base}")
     return checked, problems, names, prefixes, pattern
 
 
@@ -118,22 +108,18 @@ SELF_CHECK_MISSES = (
 )
 
 
-def self_check(
-    names: set[str], prefixes: list[str], pattern: re.Pattern[str]
-) -> list[str]:
+def self_check(names: set[str], prefixes: list[str], pattern: re.Pattern[str]) -> list[str]:
     """그물이 잡아야 할 형태를 실제로 잡는지 — 그물의 그물."""
     failures = []
     for sample in SELF_CHECK_HITS:
         if not any(
-            m[1].split("/")[0] in names
-            or any(m[1].split("/")[0].startswith(p) for p in prefixes)
+            m[1].split("/")[0] in names or any(m[1].split("/")[0].startswith(p) for p in prefixes)
             for m in pattern.findall(sample)
         ):
             failures.append(f"잡아야 하는데 놓쳤다: {sample}")
     for sample in SELF_CHECK_MISSES:
         if any(
-            m[1].split("/")[0] in names
-            or any(m[1].split("/")[0].startswith(p) for p in prefixes)
+            m[1].split("/")[0] in names or any(m[1].split("/")[0].startswith(p) for p in prefixes)
             for m in pattern.findall(sample)
         ):
             failures.append(f"잡으면 안 되는데 잡았다: {sample}")
@@ -170,8 +156,7 @@ def main() -> int:
         for line in problems:
             print(f"::error::{line}", file=sys.stderr)
         print(
-            "\n비텍스트 토큰은 선·아이콘 전용입니다 (리드 결정 ㉡). "
-            "라벨·표 헤더는 `--ink-muted` 가 받습니다.",
+            "\n비텍스트 토큰은 선·아이콘 전용입니다 (리드 결정 ㉡). 라벨·표 헤더는 `--ink-muted` 가 받습니다.",
             file=sys.stderr,
         )
         return 1

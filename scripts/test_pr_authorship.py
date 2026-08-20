@@ -190,15 +190,11 @@ def main() -> int:
         got = pa.judge(p)
         n = len(got["violations"])
         if n != expected_count:
-            failures.append(
-                f"{desc}\n    위반 {expected_count}건 기대 · 실제 {n}건: {got['violations']}"
-            )
+            failures.append(f"{desc}\n    위반 {expected_count}건 기대 · 실제 {n}건: {got['violations']}")
             continue
         for key, want in expected.items():
             if got.get(key) != want:
-                failures.append(
-                    f"{desc}\n    {key}: {want!r} 기대 · 실제 {got.get(key)!r}"
-                )
+                failures.append(f"{desc}\n    {key}: {want!r} 기대 · 실제 {got.get(key)!r}")
 
     # 판정과 종료코드가 어긋나면 CI 는 초록인데 위반이 있는 상태가 된다 — 같이 못박는다.
     for desc, p, expected_count, _ in CASES:

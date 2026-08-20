@@ -60,9 +60,7 @@ def seed(agent: str, root: Path) -> str:
         return "이미 신뢰됨"
     TRUST_DIRS[agent].mkdir(parents=True, exist_ok=True)
     path = trust_file(agent, root)
-    path.write_text(
-        json.dumps({"root": str(root), "trustedAt": int(time.time() * 1000)})
-    )
+    path.write_text(json.dumps({"root": str(root), "trustedAt": int(time.time() * 1000)}))
     path.chmod(0o600)
     return "신뢰 심음"
 
@@ -92,8 +90,7 @@ def main() -> int:
     # 심었다고 말하기 전에 읽어 확인한다.
     if not is_trusted(args.agent, root):
         print(
-            f"::warning::{root} 에 신뢰를 심었는데 확인이 안 된다 — "
-            f"{args.agent} 의 저장 규칙이 바뀌었을 수 있다",
+            f"::warning::{root} 에 신뢰를 심었는데 확인이 안 된다 — {args.agent} 의 저장 규칙이 바뀌었을 수 있다",
             file=sys.stderr,
         )
         return 1

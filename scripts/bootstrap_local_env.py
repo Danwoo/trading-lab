@@ -117,9 +117,7 @@ def parse_assignments(text: str) -> dict[str, str]:
     return out
 
 
-def resolve_managed_value(
-    key: str, shared: dict[str, str], per_file: dict[str, str]
-) -> str | None:
+def resolve_managed_value(key: str, shared: dict[str, str], per_file: dict[str, str]) -> str | None:
     """이 스크립트가 자동으로 채울 값 (대상이 아니면 None)."""
     if key in shared:
         return shared[key]
@@ -131,9 +129,7 @@ def resolve_managed_value(
     return None
 
 
-def render(
-    example_text: str, shared: dict[str, str]
-) -> tuple[str, list[str], list[str]]:
+def render(example_text: str, shared: dict[str, str]) -> tuple[str, list[str], list[str]]:
     """`.env.example` 본문 → (`.env.development` 본문, 채운 키, 값 없이 남은 키).
 
     값을 바꾸는 것은 **값이 없는 줄뿐**이다(`CHANGE_ME` 또는 빈 값). `.env.example` 이 이미 실제
@@ -182,8 +178,7 @@ def file_warnings(shown: Path, text: str, shared: dict[str, str]) -> list[str]:
             expected = LOCAL_DB_ENDPOINT.get(db["part"])
             if expected is not None and value != expected:
                 warnings.append(
-                    f"{shown}: {key}={value} — 로컬 Postgres 는 {expected} "
-                    f"({EXAMPLE_NAME} 가 로컬 기본값과 어긋남)"
+                    f"{shown}: {key}={value} — 로컬 Postgres 는 {expected} ({EXAMPLE_NAME} 가 로컬 기본값과 어긋남)"
                 )
         elif key in shared and value not in UNSET_TOKENS and value != shared[key]:
             warnings.append(
@@ -193,9 +188,7 @@ def file_warnings(shown: Path, text: str, shared: dict[str, str]) -> list[str]:
     return warnings
 
 
-def pick_shared_secrets(
-    targets: list[Path], force: bool
-) -> tuple[dict[str, str], list[str]]:
+def pick_shared_secrets(targets: list[Path], force: bool) -> tuple[dict[str, str], list[str]]:
     """공유 시크릿 값을 정한다 — 이미 있는 `.env.development` 의 값을 최대한 재사용한다.
 
     일부 파일만 이미 존재하는 상태에서 새 값을 생성하면 기존 파일과 값이 갈려 서비스 간 JWT 검증이
@@ -219,9 +212,7 @@ def pick_shared_secrets(
             continue
         chosen, _ = counts.most_common(1)[0]
         secrets_by_key[key] = chosen
-        notes.append(
-            f"{key}: 기존 {TARGET_NAME} {len(found)}개의 값을 재사용 (새로 만드는 파일에 같은 값)"
-        )
+        notes.append(f"{key}: 기존 {TARGET_NAME} {len(found)}개의 값을 재사용 (새로 만드는 파일에 같은 값)")
         odd = [str(p.relative_to(REPO_ROOT)) for p, v in found if v != chosen]
         if odd:
             notes.append(
@@ -242,9 +233,7 @@ def choose_backup_path(target: Path) -> Path:
     if not first.exists():
         return first
 
-    stamp = time.strftime(
-        "%Y%m%d-%H%M%S"
-    )  # 로컬 시각 — 사람이 백업 순서를 알아보는 용도
+    stamp = time.strftime("%Y%m%d-%H%M%S")  # 로컬 시각 — 사람이 백업 순서를 알아보는 용도
     candidate = target.with_name(f"{BACKUP_NAME}.{stamp}")
     serial = 2
     while candidate.exists():  # 같은 초에 두 번 돌린 경우
@@ -266,9 +255,7 @@ def main() -> int:
 
     targets = discover_examples()
     if not targets:
-        print(
-            f"{EXAMPLE_NAME} 을 하나도 찾지 못했다 — 레포 루트({REPO_ROOT})가 맞는지 확인하라."
-        )
+        print(f"{EXAMPLE_NAME} 을 하나도 찾지 못했다 — 레포 루트({REPO_ROOT})가 맞는지 확인하라.")
         return 1
 
     shared, notes = pick_shared_secrets(targets, args.force)
@@ -311,10 +298,7 @@ def main() -> int:
             print(f"  - {warning}")
 
     if manual:
-        print(
-            f"\n직접 채워야 하는 키 ({PLACEHOLDER} 이거나 빈 값으로 남음 — "
-            "외부 서비스 자격증명이라 자동 생성 불가):"
-        )
+        print(f"\n직접 채워야 하는 키 ({PLACEHOLDER} 이거나 빈 값으로 남음 — 외부 서비스 자격증명이라 자동 생성 불가):")
         for shown, keys, mock_ok in manual:
             hint = " · USE_REAL_API=false 라 로컬 MOCK 으로 뜬다" if mock_ok else ""
             print(f"  - {shown}{hint}")
@@ -324,13 +308,9 @@ def main() -> int:
             "해당 외부 기능을 실제로 쓸 때 채우면 된다.)"
         )
 
-    print(
-        f"\n요약: 생성 {created}개 · 건너뜀 {skipped}개 · 수동 입력 필요 파일 {len(manual)}개"
-    )
+    print(f"\n요약: 생성 {created}개 · 건너뜀 {skipped}개 · 수동 입력 필요 파일 {len(manual)}개")
     if created:
-        print(
-            "생성한 시크릿 값은 출력하지 않는다. 만들어진 파일은 gitignore(.env.*) 대상이라 커밋되지 않는다."
-        )
+        print("생성한 시크릿 값은 출력하지 않는다. 만들어진 파일은 gitignore(.env.*) 대상이라 커밋되지 않는다.")
     return 0
 
 

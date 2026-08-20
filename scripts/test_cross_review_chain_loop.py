@@ -199,25 +199,18 @@ def extract_loop() -> str:
     if start < 0:
         raise SystemExit(f"::error::체인 루프 시작 앵커를 못 찾았다: {START_ANCHOR!r}")
     end = next(
-        (
-            i
-            for i, line in enumerate(lines[start:], start)
-            if line.strip() == END_ANCHOR
-        ),
+        (i for i, line in enumerate(lines[start:], start) if line.strip() == END_ANCHOR),
         -1,
     )
     if end < 0:
         raise SystemExit(f"::error::체인 루프 끝 앵커를 못 찾았다: {END_ANCHOR!r}")
     body = "\n".join(
-        line[YAML_INDENT:] if line.startswith(" " * YAML_INDENT) else line.strip()
-        for line in lines[start : end + 1]
+        line[YAML_INDENT:] if line.startswith(" " * YAML_INDENT) else line.strip() for line in lines[start : end + 1]
     )
     # 뽑은 것이 정말 체인 루프인지 — 앵커만 맞고 내용이 딴 것이면 이 그물은 아무것도 안 본다
     for token in ("try_candidate", "chain_continue", "summarize", "attempts.tsv"):
         if token not in body:
-            raise SystemExit(
-                f"::error::추출한 블록에 {token!r} 가 없다 — 앵커가 밀렸다"
-            )
+            raise SystemExit(f"::error::추출한 블록에 {token!r} 가 없다 — 앵커가 밀렸다")
     return body
 
 
@@ -226,9 +219,7 @@ def run_case(loop: str, chain: str, scripted: str, bundle_judge: bool) -> str:
         work = Path(tmp)
         (work / "ctx").mkdir()
         if bundle_judge:
-            (work / "ctx" / "review_chain.py").write_text(
-                JUDGE.read_text(encoding="utf-8"), encoding="utf-8"
-            )
+            (work / "ctx" / "review_chain.py").write_text(JUDGE.read_text(encoding="utf-8"), encoding="utf-8")
         (work / "driver.sh").write_text(PREAMBLE + loop, encoding="utf-8")
         # **`bash -e`** — Actions 기본 셸과 같은 자세 (헤더 「셸 플래그 함정」)
         proc = subprocess.run(

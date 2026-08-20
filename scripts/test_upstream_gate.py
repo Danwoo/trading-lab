@@ -43,18 +43,13 @@ def _check(label: str, condition: bool, detail: str = "") -> None:
         failures.append(f"{label}{(' — ' + detail) if detail else ''}")
 
 
-def _run(
-    name: str, conclusion: str | None, *, run_id: int = 1, status: str = "completed"
-) -> dict:
+def _run(name: str, conclusion: str | None, *, run_id: int = 1, status: str = "completed") -> dict:
     return {"id": run_id, "name": name, "status": status, "conclusion": conclusion}
 
 
 def _green(count: int, *, start: int = 0) -> list[dict]:
     """통과하는 `test: ` 체크런을 count 개 만든다."""
-    return [
-        _run(f"test: job{i}", "success", run_id=100 + i)
-        for i in range(start, start + count)
-    ]
+    return [_run(f"test: job{i}", "success", run_id=100 + i) for i in range(start, start + count)]
 
 
 FULL = _green(gate.MIN_TEST_CHECKS)
@@ -123,19 +118,13 @@ JUDGE_CASES: list[tuple[str, list[dict], bool, str]] = [
     # 이 상태를 통과로 접으면 게이트는 아무것도 안 보고 초록이 된다.
     (
         "개시 직후 — 상류가 전부 미완",
-        [
-            _run(f"test: job{i}", None, run_id=200 + i, status="in_progress")
-            for i in range(gate.MIN_TEST_CHECKS)
-        ],
+        [_run(f"test: job{i}", None, run_id=200 + i, status="in_progress") for i in range(gate.MIN_TEST_CHECKS)],
         False,
         "wait",
     ),
     (
         "개시 직후 상태로 대기 상한 초과",
-        [
-            _run(f"test: job{i}", None, run_id=200 + i, status="in_progress")
-            for i in range(gate.MIN_TEST_CHECKS)
-        ],
+        [_run(f"test: job{i}", None, run_id=200 + i, status="in_progress") for i in range(gate.MIN_TEST_CHECKS)],
         True,
         "fail",
     ),
@@ -252,9 +241,7 @@ STRUCTURE_CASES: list[tuple[str, str, dict[str, str], bool, str]] = [
     ("게이트 이름이 판정부와 일치", _workflow(_GATE_JOB), ENOUGH, False, ""),
     (
         "게이트 이름을 바꾸고 판정부를 안 고침",
-        _workflow(
-            '  gate:\n    name: "test: gatekeeper"\n    runs-on: ubuntu-latest\n'
-        ),
+        _workflow('  gate:\n    name: "test: gatekeeper"\n    runs-on: ubuntu-latest\n'),
         ENOUGH,
         True,
         "자기 자신을 기다립니다",
@@ -364,9 +351,7 @@ def main() -> int:
         ("대기", LOOP_CASES, MIN_LOOP_CASES),
     ):
         if len(cases) < minimum:
-            print(
-                f"::error::{label} 케이스를 {len(cases)}건만 모았습니다 (하한 {minimum})"
-            )
+            print(f"::error::{label} 케이스를 {len(cases)}건만 모았습니다 (하한 {minimum})")
             return 1
 
     for label, records, final, expected in JUDGE_CASES:
@@ -424,9 +409,7 @@ def main() -> int:
     live_loop = gate.check_wait_loop(gate.gate_job_block(live_text))
     _check("[실물] 게이트 대기 루프", not live_loop, " / ".join(live_loop))
 
-    total = (
-        len(JUDGE_CASES) + len(PARSE_CASES) + len(STRUCTURE_CASES) + len(LOOP_CASES) + 2
-    )
+    total = len(JUDGE_CASES) + len(PARSE_CASES) + len(STRUCTURE_CASES) + len(LOOP_CASES) + 2
     print(
         f"케이스 {total}건 (판정 {len(JUDGE_CASES)} · 파싱 {len(PARSE_CASES)} · "
         f"구조 {len(STRUCTURE_CASES)} · 대기 {len(LOOP_CASES)} · 실물 2) · 실패 {len(failures)}건"

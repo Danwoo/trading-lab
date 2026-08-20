@@ -18,7 +18,8 @@ import logging
 import os
 import re
 import secrets
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import litellm
 from korcen import korcen  # type: ignore
@@ -65,9 +66,7 @@ def _content_text(content) -> str:
         return "".join(
             p["text"]
             for p in content
-            if isinstance(p, dict)
-            and p.get("type") == "text"
-            and isinstance(p.get("text"), str)
+            if isinstance(p, dict) and p.get("type") == "text" and isinstance(p.get("text"), str)
         )
     return ""
 
@@ -79,11 +78,7 @@ def _map_text_parts(content, fn):
         return fn(content)
     if isinstance(content, list):
         for p in content:
-            if (
-                isinstance(p, dict)
-                and p.get("type") == "text"
-                and isinstance(p.get("text"), str)
-            ):
+            if isinstance(p, dict) and p.get("type") == "text" and isinstance(p.get("text"), str):
                 p["text"] = fn(p["text"])
     return content
 
@@ -178,13 +173,9 @@ class SafetyGuard(CustomGuardrail):
         self._scope = _resolve_scope(kwargs.pop("models", None))
         super().__init__(**kwargs)
 
-    async def async_post_call_success_hook(
-        self, data, user_api_key_dict: UserAPIKeyAuth, response
-    ):
+    async def async_post_call_success_hook(self, data, user_api_key_dict: UserAPIKeyAuth, response):
         """비스트리밍: 전체 응답 조립 후 canary 검사, 욕설 처리."""
-        if not isinstance(response, litellm.ModelResponse) or not _in_scope(
-            self._scope, data
-        ):
+        if not isinstance(response, litellm.ModelResponse) or not _in_scope(self._scope, data):
             return response
         canary_norm = _normalize(PROMPT_CANARY)
         for choice in response.choices:
@@ -239,11 +230,7 @@ class SafetyGuard(CustomGuardrail):
                 continue
 
             # 종료 chunk 면 보류분까지, 아니면 hold-back 만큼 말미 보류
-            safe_end = (
-                len(full_out)
-                if finish is not None
-                else max(0, len(full_out) - _HOLDBACK)
-            )
+            safe_end = len(full_out) if finish is not None else max(0, len(full_out) - _HOLDBACK)
             out_text = ""
             if safe_end > emitted:
                 out_text = self._mask_profanity(full_out[emitted:safe_end])
@@ -278,17 +265,13 @@ class SafetyGuard(CustomGuardrail):
         if not text:
             return text
         try:
-            marked = korcen.highlight_profanity(
-                text, level="general", highlight_char=_PROFANITY_MARK
-            )
+            marked = korcen.highlight_profanity(text, level="general", highlight_char=_PROFANITY_MARK)
             return _PROFANITY_RE.sub(_PROFANITY_MASK, marked)
         except Exception:
             return text
 
     @staticmethod
-    def _clone_chunk(
-        template: ModelResponseStream, content: str, finish_reason=_KEEP
-    ) -> ModelResponseStream:
+    def _clone_chunk(template: ModelResponseStream, content: str, finish_reason=_KEEP) -> ModelResponseStream:
         """chunk 복제 후 델타 content(및 선택적 finish_reason) 교체 — 메타(id/model/created) 보존."""
         try:
             c = template.model_copy(deep=True)
