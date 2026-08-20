@@ -32,6 +32,7 @@ export const theme = {
         line: "rgb(var(--btn-line) / <alpha-value>)",
       },
       danger: "rgb(var(--danger) / <alpha-value>)",
+      caution: "rgb(var(--caution) / <alpha-value>)",
       success: "rgb(var(--success) / <alpha-value>)",
       market: {
         up: "rgb(var(--market-up) / <alpha-value>)",

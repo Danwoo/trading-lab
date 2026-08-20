@@ -13,7 +13,7 @@
       (`lib/auth/auth.ts` 의 better-auth `secret`) 서명·검증이 frontend 프로세스 안에서 끝난다 —
       다른 서비스가 같은 값을 요구하지 않으므로 공유할 이유가 없다.
   (3) `*_SQL_DB_USER`/`*_SQL_DB_PASSWORD` — 로컬 Postgres(process-compose 의 `fintech-pg` 컨테이너)
-      자격증명 `fintech`/`fintech`. host·port·db 는 `.env.example` 이 이미 `localhost:5432/fintech`
+      자격증명 `fintech`/`fintech`. host·port·db 는 `.env.example` 이 이미 `localhost:5442/fintech`
       라 그대로 둔다(어긋나면 값을 바꾸지 않고 경고만 — 사람이 판단할 문제).
 
 "값이 없는 자리"는 `CHANGE_ME` 와 **빈 값**(`KEY=`) 둘 다다 — 위 3종에 해당하면 채우고, 나머지
@@ -56,9 +56,11 @@ SHARED_SECRET_KEYS = ("JWT_SECRET",)
 PER_FILE_SECRET_KEYS = ("BETTER_AUTH_SECRET", "EMAIL_SECRET")
 SECRET_BYTES = 48
 
-# 로컬 Postgres (process-compose 의 fintech-pg) — 자격증명은 채우고, 접속 좌표는 검증만 한다
+# 로컬 Postgres (process-compose 의 fintech-pg) — 자격증명은 채우고, 접속 좌표는 검증만 한다.
+# PORT 의 SoT 는 process-compose.yaml 의 postgres `vars.PORT` 이고,
+# scripts/verify_dev_port_hygiene.py 가 이 값과 대조한다 (#294).
 LOCAL_DB_CREDENTIALS = {"USER": "fintech", "PASSWORD": "fintech"}
-LOCAL_DB_ENDPOINT = {"HOST": "localhost", "PORT": "5432", "NAME": "fintech"}
+LOCAL_DB_ENDPOINT = {"HOST": "localhost", "PORT": "5442", "NAME": "fintech"}
 DB_KEY_RE = re.compile(r"^[A-Z0-9_]+_SQL_DB_(?P<part>USER|PASSWORD|HOST|PORT|NAME)$")
 
 ASSIGN_RE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)=(?P<rest>.*)$")

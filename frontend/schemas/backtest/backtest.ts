@@ -123,6 +123,15 @@ export interface RunSummaryOut {
   period_from: string;
   period_to: string;
   initial_cash: number;
+  /**
+   * 같은 조합을 비용 0으로 다시 돌린 요약 (SC-007). `null` 은 「격차 0」이 아니라
+   * **대조군을 안 돌린 옛 실행**이다 — 화면이 그 둘을 갈라 말한다.
+   */
+  costless_summary:
+    | { final_equity: number; return_pct: number | null; trade_count: number; absent_reason?: never }
+    /** 돌렸는데 못 구한 경우 — `null`(안 돌린 옛 실행)과 다른 상태다. */
+    | { absent_reason: string; final_equity?: never; return_pct?: never; trade_count?: never }
+    | null;
   status: string;
   failed_reason: string | null;
   finished_dt: string | null;

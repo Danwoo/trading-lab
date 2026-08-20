@@ -21,7 +21,12 @@ ReAct Supervisor 와의 핵심 차이: LLM 은 "계획"만 세우고 실행은 �
         config={"recursion_limit": 100},
     )
 
-모듈 경계 (동작 보존 리팩터, 상세 REFACTOR.md):
+모듈 경계 (상세: .docs/guides/multi-agent-plan-execute.md):
+    builder      — build_plan_execute_graph (deps 생성 + StateGraph 배선)
+    deps         — _GraphDeps + 동적 라우팅 스키마 팩토리
+    nodes        — 코어 노드 (guardrail·clarify·plan·run_stage·replan·answer)
+    map_reduce   — 도메인별 sub-answer(Map) + 통합(Reduce) 노드
+    routing      — 조건 분기 라우터 4종
     schemas      — Pydantic 모델 + State
     tool_trace   — _ToolTraceCallback + tool 출력 텍스트 추출
     context      — 쿼리/히스토리/이전결과 프롬프트 포매팅
@@ -29,10 +34,9 @@ ReAct Supervisor 와의 핵심 차이: LLM 은 "계획"만 세우고 실행은 �
     domains_map  — 도메인 라벨·분류 + Map-Reduce 그룹핑 (★ 새 도메인 추가 지점)
     topology     — depends_on_agents 위상 정렬
     invocation   — 에이전트 안전 호출
-    builder      — build_plan_execute_graph (노드 클로저 + 그래프 조립)
 
-내부 헬퍼는 이전 단일 모듈 시절의 `graphs.plan_execute.<name>` 경로를 유지하도록 재노출한다
-(하위호환 + 정적 동등성 하네스 접근용).
+내부 헬퍼도 `graphs.plan_execute.<name>` 경로로 재노출한다 — 서브모듈 구조와 무관하게
+심볼에 닿아야 하는 검증 하네스(scripts/verify_plan_execute_refactor.py)의 접근 경로다.
 """
 
 from __future__ import annotations

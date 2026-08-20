@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createEquityChart, type EquityChartHandle, type EquityChartPoint } from "@/lib/bench/equityChart";
 import { downsampleLttb, drawdownRatios } from "@/lib/bench/equityMath";
-import type { MetricOut, RunReportOut, TradeOut } from "@/schemas/backtest/backtest";
+import type { MetricOut, RunReportOut, RunSummaryOut, TradeOut } from "@/schemas/backtest/backtest";
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { redactReason } from "@/utils/common/errors/redactReason";
 
@@ -182,6 +182,74 @@ function ratePercent(rate: number): string {
 }
 
 /**
+ * **이 성과가 무엇을 치르고 남은 것인가** — 비용 미반영 세계와 나란히 (SC-007).
+ *
+ * 나눗셈이 아니라 **다시 돌린 결과**다. 판정 신호는 두 세계가 같지만(전략은 현금을 안 본다)
+ * 비용이 현금을 깎아 **체결 수량**이 달라지므로, 끝난 자산은 나눗셈으로 복원되지 않는다.
+ */
+function CostComparison({
+  run,
+  finalEquity,
+}: {
+  run: RunSummaryOut;
+  /** 이 실행이 실제로 끝낸 자산 — 자산곡선의 마지막 점. 없으면 그릴 것이 없다. */
+  finalEquity: number | null;
+}) {
+  const twin = run.costless_summary;
+
+  // 견줄 상대가 없는 이유가 셋이다 — 뭉개면 **터진 실행에 소용없는 재실행을 시킨다.**
+  const missing =
+    twin === null
+      ? run.status === "running" || run.status === "queued"
+        ? "실행이 끝나면 채워집니다."
+        : "대조군을 돌리지 않은 옛 실행입니다. 다시 실행하면 채워집니다."
+      : (redactReason(twin.absent_reason) ?? null);
+  if (missing !== null || twin === null) {
+    return <p className="break-keep text-2xs text-ink-muted">비용 미반영 대비 — {missing}</p>;
+  }
+  if (finalEquity === null) {
+    return <p className="break-keep text-2xs text-ink-muted">비용 미반영 대비 — 자산곡선이 없어 견줄 수 없습니다.</p>;
+  }
+
+  const won = (value: number) => Math.round(value).toLocaleString("ko-KR");
+  const twinEquity = twin.final_equity as number;
+  return (
+    <table className="min-w-0 text-2xs">
+      <caption className="break-keep pb-1 text-left text-2xs text-ink-muted">
+        비용 미반영 대비 — 같은 조합을 비용 0으로 다시 돌린 결과입니다 (시작 자금 {won(run.initial_cash)}원)
+      </caption>
+      <thead>
+        <tr className="text-ink-muted">
+          <th scope="col" className="pr-3 text-left font-normal" />
+          <th scope="col" className="pr-3 text-right font-normal">
+            반영
+          </th>
+          <th scope="col" className="text-right font-normal">
+            미반영
+          </th>
+        </tr>
+      </thead>
+      <tbody className="text-ink">
+        <tr>
+          <th scope="row" className="pr-3 text-left font-normal text-ink-muted">
+            끝난 자산
+          </th>
+          <td className="pr-3 text-right tabular-nums">{won(finalEquity)}</td>
+          <td className="text-right tabular-nums">{won(twinEquity)}</td>
+        </tr>
+        <tr>
+          <th scope="row" className="pr-3 text-left font-normal text-ink-muted">
+            차이
+          </th>
+          <td className="pr-3 text-right tabular-nums text-ink-muted">—</td>
+          <td className="text-right tabular-nums">{won(twinEquity - finalEquity)}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+/**
  * 격자에서 고른 한 조합의 리포트 (#203) — 곡선·낙폭, 판정 지표, 거래목록이 **그 조합으로**
  * 바뀌는 자리다 (전파 규칙 §2.3).
  */
@@ -225,6 +293,12 @@ export function RunReportView({ report }: { report: RunReportOut }) {
           <section aria-label="판정 지표" className="min-w-0">
             <h3 className="break-keep text-sm font-ui text-ink-strong">판정 지표</h3>
             <MetricsList metrics={report.metrics} />
+            <div className="mt-2 min-w-0 overflow-x-auto">
+              <CostComparison
+                run={run}
+                finalEquity={report.equity.length > 0 ? report.equity[report.equity.length - 1].equity : null}
+              />
+            </div>
             <p className="mt-1 break-keep text-2xs text-ink-muted">
               샤프는 무위험수익률 0 가정의 참고용입니다 — 순서가 곧 판정 순서입니다 (낙폭이 먼저).
             </p>

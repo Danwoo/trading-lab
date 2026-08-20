@@ -36,6 +36,9 @@ from itertools import product
 
 from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, run_single
 
+#: 대조군의 비용 — **미반영 세계**. 이 하나가 SC-007 「반영 vs 미반영을 나란히」의 다른 한쪽이다.
+FREE_COSTS = CostModel(fee_rate=0.0, slippage_rate=0.0, sell_tax_rate=0.0)
+
 # 한 번에 도는 조합 수 상한. 스펙 §5 의 예산(실행·전체 재계산 >10s 는 완료 예상 표시)을
 # 넘지 않게 하는 안전핀이지, 성능 목표가 아니다. 넘으면 **조용히 자르지 않고** 던진다 —
 # 「전부 돌려봤다」고 말할 수 없는 결과를 그렇게 말하는 것이 §8.5.2 의 자기모순이다.
@@ -43,7 +46,13 @@ from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, 
 # **크기는 만들기 전에 센다.** 처음엔 곱집합을 다 만든 뒤에 길이를 봤는데, 그러면 2축×1000값
 # 만으로 상한의 500배(100만 칸)를 **실제로 만든 뒤에야** 거부했다(실측 1.11초). 이 앱은
 # `--workers=1` 이라 그동안 모든 HTTP 요청이 함께 멈춘다 — 안전핀이 안전핀 역할을 못 한 것이다.
-MAX_COMBOS = 2000
+#
+# **대조군이 이 값을 밀어냈다** (SC-007). 칸마다 엔진을 두 번 도므로 상한에서의 소요가 두 배가
+# 됐다. `scripts/verify_grid_cost_budget.py` 가 선언 범위 전체를 훑어 실측한다 — 칸당 9.16ms 라
+# 500칸이 이 기계에서 4.6초, CI 러너(실측 1.7배)에서 약 7.8초다. 800칸은 러너에서 예산 밖이다.
+#
+# 상한은 안전핀이지 목표가 아니다 — 흔한 격자는 2축×5값 = 25칸이다.
+MAX_COMBOS = 500
 
 
 @dataclass(frozen=True)
@@ -74,6 +83,12 @@ class Cell:
     params: dict
     result: RunResult
     failed_reason: str | None = None
+    #: 같은 조합을 **비용 0으로 다시 돌린** 결과. 「비용을 안 냈다면 얼마였나」를 나눗셈으로
+    #: 흉내내면 틀린다 — 비용이 현금을 깎아 체결 수량 자체가 달라지므로, 거래 수까지 갈린다.
+    costless: RunResult | None = None
+    #: 대조군을 **못 구한 사유**. `None` 이면 구했거나 안 돌린 것이고, 값이 있으면 「돌렸는데
+    #: 터졌다」다 — 그 둘을 뭉개면 화면이 소용없는 재실행을 시킨다.
+    costless_absent: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -170,11 +185,42 @@ def run_grid(
                 initial_cash=initial_cash,
                 costs=costs,
             )
-            cells.append(Cell(params=params, result=result))
+            costless, costless_absent = _costless(strategy, params, series, rows, initial_cash)
+            cells.append(Cell(params=params, result=result, costless=costless, costless_absent=costless_absent))
         except Exception as exc:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
             cells.append(Cell(params=params, result=RunResult(), failed_reason=str(exc)[:500]))
 
     return Grid(axes=axes, cells=cells, base_params=dict(base_params))
+
+
+def _costless(
+    strategy: Strategy, params: dict, series: BarSeries, rows, initial_cash: float
+) -> tuple[RunResult | None, str | None]:
+    """같은 조합을 **비용 0으로** 다시 돌린다. `(결과, 못 구한 사유)` 를 준다.
+
+    같은 `rows` 를 재사용하므로 DB 를 더 읽지 않는다.
+
+    **대조군 사고가 이 칸을 죽이지 않는다.** 비용을 낸 세계의 결과는 이미 나왔고, 못 구한 것은
+    견줄 상대뿐이다. 다만 **삼키지는 않는다** — 그냥 `None` 을 주면 저장된 `NULL` 이 「대조군을
+    안 돌린 옛 실행」으로 읽혀, 화면이 다른 원인을 말하며 소용없는 재실행을 시킨다.
+    """
+    try:
+        result = run_single(
+            strategy=strategy,
+            params=params,
+            series=series,
+            rows=rows,
+            initial_cash=initial_cash,
+            costs=FREE_COSTS,
+        )
+    except Exception as exc:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
+        # `core.logger` 는 import 시점에 앱 설정을 세운다 — 모듈 상단에서 가져오면 이 모듈을
+        # import 하는 검증 스크립트·standalone 그물이 설정 없이는 죽는다. 늦게 가져온다.
+        from core.logger import logger
+
+        logger.warning(f"대조군 실행이 실패했습니다 — {type(exc).__name__}")
+        return None, f"대조군을 구하지 못했습니다 — 실행이 {type(exc).__name__} 으로 멈췄습니다"
+    return result, None
 
 
 def axes_from_spec(param_specs: list[dict], sweep: dict[str, list]) -> tuple[Axis, ...]:

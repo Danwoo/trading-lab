@@ -10,6 +10,7 @@ import sys
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND / "app"))
@@ -196,6 +197,26 @@ def test_round_trip_cost_feeds_metric() -> None:
     paid = next(m for m in report["metrics"] if m["key"] == "cost_paid")
     check("옛 실행의 치른 비용은 값이 없다", paid["value"], None)
     check("사유가 옛 실행임을 말한다", "옛 실행" in (paid["absent_reason"] or ""), True)
+
+
+def test_grid_cell_twin_failure_is_recorded_not_swallowed() -> None:
+    """격자 칸의 대조군이 터지면 **그 사유가 저장된다** — `NULL` 로 두면 「옛 실행」으로 읽힌다."""
+    svc = service(FakeRepository(run_row(), [], []))
+    cell = SimpleNamespace(
+        costless=None, costless_absent="대조군을 구하지 못했습니다 — 실행이 KeyError 으로 멈췄습니다"
+    )
+    saved = svc._cell_costless_json(cell, None, 1_000_000.0)
+    check("사유가 실린다", saved is not None and "구하지 못했습니다" in saved, True)
+
+    # 실패한 칸은 대조군 이야기를 하지 않는다 — 그 칸은 애초에 결과가 없다.
+    check("실패한 칸은 NULL", svc._cell_costless_json(cell, "전략이 터졌습니다", 1_000_000.0), None)
+
+    # 안 돌린 칸(사유도 없음)은 「옛 실행」과 같은 NULL 이 맞다.
+    check(
+        "안 돌린 칸은 NULL",
+        svc._cell_costless_json(SimpleNamespace(costless=None, costless_absent=None), None, 1_000_000.0),
+        None,
+    )
 
 
 def main() -> int:
