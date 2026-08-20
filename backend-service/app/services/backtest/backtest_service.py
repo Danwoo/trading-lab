@@ -14,7 +14,6 @@ import json
 from types import SimpleNamespace
 
 from core.exceptions import BadRequestError, NotFoundError
-from core.logger import logger
 from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, quantize, run_single
 from services.backtest.grid import FREE_COSTS, axes_from_spec, run_grid
 from services.backtest.metrics import compute
@@ -186,6 +185,20 @@ class BacktestService:
 
         return {"run_id": run_id, "status": "succeeded", **written}
 
+    def _cell_costless_json(self, cell, failed_reason: str | None, initial_cash: float) -> str | None:
+        """격자 칸의 대조군 요약 JSON. 못 구했으면 **그 사유를 싣는다**.
+
+        `None` 을 주면 저장된 `NULL` 이 「대조군을 안 돌린 옛 실행」으로 읽힌다 — 화면이 다른
+        원인을 말하며 소용없는 재실행을 시킨다. 단일 실행 경로와 같은 규약이다.
+        """
+        if failed_reason is not None:
+            return None
+        if cell.costless is None:
+            if cell.costless_absent is None:
+                return None
+            return json.dumps({"absent_reason": cell.costless_absent}, ensure_ascii=False)
+        return json.dumps(self._costless_summary(cell.costless, initial_cash), ensure_ascii=False)
+
     def _costless_json(self, strategy, params: dict, series: BarSeries, rows, args: dict) -> str | None:
         """대조군을 돌려 요약 JSON 을 만든다. 실패하면 `None` — 이 실행의 결과는 건드리지 않는다."""
         initial_cash = float(args["initial_cash"])
@@ -202,6 +215,11 @@ class BacktestService:
             # **삼키지 않는다.** `NULL` 은 이 레포에서 「대조군을 안 돌린 옛 실행」을 뜻한다고
             # 네 곳(마이그레이션·모델·스키마·프론트)이 못박았다. 터진 것을 그 `NULL` 로 두면
             # 화면이 **다른 원인**을 말하고, 시키는 재실행은 같은 이유로 또 터진다.
+            # **여기서 늦게 가져온다.** `core.logger` 는 import 시점에 `Settings()` 를 세우므로,
+            # 모듈 상단에서 가져오면 이 서비스를 import 하는 **모든** 자리가 앱 설정을 요구하게
+            # 된다 — DB 검증 스크립트와 standalone 그물이 그래서 죽었다. 그 사슬을 안 만든다.
+            from core.logger import logger
+
             logger.warning(f"대조군 실행이 실패했습니다 — {type(exc).__name__}")
             return json.dumps(
                 {"absent_reason": f"대조군을 구하지 못했습니다 — 실행이 {type(exc).__name__} 으로 멈췄습니다"},
@@ -355,14 +373,7 @@ class BacktestService:
                         "run_id": run_id,
                         "status": "succeeded" if failed_reason is None else "failed",
                         "failed_reason": failed_reason,
-                        "costless_summary": (
-                            json.dumps(
-                                self._costless_summary(cell.costless, float(args["initial_cash"])),
-                                ensure_ascii=False,
-                            )
-                            if failed_reason is None and cell.costless is not None
-                            else None
-                        ),
+                        "costless_summary": self._cell_costless_json(cell, failed_reason, float(args["initial_cash"])),
                     }
                 )
             except Exception as exc:  # noqa: BLE001

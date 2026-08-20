@@ -86,6 +86,9 @@ class Cell:
     #: 같은 조합을 **비용 0으로 다시 돌린** 결과. 「비용을 안 냈다면 얼마였나」를 나눗셈으로
     #: 흉내내면 틀린다 — 비용이 현금을 깎아 체결 수량 자체가 달라지므로, 거래 수까지 갈린다.
     costless: RunResult | None = None
+    #: 대조군을 **못 구한 사유**. `None` 이면 구했거나 안 돌린 것이고, 값이 있으면 「돌렸는데
+    #: 터졌다」다 — 그 둘을 뭉개면 화면이 소용없는 재실행을 시킨다.
+    costless_absent: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -182,23 +185,27 @@ def run_grid(
                 initial_cash=initial_cash,
                 costs=costs,
             )
-            cells.append(
-                Cell(params=params, result=result, costless=_costless(strategy, params, series, rows, initial_cash))
-            )
+            costless, costless_absent = _costless(strategy, params, series, rows, initial_cash)
+            cells.append(Cell(params=params, result=result, costless=costless, costless_absent=costless_absent))
         except Exception as exc:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
             cells.append(Cell(params=params, result=RunResult(), failed_reason=str(exc)[:500]))
 
     return Grid(axes=axes, cells=cells, base_params=dict(base_params))
 
 
-def _costless(strategy: Strategy, params: dict, series: BarSeries, rows, initial_cash: float) -> RunResult | None:
-    """같은 조합을 **비용 0으로** 다시 돌린다. 같은 `rows` 를 재사용하므로 DB 를 더 읽지 않는다.
+def _costless(
+    strategy: Strategy, params: dict, series: BarSeries, rows, initial_cash: float
+) -> tuple[RunResult | None, str | None]:
+    """같은 조합을 **비용 0으로** 다시 돌린다. `(결과, 못 구한 사유)` 를 준다.
+
+    같은 `rows` 를 재사용하므로 DB 를 더 읽지 않는다.
 
     **대조군 사고가 이 칸을 죽이지 않는다.** 비용을 낸 세계의 결과는 이미 나왔고, 못 구한 것은
-    견줄 상대뿐이다 — 실패하면 `None` 을 주고 화면이 「모른다」로 답한다.
+    견줄 상대뿐이다. 다만 **삼키지는 않는다** — 그냥 `None` 을 주면 저장된 `NULL` 이 「대조군을
+    안 돌린 옛 실행」으로 읽혀, 화면이 다른 원인을 말하며 소용없는 재실행을 시킨다.
     """
     try:
-        return run_single(
+        result = run_single(
             strategy=strategy,
             params=params,
             series=series,
@@ -206,8 +213,14 @@ def _costless(strategy: Strategy, params: dict, series: BarSeries, rows, initial
             initial_cash=initial_cash,
             costs=FREE_COSTS,
         )
-    except Exception:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
-        return None
+    except Exception as exc:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
+        # `core.logger` 는 import 시점에 앱 설정을 세운다 — 모듈 상단에서 가져오면 이 모듈을
+        # import 하는 검증 스크립트·standalone 그물이 설정 없이는 죽는다. 늦게 가져온다.
+        from core.logger import logger
+
+        logger.warning(f"대조군 실행이 실패했습니다 — {type(exc).__name__}")
+        return None, f"대조군을 구하지 못했습니다 — 실행이 {type(exc).__name__} 으로 멈췄습니다"
+    return result, None
 
 
 def axes_from_spec(param_specs: list[dict], sweep: dict[str, list]) -> tuple[Axis, ...]:

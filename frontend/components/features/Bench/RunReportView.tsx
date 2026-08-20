@@ -203,7 +203,7 @@ function CostComparison({
       ? run.status === "running" || run.status === "queued"
         ? "실행이 끝나면 채워집니다."
         : "대조군을 돌리지 않은 옛 실행입니다. 다시 실행하면 채워집니다."
-      : (twin.absent_reason ?? null);
+      : (redactReason(twin.absent_reason) ?? null);
   if (missing !== null || twin === null) {
     return <p className="break-keep text-2xs text-ink-muted">비용 미반영 대비 — {missing}</p>;
   }
