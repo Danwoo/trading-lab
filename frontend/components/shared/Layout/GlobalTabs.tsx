@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTabStore, OpenedTab } from "@/stores/shared/tabStore";
 import { Icon } from "@/components/shared/ui/primitives/icons";
 import { cn } from "@/components/shared/ui/primitives/cn";
+import { ICON_HIT_AREA } from "@/components/shared/ui/primitives/hitArea";
 
 /**
  * 열린 화면 탭 바 (#341 — DevExtreme `Tabs` + `Sortable` 이관).
@@ -119,7 +120,8 @@ export function GlobalTabs() {
                 <button
                   type="button"
                   aria-label={`${tab.title} 닫기`}
-                  className="ml-auto flex-shrink-0 rounded p-0.5 hover:bg-gray-300"
+                  // `-my-1` 은 24 짜리 표적이 탭 줄을 밀어 늘리지 않게 한다.
+                  className={cn(ICON_HIT_AREA, "-my-1 ml-auto flex-shrink-0 rounded hover:bg-gray-300")}
                   onClick={(e) => handleCloseClick(e, tab)}
                 >
                   <Icon name="close" size={11} />

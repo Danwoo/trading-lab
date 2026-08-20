@@ -11,6 +11,8 @@
 
 import type { ReactNode } from "react";
 
+import { ICON_HIT_AREA } from "./hitArea";
+
 interface Props {
   children: ReactNode;
   isInvalid: boolean;
@@ -62,7 +64,10 @@ export function fieldBorderClass(isInvalid: boolean): string {
  *
  * hover 는 **색이 아니라 바탕**으로 준다. 색을 밝히면 어두운 데서 좋아지고 밝은 데서 나빠진다 —
  * 한 색으로 양쪽을 다 올릴 수 없다. 바탕을 얹으면 글자 대비를 안 깎고 반응만 더한다.
+ *
+ * 크기는 `ICON_HIT_AREA` 가 정한다 — 24×24 상자 안에 글리프를 가운데 두므로 보이는 크기는
+ * 그대로다(#289). `right-2`(8) + 24 = 32 = 입력의 `pr-8` 이라 글자를 안 덮는다.
  */
 export const FIELD_ICON_BUTTON_CLASS =
-  "absolute right-2 top-1/2 -translate-y-1/2 rounded px-0.5 text-gray-500 " +
+  `${ICON_HIT_AREA} absolute right-2 top-1/2 -translate-y-1/2 rounded text-gray-500 ` +
   "hover:bg-gray-500/10 focus-visible:bg-gray-500/10 focus:outline-none";

@@ -101,6 +101,22 @@ describe("터치 표적 — 손가락 축 (#230)", () => {
     expect(coarse).not.toContain("--shell-rail:");
   });
 
+  it("어느 갈래에서도 WCAG 2.5.8 하한(24px) 아래로 안 내려간다", () => {
+    // 표적 최소값이 두 군데 산다 — 여기 `--touch-*`(셸의 손가락 축)와
+    // `components/shared/ui/primitives/hitArea.ts` 의 24(규격 하한). 둘은 층이 다르지만
+    // **토큰이 하한 아래로 내려가면** 셸이 규격을 깨는 것이라, 그 관계를 여기서 잠근다.
+    const declared = [...GLOBALS_CSS.matchAll(/(--touch-[a-z-]+)\s*:\s*(\d+)px;/g)].map(([, name, value]) => ({
+      name,
+      px: Number(value),
+    }));
+
+    // 선언이 사라져도 「위반 0건」으로 초록이 되지 않게 — 기본 2개 + coarse 2개.
+    expect(declared.length, `--touch-* 선언이 ${declared.length}건이다`).toBe(4);
+    for (const { name, px } of declared) {
+      expect(px, `${name} 가 ${px}px 이다 — WCAG 2.5.8 하한(24px) 아래다`).toBeGreaterThanOrEqual(24);
+    }
+  });
+
   it("Tailwind 가 그 토큰을 읽는다 — 클래스가 값 없이 죽지 않게", () => {
     const extend = themeExtend();
     const spacing = extend.spacing as Record<string, string>;
