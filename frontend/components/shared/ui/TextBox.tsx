@@ -3,6 +3,7 @@
 
 import { useId, useState } from "react";
 import { cn } from "./primitives/cn";
+import { FIELD_INPUT_CLASS, FieldShell, fieldBorderClass } from "./primitives/FieldShell";
 import { Icon } from "./primitives/icons";
 
 /**
@@ -180,11 +181,8 @@ export function TextBox<T = any>({
       aria-describedby={isInvalid && errorMessage ? errorMessageId : undefined}
       style={{ height }}
       className={cn(
-        "w-full rounded border bg-bg-panel px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted",
-        "focus:outline-none focus:ring-2 focus:ring-line-strong",
-        "read-only:cursor-default read-only:bg-bg-raised",
-        "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted",
-        isInvalid ? "border-danger" : "border-line",
+        FIELD_INPUT_CLASS,
+        fieldBorderClass(isInvalid),
         showClearButton && value ? "pr-8" : "",
         showPasswordToggle ? "pr-8" : "",
         className,
@@ -198,37 +196,35 @@ export function TextBox<T = any>({
   // 100% 기본값(className)이 실제 관측된 쓰임과 그대로 맞는다. effectiveWidth 가 명시되면
   // inline style 이 그 클래스를 덮는다(cn.ts 가 클래스 충돌을 안 풀어주므로 폭은 항상 style).
   return (
-    <div className="flex w-full flex-col">
-      <div className="relative w-full" style={{ width: effectiveWidth }}>
-        {input}
-        {showClearButton && !!value && !showPasswordToggle && (
-          <button
-            type="button"
-            aria-label="지우기"
-            className={ICON_BUTTON_CLASS}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onValueChanged?.(fieldName as keyof T, "")}
-          >
-            ×
-          </button>
-        )}
-        {showPasswordToggle && (
-          <button
-            type="button"
-            aria-label={passwordVisible ? "비밀번호 숨기기" : "비밀번호 표시"}
-            className={ICON_BUTTON_CLASS}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setPasswordVisible((v) => !v)}
-          >
-            <Icon name={passwordVisible ? "eyeopen" : "eyeclose"} size={18} />
-          </button>
-        )}
-      </div>
-      {isInvalid && errorMessage && (
-        <div id={errorMessageId} className="mt-1 self-start rounded bg-danger p-2 text-xs leading-normal text-bg-base">
-          {errorMessage}
-        </div>
+    <FieldShell
+      isInvalid={isInvalid}
+      errorMessage={errorMessage}
+      errorMessageId={errorMessageId}
+      width={effectiveWidth}
+    >
+      {input}
+      {showClearButton && !!value && !showPasswordToggle && (
+        <button
+          type="button"
+          aria-label="지우기"
+          className={ICON_BUTTON_CLASS}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onValueChanged?.(fieldName as keyof T, "")}
+        >
+          ×
+        </button>
       )}
-    </div>
+      {showPasswordToggle && (
+        <button
+          type="button"
+          aria-label={passwordVisible ? "비밀번호 숨기기" : "비밀번호 표시"}
+          className={ICON_BUTTON_CLASS}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setPasswordVisible((v) => !v)}
+        >
+          <Icon name={passwordVisible ? "eyeopen" : "eyeclose"} size={18} />
+        </button>
+      )}
+    </FieldShell>
   );
 }

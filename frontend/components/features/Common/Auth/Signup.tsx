@@ -119,11 +119,17 @@ export const Signup: FC<Props> = () => {
   };
 
   return (
-    <div className="relative h-[100dvh] w-screen">
+    <div className="relative h-[100dvh] w-screen bg-bg-base">
       <div className="auth-backdrop absolute z-10 m-auto w-full px-4 py-8 h-full min-h-[667px]">
         <PolicyPopup additionalClassName="pointer-events-none" />
 
-        <div className="card lg:card-side rounded-3xl bg-[#F0F1F2] w-full h-full sm:max-h-[700px] sm:max-w-[800px] m-auto">
+        {/* **이 카드는 라이트다** — 그 사실을 선언한다. 바깥 `.auth-backdrop` 은 모드와 무관한
+            어두운 섬이라 다크 토큰을 깔고, 그 안의 이 카드만 밝다. 선언이 없으면 카드 안의 공용
+            입력이 `:root`(다크) 토큰으로 풀려 밝은 카드 위에 검은 상자가 놓인다. */}
+        <div
+          data-theme="light"
+          className="card lg:card-side rounded-3xl bg-[#F0F1F2] w-full h-full sm:max-h-[700px] sm:max-w-[800px] m-auto"
+        >
           <div className="card-body">
             <div className="w-full lg:max-w-3xl sm:mx-auto sm:w-full sm:max-w-sm sm:pt-10">
               <h2 className="font-bold text-2xl sm:text-4xl mt-10 text-center tracking-tight text-[#303F67]">

@@ -63,11 +63,16 @@ export const SignupInfo: FC<Props> = () => {
   };
 
   return (
-    <div className="relative h-[100dvh] w-screen">
+    <div className="relative h-[100dvh] w-screen bg-bg-base">
       <div className="auth-backdrop absolute z-10 m-auto w-full px-4 py-8 h-full min-h-[667px]">
         <PolicyPopup additionalClassName="pointer-events-none" />
 
-        <div className="card lg:card-side rounded-3xl bg-[#F0F1F2] w-full h-full sm:max-h-[700px] sm:max-w-[800px] m-auto">
+        {/* 라이트 카드 — 어두운 `.auth-backdrop` 안의 밝은 섬이라 자기 모드를 선언한다
+            (Signup.tsx 와 같은 이유). */}
+        <div
+          data-theme="light"
+          className="card lg:card-side rounded-3xl bg-[#F0F1F2] w-full h-full sm:max-h-[700px] sm:max-w-[800px] m-auto"
+        >
           <div className="card-body">
             <div className="w-full lg:max-w-3xl sm:mx-auto sm:w-full sm:max-w-sm sm:pt-10">
               <h2 className="font-bold text-2xl sm:text-4xl mt-10 text-center tracking-tight text-[#303F67]">

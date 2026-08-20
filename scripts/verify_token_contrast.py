@@ -98,6 +98,8 @@ EXACT_ROLES: dict[str, str] = {
     # 곱집합에서 뺀다. 이 분류가 ㉡ 결정을 코드로 강제하는 자리다.
     "--ink-faint": NON_TEXT,
     # 상태색은 메시지·배지·테두리에만 온다 — 버튼 채움이 되지 않는다(§2.3).
+    # 배지는 **채워서** 그리므로 그 자리에선 바탕이기도 하다 — 역할은 하나만 붙일 수 있어
+    # 아래 EXTRA_COMBINATIONS 가 그 조합을 따로 받는다.
     "--danger": INK_CONTENT,
     "--caution": INK_CONTENT,
     "--success": INK_CONTENT,
@@ -153,6 +155,16 @@ TOKEN_SETS: list[tuple[str, tuple[str, ...], bool]] = [
         ),
         False,
     ),
+]
+
+# 역할 곱집합 **밖**에서 화면이 실제로 띄우는 조합 (글자 토큰, 바탕 토큰).
+# 역할은 토큰마다 하나뿐이라, 한 토큰이 자리에 따라 글자도 되고 바탕도 되는 경우를 곱집합이
+# 못 만든다. 검증 오류칩(`bg-danger text-bg-base`, primitives/FieldShell.tsx)이 그 자리다 —
+# `--danger` 는 INK_CONTENT 로 분류돼 있어 이 조합이 곱집합에 아예 없었다.
+# **여기 적힌 것은 화면에 실재하는 조합이어야 한다** — 안 쓰는 조합을 적으면 값을 화면이 아니라
+# 스크립트를 위해 맞추게 된다.
+EXTRA_COMBINATIONS: list[tuple[str, str]] = [
+    ("--bg-base", "--danger"),
 ]
 
 # WCAG 명세가 못박은 두 점 + `--ink-faint` 결정(㉡)의 전후 값.
@@ -388,6 +400,13 @@ def check_set(
     ]
     combinations += [(fg, bg) for fg in names_by_role[INK_ANY] for bg in names_by_role[CONTROL_SURFACE]]
 
+    # 곱집합 밖의 실제 조합. 토큰이 이 벌에 없으면 조용히 빠지지 않고 실패한다.
+    missing_extra = [f"{fg} on {bg}" for fg, bg in EXTRA_COMBINATIONS if fg not in colors or bg not in colors]
+    if missing_extra:
+        _fail(f"{label}: EXTRA_COMBINATIONS 의 토큰을 이 벌에서 찾지 못했습니다: {', '.join(missing_extra)}")
+        ok = False
+    combinations += [(fg, bg) for fg, bg in EXTRA_COMBINATIONS if fg in colors and bg in colors]
+
     if len(combinations) < MIN_COMBINATIONS_PER_SET:
         _fail(
             f"{label}: 검사할 조합이 {len(combinations)}건입니다 (하한 {MIN_COMBINATIONS_PER_SET}) — fail-closed 종료"
@@ -400,6 +419,7 @@ def check_set(
         f"(({INK_ANY} {len(names_by_role[INK_ANY])} + {INK_CONTENT} {len(names_by_role[INK_CONTENT])})"
         f" × {SURFACE} {len(names_by_role[SURFACE])}"
         f" + {INK_ANY} × {CONTROL_SURFACE} {len(names_by_role[CONTROL_SURFACE])}"
+        f" + 곱집합 밖 {len(EXTRA_COMBINATIONS)}"
         f" = {len(combinations)}) ──"
     )
     violations: list[tuple[str, str, float]] = []

@@ -86,7 +86,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
   }, [isEmbed, loaded, authorized, pathname, navItems, openTab]);
 
-  if (isEmbed === null || !loaded || authorized === null) return null;
+  // 게이트가 열리기 전에도 **라이트 바탕을 깐다.** `null` 을 돌려주면 그 구간의 문서 캔버스가
+  // 보이는데, `:root` 의 `color-scheme: dark` 때문에 그 캔버스는 어둡다 — 라이트 셸이 뜨는
+  // 순간 화면이 검정에서 흰색으로 튄다.
+  if (isEmbed === null || !loaded || authorized === null)
+    return <div data-theme="light" className="h-screen bg-bg-base" />;
 
   // **관리 화면은 라이트다** — 그 사실을 선언한다.
   //

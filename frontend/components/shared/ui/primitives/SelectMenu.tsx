@@ -244,8 +244,8 @@ export function SelectMenu({
             aria-readonly={readOnly || undefined}
             style={{ height }}
             className={cn(
+              // 포커스 표시는 globals.css 의 `:focus-visible` outline 한 자리가 정본이다.
               "flex w-full items-center justify-between gap-1 rounded border px-3 py-1.5 text-left text-sm text-ink",
-              "focus:outline-none focus:ring-2 focus:ring-line-strong",
               "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted",
               readOnly ? "cursor-default bg-bg-raised" : "cursor-pointer bg-bg-panel",
               isInvalid ? "border-danger" : "border-line",
@@ -298,7 +298,10 @@ export function SelectMenu({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full rounded border border-line px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-line-strong"
+                // 팝오버 안이라도 **자기 바탕을 칠한다** — 안 칠하면 브라우저 기본으로 떨어져
+                // 팝오버(`--bg-panel`)와 다른 색이 된다. #281 이 고친 그 형태다.
+                // 팝오버가 `--bg-panel` 이라 입력칸은 한 단 아래(`--bg-base`)를 써 파인 자리로 읽힌다.
+                className="w-full rounded border border-line bg-bg-base px-2 py-1 text-sm text-ink placeholder:text-ink-muted"
               />
             </div>
           )}
@@ -332,7 +335,10 @@ export function SelectMenu({
                   onClick={() => commit(itemValue)}
                   className={cn(
                     "flex cursor-pointer items-center gap-2 px-3 py-1.5",
-                    index === activeIndex ? "bg-bg-raised" : "",
+                    // 목록이 `focus:outline-none` 으로 정본 outline 을 눌러 두므로, 키보드 위치는
+                    // **이 표시 하나뿐**이다. 바탕만으로는 `--bg-raised` on `--bg-panel` 1.35:1 이라
+                    // 눈에 안 띈다 — 비텍스트 3:1 을 넘는 선(`--ink-muted`)을 함께 두른다.
+                    index === activeIndex ? "bg-bg-raised ring-1 ring-inset ring-ink-muted" : "",
                     isSelected ? "font-medium text-ink-strong" : "text-ink",
                   )}
                 >
