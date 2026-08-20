@@ -6,6 +6,7 @@ import { describeStaleness, type StalenessNote } from "@/lib/terminal/staleness"
 import type { IngestRunOut } from "@/schemas/terminal/ingest";
 import type { Provenance } from "@/types/terminal/provenance";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
+import { redactReason } from "@/utils/common/errors/redactReason";
 
 /** 시세 신선도를 좌우하는 잡 — 종목 마스터는 캔들이 아니라서 「시세가 언제까지 있나」에 답하지 않는다. */
 const CANDLE_JOB_KINDS = ["daily_bar", "minute_bar"];
@@ -78,7 +79,7 @@ export function useQuoteFreshness(): QuoteFreshness {
         provenance: { kind: "unavailable", reason },
         staleness: null,
         running: false,
-        failedReason: runs.error ? getApiErrorMessage(runs.error) : null,
+        failedReason: runs.error ? redactReason(getApiErrorMessage(runs.error)) : null,
       };
     }
 
@@ -107,7 +108,7 @@ export function useQuoteFreshness(): QuoteFreshness {
         },
         staleness: null,
         running,
-        failedReason: last.failed_reason,
+        failedReason: redactReason(last.failed_reason),
       };
     }
 
@@ -118,7 +119,7 @@ export function useQuoteFreshness(): QuoteFreshness {
       provenance: { kind: "loaded", source: "시세", asOf },
       staleness,
       running,
-      failedReason: candleRuns[0].status === "failed" ? candleRuns[0].failed_reason : null,
+      failedReason: candleRuns[0].status === "failed" ? redactReason(candleRuns[0].failed_reason) : null,
     };
   }, [runs.data, runs.isLoading, runs.error, runs.provenance]);
 }

@@ -400,6 +400,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_color_token_usage.py
 
+      # 실패 사유가 화면으로 나가는 자리의 가림 (#274) — **경로 필터가 없는 이 잡에 둔다.**
+      # `ci.yml` 의 백엔드 잡에 두면 `FILTER_PATTERNS` 에 `frontend/**` 가 없어, 프론트만 바꾼
+      # PR(= 이 그물이 지켜야 할 바로 그 클래스)에서 조용히 skip 된다. 실제로 그 상태였다.
+      - name: 실패 사유 가림 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_reason_redaction.py
+
       # 비텍스트 토큰을 글자에 쓰는 것 (#73 리드 결정 ㉡) — 위 두 그물 **사이**에 난 구멍이다.
       # 대비 검사는 「비텍스트니 검사 안 함」으로, 색 사용 검사는 「등록된 토큰이니 위반 아님」으로
       # 넘겨, 규격상 못 읽는 값이 글자로 새어 나간다(실측: PR #161). 검사 0건이면 실패.

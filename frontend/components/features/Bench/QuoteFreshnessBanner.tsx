@@ -5,6 +5,7 @@ import { ProvenanceBadge } from "@/components/features/Terminal/ProvenanceBadge"
 import { ImpactNotice } from "@/components/features/Bench/ImpactNotice";
 import { MARKET_PATH } from "@/constants/routes";
 import { useQuoteFreshness } from "@/hooks/bench/useQuoteFreshness";
+import { redactReason } from "@/utils/common/errors/redactReason";
 
 /** 적재를 실제로 돌릴 수 있는 자리로 보낸다 — 안내만 하고 갈 곳을 안 주면 그것도 막다른 길이다. */
 function GoLoadLink() {
@@ -58,7 +59,7 @@ export function QuoteFreshnessBanner() {
           headline={`시세 적재본이 ${freshness.staleness?.label ?? "낡음"} 상태입니다 — 오늘 값으로 판정하지 않습니다`}
           halted={["오늘 신호 판정"]}
           running={["격자·과거 성적 (적재된 구간까지)"]}
-          detail={freshness.failedReason}
+          detail={redactReason(freshness.failedReason)}
           action={<GoLoadLink />}
         />
       )}
@@ -80,7 +81,7 @@ export function QuoteFreshnessBanner() {
           headline="캔들 적재가 아직 한 번도 성공하지 못했습니다"
           halted={["오늘 신호 판정", "차트"]}
           running={["봇 만들기", "조건 편집"]}
-          detail={freshness.failedReason}
+          detail={redactReason(freshness.failedReason)}
           action={<GoLoadLink />}
         />
       )}
@@ -89,7 +90,7 @@ export function QuoteFreshnessBanner() {
           headline="시세가 얼마나 낡았는지 확인하지 못했습니다 — 모르는 것을 최신으로 두지 않습니다"
           halted={["오늘 신호 판정", "신선도 판정"]}
           running={["봇 만들기", "조건 편집"]}
-          detail={freshness.failedReason}
+          detail={redactReason(freshness.failedReason)}
           action={<GoLoadLink />}
         />
       )}

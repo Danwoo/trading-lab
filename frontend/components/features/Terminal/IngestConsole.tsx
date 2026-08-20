@@ -12,6 +12,7 @@ import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import type { DataKind, IngestRunOut } from "@/schemas/terminal/ingest";
 import type { MarketCapability } from "@/services/terminal/marketService";
 import { CREDENTIAL_MISSING_CODE } from "@/lib/terminal/marketDataError";
+import { redactReason } from "@/utils/common/errors/redactReason";
 
 /**
  * 시세 화면의 **적재 콘솔** — 마일스톤 2 가 이 화면에서 요구하는 두 줄이 여기서 보인다:
@@ -230,7 +231,9 @@ function Runs({ rows, loading }: { rows: IngestRunOut[] | null; loading: boolean
             <span className="text-ink-muted">건너뜀 {run.skipped_rows}</span>
           )}
           {emptyReason(run) && <span className="min-w-0 break-keep text-danger">{emptyReason(run)}</span>}
-          {run.failed_reason && <span className="min-w-0 break-keep text-danger">{run.failed_reason}</span>}
+          {redactReason(run.failed_reason) && (
+            <span className="min-w-0 break-keep text-danger">{redactReason(run.failed_reason)}</span>
+          )}
         </li>
       ))}
     </ul>
