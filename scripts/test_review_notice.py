@@ -50,9 +50,7 @@ def main() -> int:
     for desc, payload, want_docs_only, want_error in CASES:
         got = review_notice.decide(payload)
         if got["docs_only"] != want_docs_only:
-            failures.append(
-                f"{desc}: docs_only={got['docs_only']} (기대 {want_docs_only})"
-            )
+            failures.append(f"{desc}: docs_only={got['docs_only']} (기대 {want_docs_only})")
         if bool(got["error"]) != want_error:
             failures.append(f"{desc}: error={got['error']!r} (기대 유무 {want_error})")
         if got["docs_only"] and got["error"]:

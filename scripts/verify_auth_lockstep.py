@@ -192,9 +192,7 @@ EXPECTED_SERVICES = [
 
 
 def discover_services() -> list[str]:
-    return sorted(
-        p.parents[2].name for p in REPO_ROOT.glob("*-service/app/core/security.py")
-    )
+    return sorted(p.parents[2].name for p in REPO_ROOT.glob("*-service/app/core/security.py"))
 
 
 def check_byte_identical(services: list[str]) -> list[str]:
@@ -208,17 +206,14 @@ def check_byte_identical(services: list[str]) -> list[str]:
             if not path.is_file():
                 problems.append(f"{service}/app/core/{name}: 파일 없음")
             elif path.read_bytes() != reference:
-                problems.append(
-                    f"{service}/app/core/{name}: {REFERENCE_SERVICE} 와 내용 다름"
-                )
+                problems.append(f"{service}/app/core/{name}: {REFERENCE_SERVICE} 와 내용 다름")
     return problems
 
 
 def _services_with_relative_path(relative_path: str) -> list[str]:
     """relative_path 를 실제로 가진 서비스 목록 — 매 실행 손으로 안 세고 glob 으로 다시 찾는다."""
     return sorted(
-        p.parents[len(Path(relative_path).parts) - 1].name
-        for p in REPO_ROOT.glob(f"*-service/{relative_path}")
+        p.parents[len(Path(relative_path).parts) - 1].name for p in REPO_ROOT.glob(f"*-service/{relative_path}")
     )
 
 
@@ -243,9 +238,7 @@ def check_replica_groups() -> list[str]:
             if not path.is_file():
                 problems.append(f"{service}/{relative_path}: 파일 없음")
             elif path.read_bytes() != reference:
-                problems.append(
-                    f"{service}/{relative_path}: {reference_service} 와 내용 다름"
-                )
+                problems.append(f"{service}/{relative_path}: {reference_service} 와 내용 다름")
         # members·known_divergent 밖에서 같은 경로에 파일을 가진 서비스가 새로 나타났다 —
         # 내용이 같은지는 안 본다, 선언 안 된 존재 자체가 위반이다 (#290 의 3번째 복제본 구멍).
         discovered = set(_services_with_relative_path(relative_path))
@@ -292,9 +285,7 @@ def check_undeclared_replicas() -> list[str]:
                     "REPLICA_GROUPS 에 없다 (선언하거나 의도적으로 다르게 만들 것)"
                 )
     if scanned == 0:
-        problems.append(
-            "미선언 복제 스캔: 대상 .py 파일 0건 — *-service/app 글롭이 어긋났다"
-        )
+        problems.append("미선언 복제 스캔: 대상 .py 파일 0건 — *-service/app 글롭이 어긋났다")
     return problems
 
 
@@ -302,11 +293,7 @@ def _field_defaults(settings: ast.ClassDef) -> dict[str, ast.expr]:
     """Settings 본문의 `이름: 타입 = 기본값` 클래스 필드를 {이름: 기본값 expr} 로 수집."""
     out: dict[str, ast.expr] = {}
     for node in settings.body:
-        if (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.value is not None
-        ):
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
             out[node.target.id] = node.value
     return out
 
@@ -320,9 +307,7 @@ def _env_file_value(settings: ast.ClassDef) -> ast.expr | None:
     for node in ast.walk(settings):
         if isinstance(node, ast.keyword) and node.arg == "env_file":
             return node.value
-        if isinstance(node, ast.Assign) and any(
-            isinstance(t, ast.Name) and t.id == "env_file" for t in node.targets
-        ):
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "env_file" for t in node.targets):
             return node.value
         if (
             isinstance(node, ast.AnnAssign)
@@ -386,19 +371,12 @@ def check_config_delta(service: str) -> list[str]:
                 f'{prefix}: env_file 에서 os.getenv("APP_ENV", <리터럴>) fallback 을 '
                 "인식 못 함 (누락이거나 인식 못 하는 형태)"
             )
-        elif not (
-            isinstance(fallback, ast.Constant) and fallback.value == "production"
-        ):
-            problems.append(
-                f'{prefix}: env_file fallback 이 "production" 이 아님 (미설정 배포가 dev env 로 fail-open)'
-            )
+        elif not (isinstance(fallback, ast.Constant) and fallback.value == "production"):
+            problems.append(f'{prefix}: env_file fallback 이 "production" 이 아님 (미설정 배포가 dev env 로 fail-open)')
     bypass = defaults.get("AUTH_DEV_BYPASS")
     if not (isinstance(bypass, ast.Constant) and bypass.value is False):
         problems.append(f"{prefix}: AUTH_DEV_BYPASS: bool = False 필드 없음")
-    if not any(
-        isinstance(n, ast.FunctionDef) and n.name == BYPASS_VALIDATOR
-        for n in settings.body
-    ):
+    if not any(isinstance(n, ast.FunctionDef) and n.name == BYPASS_VALIDATOR for n in settings.body):
         problems.append(f"{prefix}: {BYPASS_VALIDATOR} validator 없음")
     return problems
 
@@ -406,8 +384,7 @@ def check_config_delta(service: str) -> list[str]:
 def main() -> int:
     services = discover_services()
     problems = [
-        f"{s}: app/core/security.py 미발견 (삭제·이름변경?)"
-        for s in sorted(set(EXPECTED_SERVICES) - set(services))
+        f"{s}: app/core/security.py 미발견 (삭제·이름변경?)" for s in sorted(set(EXPECTED_SERVICES) - set(services))
     ]
     problems.extend(check_byte_identical(services))
     problems.extend(check_replica_groups())

@@ -177,17 +177,14 @@ def judge(
     ]
     for name in sorted(latest):
         record = latest[name]
-        lines.append(
-            f"  · {name}: {record.get('status')}/{record.get('conclusion') or '-'}"
-        )
+        lines.append(f"  · {name}: {record.get('status')}/{record.get('conclusion') or '-'}")
 
     problems: list[str] = []
     pending = [n for n, r in latest.items() if r.get("status") != "completed"]
     bad = [
         n
         for n, r in latest.items()
-        if r.get("status") == "completed"
-        and r.get("conclusion") not in PASSING_CONCLUSIONS
+        if r.get("status") == "completed" and r.get("conclusion") not in PASSING_CONCLUSIONS
     ]
 
     # 실패는 기다려도 안 바뀐다 — 미완이 남아 있어도 즉시 빨간불로 접는다.
@@ -208,9 +205,7 @@ def judge(
                 lines,
                 [f"아직 끝나지 않은 테스트 체크 {len(pending)}건: {detail}"],
             )
-        problems.append(
-            f"대기 한도 안에 끝나지 않은 테스트 체크 {len(pending)}건: {detail}"
-        )
+        problems.append(f"대기 한도 안에 끝나지 않은 테스트 체크 {len(pending)}건: {detail}")
 
     if len(latest) < minimum:
         message = (
@@ -327,14 +322,10 @@ def check_wait_loop(block: str) -> list[str]:
             "게이트가 영영 초록도 빨강도 아닌 상태로 남습니다"
         )
 
-    deadline = re.search(
-        r"DEADLINE=\$\(\(\s*\$\(date \+%s\)\s*\+\s*(\d+)\s*\)\)", block
-    )
+    deadline = re.search(r"DEADLINE=\$\(\(\s*\$\(date \+%s\)\s*\+\s*(\d+)\s*\)\)", block)
     timeout = re.search(r"^\s*timeout-minutes:\s*(\d+)\s*$", block, re.M)
     if deadline is None:
-        problems.append(
-            "대기 상한(`DEADLINE`)이 없습니다 — 상한 없는 대기는 fail-closed 가 아닙니다"
-        )
+        problems.append("대기 상한(`DEADLINE`)이 없습니다 — 상한 없는 대기는 fail-closed 가 아닙니다")
     if timeout is None:
         problems.append("게이트 잡에 `timeout-minutes` 가 없습니다")
     if deadline and timeout:
@@ -371,16 +362,12 @@ def check_structure(
     ② 테스트 잡을 지우면 하한 미만이 되는데 그 사실을 **PR 이 돌기 전엔** 모른다.
     """
     if not gate_jobs:
-        return [
-            "워크플로에서 잡을 0건 읽었습니다 — 파싱이 깨졌거나 파일이 사라졌습니다"
-        ]
+        return ["워크플로에서 잡을 0건 읽었습니다 — 파싱이 깨졌거나 파일이 사라졌습니다"]
 
     problems: list[str] = []
     gate = gate_jobs.get(GATE_JOB_ID)
     if gate is None:
-        problems.append(
-            f"게이트 잡 `{GATE_JOB_ID}` 이 없습니다 — 읽은 잡: {', '.join(sorted(gate_jobs))}"
-        )
+        problems.append(f"게이트 잡 `{GATE_JOB_ID}` 이 없습니다 — 읽은 잡: {', '.join(sorted(gate_jobs))}")
     elif gate["name"] != SELF_CHECK_NAME:
         problems.append(
             f"게이트의 체크 이름이 {gate['name']!r} 인데 판정부는 {SELF_CHECK_NAME!r} 를 "
@@ -411,13 +398,9 @@ def check_structure(
 def main(argv: list[str]) -> int:
     final = "--final" in argv[1:]
 
-    gate_text = (
-        GATE_WORKFLOW.read_text(encoding="utf-8") if GATE_WORKFLOW.is_file() else ""
-    )
+    gate_text = GATE_WORKFLOW.read_text(encoding="utf-8") if GATE_WORKFLOW.is_file() else ""
     gate_jobs = parse_jobs(gate_text)
-    test_job_names = (
-        collect_test_job_names(WORKFLOW_DIR) if WORKFLOW_DIR.is_dir() else {}
-    )
+    test_job_names = collect_test_job_names(WORKFLOW_DIR) if WORKFLOW_DIR.is_dir() else {}
     structure_problems = check_structure(gate_jobs, test_job_names)
     structure_problems += check_wait_loop(gate_job_block(gate_text))
 
@@ -440,9 +423,7 @@ def main(argv: list[str]) -> int:
     if structure_problems:
         for problem in problems:
             _fail(problem)
-        print(
-            f"판정: 게이트 실패 — 구조 {len(structure_problems)}건 · 결과 {len(problems)}건"
-        )
+        print(f"판정: 게이트 실패 — 구조 {len(structure_problems)}건 · 결과 {len(problems)}건")
         return 1
 
     if state == "wait":

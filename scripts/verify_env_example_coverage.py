@@ -38,13 +38,9 @@ def services_with_config() -> list[str]:
 
 def main() -> int:
     services = services_with_config()
-    missing = [
-        s for s in services if not (REPO_ROOT / s / "app" / EXAMPLE_NAME).is_file()
-    ]
+    missing = [s for s in services if not (REPO_ROOT / s / "app" / EXAMPLE_NAME).is_file()]
 
-    print(
-        f"config 를 가진 서비스 {len(services)}개 검사 · {EXAMPLE_NAME} 누락 {len(missing)}건"
-    )
+    print(f"config 를 가진 서비스 {len(services)}개 검사 · {EXAMPLE_NAME} 누락 {len(missing)}건")
 
     if len(services) < MIN_SERVICES:
         print(
@@ -70,9 +66,7 @@ def main() -> int:
             )
         return 1
 
-    print(
-        f"판정: 모든 서비스가 부트스트랩 대상이다 (frontend 포함 {len(services) + 1}개)"
-    )
+    print(f"판정: 모든 서비스가 부트스트랩 대상이다 (frontend 포함 {len(services) + 1}개)")
     return 0
 
 

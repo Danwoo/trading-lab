@@ -92,13 +92,9 @@ def table_packages(text: str) -> list[str]:
 
 def split_sections(text: str) -> dict[str, str]:
     """`## N.` 머리로 문서를 절로 가른다 (§3 의 표는 npm 패키지가 아니다 — 섞이면 안 된다)."""
-    marks = [
-        (m.group(1), m.start()) for m in re.finditer(r"^## (\d)\. ", text, re.MULTILINE)
-    ]
+    marks = [(m.group(1), m.start()) for m in re.finditer(r"^## (\d)\. ", text, re.MULTILINE)]
     if len(marks) != 3:
-        raise Problem(
-            f"절 머리(`## N. `)를 {len(marks)}개 찾았다 — 기대 3개 (§1·§2·§3)"
-        )
+        raise Problem(f"절 머리(`## N. `)를 {len(marks)}개 찾았다 — 기대 3개 (§1·§2·§3)")
     sections: dict[str, str] = {}
     for index, (number, start) in enumerate(marks):
         end = marks[index + 1][1] if index + 1 < len(marks) else len(text)
@@ -115,34 +111,21 @@ def parse_document(text: str) -> tuple[set[str], set[str], list[str]]:
     total = int(one(r"프로덕션 의존성 (\d+)개", text, "최상단 총계").group(1))
 
     # §1 Apache-2.0 — 머리의 개수 = 변형별 선언 합 = 변형이 실제로 열거한 패키지 수
-    apache_declared = int(
-        one(
-            r"^(\d+)개 패키지\. Apache-2\.0 은", sections["1"], "§1 Apache-2.0 머리"
-        ).group(1)
-    )
-    variants = re.findall(
-        r"<summary>변형 (\d+) — (\d+)개 패키지: (.+?)</summary>", sections["1"]
-    )
+    apache_declared = int(one(r"^(\d+)개 패키지\. Apache-2\.0 은", sections["1"], "§1 Apache-2.0 머리").group(1))
+    variants = re.findall(r"<summary>변형 (\d+) — (\d+)개 패키지: (.+?)</summary>", sections["1"])
     if len(variants) < MIN_VARIANTS:
-        raise Problem(
-            f"§1 본문 변형을 {len(variants)}개 파싱했다 — 하한 {MIN_VARIANTS} 미만"
-        )
+        raise Problem(f"§1 본문 변형을 {len(variants)}개 파싱했다 — 하한 {MIN_VARIANTS} 미만")
     apache: set[str] = set()
     for number, declared, body in variants:
         listed = re.findall(r"`([^`]+)`", body)
         if len(listed) != int(declared):
             raise Problem(
-                f"§1 변형 {number}: 「{declared}개 패키지」라 적혀 있는데 실제로 열거한 것은 "
-                f"{len(listed)}개다"
+                f"§1 변형 {number}: 「{declared}개 패키지」라 적혀 있는데 실제로 열거한 것은 {len(listed)}개다"
             )
         apache |= set(listed)
     if len(apache) != apache_declared:
-        raise Problem(
-            f"§1 Apache-2.0: 머리는 {apache_declared}개 · 변형 열거 합은 {len(apache)}개"
-        )
-    lines.append(
-        f"§1 Apache-2.0 {apache_declared}개 = 본문 변형 {len(variants)}종의 열거 합"
-    )
+        raise Problem(f"§1 Apache-2.0: 머리는 {apache_declared}개 · 변형 열거 합은 {len(apache)}개")
+    lines.append(f"§1 Apache-2.0 {apache_declared}개 = 본문 변형 {len(variants)}종의 열거 합")
 
     # §1 나머지 (MPL·LGPL·듀얼·퍼블릭도메인 등) — 표로만 적힌 절
     others = table_packages(sections["1"])
@@ -152,11 +135,7 @@ def parse_document(text: str) -> tuple[set[str], set[str], list[str]]:
     lines.append(f"§1 표 절 {len(others)}개 → §1 합계 {len(section1)}개")
 
     # §2 — 머리 개수 = 예외 표 + 나머지 표
-    section2_declared = int(
-        one(
-            r"^## 2\. 그 외 permissive 라이선스 \((\d+)개\)", sections["2"], "§2 머리"
-        ).group(1)
-    )
+    section2_declared = int(one(r"^## 2\. 그 외 permissive 라이선스 \((\d+)개\)", sections["2"], "§2 머리").group(1))
     exception_declared = int(
         one(
             r"원문 파일 없이 선언만 있는 패키지 \((\d+)개\)",
@@ -164,46 +143,31 @@ def parse_document(text: str) -> tuple[set[str], set[str], list[str]]:
             "§2 예외 머리",
         ).group(1)
     )
-    rest_declared = int(
-        one(r"<summary>펼치기 — 나머지 (\d+)개", sections["2"], "§2 나머지 머리").group(
-            1
-        )
-    )
-    body_declared, file_declared = one(
-        r"(\d+)개 중 (\d+)개는 npm 배포본에", sections["2"], "§2 본문 서술"
-    ).groups()
+    rest_declared = int(one(r"<summary>펼치기 — 나머지 (\d+)개", sections["2"], "§2 나머지 머리").group(1))
+    body_declared, file_declared = one(r"(\d+)개 중 (\d+)개는 npm 배포본에", sections["2"], "§2 본문 서술").groups()
     if int(body_declared) != section2_declared or int(file_declared) != rest_declared:
         raise Problem(
             f"§2 본문 서술({body_declared} 중 {file_declared})이 머리 선언"
             f"({section2_declared} · 나머지 {rest_declared})과 어긋난다"
         )
     if exception_declared + rest_declared != section2_declared:
-        raise Problem(
-            f"§2: 예외 {exception_declared} + 나머지 {rest_declared} "
-            f"≠ 머리 {section2_declared}"
-        )
+        raise Problem(f"§2: 예외 {exception_declared} + 나머지 {rest_declared} ≠ 머리 {section2_declared}")
     section2 = set(table_packages(sections["2"]))
     if len(section2) != section2_declared:
         raise Problem(f"§2 표 행 {len(section2)}개 · 머리 선언 {section2_declared}개")
     # 예외 표(원문 파일 없이 선언만 있는 것)는 `<details>` 앞에만 있다 — 실측과 따로 대조한다.
     exceptions = set(table_packages(sections["2"].split("<details>")[0]))
     if len(exceptions) != exception_declared:
-        raise Problem(
-            f"§2 예외 표 행 {len(exceptions)}개 · 머리 선언 {exception_declared}개"
-        )
+        raise Problem(f"§2 예외 표 행 {len(exceptions)}개 · 머리 선언 {exception_declared}개")
     lines.append(
-        f"§2 permissive {section2_declared}개 = 예외 {exception_declared} + 나머지 {rest_declared} "
-        "(표 행 수와 일치)"
+        f"§2 permissive {section2_declared}개 = 예외 {exception_declared} + 나머지 {rest_declared} (표 행 수와 일치)"
     )
 
     declared_packages = section1 | section2
     if len(declared_packages) != len(section1) + len(section2):
         raise Problem("§1 과 §2 에 같은 패키지가 중복으로 적혀 있다")
     if len(declared_packages) != total:
-        raise Problem(
-            f"최상단 총계 {total}개 · §1({len(section1)}) + §2({len(section2)}) = "
-            f"{len(declared_packages)}개"
-        )
+        raise Problem(f"최상단 총계 {total}개 · §1({len(section1)}) + §2({len(section2)}) = {len(declared_packages)}개")
     if len(declared_packages) < MIN_PACKAGES:
         raise Problem(
             f"문서에서 패키지를 {len(declared_packages)}개 파싱했다 — 하한 {MIN_PACKAGES} 미만 "
@@ -230,35 +194,22 @@ def check_bundled_assets(text: str) -> tuple[list[str], list[str]]:
     actual_woff2 = len(list((FRONTEND / "public" / "font" / "woff2").glob("*.woff2")))
     if actual_woff == 0 or actual_woff2 == 0:
         problems.append(
-            f"폰트 파일을 woff {actual_woff}개 · woff2 {actual_woff2}개 찾았다 — 0건은 "
-            "경로가 바뀐 것이다 (fail-closed)"
+            f"폰트 파일을 woff {actual_woff}개 · woff2 {actual_woff2}개 찾았다 — 0건은 경로가 바뀐 것이다 (fail-closed)"
         )
     if actual_woff != int(weights) or actual_woff2 != int(weights):
-        problems.append(
-            f"§3: 굵기 {weights}종이라 적혀 있는데 실측은 woff {actual_woff}개 · "
-            f"woff2 {actual_woff2}개다"
-        )
+        problems.append(f"§3: 굵기 {weights}종이라 적혀 있는데 실측은 woff {actual_woff}개 · woff2 {actual_woff2}개다")
     if actual_woff + actual_woff2 != int(files):
-        problems.append(
-            f"§3: 총 {files}개 파일이라 적혀 있는데 실측 합은 {actual_woff + actual_woff2}개다"
-        )
+        problems.append(f"§3: 총 {files}개 파일이라 적혀 있는데 실측 합은 {actual_woff + actual_woff2}개다")
     if int(weights) * int(formats) != int(files):
         problems.append(f"§3: {weights}종 × {formats}포맷 ≠ {files}개")
 
     if not FONTS_CSS.is_file():
-        problems.append(
-            f"§3: {FONTS_CSS.relative_to(REPO_ROOT)} 가 없다 — 선언을 대조할 수 없다"
-        )
+        problems.append(f"§3: {FONTS_CSS.relative_to(REPO_ROOT)} 가 없다 — 선언을 대조할 수 없다")
         actual_faces = 0
     else:
-        actual_faces = len(
-            re.findall(r"@font-face", FONTS_CSS.read_text(encoding="utf-8"))
-        )
+        actual_faces = len(re.findall(r"@font-face", FONTS_CSS.read_text(encoding="utf-8")))
         if actual_faces != int(faces):
-            problems.append(
-                f"§3: `@font-face` {faces}개라 적혀 있는데 {FONTS_CSS.name} 의 실측은 "
-                f"{actual_faces}개다"
-            )
+            problems.append(f"§3: `@font-face` {faces}개라 적혀 있는데 {FONTS_CSS.name} 의 실측은 {actual_faces}개다")
 
     return [
         f"§3 폰트 파일 {actual_woff + actual_woff2}개 실측 (woff {actual_woff} · "
@@ -283,8 +234,7 @@ def run_scan(destination: Path) -> dict[str, dict]:
     )
     if result.returncode != 0:
         raise Problem(
-            f"라이선스 스캔 실패 (exit {result.returncode}): "
-            f"{(result.stderr or result.stdout).strip()[:400]}"
+            f"라이선스 스캔 실패 (exit {result.returncode}): {(result.stderr or result.stdout).strip()[:400]}"
         )
     return load_scan(destination)
 
@@ -295,9 +245,7 @@ def load_scan(path: Path) -> dict[str, dict]:
     except (OSError, json.JSONDecodeError) as error:
         raise Problem(f"스캔 산출물을 읽을 수 없다 ({path}): {error}") from error
     if not isinstance(data, dict) or not data:
-        raise Problem(
-            f"스캔 산출물이 비었다 ({path}) — 0건은 통과가 아니다 (fail-closed)"
-        )
+        raise Problem(f"스캔 산출물이 비었다 ({path}) — 0건은 통과가 아니다 (fail-closed)")
     return data
 
 
@@ -360,15 +308,10 @@ def main(argv: list[str] | None = None) -> int:
     # §2 예외 축 — 「원문 파일을 동봉하지 않는 것」이 문서의 3개 그대로인지. 개수·목록 축과
     # 별개다: 어떤 패키지가 조용히 라이선스 파일을 빼도 위 집합 대조는 통과한다.
     without_file = {
-        name
-        for name, meta in scanned.items()
-        if not meta.get("licenseFile") or not Path(meta["licenseFile"]).is_file()
+        name for name, meta in scanned.items() if not meta.get("licenseFile") or not Path(meta["licenseFile"]).is_file()
     }
     if without_file != exceptions:
-        detail = (
-            f"실측에만 {sorted(without_file - exceptions)} · "
-            f"문서에만 {sorted(exceptions - without_file)}"
-        )
+        detail = f"실측에만 {sorted(without_file - exceptions)} · 문서에만 {sorted(exceptions - without_file)}"
         if len(without_file) > len(scanned) // 5:
             detail += (
                 " (실측의 licenseFile 경로가 이 환경에서 안 풀린다 — 다른 곳에서 뜬 "
@@ -385,9 +328,7 @@ def main(argv: list[str] | None = None) -> int:
         f"원문 파일 없는 패키지 {len(without_file)}개 (문서 선언 {len(exceptions)}개)"
     )
     if problems:
-        fail(
-            f"THIRD-PARTY-NOTICES.md 의 손유지 숫자가 현실과 어긋났습니다 ({len(problems)}건):"
-        )
+        fail(f"THIRD-PARTY-NOTICES.md 의 손유지 숫자가 현실과 어긋났습니다 ({len(problems)}건):")
         for problem in problems:
             fail(f"  · {problem}")
         fail(

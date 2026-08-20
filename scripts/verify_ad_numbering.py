@@ -72,9 +72,7 @@ def main() -> int:
                     definitions.setdefault(key, []).append(f"{rel}:{i}")
 
     if prefixed_count == 0:
-        print(
-            "::error::M2-AD-*/MD-AD-* 표기를 0건 찾았습니다 — 검사 대상 소실 의심, fail-closed 종료"
-        )
+        print("::error::M2-AD-*/MD-AD-* 표기를 0건 찾았습니다 — 검사 대상 소실 의심, fail-closed 종료")
         return 1
     if not definitions:
         print(
@@ -84,9 +82,7 @@ def main() -> int:
 
     for (prefix, number), sites in definitions.items():
         if len(sites) > 1:
-            violations.append(
-                f"{prefix}-AD-{number} 이 {len(sites)}곳에서 정의됨(유일해야 함): {', '.join(sites)}"
-            )
+            violations.append(f"{prefix}-AD-{number} 이 {len(sites)}곳에서 정의됨(유일해야 함): {', '.join(sites)}")
 
     print(
         f"검사한 .md 파일 {len(md_files)}개, 접두사 표기(M2-AD-/MD-AD-) {prefixed_count}건, "

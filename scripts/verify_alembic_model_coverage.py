@@ -57,8 +57,7 @@ def tables_in_migrations() -> dict[str, str]:
     files = sorted(VERSIONS.glob("*.py"))
     if len(files) < MIN_MIGRATIONS:
         raise SystemExit(
-            f"::error::마이그레이션을 {len(files)}건 수집했다 (하한 {MIN_MIGRATIONS}) — "
-            "글롭이 어긋났는지 보라"
+            f"::error::마이그레이션을 {len(files)}건 수집했다 (하한 {MIN_MIGRATIONS}) — 글롭이 어긋났는지 보라"
         )
     for path in files:
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -94,9 +93,7 @@ def tables_in_models() -> set[str]:
 def main() -> int:
     migrated = tables_in_migrations()
     modeled = tables_in_models()
-    uncovered = {
-        t: src for t, src in migrated.items() if t not in modeled and t not in EXEMPT
-    }
+    uncovered = {t: src for t, src in migrated.items() if t not in modeled and t not in EXEMPT}
 
     print(
         f"마이그레이션이 만든 우리 테이블 {len(migrated)}건 검사 · 모델 등재 "

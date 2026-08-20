@@ -21,9 +21,7 @@ import review_verdict as rv  # noqa: E402
 import runner_freeze_rerun as rfr  # noqa: E402
 
 FIXTURE = json.loads(
-    (
-        Path(__file__).resolve().parent / "fixtures" / "runner_freeze_annotations.json"
-    ).read_text(encoding="utf-8")
+    (Path(__file__).resolve().parent / "fixtures" / "runner_freeze_annotations.json").read_text(encoding="utf-8")
 )
 
 FREEZE_ANN = FIXTURE["freeze"]  # cross 잡 — 동결 서명 1건
@@ -181,16 +179,12 @@ def run_lockstep_checks():
     # UNABLE_PREFIX ↔ review_verdict 의 unable 문구 (annotation 은 ::error:: 줄에서 나온다)
     _, verdict_lines = rv.judge("unable")
     error_lines = [ln for ln in verdict_lines if ln.startswith("::error::")]
-    if not error_lines or not error_lines[0].removeprefix("::error::").startswith(
-        rfr.UNABLE_PREFIX
-    ):
+    if not error_lines or not error_lines[0].removeprefix("::error::").startswith(rfr.UNABLE_PREFIX):
         print("FAIL UNABLE_PREFIX 가 review_verdict.judge('unable') 문구와 어긋난다")
         failures += 1
     # 픽스처의 여파 annotation 도 같은 prefix 인지 (실환경 대조)
     unable_msgs = [
-        a["message"]
-        for a in UNABLE_ANN
-        if a["annotation_level"] == "failure" and a["message"] != rfr.GENERIC_EXIT
+        a["message"] for a in UNABLE_ANN if a["annotation_level"] == "failure" and a["message"] != rfr.GENERIC_EXIT
     ]
     if not unable_msgs or not all(m.startswith(rfr.UNABLE_PREFIX) for m in unable_msgs):
         print("FAIL 픽스처의 verdict unable annotation 이 UNABLE_PREFIX 와 어긋난다")
@@ -226,9 +220,7 @@ def run_cli_check():
     )
     last = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ""
     if proc.returncode != 0 or last != "action=skip":
-        print(
-            f"FAIL CLI 계약(파싱 실패 fail-closed): rc={proc.returncode}, 마지막 줄 {last!r}"
-        )
+        print(f"FAIL CLI 계약(파싱 실패 fail-closed): rc={proc.returncode}, 마지막 줄 {last!r}")
         failures += 1
     return failures
 

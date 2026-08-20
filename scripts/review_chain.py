@@ -192,9 +192,7 @@ def summarize(chain: list[str], attempts: list[tuple[str, int, str]]) -> dict[st
     # 폴백 사유 — 실패한 후보들을 종류별로 묶어 적는다. 사람이 취할 행동이 종류마다 다르다:
     # 한도는 충전·리뷰어 공급, 일시 장애는 재실행, 기동 실패는 그 리뷰어의 런타임 점검.
     causes = [
-        _cause_phrase(kind, by_kind[kind])
-        for kind in ("limit", "transient", "startup", "unknown")
-        if by_kind.get(kind)
+        _cause_phrase(kind, by_kind[kind]) for kind in ("limit", "transient", "startup", "unknown") if by_kind.get(kind)
     ]
     fallback_cause = " + ".join(causes)
     if fallback and not fallback_cause:

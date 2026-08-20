@@ -81,9 +81,7 @@ def png(size: int) -> bytes:
     """PNG 매직으로 시작하는 `size` 바이트 — 매직 넘버 표에서 직접 가져온다."""
     magic = next((m for m, name in gate.ASSET_MAGICS if name.startswith("PNG")), None)
     if magic is None:
-        raise SystemExit(
-            "실패: ASSET_MAGICS 에 PNG 항목이 없다 — 매직 넘버 표에서 지워졌다 (#406 ①)"
-        )
+        raise SystemExit("실패: ASSET_MAGICS 에 PNG 항목이 없다 — 매직 넘버 표에서 지워졌다 (#406 ①)")
     return magic + b"\x00" * (size - len(magic))
 
 
@@ -93,9 +91,7 @@ def b64(data: bytes) -> str:
 
 # 벡터 픽스처 — ①(인라인 자산)과 ①-e(선두 바이트·인코딩)가 같은 것을 쓴다. 두 벌로 적으면
 # 한쪽만 손대도 두 절이 서로 다른 것을 재게 된다.
-SVG_ART = (
-    '<svg xmlns="http://www.w3.org/2000/svg">' + '<path d="M0 0h1v1z"/>' * 90 + "</svg>"
-)
+SVG_ART = '<svg xmlns="http://www.w3.org/2000/svg">' + '<path d="M0 0h1v1z"/>' * 90 + "</svg>"
 SVG_ICON = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M2 8l4 4 8-8"/></svg>'  # 70 B, 문턱 아래
 
 # 퍼센트로 접은 최소 SVG(`<svg/>`). **소스에 실물 표기를 적지 않고 이어 붙인다** — 이 그물
@@ -132,17 +128,11 @@ def inline_cases() -> list[tuple[str, str, bool]]:
     unknown_small = png(900)  # 문턱 아래
     tiny_icon = png(68)  # 1x1 투명 PNG 크기 — 오차단이 나면 안 되는 자리
     # 매직 표에 없는 바이너리 — D2 앵커가 없어 **D1 만이 유일한 탐지기**인 자리.
-    unknown_blob = (
-        b"\xfe\xed" + bytes(range(256)) * 5
-    )  # UTF-8 로 안 읽힘 = 바이너리, 1282 B
+    unknown_blob = b"\xfe\xed" + bytes(range(256)) * 5  # UTF-8 로 안 읽힘 = 바이너리, 1282 B
     svg_icon = SVG_ICON
     svg_art = SVG_ART
     # 네임스페이스 접두를 쓴 같은 아트워크 — 접두 이름은 선언만 하면 무엇이든 된다.
-    svg_ns = (
-        '<n:svg xmlns:n="http://www.w3.org/2000/svg">'
-        + '<n:path d="M0 0h1v1z"/>' * 90
-        + "</n:svg>"
-    )
+    svg_ns = '<n:svg xmlns:n="http://www.w3.org/2000/svg">' + '<n:path d="M0 0h1v1z"/>' * 90 + "</n:svg>"
     prefix = "data:image/png;base64,"
     payload = b64(banned)
     return [
@@ -242,9 +232,7 @@ def inline_cases() -> list[tuple[str, str, bool]]:
         ),
         (
             "퍼센트 인코딩 payload + 개행",
-            'x = "data:image/png,'
-            + wrap(urllib.parse.quote_from_bytes(unknown_big), 76)
-            + '"',
+            'x = "data:image/png,' + wrap(urllib.parse.quote_from_bytes(unknown_big), 76) + '"',
             True,
         ),
         # ─ ①-c 벡터에는 바이트 문턱이 없다 (PR #409 리뷰) ─
@@ -266,38 +254,22 @@ def inline_cases() -> list[tuple[str, str, bool]]:
         #   ①-d-1 마임·파라미터 구간의 길이 — **상한을 다시 넣으면 여기가 빨간불이다.**
         (
             "마임 파라미터 199자 패딩 (구 200자 상한 경계)",
-            'x = "data:image/svg+xml;x='
-            + "a" * 199
-            + ";base64,"
-            + b64(svg_art.encode())
-            + '"',
+            'x = "data:image/svg+xml;x=' + "a" * 199 + ";base64," + b64(svg_art.encode()) + '"',
             True,
         ),
         (
             "마임 파라미터 250자 패딩",
-            'x = "data:image/svg+xml;x='
-            + "a" * 250
-            + ";base64,"
-            + b64(svg_art.encode())
-            + '"',
+            'x = "data:image/svg+xml;x=' + "a" * 250 + ";base64," + b64(svg_art.encode()) + '"',
             True,
         ),
         (
             "마임 파라미터 5000자 패딩 (상한은 상수만 바꿔도 다시 뚫린다)",
-            'x = "data:image/svg+xml;x='
-            + "a" * 5000
-            + ";base64,"
-            + b64(svg_art.encode())
-            + '"',
+            'x = "data:image/svg+xml;x=' + "a" * 5000 + ";base64," + b64(svg_art.encode()) + '"',
             True,
         ),
         (
             "마임 파라미터 패딩 + 매직 표 밖 바이너리",
-            'x = "data:application/octet-stream;x='
-            + "a" * 250
-            + ";base64,"
-            + b64(unknown_blob)
-            + '"',
+            'x = "data:application/octet-stream;x=' + "a" * 250 + ";base64," + b64(unknown_blob) + '"',
             True,
         ),
         #   ①-d-2 스킴 키워드 쪼개기 — URL 파서가 URL **전체**에서 tab·LF·CR 를 지운다.
@@ -324,16 +296,12 @@ def inline_cases() -> list[tuple[str, str, bool]]:
         #   ①-d-3 스니핑 창 — XML 은 루트 앞 주석을 크기 제한 없이 허용한다.
         (
             "선두 XML 주석 600 B + SVG (base64)",
-            'x = "data:image/svg+xml;base64,'
-            + b64(("<!--" + "p" * 600 + "-->" + svg_art).encode())
-            + '"',
+            'x = "data:image/svg+xml;base64,' + b64(("<!--" + "p" * 600 + "-->" + svg_art).encode()) + '"',
             True,
         ),
         (
             "선두 XML 주석 600 B + SVG (퍼센트)",
-            'x = "data:image/svg+xml,'
-            + urllib.parse.quote("<!--" + "p" * 600 + "-->" + svg_art)
-            + '"',
+            'x = "data:image/svg+xml,' + urllib.parse.quote("<!--" + "p" * 600 + "-->" + svg_art) + '"',
             True,
         ),
         (
@@ -346,11 +314,7 @@ def inline_cases() -> list[tuple[str, str, bool]]:
         (
             "DOCTYPE + 주석 + 처리명령을 섞은 프롤로그",
             'x = "data:image/svg+xml;base64,'
-            + b64(
-                (
-                    "<!DOCTYPE svg><!--a--><?pi x?><!--" + "p" * 900 + "-->" + svg_art
-                ).encode()
-            )
+            + b64(("<!DOCTYPE svg><!--a--><?pi x?><!--" + "p" * 900 + "-->" + svg_art).encode())
             + '"',
             True,
         ),
@@ -398,11 +362,7 @@ def inline_cases() -> list[tuple[str, str, bool]]:
         (
             "선두 주석 + SVG 아닌 XML 루트 (통과)",
             'x = "data:application/xml;base64,'
-            + b64(
-                (
-                    "<!--" + "p" * 600 + "--><rss><item>" + "x" * 1500 + "</item></rss>"
-                ).encode()
-            )
+            + b64(("<!--" + "p" * 600 + "--><rss><item>" + "x" * 1500 + "</item></rss>").encode())
             + '"',
             False,
         ),
@@ -411,15 +371,7 @@ def inline_cases() -> list[tuple[str, str, bool]]:
         (
             "HTML 래퍼 + 1000 B 패딩 뒤에 박힌 SVG 아트워크",
             'x = "data:text/html;base64,'
-            + b64(
-                (
-                    "<html><head><!--"
-                    + "q" * 1000
-                    + "--></head><body>"
-                    + svg_art
-                    + "</body></html>"
-                ).encode()
-            )
+            + b64(("<html><head><!--" + "q" * 1000 + "--></head><body>" + svg_art + "</body></html>").encode())
             + '"',
             True,
         ),
@@ -538,15 +490,11 @@ def run_inline_cases() -> list[str]:
     probe = f'\n\nx = url("data:image/svg+xml,{PCT_SVG_TINY}")\n'
     reported = gate.check_inline_assets(FakeEntry("probe"), probe)
     if len(reported) != 1 or not reported[0].startswith("probe:3:"):
-        failures.append(
-            f"① 줄 번호 보고가 어긋났다 — 기대 «probe:3:» 1건 · 실제 {reported}"
-        )
+        failures.append(f"① 줄 번호 보고가 어긋났다 — 기대 «probe:3:» 1건 · 실제 {reported}")
 
     cases = inline_cases()
     if len(cases) < MIN_INLINE_CASES:
-        return [
-            f"① 케이스 {len(cases)}건 — 하한 {MIN_INLINE_CASES} 미만 (수집이 깨졌다)"
-        ]
+        return [f"① 케이스 {len(cases)}건 — 하한 {MIN_INLINE_CASES} 미만 (수집이 깨졌다)"]
     names = {name for name, _text, _catch in cases}
     missing = BY_DENYLIST - names
     if missing:  # fail-closed — 케이스 이름을 바꾸면 해시 검증이 조용히 사라진다
@@ -669,9 +617,7 @@ def _inline_forms(payload: bytes) -> list[tuple[str, str]]:
 def run_leading_byte_cases() -> list[str]:
     failures: list[str] = []
     if len(LEADING_BYTES) < MIN_LEAD_CASES:
-        return [
-            f"① 선두 바이트 {len(LEADING_BYTES)}건 — 하한 {MIN_LEAD_CASES} 미만 (표가 깎였다)"
-        ]
+        return [f"① 선두 바이트 {len(LEADING_BYTES)}건 — 하한 {MIN_LEAD_CASES} 미만 (표가 깎였다)"]
     body = (XML_PROLOGUE + SVG_ART).encode()
     checked = 0
     for name, lead in LEADING_BYTES:
@@ -708,10 +654,7 @@ def run_leading_byte_cases() -> list[str]:
             caught = bool(gate.check_inline_assets(FakeEntry("probe"), text))
             if caught != should_catch:
                 want = "잡힘" if should_catch else "통과"
-                failures.append(
-                    f"① 인코딩 «{name}» ({form}): 기대 {want} · 실제 "
-                    f"{'잡힘' if caught else '통과'}"
-                )
+                failures.append(f"① 인코딩 «{name}» ({form}): 기대 {want} · 실제 {'잡힘' if caught else '통과'}")
     print(
         f"  ① 선두 바이트 {len(LEADING_BYTES)}종 · 프롤로그 패딩 {len(PROLOGUE_PADDINGS)}종"
         f"(최대 {max(PROLOGUE_PADDINGS):,}B) · 인코딩 {len(encodings)}종 을 "
@@ -767,12 +710,7 @@ NOTATION_ENCODINGS: list[tuple[str, object, str, bool]] = [
     ("전부 퍼센트", lambda b: urllib.parse.quote(b, safe=NOTATION_WS), "", False),
     (
         "%3c%73vg (마커 내부까지 퍼센트)",
-        lambda b: (
-            b.replace("<svg", "%3c%73vg")
-            .replace("</svg", "%3c%2f%73vg")
-            .replace("<", "%3c")
-            .replace(">", "%3e")
-        ),
+        lambda b: b.replace("<svg", "%3c%73vg").replace("</svg", "%3c%2f%73vg").replace("<", "%3c").replace(">", "%3e"),
         "",
         False,
     ),
@@ -886,9 +824,7 @@ def notation_cases() -> list[tuple[str, str, bool, bool]]:
                     # base64 본문은 공백이 무의미해 해당 없다.
                     restorable = False
                 elif ws_text in ("\n", "\r") and "템플릿" not in c_name:
-                    restorable = (
-                        False  # CSS·JS 문자열은 이스케이프 없는 실제 개행을 못 담는다
-                    )
+                    restorable = False  # CSS·JS 문자열은 이스케이프 없는 실제 개행을 못 담는다
                 elif language_layer and not html_parser:
                     restorable = False  # 엔티티는 HTML 파서가 있는 자리에서만 풀린다
                 cases.append(
@@ -917,8 +853,7 @@ def run_notation_cases() -> list[str]:
             must_catch += 1
             if not caught:
                 failures.append(
-                    f"①-f «{name}»: 브라우저가 되살리는 표기인데 게이트가 못 잡는다 — "
-                    "탐지가 표기의 우연에 걸린 자리다"
+                    f"①-f «{name}»: 브라우저가 되살리는 표기인데 게이트가 못 잡는다 — 탐지가 표기의 우연에 걸린 자리다"
                 )
         elif language_layer and restorable:
             open_layer += 1
@@ -983,18 +918,12 @@ def run_decode_cases() -> list[str]:
     failures: list[str] = []
     cases = decode_cases()
     if len(cases) < MIN_DECODE_CASES:
-        return [
-            f"① 디코드 케이스 {len(cases)}건 — 하한 {MIN_DECODE_CASES} 미만 (수집이 깨졌다)"
-        ]
+        return [f"① 디코드 케이스 {len(cases)}건 — 하한 {MIN_DECODE_CASES} 미만 (수집이 깨졌다)"]
     for name, payload, expected in cases:
         got = gate._decode_b64(payload)
         if got != expected:
             want = "거절" if expected is None else f"원본 {len(expected)}B 와 일치"
-            actual = (
-                "거절"
-                if got is None
-                else f"{len(got)}B (원본과 {'일치' if got == expected else '불일치'})"
-            )
+            actual = "거절" if got is None else f"{len(got)}B (원본과 {'일치' if got == expected else '불일치'})"
             failures.append(f"① 디코드 «{name}»: 기대 {want} · 실제 {actual}")
     print(f"  ① 공백 제거 후 디코드 {len(cases)}건 검사 (바이트 단위 일치)")
     return failures
@@ -1019,10 +948,7 @@ def run_decode_cases() -> list[str]:
 #   · HTML 문자 참조 → `html.unescape` (HTML5 문자 참조 해석)
 # 조사 단계에서는 node 와 css-tree 로 JS/TS·CSS 판까지 복원을 확인했다 (결과는 독스트링에).
 MIN_KNOWN_BYPASS_CASES = 4
-KNOWN_BYPASS_DOC = (
-    "verify_public_release_tree.py 독스트링 「못 막는 것」 ㉮-1 · "
-    ".docs/6-도구/공개배포-릴리스.md"
-)
+KNOWN_BYPASS_DOC = "verify_public_release_tree.py 독스트링 「못 막는 것」 ㉮-1 · .docs/6-도구/공개배포-릴리스.md"
 
 
 def known_bypass_cases() -> list[tuple[str, str, str]]:
@@ -1080,9 +1006,7 @@ def run_known_bypass_cases() -> list[str]:
     failures: list[str] = []
     cases = known_bypass_cases()
     if len(cases) < MIN_KNOWN_BYPASS_CASES:
-        return [
-            f"③ 케이스 {len(cases)}건 — 하한 {MIN_KNOWN_BYPASS_CASES} 미만 (수집이 깨졌다)"
-        ]
+        return [f"③ 케이스 {len(cases)}건 — 하한 {MIN_KNOWN_BYPASS_CASES} 미만 (수집이 깨졌다)"]
 
     banned = png(4096)
     saved = dict(gate.DENYLIST_BLOBS)
@@ -1093,9 +1017,7 @@ def run_known_bypass_cases() -> list[str]:
             # (가) 런타임 층이 **정말로** 원본을 복원하는가 — 아니면 픽스처가 죽은 것이라
             #      「게이트가 통과시킨다」는 관측에 아무 의미가 없다.
             runtime = _restore(text, layer)
-            stripped = "".join(
-                ch for ch in runtime.split(",", 1)[-1] if ch not in gate.B64_STRIP_CHARS
-            )
+            stripped = "".join(ch for ch in runtime.split(",", 1)[-1] if ch not in gate.B64_STRIP_CHARS)
             revived = gate._decode_b64(stripped, minimum=0)
             if revived != banned:
                 failures.append(
@@ -1229,14 +1151,10 @@ def run_remote_cases() -> list[str]:
         repo.mkdir()
         origin = "https://github.com/example-owner/example-repo.git"
         subprocess.run(["git", "init", "-q", str(repo)], check=True)
-        subprocess.run(
-            ["git", "-C", str(repo), "remote", "add", "origin", origin], check=True
-        )
+        subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", origin], check=True)
         cases = remote_cases(repo, origin)
         if len(cases) < MIN_REMOTE_CASES:
-            return [
-                f"② 케이스 {len(cases)}건 — 하한 {MIN_REMOTE_CASES} 미만 (수집이 깨졌다)"
-            ]
+            return [f"② 케이스 {len(cases)}건 — 하한 {MIN_REMOTE_CASES} 미만 (수집이 깨졌다)"]
         for name, remote, should_reject in cases:
             compared, reason = rp.check_remote_not_self(remote, repo)
             if compared == 0:
@@ -1266,9 +1184,7 @@ def _fixture_git(*args: str, cwd: Path) -> None:
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
 
 
-def make_destination(
-    root: Path, label: str, default: str, seeded: dict[str, str]
-) -> Path:
+def make_destination(root: Path, label: str, default: str, seeded: dict[str, str]) -> Path:
     """bare 공개 레포 픽스처. `seeded` 는 브랜치명 → 그 브랜치에 담을 표식."""
     bare = root / f"{label}.git"
     subprocess.run(
@@ -1368,9 +1284,7 @@ def run_branch_cases() -> list[str]:
     failures: list[str] = []
     cases = branch_cases()
     if len(cases) < MIN_BRANCH_CASES:
-        return [
-            f"④ 케이스 {len(cases)}건 — 하한 {MIN_BRANCH_CASES} 미만 (수집이 깨졌다)"
-        ]
+        return [f"④ 케이스 {len(cases)}건 — 하한 {MIN_BRANCH_CASES} 미만 (수집이 깨졌다)"]
 
     with tempfile.TemporaryDirectory(prefix="release-branch-test-") as tmp:
         root = Path(tmp)
@@ -1386,14 +1300,10 @@ def run_branch_cases() -> list[str]:
             workdir = root / f"work{index}"
             workdir.mkdir()
             try:
-                clone, branch, has_commits, _why = rp.prepare_destination(
-                    str(bare), workdir, override
-                )
+                clone, branch, has_commits, _why = rp.prepare_destination(str(bare), workdir, override)
             except RuntimeError as error:
                 if expected is not None:
-                    failures.append(
-                        f"④ {name}: 기대 브랜치 {expected} · 실제 거부 ({error})"
-                    )
+                    failures.append(f"④ {name}: 기대 브랜치 {expected} · 실제 거부 ({error})")
                 continue
             except subprocess.CalledProcessError as error:
                 # 판정한 브랜치가 목적지에 없으면 체크아웃이 죽는다 — 「기존 릴리스 있음」과
@@ -1406,17 +1316,13 @@ def run_branch_cases() -> list[str]:
             if branch != expected:
                 failures.append(f"④ {name}: 기대 브랜치 {expected} · 실제 {branch}")
             if has_commits != expect_existing:
-                failures.append(
-                    f"④ {name}: 기존 릴리스 판정이 {has_commits} — 기대 {expect_existing}"
-                )
+                failures.append(f"④ {name}: 기존 릴리스 판정이 {has_commits} — 기대 {expect_existing}")
             if not has_commits:
                 continue
             # 핵심 회귀 — 비교 기준이 **원격의 그 브랜치**여야 한다. 옛 코드처럼 로컬 브랜치를
             # 현재 HEAD 위로 옮기면 여기서 어긋난다 (그때 매니페스트가 엉뚱한 비교가 됐다).
             head = rp.git("rev-parse", "HEAD", cwd=clone).stdout.strip()
-            want = rp.git(
-                "rev-parse", f"refs/remotes/origin/{branch}", cwd=clone, check=False
-            ).stdout.strip()
+            want = rp.git("rev-parse", f"refs/remotes/origin/{branch}", cwd=clone, check=False).stdout.strip()
             if head != want:
                 failures.append(
                     f"④ {name}: HEAD({head[:8]}) 가 origin/{branch}({want[:8]}) 와 다르다 — "
@@ -1431,9 +1337,7 @@ def run_branch_cases() -> list[str]:
         workdir = root / "work-dangling"
         workdir.mkdir()
         try:
-            _clone, branch, has_commits, _why = rp.prepare_destination(
-                str(dangling), workdir
-            )
+            _clone, branch, has_commits, _why = rp.prepare_destination(str(dangling), workdir)
         except RuntimeError:
             pass
         else:
@@ -1442,9 +1346,7 @@ def run_branch_cases() -> list[str]:
                 f"(기존 릴리스 {has_commits}) — 추측하면 매니페스트가 거짓이 된다 (#410)"
             )
 
-    print(
-        f"  ④ 목적지 브랜치 {len(cases) + 1}건 검사 (bare 레포 픽스처 — 네트워크 없음)"
-    )
+    print(f"  ④ 목적지 브랜치 {len(cases) + 1}건 검사 (bare 레포 픽스처 — 네트워크 없음)")
     return failures
 
 

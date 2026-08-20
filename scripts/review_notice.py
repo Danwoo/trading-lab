@@ -41,11 +41,7 @@ def is_doc(path: str) -> bool:
 
 def decide(payload) -> dict:
     files = payload.get("files") if isinstance(payload, dict) else None
-    if (
-        not isinstance(files, list)
-        or not files
-        or not all(isinstance(f, str) and f for f in files)
-    ):
+    if not isinstance(files, list) or not files or not all(isinstance(f, str) and f for f in files):
         return {
             "docs_only": False,
             "total": 0,

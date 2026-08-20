@@ -171,9 +171,7 @@ NOTICE_FRESHNESS_PAIRS = [
 
 
 def git(*args: str, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=check
-    )
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=check)
 
 
 def fail(message: str) -> int:
@@ -386,22 +384,16 @@ def preflight(repo: Path, source_ref: str) -> tuple[str, str] | None:
 
     dirty = git("status", "--porcelain", cwd=repo).stdout.strip()
     if dirty:
-        print(
-            f"  ✗ 워킹트리가 더럽다 ({len(dirty.splitlines())}건) — 커밋하거나 정리하고 다시 실행하라"
-        )
+        print(f"  ✗ 워킹트리가 더럽다 ({len(dirty.splitlines())}건) — 커밋하거나 정리하고 다시 실행하라")
         return None
 
-    resolved = git(
-        "rev-parse", "--verify", f"{source_ref}^{{commit}}", cwd=repo, check=False
-    )
+    resolved = git("rev-parse", "--verify", f"{source_ref}^{{commit}}", cwd=repo, check=False)
     if resolved.returncode != 0:
         print(f"  ✗ 소스 ref 를 못 찾는다: {source_ref}")
         return None
     sha = resolved.stdout.strip()
 
-    main_ref = git(
-        "rev-parse", "--verify", "origin/main^{commit}", cwd=repo, check=False
-    )
+    main_ref = git("rev-parse", "--verify", "origin/main^{commit}", cwd=repo, check=False)
     if main_ref.returncode != 0:
         print("  ✗ origin/main 을 못 찾는다 — fetch 후 다시 실행하라")
         return None
@@ -414,10 +406,7 @@ def preflight(repo: Path, source_ref: str) -> tuple[str, str] | None:
         check=False,
     )
     if reachable.returncode != 0:
-        print(
-            f"  ✗ 소스 커밋 {sha[:8]} 이 origin/main 에서 도달 불가 — "
-            "미머지 코드는 공개본에 내보내지 않는다"
-        )
+        print(f"  ✗ 소스 커밋 {sha[:8]} 이 origin/main 에서 도달 불가 — 미머지 코드는 공개본에 내보내지 않는다")
         return None
 
     subject = git("log", "-1", "--format=%s", sha, cwd=repo).stdout.strip()
@@ -431,29 +420,19 @@ def check_notice_freshness(repo: Path, sha: str) -> list[str]:
     problems: list[str] = []
     checked = 0
     for notice, watched in NOTICE_FRESHNESS_PAIRS:
-        notice_time = git(
-            "log", "-1", "--format=%ct", sha, "--", notice, cwd=repo
-        ).stdout.strip()
-        watched_time = git(
-            "log", "-1", "--format=%ct", sha, "--", watched, cwd=repo
-        ).stdout.strip()
+        notice_time = git("log", "-1", "--format=%ct", sha, "--", notice, cwd=repo).stdout.strip()
+        watched_time = git("log", "-1", "--format=%ct", sha, "--", watched, cwd=repo).stdout.strip()
         if not notice_time:
             problems.append(f"{notice}: 이 커밋의 히스토리에 없다")
             continue
         if not watched_time:
-            problems.append(
-                f"{watched}: 이 커밋의 히스토리에 없다 — 신선도 대조 대상이 사라졌다"
-            )
+            problems.append(f"{watched}: 이 커밋의 히스토리에 없다 — 신선도 대조 대상이 사라졌다")
             continue
         checked += 1
         if int(notice_time) < int(watched_time):
-            problems.append(
-                f"{notice} 가 {watched} 보다 오래됐다 — 의존성이 바뀐 뒤 고지가 갱신되지 않았다"
-            )
+            problems.append(f"{notice} 가 {watched} 보다 오래됐다 — 의존성이 바뀐 뒤 고지가 갱신되지 않았다")
     if checked == 0:
-        problems.append(
-            "신선도 대조 0건 — 대조 쌍 지정이 현실과 어긋났다 (fail-closed)"
-        )
+        problems.append("신선도 대조 0건 — 대조 쌍 지정이 현실과 어긋났다 (fail-closed)")
     print(f"  · 고지 신선도 대조 {checked}쌍")
     return problems
 
@@ -469,9 +448,7 @@ def export_tree(repo: Path, sha: str, destination: Path) -> tuple[int, int]:
     destination.mkdir(parents=True, exist_ok=True)
     archive = destination.parent / "export.tar"
     with archive.open("wb") as handle:
-        subprocess.run(
-            ["git", "archive", "--format=tar", sha], cwd=repo, stdout=handle, check=True
-        )
+        subprocess.run(["git", "archive", "--format=tar", sha], cwd=repo, stdout=handle, check=True)
     with tarfile.open(archive) as tar:
         members = tar.getmembers()
         tar.extractall(destination, filter="data")
@@ -488,9 +465,7 @@ def audit_workflows(tree: Path) -> list[tuple[str, str]]:
     if not workflow_dir.is_dir():
         return []
     rows: list[tuple[str, str]] = []
-    for path in sorted(workflow_dir.glob("*.yml")) + sorted(
-        workflow_dir.glob("*.yaml")
-    ):
+    for path in sorted(workflow_dir.glob("*.yml")) + sorted(workflow_dir.glob("*.yaml")):
         text = path.read_text(encoding="utf-8")
         flags = []
         if re.search(r"^\s*runs-on:.*self-hosted", text, re.MULTILINE):
@@ -498,9 +473,7 @@ def audit_workflows(tree: Path) -> list[tuple[str, str]]:
         secrets = sorted(set(re.findall(r"secrets\.([A-Z_][A-Z0-9_]*)", text)))
         if secrets:
             flags.append("시크릿 " + "·".join(secrets))
-        if re.search(
-            r"^\s*(contents|issues|pull-requests|statuses):\s*write", text, re.MULTILINE
-        ):
+        if re.search(r"^\s*(contents|issues|pull-requests|statuses):\s*write", text, re.MULTILINE):
             flags.append("쓰기 권한")
         if "pull_request_target" in text:
             flags.append("⚠ pull_request_target")
@@ -516,9 +489,7 @@ FALLBACK_PUBLIC_BRANCH = "main"
 
 def remote_branches(clone: Path) -> list[str]:
     """목적지에 실재하는 브랜치 이름 (origin/ 접두 제거, origin/HEAD 심볼릭 제외)."""
-    listing = git(
-        "for-each-ref", "--format=%(refname:strip=3)", "refs/remotes/origin", cwd=clone
-    )
+    listing = git("for-each-ref", "--format=%(refname:strip=3)", "refs/remotes/origin", cwd=clone)
     return sorted({name for name in listing.stdout.split() if name != "HEAD"})
 
 
@@ -550,23 +521,13 @@ def resolve_release_branch(clone: Path, override: str | None) -> tuple[str, bool
         return override, bool(branches), "--branch 로 명시"
 
     if not branches:
-        unborn = git(
-            "symbolic-ref", "--short", "HEAD", cwd=clone, check=False
-        ).stdout.strip()
+        unborn = git("symbolic-ref", "--short", "HEAD", cwd=clone, check=False).stdout.strip()
         branch = unborn or FALLBACK_PUBLIC_BRANCH
-        why = (
-            "빈 레포의 unborn HEAD"
-            if unborn
-            else f"fallback 기본값 {FALLBACK_PUBLIC_BRANCH}"
-        )
+        why = "빈 레포의 unborn HEAD" if unborn else f"fallback 기본값 {FALLBACK_PUBLIC_BRANCH}"
         return branch, False, why
 
-    head = git(
-        "symbolic-ref", "--short", "refs/remotes/origin/HEAD", cwd=clone, check=False
-    )
-    default = (
-        head.stdout.strip().removeprefix("origin/") if head.returncode == 0 else ""
-    )
+    head = git("symbolic-ref", "--short", "refs/remotes/origin/HEAD", cwd=clone, check=False)
+    default = head.stdout.strip().removeprefix("origin/") if head.returncode == 0 else ""
     if not default or default not in branches:
         raise RuntimeError(
             "목적지의 기본 브랜치를 판정할 수 없다 — 원격 HEAD 가 없거나 실재하지 않는 브랜치를 "
@@ -577,9 +538,7 @@ def resolve_release_branch(clone: Path, override: str | None) -> tuple[str, bool
     return default, True, "원격 기본 브랜치(origin/HEAD)"
 
 
-def prepare_destination(
-    remote: str, workdir: Path, override: str | None = None
-) -> tuple[Path, str, bool, str]:
+def prepare_destination(remote: str, workdir: Path, override: str | None = None) -> tuple[Path, str, bool, str]:
     """공개 원격을 클론하고 릴리스 브랜치를 세운다.
 
     커밋이 있으면 로컬 브랜치를 **`origin/<브랜치>` 에서 다시 세운다** — 클론이 체크아웃해 둔
@@ -662,9 +621,7 @@ def tree_report(export: Path) -> list[tuple[str, int, int]]:
 
 # ── 본체 ─────────────────────────────────────────────────────────────────────
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="공개 배포 레포로 현재 트리를 내보낸다"
-    )
+    parser = argparse.ArgumentParser(description="공개 배포 레포로 현재 트리를 내보낸다")
     parser.add_argument(
         "--remote",
         required=True,
@@ -675,18 +632,14 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_PUBLIC_NAME,
         help=f"공개 레포 이름 (기본 {DEFAULT_PUBLIC_NAME})",
     )
-    parser.add_argument(
-        "--source-ref", default="origin/main", help="내보낼 ref (기본 origin/main)"
-    )
+    parser.add_argument("--source-ref", default="origin/main", help="내보낼 ref (기본 origin/main)")
     parser.add_argument(
         "--branch",
         default=None,
         help="공개 레포의 릴리스 브랜치 (기본: 목적지의 기본 브랜치를 조회. 판정 불가면 멈춘다)",
     )
     parser.add_argument("--repo", type=Path, default=REPO_ROOT, help="개발 레포 경로")
-    parser.add_argument(
-        "--execute", action="store_true", help="실제로 push 한다 (기본은 드라이런)"
-    )
+    parser.add_argument("--execute", action="store_true", help="실제로 push 한다 (기본은 드라이런)")
     args = parser.parse_args(argv)
 
     mode = "실행 (push 한다)" if args.execute else "드라이런 (아무것도 쓰지 않는다)"
@@ -695,9 +648,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  · 원격: {args.remote}")
 
     if not GATE_SCRIPT.is_file():
-        return fail(
-            f"내용 게이트를 못 찾는다 ({GATE_SCRIPT}) — 게이트 없는 릴리스는 하지 않는다"
-        )
+        return fail(f"내용 게이트를 못 찾는다 ({GATE_SCRIPT}) — 게이트 없는 릴리스는 하지 않는다")
 
     print("\n-- 1. 사전 점검 --")
     # 가드 A — 아무것도 만들기 전에 원격 자기 지정부터 본다 (#406 ②)
@@ -727,9 +678,7 @@ def main(argv: list[str] | None = None) -> int:
             f"  · 일반 파일 {files}개 + 심링크 {symlinks}개 = {files + symlinks}개 전개 "
             "(히스토리·.git·gitignore 대상 없음)"
         )
-        print(
-            f"  · 내용 게이트가 검사하는 것은 일반 파일 {files}개 — 심링크는 내용이 없다"
-        )
+        print(f"  · 내용 게이트가 검사하는 것은 일반 파일 {files}개 — 심링크는 내용이 없다")
 
         print("\n-- 3. 내용 게이트 --")
         gate = subprocess.run(
@@ -749,9 +698,7 @@ def main(argv: list[str] | None = None) -> int:
         for name, files, size in tree_report(export):
             print(f"  {name:<28} {files:>5}개  {size / 1024:>10.1f} KiB")
 
-        print(
-            "\n-- 5. CI 워크플로 (공개본에서도 Actions 가 돈다 — 설정은 사람이 정한다) --"
-        )
+        print("\n-- 5. CI 워크플로 (공개본에서도 Actions 가 돈다 — 설정은 사람이 정한다) --")
         rows = audit_workflows(export)
         if not rows:
             print("  · 워크플로 없음")
@@ -760,9 +707,7 @@ def main(argv: list[str] | None = None) -> int:
 
         print("\n-- 6. 목적지 --")
         try:
-            clone, branch, has_commits, why = prepare_destination(
-                args.remote, workdir, args.branch
-            )
+            clone, branch, has_commits, why = prepare_destination(args.remote, workdir, args.branch)
         except RuntimeError as error:
             return fail(str(error))
         print(f"  · 릴리스 브랜치: {branch} ({why})")
@@ -804,15 +749,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  · 커밋 {new_sha[:8]}")
 
         print(f"\n-- 8. push → {branch} (force 없음 — non-fast-forward 면 실패한다) --")
-        pushed = git(
-            "push", "origin", f"HEAD:refs/heads/{branch}", cwd=clone, check=False
-        )
+        pushed = git("push", "origin", f"HEAD:refs/heads/{branch}", cwd=clone, check=False)
         if pushed.returncode != 0:
             print(pushed.stderr.rstrip())
-            return fail(
-                "push 실패 — 그 사이 공개본이 앞서 나갔을 수 있다. "
-                "force 로 덮지 말고 원인을 확인하라"
-            )
+            return fail("push 실패 — 그 사이 공개본이 앞서 나갔을 수 있다. force 로 덮지 말고 원인을 확인하라")
         print(f"  · {branch} ← {new_sha[:8]} 완료")
         print(f"\n== 릴리스 완료: {args.name} {branch} {new_sha[:8]} ==")
     return 0
