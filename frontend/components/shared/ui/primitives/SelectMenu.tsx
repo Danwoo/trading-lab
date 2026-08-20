@@ -201,7 +201,7 @@ export function SelectMenu({
               <button
                 type="button"
                 aria-label={`${labelFor(entry)} 제거`}
-                className="text-gray-500 hover:text-gray-700"
+                className={cn(ICON_HIT_AREA, "text-gray-500 hover:text-gray-700")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onChange(selectedValues.filter((existing) => existing !== entry));
