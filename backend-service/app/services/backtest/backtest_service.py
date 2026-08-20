@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 from core.exceptions import BadRequestError, NotFoundError
 from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, quantize, run_single
-from services.backtest.grid import axes_from_spec, run_grid
+from services.backtest.grid import FREE_COSTS, axes_from_spec, run_grid
 from services.backtest.metrics import compute
 
 # 스펙 §8.5.1 — 위탁수수료 0.15% 는 **10배 오차**였고 그 오차가 "연 비용 원금의 145%" 경고를
@@ -154,24 +154,96 @@ class BacktestService:
         )
 
         try:
+            # `rows()` 는 호출마다 행 지향 리스트를 새로 만드는 팩토리다 — **한 번 만들어 재사용한다**
+            # (engine.BarSeries.rows 가 호출자 책임으로 못박은 계약).
+            rows = series.rows()
             result = run_single(
                 strategy=strategy,
                 params=params,
                 series=series,
-                rows=series.rows(),
+                rows=rows,
                 initial_cash=float(args["initial_cash"]),
                 costs=costs,
             )
             written = self._persist(run_id, result)
-            self.backtest_repository.finish_run({"run_id": run_id, "status": "succeeded", "failed_reason": None})
+            self.backtest_repository.finish_run(
+                {
+                    "run_id": run_id,
+                    "status": "succeeded",
+                    "failed_reason": None,
+                    # **대조군 사고가 이 실행을 죽이지 않는다.** 비용을 낸 세계의 결과는 이미 나왔고,
+                    # 못 구한 것은 견줄 상대뿐이다 — `NULL` 이 「모른다」를 뜻하는 규약 그대로 둔다.
+                    "costless_summary": self._costless_json(strategy, params, series, rows, args),
+                }
+            )
         except Exception as exc:  # noqa: BLE001
             # 실패도 남긴다 — 「돌렸는데 아무것도 없다」와 「실패했다」는 다른 상태다.
             self.backtest_repository.finish_run(
-                {"run_id": run_id, "status": "failed", "failed_reason": str(exc)[:1000]}
+                {"run_id": run_id, "status": "failed", "failed_reason": str(exc)[:1000], "costless_summary": None}
             )
             raise
 
         return {"run_id": run_id, "status": "succeeded", **written}
+
+    def _cell_costless_json(self, cell, failed_reason: str | None, initial_cash: float) -> str | None:
+        """격자 칸의 대조군 요약 JSON. 못 구했으면 **그 사유를 싣는다**.
+
+        `None` 을 주면 저장된 `NULL` 이 「대조군을 안 돌린 옛 실행」으로 읽힌다 — 화면이 다른
+        원인을 말하며 소용없는 재실행을 시킨다. 단일 실행 경로와 같은 규약이다.
+        """
+        if failed_reason is not None:
+            return None
+        if cell.costless is None:
+            if cell.costless_absent is None:
+                return None
+            return json.dumps({"absent_reason": cell.costless_absent}, ensure_ascii=False)
+        return json.dumps(self._costless_summary(cell.costless, initial_cash), ensure_ascii=False)
+
+    def _costless_json(self, strategy, params: dict, series: BarSeries, rows, args: dict) -> str | None:
+        """대조군을 돌려 요약 JSON 을 만든다. 실패하면 `None` — 이 실행의 결과는 건드리지 않는다."""
+        initial_cash = float(args["initial_cash"])
+        try:
+            costless = run_single(
+                strategy=strategy,
+                params=params,
+                series=series,
+                rows=rows,
+                initial_cash=initial_cash,
+                costs=FREE_COSTS,
+            )
+        except Exception as exc:  # noqa: BLE001 — 남의 전략 코드라 무엇이 터질지 모른다
+            # **삼키지 않는다.** `NULL` 은 이 레포에서 「대조군을 안 돌린 옛 실행」을 뜻한다고
+            # 네 곳(마이그레이션·모델·스키마·프론트)이 못박았다. 터진 것을 그 `NULL` 로 두면
+            # 화면이 **다른 원인**을 말하고, 시키는 재실행은 같은 이유로 또 터진다.
+            # **여기서 늦게 가져온다.** `core.logger` 는 import 시점에 `Settings()` 를 세우므로,
+            # 모듈 상단에서 가져오면 이 서비스를 import 하는 **모든** 자리가 앱 설정을 요구하게
+            # 된다 — DB 검증 스크립트와 standalone 그물이 그래서 죽었다. 그 사슬을 안 만든다.
+            from core.logger import logger
+
+            logger.warning(f"대조군 실행이 실패했습니다 — {type(exc).__name__}")
+            return json.dumps(
+                {"absent_reason": f"대조군을 구하지 못했습니다 — 실행이 {type(exc).__name__} 으로 멈췄습니다"},
+                ensure_ascii=False,
+            )
+        return json.dumps(self._costless_summary(costless, initial_cash), ensure_ascii=False)
+
+    @staticmethod
+    def _costless_summary(result: RunResult, initial_cash: float) -> dict:
+        """대조군(비용 0) 실행의 요약 — 화면이 「미반영」 쪽 열에 쓰는 값.
+
+        **거래 수를 함께 남긴다.** 비용은 현금을 깎아 체결 수량을 바꾸므로, 두 세계의 거래 수가
+        다를 수 있다. 그 차이를 숨기면 「같은 매매를 했는데 비용만 다른 것」처럼 읽힌다.
+        """
+        # **자산곡선이 없으면 지어내지 않는다.** 시작 자금으로 채우면 「격차 0」인 요약이 DB 에
+        # 남아, 못 구한 것과 정말 0인 것이 같아진다.
+        if not result.equity:
+            return {"absent_reason": "대조군의 자산곡선이 비었습니다"}
+        final_equity = result.equity[-1].equity
+        return {
+            "final_equity": round(final_equity, 4),
+            "return_pct": round((final_equity - initial_cash) / initial_cash * 100, 6) if initial_cash > 0 else None,
+            "trade_count": len(result.trades),
+        }
 
     def _persist(self, run_id: int, result: RunResult) -> dict:
         """엔진 산출물을 네 테이블 + 현금 원장에 넣는다."""
@@ -301,6 +373,7 @@ class BacktestService:
                         "run_id": run_id,
                         "status": "succeeded" if failed_reason is None else "failed",
                         "failed_reason": failed_reason,
+                        "costless_summary": self._cell_costless_json(cell, failed_reason, float(args["initial_cash"])),
                     }
                 )
             except Exception as exc:  # noqa: BLE001
@@ -499,6 +572,7 @@ class BacktestService:
             round_trip_cost_rate=round_trip,
             initial_cash=float(run["initial_cash"]),
             sell_tax_rate=float(costs.get("sell_tax_rate") or 0),
+            costless_summary=run.get("costless_summary"),
         )
 
         return {
@@ -516,6 +590,7 @@ class BacktestService:
                 "period_from": str(run["period_from"]),
                 "period_to": str(run["period_to"]),
                 "initial_cash": float(run["initial_cash"]),
+                "costless_summary": run.get("costless_summary"),
                 "status": run["status"],
                 "failed_reason": run["failed_reason"],
                 "finished_dt": str(run["finished_dt"]) if run["finished_dt"] else None,

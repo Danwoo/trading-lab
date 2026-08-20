@@ -44,6 +44,7 @@ function report(overrides: Partial<RunReportOut> = {}): RunReportOut {
       period_from: "2026-01-02",
       period_to: "2026-03-31",
       initial_cash: 1000000,
+      costless_summary: { final_equity: 1080000, return_pct: 8, trade_count: 3 },
       status: "succeeded",
       failed_reason: null,
       finished_dt: null,
@@ -161,6 +162,70 @@ describe("RunReportView", () => {
     render(<RunReportView report={noCosts} />);
 
     expect(document.body.textContent ?? "").toContain("비용 가정 — 기록되지 않았습니다");
+  });
+
+  it("반영 열이 **이 실행이 실제로 끝낸 자산**이다 — 시작 자금이 아니다 (SC-007)", () => {
+    // 픽스처: 시작 1,000,000 · 끝난 자산 1,010,000 · 대조군 1,080,000 → 격차는 70,000 이다.
+    // 반영 칸에 시작 자금을 그리면 80,000 으로 읽힌다 — 같은 화면이 두 격차를 말하게 된다.
+    render(<RunReportView report={report()} />);
+
+    const table = screen.getByRole("table", { name: /비용 미반영 대비/ });
+    const row = within(table).getByRole("row", { name: /끝난 자산/ });
+    const cells = within(row)
+      .getAllByRole("cell")
+      .map((c) => c.textContent?.trim());
+    expect(cells).toEqual(["1,010,000", "1,080,000"]);
+
+    const diff = within(table).getByRole("row", { name: /차이/ });
+    expect(within(diff).getAllByRole("cell").at(-1)?.textContent?.trim()).toBe("70,000");
+  });
+
+  it("손실 실행에서도 반영 열이 시작 자금으로 보이지 않는다", () => {
+    const lost = report();
+    lost.equity = [
+      { dt: "2026-01-02", equity: 1000000, cash: 1000000, position_count: 0, gross_exposure: 0 },
+      { dt: "2026-01-03", equity: 940000, cash: 940000, position_count: 0, gross_exposure: 0 },
+    ];
+    render(<RunReportView report={lost} />);
+
+    const table = screen.getByRole("table", { name: /비용 미반영 대비/ });
+    const row = within(table).getByRole("row", { name: /끝난 자산/ });
+    expect(within(row).getAllByRole("cell")[0].textContent?.trim()).toBe("940,000");
+  });
+
+  it("대조군이 없는 옛 실행은 격차 0인 척하지 않는다", () => {
+    const old = report();
+    old.run = { ...old.run, costless_summary: null };
+    render(<RunReportView report={old} />);
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("대조군을 돌리지 않은 옛 실행입니다");
+    expect(screen.queryByRole("table", { name: /비용 미반영 대비/ })).toBeNull();
+  });
+
+  it("대조군이 터진 실행에 재실행을 권하지 않는다 — 같은 이유로 또 터진다", () => {
+    const broken = report();
+    broken.run = {
+      ...broken.run,
+      costless_summary: { absent_reason: "대조군을 구하지 못했습니다 — 실행이 KeyError 으로 멈췄습니다" },
+    };
+    render(<RunReportView report={broken} />);
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("대조군을 구하지 못했습니다");
+    expect(text).not.toContain("옛 실행");
+    expect(text).not.toContain("다시 실행하면");
+    expect(screen.queryByRole("table", { name: /비용 미반영 대비/ })).toBeNull();
+  });
+
+  it("아직 도는 실행에 재실행을 권하지 않는다", () => {
+    const running = report();
+    running.run = { ...running.run, status: "running", costless_summary: null };
+    render(<RunReportView report={running} />);
+
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("실행이 끝나면 채워집니다");
+    expect(text).not.toContain("옛 실행");
   });
 
   it("실패한 실행은 지표를 지어내지 않고 사유를 낸다", () => {
