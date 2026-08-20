@@ -44,6 +44,7 @@ class BacktestRepository:
             UPDATE tn_backtest_run
                SET status = :status
                  , failed_reason = :failed_reason
+                 , costless_summary = COALESCE(CAST(:costless_summary AS jsonb), costless_summary)
                  , finished_dt = CURRENT_TIMESTAMP
                  , mod_id = 'system'
                  , mod_dt = CURRENT_TIMESTAMP

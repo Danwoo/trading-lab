@@ -69,7 +69,9 @@ class SecProvider:
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
                 raise RateLimitExhausted(cursor=f"instrument_master:{market}") from exc
-            raise ProviderResponseInvalid(f"SEC 응답 상태 {exc.response.status_code}") from exc
+            raise ProviderResponseInvalid(
+                f"SEC 응답 상태 {exc.response.status_code}", http_status=exc.response.status_code
+            ) from exc
 
         if not isinstance(payload, dict):
             raise ProviderResponseInvalid("최상위가 객체가 아닙니다")

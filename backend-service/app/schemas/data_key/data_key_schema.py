@@ -32,9 +32,19 @@ class DataKeySaveIn(BaseModel):
     있다. 경로 조작이나 임의 변수 덮어쓰기는 여전히 도달할 수 없다 (#225).
     """
 
-    source: str = Field(..., max_length=40)
-    value: str = Field(..., max_length=500)
-    setting: str | None = Field(default=None, max_length=60)
+    source: str = Field(
+        ...,
+        max_length=40,
+        description="소스 id — 등록된 이름만 받습니다. 무엇이 있는지는 GET /data-key 가 답합니다.",
+        examples=["toss"],
+    )
+    value: str = Field(..., max_length=500, description="넣을 값 — 500자까지. 빈 문자열은 저장하지 않습니다.")
+    setting: str | None = Field(
+        default=None,
+        max_length=60,
+        description="값이 둘 이상인 소스에서 어느 항목인지 — 그 소스의 표에 있는 변수 이름만 받습니다. "
+        "항목이 하나뿐이면 비웁니다.",
+    )
 
 
 class DataKeySaveOut(BaseModel):

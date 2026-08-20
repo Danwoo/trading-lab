@@ -2,10 +2,31 @@
 
 import Link from "next/link";
 import { ProvenanceBadge } from "@/components/features/Terminal/ProvenanceBadge";
-import { ImpactNotice } from "@/components/features/Bench/ImpactNotice";
+import { ImpactNotice, type ImpactTone } from "@/components/features/Bench/ImpactNotice";
 import { MARKET_PATH } from "@/constants/routes";
-import { useQuoteFreshness } from "@/hooks/bench/useQuoteFreshness";
+import { useQuoteFreshness, type QuoteFreshnessKind } from "@/hooks/bench/useQuoteFreshness";
 import { redactReason } from "@/utils/common/errors/redactReason";
+
+/**
+ * 신선도 상태 → 색 단계. **이 표가 대응의 유일한 자리다** — 자리마다 손으로 색을 고르면
+ * 같은 뜻이 자리마다 다른 색으로 나온다.
+ *
+ * 사다리는 「얼마나 비었나」가 아니라 **「무엇이 잘못됐나」**로 오른다:
+ * - `alert` — 적재가 실패했거나 이력 자체를 못 읽었다. 사람이 안 시킨 일이 잘못됐다
+ * - `caution` — 값은 있는데 오늘 것이 아니다. 그대로 두면 어제 값으로 판정한다
+ * - `quiet` — 확인 중이거나, 첫 적재를 아직 안 돌렸다. **계획대로인 상태다**
+ *
+ * 그래서 「적재가 아예 없다」(quiet)와 「하루 낡았다」(caution)의 색이 갈린다 — 전자는 아직
+ * 시작을 안 한 것이고, 후자는 이미 굴리던 것이 뒤처진 것이다.
+ */
+export const FRESHNESS_TONE: Record<QuoteFreshnessKind, ImpactTone> = {
+  checking: "quiet",
+  fresh: "quiet",
+  stale: "caution",
+  "never-run": "quiet",
+  "never-succeeded": "alert",
+  unreadable: "alert",
+};
 
 /** 적재를 실제로 돌릴 수 있는 자리로 보낸다 — 안내만 하고 갈 곳을 안 주면 그것도 막다른 길이다. */
 function GoLoadLink() {
@@ -56,6 +77,7 @@ export function QuoteFreshnessBanner() {
       {badge}
       {freshness.kind === "stale" && (
         <ImpactNotice
+          tone={FRESHNESS_TONE.stale}
           headline={`시세 적재본이 ${freshness.staleness?.label ?? "낡음"} 상태입니다 — 오늘 값으로 판정하지 않습니다`}
           halted={["오늘 신호 판정"]}
           running={["격자·과거 성적 (적재된 구간까지)"]}
@@ -65,7 +87,7 @@ export function QuoteFreshnessBanner() {
       )}
       {freshness.kind === "never-run" && (
         <ImpactNotice
-          tone={freshness.running ? "quiet" : "alert"}
+          tone={FRESHNESS_TONE["never-run"]}
           headline={
             freshness.running
               ? "첫 캔들 적재가 돌고 있습니다 — 끝나면 이 줄이 날짜로 바뀝니다"
@@ -78,6 +100,7 @@ export function QuoteFreshnessBanner() {
       )}
       {freshness.kind === "never-succeeded" && (
         <ImpactNotice
+          tone={FRESHNESS_TONE["never-succeeded"]}
           headline="캔들 적재가 아직 한 번도 성공하지 못했습니다"
           halted={["오늘 신호 판정", "차트"]}
           running={["봇 만들기", "조건 편집"]}
@@ -87,6 +110,7 @@ export function QuoteFreshnessBanner() {
       )}
       {freshness.kind === "unreadable" && (
         <ImpactNotice
+          tone={FRESHNESS_TONE.unreadable}
           headline="시세가 얼마나 낡았는지 확인하지 못했습니다 — 모르는 것을 최신으로 두지 않습니다"
           halted={["오늘 신호 판정", "신선도 판정"]}
           running={["봇 만들기", "조건 편집"]}

@@ -10,6 +10,10 @@
    가림(`redact_secrets`)은 마지막 방어층이지 첫 방어층이 아니다.
 
 기술 원문은 버리지 않는다 — 로그로 간다. 화면과 로그의 독자가 다르기 때문이다.
+
+**어댑터가 상태 코드를 먼저 옮겨 담은 경우도 여기를 지난다.** 어댑터의 사유는 「무엇이 일어났나」
+에서 멈추므로(`Alpaca 응답 상태 403`), 그런 예외는 `http_status` 로 코드를 들고 오고 다음 행동은
+이 파일이 세운다 — 문구의 주인이 둘이 되면 소스마다 조언이 갈린다.
 """
 
 from __future__ import annotations
@@ -34,23 +38,37 @@ _BY_STATUS: dict[int, tuple[str, str]] = {
 _SERVER_SIDE = ("소스 쪽에 장애가 있습니다", "잠시 뒤 다시 시도하세요 — 우리 쪽 설정 문제가 아닙니다")
 
 
+def _describe_status(status: int) -> str:
+    """상태 코드 하나를 「무엇이 일어났나 (HTTP n) — 무엇을 하면 되나」로. 소스 이름은 부르는 쪽이 붙인다."""
+    known = _BY_STATUS.get(status)
+    if known is None and status >= 500:
+        known = _SERVER_SIDE
+    if known is None:
+        # **모르는 상태 코드에 아는 척하지 않는다.** 400 의 조언을 빌려 주면
+        # 「종목 코드를 확인하세요」 같은 틀린 다음 행동을 말하게 된다 (302·407·451 등).
+        return f"소스가 예상 밖의 응답을 냈습니다 (HTTP {status}). 서버 로그를 확인하세요."
+    what, todo = known
+    return f"{what} (HTTP {status}). {todo}."
+
+
+def _named(source: str, message: str) -> str:
+    """여러 소스가 섞인 이력에서 누가 실패했는지 알 수 있게. 이미 제 이름으로 시작하는 사유는 그대로 둔다."""
+    return message if message.startswith(source) else f"{source}: {message}"
+
+
 def describe_provider_failure(exc: BaseException, source: str) -> str:
     """화면에 낼 실패 사유. **URL·원문·자격을 담지 않는다.**"""
+    status = getattr(exc, "http_status", None)
+    if isinstance(status, int):
+        # 어댑터가 상태 코드를 자기 말로 옮긴 경우다. 옮긴 문장은 「무엇이 일어났나」에서 멈추므로
+        # (`Alpaca 응답 상태 403`) 다음 행동은 코드에서 다시 세운다 — 그것을 아는 것은 코드다.
+        return _named(source, _describe_status(status))
     if isinstance(exc, HTTPError):
         # 우리가 만든 예외는 이미 한국어이고 다음 행동을 담고 있다 — 덮으면 나빠진다.
         # (`등록되지 않은 시세 소스입니다: 'tos'` 같은 문장이 「처리하지 못한 오류」로 뭉개졌다)
-        return f"{source}: {exc}"
+        return _named(source, str(exc))
     if isinstance(exc, httpx.HTTPStatusError):
-        status = exc.response.status_code
-        known = _BY_STATUS.get(status)
-        if known is None and status >= 500:
-            known = _SERVER_SIDE
-        if known is None:
-            # **모르는 상태 코드에 아는 척하지 않는다.** 400 의 조언을 빌려 주면
-            # 「종목 코드를 확인하세요」 같은 틀린 다음 행동을 말하게 된다 (302·407·451 등).
-            return f"{source}: 소스가 예상 밖의 응답을 냈습니다 (HTTP {status}). 서버 로그를 확인하세요."
-        what, todo = known
-        return f"{source}: {what} (HTTP {status}). {todo}."
+        return _named(source, _describe_status(exc.response.status_code))
     if isinstance(exc, httpx.TimeoutException):
         return f"{source}: 소스가 제때 응답하지 않았습니다. 잠시 뒤 다시 시도하세요."
     if isinstance(exc, httpx.TransportError):

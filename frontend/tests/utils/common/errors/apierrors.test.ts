@@ -130,6 +130,30 @@ describe("#224 화면에 나가는 API 에러 문구", () => {
     expect(message).toContain("scope: 적재 범위를 넣으세요.");
   });
 
+  // 값의 **범위**를 어긴 것도 안내를 받아야 한다 — 아래 본문은 실제 backend-service 가 낸 응답을
+  // 그대로 옮긴 것이다(POST /backtest-run/grid, initial_cash=0). #292 이전에는 `hint` 가 없어
+  // 이 경로가 「입력 데이터를 확인해주세요.」로 끝났다.
+  it("범위를 어긴 값의 안내도 화면 문구에 실린다", () => {
+    const message = getApiErrorMessage({
+      response: {
+        status: 422,
+        data: {
+          detail: [
+            {
+              loc: ["body", "initial_cash"],
+              msg: "Input should be greater than 0",
+              type: "greater_than",
+              hint: "시작 자금 (원). 0 보다 커야 합니다 — 성과율의 분모라 0 이면 아무 지표도 못 냅니다.",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(message).toContain("initial_cash: 시작 자금 (원). 0 보다 커야 합니다");
+    expect(message).not.toContain("Input should be greater than 0");
+  });
+
   it("안내가 없으면 프레임워크 영문을 내보내지 않는다", () => {
     const message = getApiErrorMessage({
       response: { status: 422, data: { detail: [{ loc: ["body", "x"], msg: "Field required", type: "missing" }] } },

@@ -74,7 +74,9 @@ class AlpacaProvider:
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
                 raise RateLimitExhausted(cursor=cursor) from exc
-            raise ProviderResponseInvalid(f"Alpaca 응답 상태 {exc.response.status_code}") from exc
+            raise ProviderResponseInvalid(
+                f"Alpaca 응답 상태 {exc.response.status_code}", http_status=exc.response.status_code
+            ) from exc
         except httpx.DecodingError as exc:
             # 원문(영문)을 사유로 싣지 않는다 — 이 문자열은 화면까지 간다.
             raise ProviderResponseInvalid("Alpaca 응답을 해석하지 못했습니다 (형식이 바뀌었을 수 있습니다)") from exc
@@ -135,7 +137,9 @@ class AlpacaProvider:
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 429:
                 raise RateLimitExhausted(cursor="quote:" + ",".join(sorted(market_by_symbol))) from exc
-            raise ProviderResponseInvalid(f"Alpaca 응답 상태 {exc.response.status_code}") from exc
+            raise ProviderResponseInvalid(
+                f"Alpaca 응답 상태 {exc.response.status_code}", http_status=exc.response.status_code
+            ) from exc
         except httpx.DecodingError as exc:
             # 원문(영문)을 사유로 싣지 않는다 — 이 문자열은 화면까지 간다.
             raise ProviderResponseInvalid("Alpaca 응답을 해석하지 못했습니다 (형식이 바뀌었을 수 있습니다)") from exc

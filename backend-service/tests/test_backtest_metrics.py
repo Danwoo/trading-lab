@@ -107,6 +107,7 @@ def test_underwater_still_recovering() -> None:
             round_trip_cost_rate=0.0,
             initial_cash=1000.0,
             sell_tax_rate=0.0,
+            costless_summary=None,
         ),
         "longest_underwater",
     )
@@ -120,7 +121,13 @@ def test_short_sample_is_not_annualized() -> None:
     """
     equity = [1000.0 + i * 5 for i in range(26)]
     ms = compute(
-        equity_dt=dates(26), equity=equity, trades=[], round_trip_cost_rate=0.0, initial_cash=1000.0, sell_tax_rate=0.0
+        equity_dt=dates(26),
+        equity=equity,
+        trades=[],
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0,
+        costless_summary=None,
     )
     cagr = by_key(ms, "cagr")
     check("CAGR 은 없다", cagr.value, None)
@@ -139,6 +146,7 @@ def test_long_sample_is_annualized() -> None:
         round_trip_cost_rate=0.0,
         initial_cash=1000.0,
         sell_tax_rate=0.0,
+        costless_summary=None,
     )
     cagr = by_key(ms, "cagr")
     check("CAGR 계산됨", cagr.value is not None, True)
@@ -149,7 +157,13 @@ def test_calmar_absent_when_cagr_absent() -> None:
     """CAGR 이 없으면 Calmar 도 없다 — 없는 계산을 한 척하지 않는다."""
     equity = [1000.0, 1200.0, 900.0]
     ms = compute(
-        equity_dt=dates(3), equity=equity, trades=[], round_trip_cost_rate=0.0, initial_cash=1000.0, sell_tax_rate=0.0
+        equity_dt=dates(3),
+        equity=equity,
+        trades=[],
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0,
+        costless_summary=None,
     )
     calmar = by_key(ms, "calmar")
     check("Calmar 없음", calmar.value, None)
@@ -165,6 +179,7 @@ def test_no_trades_is_not_zero_percent() -> None:
         round_trip_cost_rate=0.001,
         initial_cash=1000.0,
         sell_tax_rate=0.0,
+        costless_summary=None,
     )
     win = by_key(ms, "win_rate")
     check("승률 값이 없다", win.value, None)
@@ -185,6 +200,7 @@ def test_every_metric_carries_derivation() -> None:
         round_trip_cost_rate=0.0015,
         initial_cash=1000.0,
         sell_tax_rate=0.0,
+        costless_summary=None,
     )
     global CHECKED
     for m in ms:
@@ -206,6 +222,7 @@ def test_metric_order_is_the_decided_one() -> None:
         round_trip_cost_rate=0.0015,
         initial_cash=1000.0,
         sell_tax_rate=0.0,
+        costless_summary=None,
     )
     check("1급이 최장 미회복 기간", ms[0].key, "longest_underwater")
     keys = [m.key for m in ms]
@@ -242,13 +259,22 @@ def test_avg_trade_subtracts_round_trip_cost() -> None:
         round_trip_cost_rate=0.0015,
         initial_cash=1000.0,
         sell_tax_rate=0.0,
+        costless_summary=None,
     )
     check("평균 − 비용", by_key(ms, "avg_trade_vs_cost").value, 4.85, tol=1e-9)
 
 
 def test_empty_equity_says_why() -> None:
     """자산곡선이 없으면 전 지표가 사유를 단다 — 0 으로 채우지 않는다."""
-    ms = compute(equity_dt=[], equity=[], trades=[], round_trip_cost_rate=0.0, initial_cash=1000.0, sell_tax_rate=0.0)
+    ms = compute(
+        equity_dt=[],
+        equity=[],
+        trades=[],
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0,
+        costless_summary=None,
+    )
     global CHECKED
     CHECKED += 1
     if not ms:
@@ -279,6 +305,7 @@ def test_cost_paid_sums_all_three_axes() -> None:
         round_trip_cost_rate=0.0,
         initial_cash=1000.0,
         sell_tax_rate=0.0018,
+        costless_summary=None,
     )
     check("치른 비용", by_key(ms, "cost_paid").value, 49.0)
     # 분모는 시작 자금 1,000 이지 `equity[0]`(=990) 이 아니다. 990 이면 4.9495… 가 나온다.
@@ -295,6 +322,7 @@ def test_cost_drag_denominator_is_initial_cash() -> None:
         round_trip_cost_rate=0.0,
         initial_cash=1000.0,
         sell_tax_rate=0.0018,
+        costless_summary=None,
     )
     # 잘못된 구현(= equity[0]=500)이면 2.0 이 나온다.
     check("분모 = 시작 자금", by_key(ms, "cost_drag_pct").value, 1.0, tol=1e-9)
@@ -313,6 +341,7 @@ def test_old_run_without_tax_record_says_so() -> None:
         round_trip_cost_rate=0.0,
         initial_cash=1000.0,
         sell_tax_rate=0.0018,
+        costless_summary=None,
     )
     for key in ("cost_paid", "cost_drag_pct"):
         m = by_key(ms, key)
@@ -333,8 +362,73 @@ def test_zero_tax_rate_run_still_reports_cost() -> None:
         round_trip_cost_rate=0.0,
         initial_cash=1000.0,
         sell_tax_rate=0.0,
+        costless_summary=None,
     )
     check("세율 0 run 의 치른 비용", by_key(ms, "cost_paid").value, 6.5)
+
+
+def test_cost_gap_is_the_rerun_difference() -> None:
+    """격차 = **다시 돌린** 대조군 수익률 − 이 실행 수익률. 나눗셈이 아니다."""
+    ms = compute(
+        equity_dt=dates(3),
+        equity=[1000.0, 1020.0, 1050.0],
+        trades=[_cost_trade(fee=1.5, slippage=5.0, tax=18.0)],
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0018,
+        costless_summary={"final_equity": 1080.0, "return_pct": 8.0, "trade_count": 1},
+    )
+    # 이 실행 = (1050 − 1000) / 1000 = 5%. 대조군 8%. 격차 3p.
+    check("비용 격차", by_key(ms, "cost_gap_pct").value, 3.0, tol=1e-9)
+
+
+def test_cost_gap_derivation_names_both_worlds() -> None:
+    """유도 문구가 **두 수익률을 다 적는다** — 어디서 온 격차인지 화면이 그대로 읽는다."""
+    ms = compute(
+        equity_dt=dates(3),
+        equity=[1000.0, 1020.0, 1050.0],
+        trades=[_cost_trade(fee=1.5, slippage=5.0, tax=18.0)],
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0018,
+        costless_summary={"final_equity": 1080.0, "return_pct": 8.0, "trade_count": 1},
+    )
+    derived = by_key(ms, "cost_gap_pct").derived_from or ""
+    check("대조군 수익률을 적는다", "8.00%" in derived, True)
+    check("이 실행 수익률을 적는다", "5.00%" in derived, True)
+
+
+def test_broken_twin_is_not_called_an_old_run() -> None:
+    """대조군이 **터진** 실행에 「옛 실행이니 다시 돌려라」고 하지 않는다 — 또 터진다."""
+    ms = compute(
+        equity_dt=dates(3),
+        equity=[1000.0, 1020.0, 1050.0],
+        trades=[_cost_trade(fee=1.5, slippage=5.0, tax=18.0)],
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0018,
+        costless_summary={"absent_reason": "대조군을 구하지 못했습니다 — 실행이 KeyError 으로 멈췄습니다"},
+    )
+    gap = by_key(ms, "cost_gap_pct")
+    check("격차 값 없음", gap.value, None)
+    check("사유가 실패를 말한다", "구하지 못했습니다" in (gap.absent_reason or ""), True)
+    check("「옛 실행」이라 하지 않는다", "옛 실행" in (gap.absent_reason or ""), False)
+
+
+def test_old_run_without_twin_is_absent_not_zero() -> None:
+    """대조군을 안 돌린 옛 실행은 격차 0이 아니라 **모르는 것**이다."""
+    ms = compute(
+        equity_dt=dates(3),
+        equity=[1000.0, 1020.0, 1050.0],
+        trades=[_cost_trade(fee=1.5, slippage=5.0, tax=18.0)],
+        round_trip_cost_rate=0.0,
+        initial_cash=1000.0,
+        sell_tax_rate=0.0018,
+        costless_summary=None,
+    )
+    gap = by_key(ms, "cost_gap_pct")
+    check("격차 값 없음", gap.value, None)
+    check("사유가 옛 실행임을 말한다", "대조군" in (gap.absent_reason or ""), True)
 
 
 def main() -> int:
