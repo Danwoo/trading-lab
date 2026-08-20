@@ -9,7 +9,7 @@ multi-agent 는 LangGraph 를 3층으로 쌓는다:
 
 | 층 | 위치 | 역할 |
 |---|---|---|
-| ① 최상위 | `graphs/plan_execute/builder.py` `StateGraph(PlanExecuteState)` | clarify→plan→execute→answer\|map→reduce 오케스트레이션 (손수 짠 그래프) |
+| ① 최상위 | `graphs/plan_execute/builder.py` `StateGraph(PlanExecuteState)` | clarify→plan→execute→answer\|map→reduce 오케스트레이션 (손수 짠 그래프 — 패키지 내부 경계·계약은 [그래프 패키지 문서](multi-agent-plan-execute.md)) |
 | ② 중간 | `graphs/res_pipeline.py` (도메인별) | Route–Execute–Synthesize. sub-agent 들을 tool 로 보유 |
 | ③ 최하위 | `agents/builders.py`·`sub_agents.py` `create_agent(...)` | 프리빌트 ReAct. **= single-agent-service 가 만든 그것** |
 
