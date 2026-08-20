@@ -15,6 +15,7 @@ import { Button } from "@/components/shared/ui/Button";
 import { FileTypeIcon } from "@/components/shared/ui/primitives/FileTypeIcon";
 import { Icon } from "@/components/shared/ui/primitives/icons";
 import { cn } from "@/components/shared/ui/primitives/cn";
+import { ICON_HIT_AREA } from "@/components/shared/ui/primitives/hitArea";
 import { showToast, showMessage } from "@/components/shared/Feedback";
 import { getApiErrorMessage } from "@/utils/common/errors";
 import { FileDetail } from "@/schemas/common/file";
@@ -322,7 +323,7 @@ export const FileUploader = forwardRef<FileUploaderRef, Props>(
                 <button
                   type="button"
                   aria-label={`${file.name} 선택 해제`}
-                  className="text-gray-400 hover:text-gray-600"
+                  className={cn(ICON_HIT_AREA, "text-gray-400 hover:text-gray-600")}
                   onClick={() => {
                     const updated = selectedFiles.filter((_, i) => i !== index);
                     setSelectedFiles(updated);

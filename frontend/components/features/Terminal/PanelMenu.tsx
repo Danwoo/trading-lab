@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { ICON_HIT_AREA } from "@/components/shared/ui/primitives/hitArea";
 
 export interface PanelMenuProps {
   collapsed: boolean;
@@ -89,7 +90,9 @@ export function PanelMenu({ collapsed, onToggleCollapse, onClose }: PanelMenuPro
             setOpen(true);
           }
         }}
-        className="rounded-sm px-1 text-ink-muted hover:text-ink focus-visible:text-ink"
+        // `-my-1` 은 24 짜리 표적이 헤더 줄(글자 16 + `py-1`)을 밀어 늘리지 않게 한다 —
+        // 표적만 넓히고 패널 머리 높이는 그대로 둔다.
+        className={`${ICON_HIT_AREA} -my-1 rounded-sm text-ink-muted hover:text-ink focus-visible:text-ink`}
       >
         ⋮
       </button>

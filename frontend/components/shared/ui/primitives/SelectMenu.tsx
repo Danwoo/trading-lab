@@ -22,6 +22,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Popover as PopoverPrimitive } from "radix-ui";
 import { cn } from "./cn";
+import { ICON_HIT_AREA } from "./hitArea";
 
 export interface SelectMenuProps {
   /** 선택지. 문자열 배열이면 `displayExpr`/`valueExpr` 는 무시된다. */
@@ -208,7 +209,7 @@ export function SelectMenu({
               <button
                 type="button"
                 aria-label={`${labelFor(entry)} 제거`}
-                className="text-ink-muted hover:text-ink"
+                className={cn(ICON_HIT_AREA, "text-ink-muted hover:text-ink")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onChange(selectedValues.filter((existing) => existing !== entry));
@@ -265,7 +266,9 @@ export function SelectMenu({
           <button
             type="button"
             aria-label="선택 지우기"
-            className="absolute right-7 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
+            // right-5 는 24 폭 상자를 트리거가 비워 둔 자리(`pr-12`) 안에 넣으면서 × 의 가운데를
+            // 종전 자리에 유지한다 — 상자는 오른쪽 20~44px, ▾ 는 49~56px 이라 겹치지 않는다.
+            className={cn(ICON_HIT_AREA, "absolute right-5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink")}
             onClick={() => onChange(multiple ? [] : null)}
           >
             ×

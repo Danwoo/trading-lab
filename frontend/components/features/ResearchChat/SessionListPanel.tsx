@@ -1,6 +1,7 @@
 "use client";
 
 import { ResearchSession } from "@/schemas/researchChat/researchChat";
+import { ICON_HIT_AREA } from "@/components/shared/ui/primitives/hitArea";
 
 interface Props {
   sessions: ResearchSession[];
@@ -59,7 +60,7 @@ export function SessionListPanel({ sessions, activeGid, onSelect, onNew, onDelet
                     onClick={() => onDelete(session.gid)}
                     aria-label={`대화 삭제: ${session.title || "새 대화"}`}
                     title="대화 삭제"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-gray-600 focus:opacity-100 group-hover:opacity-100"
+                    className={`${ICON_HIT_AREA} absolute right-1 top-1/2 -translate-y-1/2 rounded text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-gray-600 focus:opacity-100 group-hover:opacity-100`}
                   >
                     <svg
                       className="h-3.5 w-3.5"

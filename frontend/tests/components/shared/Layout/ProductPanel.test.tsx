@@ -123,12 +123,16 @@ describe("ProductPanel — 620 토글은 에이전트에만, 1280 이상에만 (
   // §21.6 이 620 을 허용한 것은 1280 이상뿐이다. 그 아래에서 버튼을 보이면 눌러도 폭이 안 바뀌는데
   // `aria-pressed` 만 눌림으로 바뀌어 스크린리더에게 거짓 상태를 알린다. `hidden` 은 `display:none`
   // 이라 접근성 트리에서도 빠진다 — 「보이지만 안 먹는 버튼」이 생길 수 없다.
-  it("1280 미만에서는 숨는다 — `hidden` + `xl:block` 두 짝이 다 있어야 한다", () => {
+  //
+  // 지키는 것은 「xl 미만에서 숨고 xl 에서 보인다」는 짝이지 특정 유틸리티 이름이 아니다 —
+  // 표시 유틸리티는 `xl:block` 에서 `xl:inline-flex` 로 옮겼다(#289: 표적 24×24 를 위해 상자를
+  // flex 로 세운다). 그래서 이름 하나가 아니라 「보이게 하는 xl 유틸리티가 있는가」로 본다.
+  it("1280 미만에서는 숨는다 — `hidden` + 보이게 하는 xl 유틸리티 두 짝이 다 있어야 한다", () => {
     setup({ item: AGENT_ITEM });
     const classes = classesOf(screen.getByRole("button", { name: /넓히기/ }));
 
     expect(classes.has("hidden")).toBe(true);
-    expect(classes.has("xl:block")).toBe(true);
+    expect([...classes].filter((c) => /^xl:(block|inline-block|flex|inline-flex|grid)$/.test(c))).toHaveLength(1);
   });
 });
 

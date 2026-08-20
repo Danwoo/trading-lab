@@ -408,6 +408,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_color_token_usage.py
 
+      # 아이콘 조작부의 표적 클래스 (#289) — 크기를 재는 그물(frontend `npm test` 의
+      # touchTargets)은 손으로 고른 픽스처만 본다. 새 아이콘 버튼이 픽스처에 안 들어가면
+      # 그 자리는 조용히 초록이다(실측: `×` 두 자리가 그렇게 빠졌다). 여기서는 크기 대신
+      # 「공용 클래스를 안 쓴 자리」를 센다. 후보 0건이면 실패 (fail-closed).
+      - name: 아이콘 표적 클래스 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_icon_hit_area.py
+
       # 실패 사유가 화면으로 나가는 자리의 가림 (#274) — **경로 필터가 없는 이 잡에 둔다.**
       # `ci.yml` 의 백엔드 잡에 두면 `FILTER_PATTERNS` 에 `frontend/**` 가 없어, 프론트만 바꾼
       # PR(= 이 그물이 지켜야 할 바로 그 클래스)에서 조용히 skip 된다. 실제로 그 상태였다.

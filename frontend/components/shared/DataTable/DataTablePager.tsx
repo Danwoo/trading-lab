@@ -2,6 +2,7 @@
 "use client";
 
 import { ALLOWED_PAGE_SIZES } from "@/constants/app";
+import { ICON_HIT_AREA } from "@/components/shared/ui/primitives/hitArea";
 
 interface DataTablePagerProps {
   pageIndex: number;
@@ -12,7 +13,8 @@ interface DataTablePagerProps {
 }
 
 const NAV_BUTTON_CLASS =
-  "rounded border px-2 py-0.5 text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40";
+  `${ICON_HIT_AREA} rounded border px-2 py-0.5 text-gray-600 hover:bg-gray-100 ` +
+  "disabled:cursor-not-allowed disabled:opacity-40";
 
 export function DataTablePager({
   pageIndex,

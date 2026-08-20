@@ -12,6 +12,8 @@
 
 import type { ReactNode } from "react";
 
+import { ICON_HIT_AREA } from "./hitArea";
+
 interface Props {
   children: ReactNode;
   isInvalid: boolean;
@@ -61,3 +63,23 @@ export const FIELD_INPUT_CLASS =
 export function fieldBorderClass(isInvalid: boolean): string {
   return isInvalid ? "border-danger" : "border-line";
 }
+
+/**
+ * 입력 안에 겹쳐 그리는 아이콘 버튼(클리어·비밀번호 토글·달력 열기)의 클래스.
+ *
+ * **잉크는 토큰으로 준다** — 셸이 선언한 테마를 따라간다. 종전에는 `text-gray-400/500` 에
+ * `hover:text-gray-600/700` 이라 hover 색이 밝은 바탕 전제였고, 어두운 셸에서는 **대비가
+ * 1.57:1 로 떨어져 마우스를 올리면 아이콘이 사라졌다**. 원시 회색을 쓸 수밖에 없던 이유였던
+ * 「`/admin` 셸이 `data-theme="light"` 를 선언하지 않는다」는 전제는 없어졌다(#281).
+ *
+ * 왜 `text-current` 는 아닌가: 이 래퍼에는 잉크가 없어 브라우저 기본색으로 떨어진다(실측).
+ *
+ * hover 는 **색이 아니라 바탕**으로 준다. 색을 밝히면 어두운 데서 좋아지고 밝은 데서 나빠진다 —
+ * 한 색으로 양쪽을 다 올릴 수 없다. 바탕을 얹으면 글자 대비를 안 깎고 반응만 더한다.
+ *
+ * 크기는 `ICON_HIT_AREA` 가 정한다 — 24×24 상자 안에 글리프를 가운데 두므로 보이는 크기는
+ * 그대로다(#289). `right-2`(8) + 24 = 32 = 입력의 `pr-8` 이라 글자를 안 덮는다.
+ */
+export const FIELD_ICON_BUTTON_CLASS =
+  `${ICON_HIT_AREA} absolute right-2 top-1/2 -translate-y-1/2 rounded text-ink-muted ` +
+  "hover:bg-bg-raised focus-visible:bg-bg-raised";

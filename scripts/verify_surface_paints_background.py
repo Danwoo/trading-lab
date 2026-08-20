@@ -74,6 +74,11 @@ FIELD_ROOTS: tuple[str, ...] = ("components/shared/ui",)
 #: 테마를 고른다), `type="file"` 은 `sr-only` 로 숨는다.
 UNPAINTED_INPUT = re.compile(r'type="(?:checkbox|radio|file)"')
 
+#: 보이지도 않고 접근성 트리에도 없는 입력 — 칠할 바탕이 없다. `DateBox` 의 달력 앵커가 그
+#: 형태다(`display:none` 이면 `showPicker()` 가 던지므로 1px·투명으로 세워 둔다). **둘 다**
+#: 있어야 건너뛴다 — 투명하기만 하면 포커스로 돌아올 수 있고, 숨기기만 하면 눈에 보인다.
+INVISIBLE_INPUT = (re.compile(r'aria-hidden="true"'), re.compile(r"(?<![\w-])opacity-0(?![\w-])"))
+
 #: 글자색을 주는 토큰 클래스. 포털 박스는 이것도 있어야 한다 — 없으면 색 클래스를 안 가진
 #: 글자(라벨·제목)가 UA 기본 `canvastext` 로 떨어지고, 그 값은 `color-scheme` 을 따라가
 #: 다크에서 **흰색**이 된다(흰 다이얼로그 위 흰 글자).
@@ -212,6 +217,8 @@ def main() -> int:
             for tag in ("input", "textarea"):
                 for line, element in _jsx_elements(text, tag):
                     if UNPAINTED_INPUT.search(element) or "sr-only" in element:
+                        continue
+                    if all(pattern.search(element) for pattern in INVISIBLE_INPUT):
                         continue
                     input_checked += 1
                     if BG_TOKEN.search(element):
