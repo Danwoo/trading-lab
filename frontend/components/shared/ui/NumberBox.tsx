@@ -55,6 +55,28 @@ function groupDigitsOf(value: number): string {
   return value.toLocaleString("ko-KR", { maximumFractionDigits: 20 });
 }
 
+/** 구분 기호와 단위를 벗긴 뒤 남아야 하는 십진 표기. */
+const DECIMAL_TEXT = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
+
+/**
+ * 화면에 보이는 표기(`10,000,000원`)를 그대로 되쳐도 같은 값으로 읽는다 — 칸이 평상시에 그
+ * 형식을 보이는 이상 그렇게 치는 것은 예외 입력이 아니다. 구분 기호와 단위를 벗기고 읽는다.
+ *
+ * `Number()` 를 그대로 믿지 않는 이유: `1e9`·`0x10`·`Infinity`·공백까지 숫자가 된다.
+ * `Infinity` 는 `∞원` 으로 그려지고 JSON 직렬화에서 `null` 이 되어 요청 본문이 계약을 깬다.
+ */
+function parseAmount(raw: string, suffix: string): number | null {
+  let text = raw.trim();
+  if (suffix && text.endsWith(suffix)) text = text.slice(0, -suffix.length).trim();
+  text = text.replace(/,/g, "");
+  if (!DECIMAL_TEXT.test(text)) return null;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** 못 읽은 글자를 옛 값 위에 조용히 남기지 않으려면, 사유를 이 자리에서 말해야 한다. */
+const UNREADABLE_MESSAGE = "숫자로 읽을 수 없습니다 — 숫자와 쉼표로 적으세요.";
+
 /**
  * 숫자 입력 컴포넌트 (#341 ② — 네이티브 `<input type="number">`)
  *
@@ -97,6 +119,8 @@ export function NumberBox<T = any>({
   // 편집 중인 원문. 구분 기호를 넣은 표기 위에 커서를 올리면 자릿수가 밀리므로, 편집하는 동안은
   // 이 원문을 그대로 보여 준다.
   const [draft, setDraft] = useState<string | null>(null);
+  // 친 글자를 숫자로 못 읽었다는 사실. 값은 비우되 화면에는 친 글자를 남겨 사유와 함께 보인다.
+  const [unreadable, setUnreadable] = useState(false);
 
   if (!visible) return null;
 
@@ -105,17 +129,27 @@ export function NumberBox<T = any>({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    if (groupDigits) setDraft(raw);
+    if (!groupDigits) {
+      // 네이티브 숫자 입력은 못 읽는 글자를 빈 문자열로 준다 — 여기 오는 것은 숫자거나 빔이다.
+      onValueChanged(fieldName, raw === "" ? null : Number(raw));
+      return;
+    }
+    setDraft(raw);
     // 빈 문자열은 0 이 아니라 "값 없음"이다 — DevExtreme 도 null 을 넘겼다.
-    if (raw === "") {
+    if (raw.trim() === "") {
+      setUnreadable(false);
       onValueChanged(fieldName, null);
       return;
     }
-    const parsed = Number(raw);
-    // 텍스트 모드에서는 숫자가 아닌 글자도 들어온다 — 숫자가 될 때만 값을 올리고, 아니면
-    // 마지막 성한 값을 지킨다(포커스를 잃으면 화면도 그 값으로 되돌아간다).
-    if (!groupDigits || !Number.isNaN(parsed)) onValueChanged(fieldName, parsed);
+    const parsed = parseAmount(raw, suffix);
+    setUnreadable(parsed === null);
+    // 못 읽으면 옛 값을 지키지 않고 비운다 — 화면과 올라간 값이 어긋난 채 제출되는 길을 막는다
+    // (텍스트 칸에서 Enter 를 치면 블러 없이 폼이 제출된다).
+    onValueChanged(fieldName, parsed);
   };
+
+  const shownError = isInvalid ? errorMessage : unreadable ? UNREADABLE_MESSAGE : undefined;
+  const showsError = isInvalid || unreadable;
 
   const displayValue = groupDigits
     ? editing
@@ -126,12 +160,7 @@ export function NumberBox<T = any>({
     : (value ?? "");
 
   return (
-    <FieldShell
-      isInvalid={isInvalid}
-      errorMessage={errorMessage}
-      errorMessageId={errorMessageId}
-      width={effectiveWidth}
-    >
+    <FieldShell isInvalid={showsError} errorMessage={shownError} errorMessageId={errorMessageId} width={effectiveWidth}>
       <input
         type={groupDigits ? "text" : "number"}
         inputMode={groupDigits ? "decimal" : undefined}
@@ -144,17 +173,29 @@ export function NumberBox<T = any>({
         min={groupDigits ? undefined : min}
         max={groupDigits ? undefined : max}
         step={groupDigits ? undefined : step}
-        onFocus={groupDigits ? () => setDraft(value === null || value === undefined ? "" : String(value)) : undefined}
-        onBlur={groupDigits ? () => setDraft(null) : undefined}
+        // 못 읽은 글자가 남아 있으면 그대로 두고 고치게 한다 — 지우면 무엇이 틀렸는지 사라진다.
+        onFocus={
+          groupDigits
+            ? () => setDraft((prev) => prev ?? (value === null || value === undefined ? "" : String(value)))
+            : undefined
+        }
+        // 못 읽은 글자는 버리지 않는다 — 조용히 옛 값으로 되돌아가면 기각된 사실이 안 보인다.
+        onBlur={
+          groupDigits
+            ? () => {
+                if (!unreadable) setDraft(null);
+              }
+            : undefined
+        }
         onChange={handleChange}
-        aria-invalid={isInvalid || undefined}
+        aria-invalid={showsError || undefined}
         // 검증 오류가 있으면 그쪽이 이긴다 — 지금 고쳐야 할 것이 먼저 읽혀야 한다.
-        aria-describedby={isInvalid && errorMessage ? errorMessageId : describedBy}
+        aria-describedby={showsError && shownError ? errorMessageId : describedBy}
         style={{ height }}
         className={cn(
           FIELD_INPUT_CLASS,
           "text-right tabular-nums",
-          fieldBorderClass(isInvalid),
+          fieldBorderClass(showsError),
           // 스핀 버튼을 끄면 WebKit/Firefox 양쪽에서 감춘다(값·키보드 동작은 유지).
           showSpinButtons
             ? ""
