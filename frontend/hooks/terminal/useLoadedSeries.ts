@@ -80,7 +80,7 @@ export function useLoadedSeries(): PanelData<Candle[]> {
           data: null,
           isLoading: false,
           error: outcome.error,
-          provenance: { kind: "unavailable", reason: "적재본을 불러오지 못했습니다" },
+          provenance: { kind: "unavailable", reason: "적재본을 불러오지 못했습니다", because: "unreadable" },
         });
       });
 

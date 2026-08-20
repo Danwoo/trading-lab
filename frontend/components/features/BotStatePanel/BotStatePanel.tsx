@@ -33,7 +33,11 @@ export default function BotStatePanel({ instanceId }: PanelProps) {
         if (cancelled) return;
         const message = getApiErrorMessage(cause);
         setError(message);
-        reportProvenance({ kind: "unavailable", reason: `봇 목록을 불러오지 못했습니다 — ${message}` });
+        reportProvenance({
+          kind: "unavailable",
+          reason: `봇 목록을 불러오지 못했습니다 — ${message}`,
+          because: "unreadable",
+        });
       });
     return () => {
       cancelled = true;

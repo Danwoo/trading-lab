@@ -69,7 +69,7 @@ export function useOnDemand<T>(params: {
           data: null,
           isLoading: false,
           error: outcome.error,
-          provenance: { kind: "unavailable", reason: "요청을 처리하지 못했습니다" },
+          provenance: { kind: "unavailable", reason: "요청을 처리하지 못했습니다", because: "unreadable" },
         });
       });
 

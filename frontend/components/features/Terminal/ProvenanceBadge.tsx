@@ -1,5 +1,5 @@
 import type * as React from "react";
-import type { Provenance } from "@/types/terminal/provenance";
+import type { Provenance, UnavailableBecause } from "@/types/terminal/provenance";
 import type { StalenessNote } from "@/lib/terminal/staleness";
 import { formatDate } from "@/utils/common/formatters/date";
 
@@ -43,7 +43,7 @@ function PlaceholderIcon({ className }: IconProps) {
   );
 }
 
-/** 제공 안 됨 — unavailable. */
+/** 빈 자리 — unavailable. 무엇이라 부르는지는 `because` 축이 정한다. */
 function UnavailableIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 16 16" width="12" height="12" className={className} aria-hidden="true">
@@ -63,6 +63,22 @@ function UnknownProvenanceIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/**
+ * 빈 자리를 배지가 무엇이라 부르는가 — `because` 축(`types/terminal/provenance.ts`)과 1:1.
+ *
+ * `Record` 라 축에 값이 늘면 여기서 컴파일이 깨진다 — 새 상태가 조용히 「제공 안 됨」으로
+ * 접히지 않게 하는 장치다(#284: 동작하는 실행 폼 위에 「제공 안 됨」이 붙어 있었다).
+ */
+const UNAVAILABLE_LABEL: Record<UnavailableBecause, string> = {
+  "not-chosen": "고르면 채워집니다",
+  checking: "확인 중",
+  "not-run": "아직 실행 안 함",
+  "run-failed": "실행 실패",
+  empty: "대상 없음",
+  unreadable: "못 읽음",
+  "no-source": "제공 안 됨",
+};
 
 /** 기준 시각을 어디까지 보일 것인가. 일봉 적재본처럼 값 자체가 날짜뿐이면 분까지 붙이면 거짓말이 된다. */
 export type ProvenancePrecision = "datetime" | "day";
@@ -140,7 +156,7 @@ export function ProvenanceBadge({
       return (
         <span className="inline-flex items-center gap-1 text-ink-muted">
           <UnavailableIcon />
-          {provenance.because === "not-chosen" ? "고르면 채워집니다" : "제공 안 됨"}
+          {UNAVAILABLE_LABEL[provenance.because]}
         </span>
       );
   }

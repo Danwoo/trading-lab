@@ -37,5 +37,5 @@ export function provenanceForUnavailable(reason: string, code: string | null): P
   if (code === CREDENTIAL_MISSING_CODE) {
     return { kind: "placeholder", source: "임시 데이터", hint: reason };
   }
-  return { kind: "unavailable", reason };
+  return { kind: "unavailable", reason, because: "no-source" };
 }

@@ -19,8 +19,14 @@ import {
   type BenchSelection,
   type BenchSelectionKind,
 } from "@/stores/shell/benchSelectionStore";
+import {
+  GRID_RUN_FAILED_HEADLINE,
+  curveZoneProvenance,
+  gridZoneProvenance,
+  rosterZoneProvenance,
+  type RosterState,
+} from "@/lib/bench/boardProvenance";
 import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
-import type { Provenance } from "@/types/terminal/provenance";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import { ProductStages } from "@/components/features/Bench/ProductStages";
 
@@ -29,27 +35,6 @@ const TABBED_ZONE_IDS = ["grid", "curve"] as const;
 type TabbedZoneId = (typeof TABBED_ZONE_IDS)[number];
 
 const TAB_TITLES: Record<TabbedZoneId, string> = { grid: "격자", curve: "곡선" };
-
-/** 봇 목록이 지금 어떤 상태인가 — 「못 읽음」·「불러오는 중」을 「없음」과 가른다. */
-type RosterState = "loading" | "unreadable" | "empty" | "filled";
-
-/** 봇 수를 아직 모를 때 두 자리가 공통으로 하는 말. */
-const ROSTER_UNKNOWN: Record<"loading" | "unreadable", string> = {
-  loading: "봇 목록을 확인하고 있습니다",
-  unreadable: "봇 목록을 읽지 못했습니다 — 봇이 있는지 아직 모릅니다",
-};
-
-const GRID_EMPTY_REASON: Record<RosterState, string> = {
-  ...ROSTER_UNKNOWN,
-  empty: "돌릴 봇이 없습니다 — 봇을 하나 만들면 조합이 여기 깔립니다",
-  filled: "아직 돌리지 않았습니다 — 봇·종목·구간을 골라 실행하면 조합이 칸으로 깔립니다",
-};
-
-const CURVE_EMPTY_REASON: Record<RosterState, string> = {
-  ...ROSTER_UNKNOWN,
-  empty: "돌릴 봇이 없습니다 — 봇을 하나 만들면 격자를 실행할 수 있습니다",
-  filled: "아직 돌리지 않았습니다 — 격자를 실행하면 곡선이 그려집니다",
-};
 
 /** 「시작하는 길」의 머리말. `filled` 는 개수를 넣어야 해서 부르는 쪽이 만든다. */
 const PATHS_LEAD: Record<Exclude<RosterState, "filled">, string> = {
@@ -125,38 +110,26 @@ export default function Page() {
   const selectedRunId = selection?.kind === "grid-point" ? Number(selection.id) : null;
   const activeReport = board.report !== null && board.report.run.run_id === selectedRunId ? board.report : null;
 
-  // 격자·곡선이 비어 있는 이유는 상태마다 다르다. 「봇이 없다」·「아직 안 돌렸다」·「칸을 아직
-  // 안 골랐다」를 한 문장으로 뭉개면 사용자가 무엇을 하면 되는지가 사라진다.
-  const gridProvenance: Provenance =
-    board.grid !== null
-      ? { kind: "loaded", source: "백테스트 격자", asOf: null }
-      : {
-          kind: "unavailable",
-          reason: GRID_EMPTY_REASON[rosterState],
-        };
+  // 격자·곡선이 비어 있는 이유는 상태마다 다르다. 「봇이 없다」·「아직 안 돌렸다」·「돌렸는데
+  // 실패했다」·「칸을 아직 안 골랐다」를 한 문장으로 뭉개면 무엇을 하면 되는지가 사라진다.
+  const gridProvenance = gridZoneProvenance({
+    rosterState,
+    hasGrid: board.grid !== null,
+    isRunning: board.isRunning,
+    runError: board.runError,
+  });
 
-  const curveProvenance: Provenance = activeReport
-    ? {
-        kind: "loaded",
-        source: `실행 #${activeReport.run.run_id}`,
-        asOf: activeReport.run.finished_dt,
-      }
-    : {
-        kind: "unavailable",
-        reason: board.isReportLoading
-          ? "리포트를 불러오고 있습니다"
-          : (board.reportError ??
-            (board.grid !== null
-              ? "격자에서 칸을 누르면 그 조합의 곡선·지표·거래가 여기 그려집니다"
-              : CURVE_EMPTY_REASON[rosterState])),
-      };
+  const curveProvenance = curveZoneProvenance({
+    rosterState,
+    hasGrid: board.grid !== null,
+    isRunning: board.isRunning,
+    runError: board.runError,
+    report: activeReport && { runId: activeReport.run.run_id, finishedDt: activeReport.run.finished_dt },
+    isReportLoading: board.isReportLoading,
+    reportError: board.reportError,
+  });
 
-  const rosterProvenance: Provenance =
-    rosterState === "loading"
-      ? { kind: "unavailable", reason: ROSTER_UNKNOWN.loading }
-      : rosterState === "empty"
-        ? { kind: "unavailable", reason: "아직 만든 봇이 없습니다" }
-        : roster.provenance;
+  const rosterProvenance = rosterZoneProvenance(rosterState, roster.provenance);
 
   const gridZone = (
     <BoardZone
@@ -164,17 +137,22 @@ export default function Page() {
       incoming="파라미터 조합이 칸으로 깔립니다. 칸을 누르면 곡선이 그 조합으로 바뀝니다."
       provenance={gridProvenance}
       marked={selection?.kind === "grid-point"}
+      notice={
+        board.runError !== null ? (
+          <ImpactNotice
+            headline={GRID_RUN_FAILED_HEADLINE}
+            halted={board.grid !== null ? ["새 격자"] : ["격자", "곡선·지표·거래"]}
+            running={board.grid !== null ? ["앞선 격자의 칸 고르기"] : ["봇 만들기", "시세 보기"]}
+            detail={board.runError}
+            announce
+          />
+        ) : undefined
+      }
     >
       <SelectionLine selection={selection} kind="grid-point" />
       {rosterState === "filled" && (
         <div className="flex min-w-0 flex-col gap-3">
-          <GridRunForm
-            bots={bots}
-            controller={runForm}
-            isRunning={board.isRunning}
-            runError={board.runError}
-            onRun={board.runGrid}
-          />
+          <GridRunForm bots={bots} controller={runForm} isRunning={board.isRunning} onRun={board.runGrid} />
           {board.grid !== null && (
             <ParamGrid grid={board.grid} selectedRunId={selectedRunId} onSelect={board.selectCell} />
           )}
@@ -311,6 +289,7 @@ export default function Page() {
           provenance={{
             kind: "unavailable",
             reason: "리서치 저녁 배치가 아직 없어 어젯밤에 올라온 것이 없습니다",
+            because: "no-source",
           }}
         />
       </div>
