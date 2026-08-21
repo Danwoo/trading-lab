@@ -21,7 +21,7 @@ from types import SimpleNamespace
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND / "app"))
 
-from services.backtest.engine import BarSeries, CostModel, Strategy, run_single  # noqa: E402
+from services.backtest.engine import BarSeries, CostModel, Strategy, affordable_shares, run_single  # noqa: E402
 
 FAILURES: list[str] = []
 CHECKED = 0
@@ -81,18 +81,21 @@ def test_costs_reduce_exactly() -> None:
     """② 비용을 넣으면 그만큼 정확히 줄어든다.
 
     수수료 1% · 슬리피지 0% · 매도세 0%, 100 에 사서 100 에 판다.
-    매수: 현금 1,000 / (100 × 1.01) = 9.900990...주, 지출 = 수량×100 + 수량×100×0.01
-    매도: 수량×100 − 수량×100×0.01
-    최종 현금 = 1,000 − (N×100 × 1.01) + (N×100 × 0.99),  N = 1000/101
-             = 1000 − 1000 + (1000/101)×100×0.99 = 980.198019...
+    한 주 값 = 100 × 1.01 = 101 → 1,000 으로 **9주**(9×101 = 909, 10주면 1,010 으로 모자란다).
+    매수 뒤 현금 = 1,000 − 909 = 91
+    매도 수령 = 9×100 − 9×100×0.01 = 891 → 최종 자산 = 91 + 891 = **982**
+
+    기대값이 980.198019... 에서 982 로 바뀐 것은 체결이 소수점에서 1주 단위 정수로 바뀌었기
+    때문이다 (#313 — 남는 현금 91 은 현금으로 남는다).
     """
     s = series([100, 100, 100])
     costs = CostModel(fee_rate=0.01, slippage_rate=0.0, sell_tax_rate=0.0)
     r = run_single(
         strategy=strategy_from({0}, {2}), params={}, series=s, rows=s.rows(), initial_cash=1000.0, costs=costs
     )
-    check("② 왕복 후 자산", r.final_equity, (1000.0 / 101.0) * 100.0 * 0.99, tol=1e-6)
+    check("② 왕복 후 자산", r.final_equity, 982.0, tol=1e-9)
     check("② 거래 1건", len(r.trades), 1)
+    check("② 수량은 정수 9주", r.trades[0].qty, 9.0)
 
 
 def test_no_signal_keeps_cash() -> None:
@@ -110,18 +113,21 @@ def test_no_signal_keeps_cash() -> None:
 
 
 def test_same_day_round_trip_loses_cost() -> None:
-    """④ 같은 봉에 사고 팔면 왕복 비용만큼 손실.
+    """④ 사고 팔면 왕복 비용만큼 손실.
 
     이 엔진은 한 봉에서 매수 뒤 다음 봉부터 매도를 본다(같은 봉 청산 없음).
     그래서 연속 두 봉으로 왕복을 만든다 — 가격이 같으면 손실은 비용뿐이다.
-    수수료 0.5% 왕복 → 최종 = (1000/1.005) × 0.995 = 990.0497512...
+    수수료 0.5% → 한 주 값 100.5 → 1,000 으로 **9주**, 지출 904.5 → 현금 95.5
+    매도 수령 = 900 − 4.5 = 895.5 → 최종 = 95.5 + 895.5 = **991**  (왕복 비용 9 만큼 손실)
+
+    기대값이 990.0497... 에서 991 로 바뀐 것은 1주 단위 체결 때문이다 (#313).
     """
     s = series([100, 100])
     costs = CostModel(fee_rate=0.005, slippage_rate=0.0, sell_tax_rate=0.0)
     r = run_single(
         strategy=strategy_from({0}, {1}), params={}, series=s, rows=s.rows(), initial_cash=1000.0, costs=costs
     )
-    check("④ 왕복 비용만큼 손실", r.final_equity, (1000.0 / 1.005) * 0.995, tol=1e-6)
+    check("④ 왕복 비용만큼 손실", r.final_equity, 991.0, tol=1e-9)
     check("④ 손실이다", r.final_equity < 1000.0, True)
 
 
@@ -155,6 +161,68 @@ def test_mae_mfe() -> None:
     )
     check("MAE", r.trades[0].mae, -200.0)
     check("MFE", r.trades[0].mfe, 200.0)
+
+
+def test_shares_are_whole() -> None:
+    """⑤ 주식은 쪼개지지 않는다 — 남는 현금은 현금으로 남는다 (#313).
+
+    초기자금 1,000 · 매수가 300 → 3주(900) 사고 현금 100 이 남는다.
+    마지막 종가 400 → 3×400 + 100 = 1,300.  (소수점 체결이면 3.333…주로 1,333.33 이었다)
+    """
+    s = series([300, 400])
+    r = run_single(
+        strategy=strategy_from({0}, set()), params={}, series=s, rows=s.rows(), initial_cash=1000.0, costs=FREE
+    )
+    check("⑤ 남는 현금은 현금으로 남는다", r.equity[-1].cash, 100.0)
+    check("⑤ 보유 평가액 = 3주 × 400", r.equity[-1].gross_exposure, 1200.0)
+    check("⑤ 최종 자산", r.final_equity, 1300.0)
+
+
+def test_initial_cash_changes_the_verdict() -> None:
+    """⑥ 시작 자금이 판정을 바꾼다 — 표시용 배수가 아니다 (#313).
+
+    종가 300 → 600, 비용 0.
+      시작 자금 1,000 → 3주 + 현금 100 → 3×600 + 100 = 1,900  → +90.0%
+      시작 자금   900 → 3주 + 현금   0 → 3×600       = 1,800  → +100.0%
+
+    소수점 체결이면 둘 다 정확히 +100% 로 같았다 — 그 「같음」이 이 이슈의 증상이었다.
+    """
+    s = series([300, 600])
+    rich = run_single(
+        strategy=strategy_from({0}, set()), params={}, series=s, rows=s.rows(), initial_cash=1000.0, costs=FREE
+    )
+    poor = run_single(
+        strategy=strategy_from({0}, set()), params={}, series=s, rows=s.rows(), initial_cash=900.0, costs=FREE
+    )
+    check("⑥ 1,000 으로 시작한 수익률", (rich.final_equity - 1000.0) / 1000.0 * 100, 90.0)
+    check("⑥ 900 으로 시작한 수익률", (poor.final_equity - 900.0) / 900.0 * 100, 100.0)
+    check("⑥ 두 수익률이 다르다", (rich.final_equity - 1000.0) / 1000.0 == (poor.final_equity - 900.0) / 900.0, False)
+
+
+def test_too_expensive_means_no_trade() -> None:
+    """⑦ 한 주 값이 시작 자금보다 크면 거래 0건 — 못 사는 것을 산 척하지 않는다 (#313).
+
+    189,700원짜리 한 주를 100,000원으로는 못 산다. 매수 신호가 나도 체결은 없고,
+    자산은 초기자금 그대로다 (소수점 체결이면 0.527주를 샀다).
+    """
+    s = series([189700, 200000])
+    r = run_single(
+        strategy=strategy_from({0}, set()), params={}, series=s, rows=s.rows(), initial_cash=100000.0, costs=FREE
+    )
+    check("⑦ 거래 0건", len(r.trades), 0)
+    check("⑦ 자산 = 초기자금", r.final_equity, 100000.0)
+    check("⑦ 현금 그대로", r.equity[-1].cash, 100000.0)
+    check("⑦ 보유 종목 없음", r.equity[-1].position_count, 0)
+
+
+def test_affordable_shares_edges() -> None:
+    """살 수 있는 주식 수의 경계 — 0주·딱 떨어짐·부동소수 잔재."""
+    check("한 주도 못 사면 0주", affordable_shares(99.0, 100.0), 0)
+    check("딱 떨어지면 다 산다", affordable_shares(1000.0, 100.0), 10)
+    check("단가가 0 이면 0주", affordable_shares(1000.0, 0.0), 0)
+    check("현금이 0 이면 0주", affordable_shares(0.0, 100.0), 0)
+    # 7 × 0.7 = 4.8999999999999995 라 나눗셈이 6주로 떨어진다 — 잔재 때문에 한 주를 잃지 않는다.
+    check("부동소수 잔재로 한 주를 잃지 않는다", affordable_shares(7 * 0.7, 0.7), 7)
 
 
 def test_determinism() -> None:

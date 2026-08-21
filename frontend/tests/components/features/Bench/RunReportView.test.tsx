@@ -54,6 +54,13 @@ function report(overrides: Partial<RunReportOut> = {}): RunReportOut {
       { dt: "2026-01-03", equity: 1010000, cash: 1010000, position_count: 0, gross_exposure: 0 },
     ],
     trades: [],
+    execution_assumptions: {
+      order_unit: "1주 정수 내림 · 남는 현금은 현금으로 남습니다",
+      fill_price: "신호가 난 그 봉의 종가 · 체결 지연 없음",
+      liquidity_cap: "없음 · 그 봉의 거래량을 넘는 주문도 전량 체결됩니다",
+      adj_policy: "unadjusted · 선언값입니다 (실제로 쓴 캔들의 조정 정책과 대조하지 않습니다)",
+      stale_reason: null,
+    },
     metrics: [
       metric({
         key: "longest_underwater",
@@ -154,6 +161,35 @@ describe("RunReportView", () => {
     expect(text).toContain("수수료 0.015%");
     expect(text).toContain("슬리피지 0.050%");
     expect(text).toContain("증권거래세 0.180%");
+  });
+
+  it("체결 가정을 비용 가정과 같은 자리에서 읽어 준다 — 주문 단위·체결가·유동성·시작 자금 (#313)", () => {
+    render(<RunReportView report={report()} />);
+
+    const section = screen.getByRole("region", { name: "체결 가정" });
+    const rows = within(section)
+      .getAllByRole("term")
+      .map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
+    expect(rows).toEqual([
+      ["시작 자금", "1,000,000원"],
+      ["주문 단위", "1주 정수 내림 · 남는 현금은 현금으로 남습니다"],
+      ["체결가", "신호가 난 그 봉의 종가 · 체결 지연 없음"],
+      ["유동성 상한", "없음 · 그 봉의 거래량을 넘는 주문도 전량 체결됩니다"],
+      // 조정 정책은 선언값이다 — 실제 캔들과 대조하지 않는다는 것까지 말해야 사실이 된다.
+      ["조정 정책", "unadjusted · 선언값입니다 (실제로 쓴 캔들의 조정 정책과 대조하지 않습니다)"],
+    ]);
+  });
+
+  it("소수점 체결로 돌았던 옛 실행은 그 사실이 화면에 뜬다 (#313)", () => {
+    const stale = report();
+    stale.execution_assumptions = {
+      ...stale.execution_assumptions,
+      stale_reason:
+        "이 실행은 소수점 체결로 돌았습니다 — 거래 3건의 수량이 정수가 아닙니다. 지금 엔진은 1주 단위라 다시 돌리면 결과가 달라집니다",
+    };
+    render(<RunReportView report={stale} />);
+
+    expect(screen.getByRole("note").textContent).toContain("소수점 체결로 돌았습니다");
   });
 
   it("가정이 비어 있으면 0% 로 지어내지 않고 기록이 없다고 말한다", () => {

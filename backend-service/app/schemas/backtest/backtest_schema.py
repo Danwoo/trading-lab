@@ -198,6 +198,21 @@ class BotRunListOut(BaseModel):
     total_count: int
 
 
+class ExecutionAssumptionsOut(BaseModel):
+    """이 결과가 무엇을 가정하고 체결했나 (#313).
+
+    비용 3종만 밝히면 화면은 「이 셋만 가정했구나」로 읽힌다 — 체결 단위·체결가·유동성은
+    비용보다 큰 왜곡인데 그 자리가 비어 있었다.
+    """
+
+    order_unit: str
+    fill_price: str
+    liquidity_cap: str
+    adj_policy: str
+    #: 지금 엔진의 가정과 **다른 모형으로 돌았던** 실행이면 그 사실. 아니면 `None`.
+    stale_reason: str | None
+
+
 class RunReportOut(BaseModel):
     """한 조합의 리포트 — 곡선·거래·지표가 한 번에 온다 (칸 클릭은 계산이 아니라 조회다)."""
 
@@ -205,3 +220,4 @@ class RunReportOut(BaseModel):
     equity: list[EquityPointOut]
     trades: list[TradeOut]
     metrics: list[MetricOut]
+    execution_assumptions: ExecutionAssumptionsOut
