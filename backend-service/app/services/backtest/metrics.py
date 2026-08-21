@@ -52,6 +52,10 @@ MIN_ANNUALIZE_DAYS = 365
 
 TRADING_DAYS_PER_YEAR = 252
 
+# 스펙 D-Q2 3급 지표의 이름. 값은 **엔진이 이미 비용을 뺀 실현손익**의 평균이라, 이름이
+# 「− 왕복 비용」이면 화면이 한 번 더 뺀 값으로 읽힌다.
+AVG_TRADE_LABEL = "거래당 평균 실현수익 (비용 차감 후)"
+
 
 @dataclass(frozen=True)
 class Metric:
@@ -156,7 +160,8 @@ def compute(
     """스펙 D-Q2 의 순서대로 지표를 낸다.
 
     `trades` 는 `engine.Trade` 목록. `round_trip_cost_rate` 는 왕복 비용률(수수료 왕복 +
-    슬리피지 + 증권거래세)로, 「거래당 평균 수익이 비용을 먹고도 남나」를 답하는 데 쓴다.
+    슬리피지 + 증권거래세)로, **값에서 빼지 않고** 거래당 평균 실현수익 옆에 가정으로 적는다 —
+    실현손익은 이미 순액이라 다시 빼면 비용을 두 번 문다.
     `initial_cash`·`sell_tax_rate` 는 비용 지표가 무엇으로 나누고 무엇을 기록으로 인정할지를
     가른다 — 기본값을 두지 않는 것은 안 넘기면 조용히 틀린 값이 나오기 때문이다.
     `costless_summary` 는 같은 조합을 비용 0으로 다시 돌린 결과다(없으면 `None`).
@@ -169,7 +174,7 @@ def compute(
             ("longest_underwater", "최장 미회복 기간", "일"),
             ("mdd", "최대 낙폭", "%"),
             ("calmar", "Calmar", "배"),
-            ("avg_trade_vs_cost", "거래당 평균 수익 − 왕복 비용", "%"),
+            ("avg_trade_vs_cost", AVG_TRADE_LABEL, "%"),
             ("cagr", "연환산 수익률", "%"),
             ("sharpe", "샤프", ""),
         ):
@@ -270,7 +275,17 @@ def compute(
             )
         )
 
-    # ── 3급: 거래당 평균 수익 vs 왕복 비용 ────────────────────────────
+    # ── 3급: 거래당 평균 실현수익 — **비용은 엔진이 이미 뺐다** ──────────
+    #
+    # `engine.Trade.realized_pnl` 은 매수측 수수료·슬리피지와 매도측 수수료·슬리피지·
+    # 증권거래세를 **체결금액에 실제로 물린 뒤**의 순액이다. 그래서 이 평균 자체가 스펙
+    # D-Q2 3급의 질문(「비용 먹고도 남나」)에 대한 답이고, 여기서 왕복 비용률을 다시 빼면
+    # 같은 비용을 두 번 문다.
+    #
+    # 가정 비율로 빼는 쪽을 택하지 않은 이유가 하나 더 있다 — 증권거래세와 매도측
+    # 수수료·슬리피지는 **청산금액**에 붙는데 이 평균의 분모는 **진입금액**이라, 진입금액에
+    # 비율을 곱해 빼면 실제로 치른 비용과도 어긋난다. 가정 비율은 값에서 빼지 않고 `note` 로
+    # 나란히 세워, 쿠션이 얼마짜리 비용을 견딘 것인지 읽는 사람이 직접 견주게 한다.
     closed = [t for t in trades if getattr(t, "realized_pnl", None) is not None]
     if closed:
         avg_pnl = sum(t.realized_pnl for t in closed) / len(closed)
@@ -279,10 +294,13 @@ def compute(
         out.append(
             Metric(
                 key="avg_trade_vs_cost",
-                label="거래당 평균 수익 − 왕복 비용",
-                value=avg_pct - round_trip_cost_rate * 100,
+                label=AVG_TRADE_LABEL,
+                value=avg_pct,
                 unit="%",
-                derived_from=f"청산된 거래 {len(closed)}건의 실현손익 평균 − 왕복 비용률",
+                derived_from=(
+                    f"청산된 거래 {len(closed)}건의 실현손익(수수료·슬리피지·증권거래세 차감 후) 평균 ÷ 평균 진입금액"
+                ),
+                note=f"왕복 비용률 가정 {round_trip_cost_rate * 100:.3f}%",
             )
         )
         wins = sum(1 for t in closed if t.realized_pnl > 0)
@@ -297,7 +315,7 @@ def compute(
         )
     else:
         # **0% 가 아니다.** 거래가 없으면 승률이라는 값 자체가 존재하지 않는다.
-        for key, label in (("avg_trade_vs_cost", "거래당 평균 수익 − 왕복 비용"), ("win_rate", "승률")):
+        for key, label in (("avg_trade_vs_cost", AVG_TRADE_LABEL), ("win_rate", "승률")):
             out.append(
                 Metric(
                     key=key,

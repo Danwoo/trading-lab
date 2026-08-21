@@ -16,6 +16,7 @@ from types import SimpleNamespace
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND / "app"))
 
+from services.backtest.engine import BarSeries, CostModel, Strategy, run_single  # noqa: E402
 from services.backtest.metrics import (  # noqa: E402
     Metric,
     compute,
@@ -245,11 +246,16 @@ def test_window_inherits_prior_peak() -> None:
     check("리셋했다면 1500 이었을 것", inherited != 1500.0, True)
 
 
-def test_avg_trade_subtracts_round_trip_cost() -> None:
-    """거래당 평균 수익에서 왕복 비용을 뺀다 — 「비용 먹고도 남나」가 질문이다.
+def test_avg_trade_is_realized_pnl_and_not_charged_twice() -> None:
+    """거래당 평균은 **실현손익(순액) 그대로**다 — 왕복 비용률을 다시 빼지 않는다 (#312).
 
-    100 원에 10주(원금 1,000) 사서 실현손익 50 → 평균 5%.
-    왕복 비용률 0.15% → 5 − 0.15 = 4.85%
+    이 케이스는 원래 `4.85` 를 기대했다(= 5 − 0.15). 그 기대가 엔진 계약과 어긋난다 —
+    `engine` 의 `realized_pnl` 은 양쪽 비용을 이미 치른 뒤의 순액이라, 거기서 왕복 비용률을
+    또 빼면 같은 비용을 두 번 문다. 기대값을 새 정의로 옮긴다.
+
+    100 원에 10주(진입금액 1,000) 사서 실현손익 50 → 50 / 1,000 = 5.00%.
+    왕복 비용률 0.15% 는 값에서 빼지 않고 `note` 로만 선다.
+      이중 차감이면: 5 − 0.15 = 4.85%   ← 되돌아간 것이다
     """
     trade = SimpleNamespace(realized_pnl=50.0, entry_price=100.0, qty=10.0)
     ms = compute(
@@ -261,7 +267,106 @@ def test_avg_trade_subtracts_round_trip_cost() -> None:
         sell_tax_rate=0.0,
         costless_summary=None,
     )
-    check("평균 − 비용", by_key(ms, "avg_trade_vs_cost").value, 4.85, tol=1e-9)
+    metric = by_key(ms, "avg_trade_vs_cost")
+    check("거래당 평균 = 실현손익 평균 ÷ 진입금액", metric.value, 5.0, tol=1e-9)
+    check("이중 차감값이 아니다", metric.value != 4.85, True)
+    # 유도 문구가 계산과 어긋나면 그것도 결함이다 (스펙 §8.5.3).
+    check("유도 문구가 순액임을 말한다", "차감 후" in metric.derived_from, True)
+    check("유도 문구가 다시 빼지 않는다", "− 왕복 비용률" in metric.derived_from, False)
+    check("가정 비율은 note 로 선다", metric.note, "왕복 비용률 가정 0.150%")
+
+
+def _one_trade_run(costs: CostModel):
+    """100 원에 사서 110 원에 파는 거래 **1건**을 엔진으로 실제 돌린다.
+
+    지표가 아니라 **엔진이 남긴 실현손익**을 입력으로 쓰기 위해서다 — 이 이슈(#312)의 결함은
+    엔진과 지표의 계약이 어긋난 데서 났고, 손으로 만든 `SimpleNamespace` 로는 그 어긋남이
+    영원히 안 잡힌다.
+    """
+    module = SimpleNamespace(
+        STRATEGY={"key": "fixture", "name": "고정", "timeframe": "1d", "params": []},
+        indicators=lambda bars, params: {},
+        entry=lambda ctx: ctx["index"] == 0,
+        exit=lambda ctx: ctx["index"] == 1,
+    )
+    closes = [100.0, 110.0, 110.0]
+    series = BarSeries(
+        instrument_id=1,
+        dt=dates(3),
+        open=list(closes),
+        high=list(closes),
+        low=list(closes),
+        close=list(closes),
+        volume=[1000.0] * 3,
+    )
+    return run_single(
+        strategy=Strategy(module),
+        params={},
+        series=series,
+        rows=series.rows(),
+        initial_cash=1_000_000.0,
+        costs=costs,
+    )
+
+
+def _avg_trade_metric(result, round_trip_cost_rate: float, sell_tax_rate: float):
+    return by_key(
+        compute(
+            equity_dt=[p.dt for p in result.equity],
+            equity=[p.equity for p in result.equity],
+            trades=result.trades,
+            round_trip_cost_rate=round_trip_cost_rate,
+            initial_cash=1_000_000.0,
+            sell_tax_rate=sell_tax_rate,
+            costless_summary=None,
+        ),
+        "avg_trade_vs_cost",
+    )
+
+
+def test_avg_trade_moves_by_one_cost_not_two() -> None:
+    """비용을 0 → 기본 → 소매로 올려도 이 지표는 **비용만큼 한 번** 움직인다 (#312).
+
+    엔진은 진입금액 N 에 매수율 b, 청산금액 1.1N 에 매도율 s 를 물린다. 그래서
+    거래당 평균 실현수익률은 손으로 이렇게 나온다:
+
+        avg% = [1.1 × (1 − s) − (1 + b)] × 100
+
+      비용 0     b=0        s=0        →  (1.1 − 1)                 × 100 = 10.0000%
+      기본       b=0.00065  s=0.00245  →  (1.097305 − 1.00065)      × 100 =  9.6655%
+      소매       b=0.0045   s=0.0063   →  (1.09307  − 1.0045)       × 100 =  8.8570%
+
+    비용 0 대비 벌어진 폭이 곧 **실제로 치른 비용**이다 — 기본 0.3345p · 소매 1.1430p.
+    왕복 비용률(기본 0.31% · 소매 1.08%) 을 값에서 또 빼면 그 폭이 두 배가 된다:
+      이중 차감이면: 기본 9.3555% · 소매 7.7770%   ← 되돌아간 것이다
+    """
+    free = _avg_trade_metric(_one_trade_run(CostModel(fee_rate=0.0, slippage_rate=0.0, sell_tax_rate=0.0)), 0.0, 0.0)
+    check("비용 0 세계의 거래당 평균", free.value, 10.0, tol=1e-8)
+
+    # (왕복 비용률, 손으로 계산한 지표값, 비용 0 대비 벌어질 폭, 이중 차감이면 나올 값)
+    worlds = (
+        (
+            "기본",
+            CostModel(fee_rate=0.00015, slippage_rate=0.0005, sell_tax_rate=0.0018),
+            0.0031,
+            9.6655,
+            0.3345,
+            9.3555,
+        ),
+        ("소매", CostModel(fee_rate=0.0015, slippage_rate=0.003, sell_tax_rate=0.0018), 0.0108, 8.8570, 1.1430, 7.7770),
+    )
+    for name, costs, round_trip, expected, gap, double_charged in worlds:
+        metric = _avg_trade_metric(_one_trade_run(costs), round_trip, costs.sell_tax_rate)
+        check(f"{name} 비용 세계의 거래당 평균", metric.value, expected, tol=1e-8)
+        check(f"{name} — 비용 0 대비 폭 = 실제 치른 비용", free.value - metric.value, gap, tol=1e-8)
+        check(f"{name} — 이중 차감값이 아니다", abs(metric.value - double_charged) > 1e-6, True)
+        # 폭이 왕복 비용률의 두 배 근처면 두 번 문 것이다. 한 번만 물었으면 1배 언저리다
+        # (청산금액이 진입금액보다 크면 1배를 조금 넘는다 — 매도측 비용의 분모가 더 크다).
+        check(
+            f"{name} — 폭이 왕복 비용률의 1.5배를 넘지 않는다",
+            (free.value - metric.value) < round_trip * 100 * 1.5,
+            True,
+        )
 
 
 def test_empty_equity_says_why() -> None:
