@@ -51,6 +51,9 @@ processes:
   # 뒤처지면 한참 뒤 런타임에서 `column does not exist` 로 터진다(#370). 그래서 적용 전에
   # origin/main(마이그레이션의 정본)의 head 리비전을 이 트리가 가졌는지 먼저 확인하고, 없으면
   # 여기서 멈춘다 — 조용한 부분 적용 대신 시끄러운 실패.
+  # 이 자리는 **이 파일로 띄운 backend 만** 덮는다 — 손으로 띄우는 경로(루트 CLAUDE.md 의
+  # `cd <backend>/app && uvicorn …`)는 여기를 안 지난다. 그래서 판 대조는 앱 안에도 있다
+  # (`backend-service/app/core/schema_version.py` — 어긋나면 기동 거부, #311).
   db-migrate:
     command: |
       bash -c 'set -e

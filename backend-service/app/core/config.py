@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # 로컬 개발 전용 JWT 우회 (default false, development 밖에서는 기동 거부)
     AUTH_DEV_BYPASS: bool = False
 
+    # DB 의 alembic 리비전이 코드 head 와 어긋나도 기동을 허용하는 탈출구 (#311). 기본은 막는다 —
+    # 「알고도 띄운다」(예: 읽기 전용 조사)일 때만 명시적으로 켠다. 켜도 판정은 ERROR 로 남는다.
+    ALLOW_SCHEMA_DRIFT: bool = False
+
     # CORS 허용 origin (와일드카드 금지 — 명시 목록). 기본값 포트는 로컬 프론트 포트와 lockstep 이고
     # SoT 는 process-compose.yaml 의 frontend PORT 다 (scripts/verify_dev_port_hygiene.py 가 대조).
     CORS_ALLOW_ORIGINS: list[str] = ["http://localhost:3010"]

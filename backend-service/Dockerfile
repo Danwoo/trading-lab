@@ -17,7 +17,9 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-group dev
 
-# 애플리케이션 코드 복사
+# 애플리케이션 코드 복사 — alembic 리비전도 함께 넣는다. app/core/schema_version.py 가 기동 시
+# 이 디렉터리에서 코드 head 를 읽어 DB 리비전과 대조한다 (#311).
+COPY ./alembic ./alembic
 COPY ./app ./app
 
 # uvicorn 실행 위치

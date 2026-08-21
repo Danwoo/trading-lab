@@ -57,6 +57,10 @@ cd app && APP_ENV=development uv run uvicorn main:app --reload --port 8000   # c
 # Swagger: http://localhost:8000/docs
 ```
 
+기동 시 앱이 DB 의 alembic 리비전을 코드 head 와 대조한다 — 어긋나면 사유와 처방(`alembic upgrade head`)을
+찍고 **기동을 거부한다**(#311). 판이 어긋난 채로 띄워야 하면(읽기 전용 조사 등) `ALLOW_SCHEMA_DRIFT=true`
+— 그 경우 최신 스키마를 읽는 경로는 그대로 500 을 낸다.
+
 필요한 `.env` 키 (`app/.env.example`):
 
 - `BACKEND_SQL_DB_*` — 비즈니스 DB 접속 (DRIVER/HOST/PORT/NAME/USER/PASSWORD). `DRIVER=postgresql+psycopg`, `*_ODBC_DRIVER` 는 pyodbc 경로 전용이라 빈 값
