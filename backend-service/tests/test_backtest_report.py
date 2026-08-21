@@ -187,12 +187,16 @@ def test_round_trip_cost_feeds_metric() -> None:
             "mfe": None,
         }
     ]
-    # 왕복 비용률 = 2*0.00015 + 2*0.0005 + 0.0018 = 0.0031 → 0.31%p 차감
+    # 왕복 비용률 = 2*0.00015 + 2*0.0005 + 0.0018 = 0.0031 → 「0.310%」 로 지표 옆에 선다.
+    # **값에서 빼지 않는다** — `realized_pnl` 은 이미 비용을 치른 순액이라 다시 빼면 두 번 문다 (#312).
     repo = FakeRepository(run_row(), equity_rows([100.0, 100.5, 101.0]), trades)
     report = service(repo).select_report({"run_id": 7, "workspace_id": 1})
 
     avg = next(m for m in report["metrics"] if m["key"] == "avg_trade_vs_cost")
-    check("거래당 평균 − 왕복 비용", round(avg["value"], 4), round(1.0 - 0.31, 4))
+    # 실현손익 1 ÷ 진입금액 100 = 1.00%. 이중 차감이면 0.69% 가 나온다.
+    check("거래당 평균 = 실현손익 ÷ 진입금액", round(avg["value"], 4), 1.0)
+    check("이중 차감값이 아니다", round(avg["value"], 4) != round(1.0 - 0.31, 4), True)
+    check("왕복 비용률이 가정으로 실린다", avg["note"], "왕복 비용률 가정 0.310%")
     # 세금 기록이 없는 옛 실행은 합계를 지어내지 않는다 — 세금은 명시 비용의 절반을 넘는다.
     paid = next(m for m in report["metrics"] if m["key"] == "cost_paid")
     check("옛 실행의 치른 비용은 값이 없다", paid["value"], None)
