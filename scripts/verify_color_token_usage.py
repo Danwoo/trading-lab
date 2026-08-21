@@ -63,9 +63,9 @@ SCAN_SUFFIXES = ("*.tsx", "*.ts")
 MIN_SCANNED_FILES = 100
 
 # allowlist 상한. **내려가기만 한다** — 머리 주석 「allowlist」 참조.
-# `lib` 스캔 확장(#166)이 56 으로 올렸고, 이 PR 이 Dashboard 4건을 지워 다시 내린다.
+# `lib` 스캔 확장(#166)이 56 으로 올렸고, 이 PR 이 프리미티브 5건을 지워 다시 내린다.
 # 실측으로 정한다 — 손으로 고르면 어긋난다.
-ALLOWLIST_CAP = 49
+ALLOWLIST_CAP = 44
 
 # 위반 사유별 문구. 지금 등록분은 전부 「디자인 시스템 적용 전」이라 사유가 갈리지 않는다 —
 # 자리마다 다른 이유를 지어내기보다 무엇을 기다리는 등록인지 한 줄로 밝힌다.
@@ -113,19 +113,14 @@ ALLOWLIST: dict[str, str] = {
     "components/shared/Layout/TableCell.tsx": SHARED_COMPONENT,
     "components/shared/Layout/TableGroup.tsx": SHARED_COMPONENT,
     "components/shared/ui/Button.tsx": SHARED_COMPONENT,
-    "components/shared/ui/CheckBox.tsx": SHARED_COMPONENT,
     "components/shared/ui/CheckBoxGroup.tsx": SHARED_COMPONENT,
     "components/shared/ui/ExpandableCard.tsx": SHARED_COMPONENT,
     "components/shared/ui/FileListDisplay.tsx": SHARED_COMPONENT,
     "components/shared/ui/FileUploader.tsx": SHARED_COMPONENT,
     "components/shared/ui/MarkdownRenderer.tsx": SHARED_COMPONENT,
-    "components/shared/ui/NumberBox.tsx": SHARED_COMPONENT,
     "components/shared/ui/Popup.tsx": SHARED_COMPONENT,
     "components/shared/ui/TabPanel.tsx": SHARED_COMPONENT,
-    "components/shared/ui/TextBox.tsx": SHARED_COMPONENT,
-    "components/shared/ui/primitives/FieldShell.tsx": SHARED_COMPONENT,
     "components/shared/ui/primitives/FileTypeIcon.tsx": SHARED_COMPONENT,
-    "components/shared/ui/primitives/SelectMenu.tsx": SHARED_COMPONENT,
     "components/shared/ui/primitives/dialog.tsx": SHARED_COMPONENT,
     "app/api/common/email/route.ts": NON_DOM_COLOR,
     "lib/auth/auth.ts": NON_DOM_COLOR,

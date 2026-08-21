@@ -86,21 +86,39 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
   }, [isEmbed, loaded, authorized, pathname, navItems, openTab]);
 
-  if (isEmbed === null || !loaded || authorized === null) return null;
+  // 게이트가 열리기 전에도 **라이트 바탕을 깐다.** `null` 을 돌려주면 그 구간의 문서 캔버스가
+  // 보이는데, `:root` 의 `color-scheme: dark` 때문에 그 캔버스는 어둡다 — 라이트 셸이 뜨는
+  // 순간 화면이 검정에서 흰색으로 튄다.
+  if (isEmbed === null || !loaded || authorized === null)
+    return <div data-theme="light" className="h-screen bg-bg-base" />;
 
+  // **관리 화면은 라이트다** — 그 사실을 선언한다.
+  //
+  // 토큰(`--ink`·`--bg-*`)은 `:root` 가 다크 기본이고 `[data-theme="light"]` 가 라이트다
+  // (`styles/globals.css:64,204`). 이 셸이 그 선언을 안 해서, 공용 프리미티브가 토큰을 못 쓰고
+  // 원시 색(`bg-white`·`text-gray-900`)을 박아 왔다 — 그 프리미티브가 다크 보드에서 재사용되자
+  // 흰 상자가 됐다. 선언 한 줄이 그 갈래를 없앤다.
+  //
   // iframe 내부: chrome 없이 페이지만 렌더 (탭 콘텐츠)
+  //
+  // **탭 본문은 앱 배경이 아니라 패널이다.** 이 안의 상세 폼은 자기 바탕을 안 칠해서, 공용
+  // 입력의 그릇이 여기까지 그대로 내려온다(실측: 입력 위로 투명한 조상 23개). 여기를
+  // `--bg-base` 로 두면 그 입력의 채움(`--bg-base`)과 **같은 색**이 된다. 앱 배경은 아래
+  // 메인 프레임 섀시가 칠하고, 탭 본문은 그 위에 얹힌 패널이라 `--bg-panel` 이 맞다.
   if (isEmbed) {
     return (
       <>
         <style>{`nextjs-portal { display: none !important; }`}</style>
-        <div className="h-screen">{authorized ? children : null}</div>
+        <div data-theme="light" className="h-screen bg-bg-panel text-ink">
+          {authorized ? children : null}
+        </div>
       </>
     );
   }
 
   // 메인 프레임: Header + Sidebar + MDI 탭 섀시
   return (
-    <div className="h-screen flex flex-col">
+    <div data-theme="light" className="h-screen flex flex-col bg-bg-base text-ink">
       <div className="flex-shrink-0">
         <Header isDrawerOpen={isDrawerOpen} setIsDrawerOpen={setIsDrawerOpen} />
       </div>

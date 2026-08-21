@@ -265,8 +265,19 @@ function DialogContent({
       <DialogPrimitive.Content
         aria-describedby={undefined}
         {...props}
+        // **포털은 테마 선언 밖으로 나간다** — 컨테이너 기본값이 `document.body` 라, 셸
+        // `<div>` 에 건 `[data-theme]` 이 이 박스에는 닿지 않고 `:root`(다크)가 남는다.
+        // 이 박스는 아래 `bg-white` 로 **언제나 밝은 섬**이므로 모드도 언제나 라이트다 —
+        // 안 밝히면 그 안의 토큰 소비자(공용 입력)가 다크로 풀려 흰 상자 안에 검은 칸이 된다.
+        // `bg-white` 와 이 선언은 한 짝이다: 박스를 토큰으로 옮길 때 이 값도 함께 정해야 한다
+        // (scripts/verify_surface_paints_background.py 축 ④ 가 그 짝을 잡는다).
+        //
+        // 잉크도 여기서 정한다. 셸의 `text-ink` 역시 포털에 안 닿고, 그러면 글자색이 UA 기본
+        // (`canvastext`)으로 떨어지는데 그 값은 `color-scheme` 을 따라간다 — 다크에서 **흰색**이다.
+        // 색 클래스를 안 가진 글자(라벨·제목)가 흰 박스 위 흰 글자가 된다.
+        data-theme="light"
         className={cn(
-          "z-50 flex flex-col rounded border border-gray-200 bg-white shadow-lg",
+          "z-50 flex flex-col rounded border border-gray-200 bg-white text-ink shadow-lg",
           "motion-safe:data-[state=open]:animate-dialog-scale-in",
           "motion-safe:data-[state=closed]:animate-dialog-scale-out",
           "focus:outline-none",

@@ -1,7 +1,8 @@
 // components/shared/ui/primitives/FieldShell.tsx
 //
 // 폼 프리미티브의 공통 껍데기 (#341 ②) — 폭 컨테이너 + 검증 에러 메시지.
-// TextBox 가 인라인으로 갖고 있던 구조(#391 B2)를 그대로 올린 것이라 시각적 결과가 같다.
+// TextBox 가 인라인으로 갖고 있던 구조(#391 B2)를 그대로 올린 것이라 시각적 결과가 같다 —
+// 그 TextBox 도 이제 사본을 버리고 이 껍데기를 쓴다(#281).
 //
 // 에러 메시지 `<div>` 의 id 를 입력 요소가 `aria-describedby` 로 가리켜야 스크린리더가 "잘못됨"
 // 뿐 아니라 "왜 잘못됐는지"까지 읽는다 — 그래서 id 를 이 컴포넌트가 만들지 않고 **호출부가
@@ -32,7 +33,7 @@ export function FieldShell({ children, isInvalid, errorMessage, errorMessageId, 
         {children}
       </div>
       {isInvalid && errorMessage && (
-        <div id={errorMessageId} className="mt-1 self-start rounded bg-[#d9534f] p-2 text-xs leading-normal text-white">
+        <div id={errorMessageId} className="mt-1 self-start rounded bg-danger p-2 text-xs leading-normal text-bg-base">
           {errorMessage}
         </div>
       )}
@@ -40,27 +41,66 @@ export function FieldShell({ children, isInvalid, errorMessage, errorMessageId, 
   );
 }
 
-/** 모든 텍스트형 입력이 공유하는 기본 클래스 — TextBox 가 쓰던 것과 같다. */
+/**
+ * 모든 텍스트형 입력이 공유하는 기본 클래스. **여기 한 벌만 있다** — 프리미티브가 같은 네 줄을
+ * 따로 갖고 있으면 한쪽만 고쳐도 그물이 초록이고, 실제로 TextBox 가 사본을 갖고 있었다.
+ *
+ * **바탕을 반드시 준다.** 종전에는 배경 클래스가 아예 없어 브라우저 기본(흰색)으로 떨어졌고,
+ * 그래서 이 입력이 다크 보드 위에서 흰 상자가 됐다. 대비 검사로는 안 잡힌다 — 흰 바탕에
+ * 다크 잉크는 대비가 **높기** 때문이다. 잡히는 것은 눈으로 볼 때뿐이다.
+ *
+ * **그 바탕은 `--bg-base` 이고, 그것이 성립하려면 입력을 담는 그릇이 전부 패널 층이어야 한다.**
+ * 이 두 줄은 한 짝이다 — 한쪽만 지키면 채움과 그릇이 같은 색이 되는 자리가 남는다.
+ *
+ * 브라우저(`getComputedStyle`)로 실제 그릇을 재면 `--bg-panel`(BotForm·BoardZone·로그인
+ * 카드·SelectMenu 팝오버·`/admin` 탭 본문), `--bg-raised`(IngestConsole 구역), 라이트
+ * `#FFFFFF`(다이얼로그)·`#F0F1F2`(회원가입 카드)다. `--bg-base` 는 **앱 배경 전용**이라
+ * 그릇으로 안 나타나고, 그래서 채움이 그릇과 겹치지 않는다.
+ *
+ * 이 짝이 실제로 깨졌던 자리가 둘 있다. `--bg-panel` 을 채움으로 쓰면 BotForm·BoardZone
+ * 위에서 1.00:1 이 되고(그래서 여기를 내렸다), `/admin` 탭 셸이 `--bg-base` 를 칠하던 판에는
+ * 그 안의 상세 폼이 1.00:1 이 됐다(`app/admin/layout.tsx` 가 탭 본문을 `--bg-panel` 로 옮겨
+ * 닫았다 — 그 폼은 자기 바탕을 안 칠해서 그릇이 셸까지 내려온다).
+ *
+ * **정적 그물은 이 짝의 앞쪽만 본다.** `scripts/verify_surface_paints_background.py` 축 ⑤ 가
+ * 「채움이 그릇 역할 토큰인가」를 잡지만, 「그릇이 앱 배경 층인가」는 담는 관계를 따라가야
+ * 알 수 있어 못 본다. 입력을 새 화면에 놓을 때는 그 화면이 패널을 칠하는지 눈으로 확인하라.
+ *
+ * 방향도 두 모드에서 같다 — `--bg-base` 는 다크·라이트 양쪽에서 `--bg-panel` 보다 어두워
+ * 언제나 「파인 자리」로 읽힌다(`--bg-raised` 는 다크에서 밝고 라이트에서 어두워 방향이
+ * 뒤집힌다). 테두리도 이 바탕에서 더 갈린다: `--line` on `--bg-base` 1.34:1 >
+ * on `--bg-panel` 1.24:1. 같은 논리를 손으로 쓴 입력 둘이 이미 따르고 있다 —
+ * `SelectMenu.tsx` 의 팝오버 검색 입력과 `IngestConsole.tsx` 의 주기 select.
+ *
+ * `--bg-raised` 는 `read-only`/`disabled` 가 쓴다. 디자인 시스템 §1.1 은 그 토큰에
+ * 「입력 배경」을 적어 두었는데, 그 표는 입력이 `--bg-raised` 구역 안에 놓이는 경우를 아직
+ * 담고 있지 않다 — 표를 이 조사 결과에 맞추는 것은 정본 문서의 결정이라 이 PR 이 하지 않고
+ * 본문 「발견」으로 올린다.
+ *
+ * **포커스 링을 여기서 그리지 않는다.** 포커스 표시의 정본은 `globals.css` 의
+ * `:focus-visible { outline: … dashed rgb(var(--ink-strong)) }` 한 자리다. 여기에
+ * `focus:outline-none` 을 두면 명시도(0,2,0)가 그 정본(0,1,0)을 덮어 **키보드 포커스 표시를
+ * 지우고**, 대신 남는 `ring-line-strong` 은 `--bg-panel` 대비 1.8:1 로 WCAG 1.4.11(3:1)에
+ * 못 미친다.
+ */
 export const FIELD_INPUT_CLASS =
-  "w-full rounded border px-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500/40 " +
-  "read-only:cursor-default read-only:bg-gray-50 " +
-  "disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400";
+  "w-full rounded border bg-bg-base px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted " +
+  "read-only:cursor-default read-only:bg-bg-raised " +
+  "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted";
 
 export function fieldBorderClass(isInvalid: boolean): string {
-  return isInvalid ? "border-[#d9534f]" : "border-gray-300";
+  return isInvalid ? "border-danger" : "border-line";
 }
 
 /**
  * 입력 안에 겹쳐 그리는 아이콘 버튼(클리어·비밀번호 토글·달력 열기)의 클래스.
  *
- * **어두운 셸과 흰 `/admin` 양쪽에서 읽히는 색 하나**를 쓴다. 종전에는 `text-gray-400/500` 에
- * `hover:text-gray-600/700` 이었는데, hover 색이 밝은 바탕 전제라 어두운 셸에서는 **대비가
- * 1.57:1 로 떨어져 마우스를 올리면 아이콘이 사라졌다**.
+ * **잉크는 토큰으로 준다** — 셸이 선언한 테마를 따라간다. 종전에는 `text-gray-400/500` 에
+ * `hover:text-gray-600/700` 이라 hover 색이 밝은 바탕 전제였고, 어두운 셸에서는 **대비가
+ * 1.57:1 로 떨어져 마우스를 올리면 아이콘이 사라졌다**. 원시 회색을 쓸 수밖에 없던 이유였던
+ * 「`/admin` 셸이 `data-theme="light"` 를 선언하지 않는다」는 전제는 없어졌다(#281).
  *
- * 왜 토큰(`text-ink-*`)이 아닌가: `:root` 가 다크 기본이고 `/admin` 셸은 `bg-white` 인데
- * `data-theme="light"` 가 없다 — 토큰을 쓰면 흰 바탕에 다크 잉크가 얹혀 안 보인다.
- * 왜 `text-current` 도 아닌가: 이 래퍼에는 잉크가 없어 브라우저 기본색(검정)으로 떨어진다(실측).
+ * 왜 `text-current` 는 아닌가: 이 래퍼에는 잉크가 없어 브라우저 기본색으로 떨어진다(실측).
  *
  * hover 는 **색이 아니라 바탕**으로 준다. 색을 밝히면 어두운 데서 좋아지고 밝은 데서 나빠진다 —
  * 한 색으로 양쪽을 다 올릴 수 없다. 바탕을 얹으면 글자 대비를 안 깎고 반응만 더한다.
@@ -69,5 +109,5 @@ export function fieldBorderClass(isInvalid: boolean): string {
  * 그대로다(#289). `right-2`(8) + 24 = 32 = 입력의 `pr-8` 이라 글자를 안 덮는다.
  */
 export const FIELD_ICON_BUTTON_CLASS =
-  `${ICON_HIT_AREA} absolute right-2 top-1/2 -translate-y-1/2 rounded text-gray-500 ` +
-  "hover:bg-gray-500/10 focus-visible:bg-gray-500/10 focus:outline-none";
+  `${ICON_HIT_AREA} absolute right-2 top-1/2 -translate-y-1/2 rounded text-ink-muted ` +
+  "hover:bg-bg-raised focus-visible:bg-bg-raised";

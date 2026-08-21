@@ -96,6 +96,14 @@ export function SelectMenu({
   const [activeIndex, setActiveIndex] = useState(0);
   const listId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  //  **포털은 테마 선언 밖으로 나간다.** Radix Portal 의 기본 컨테이너가 `document.body` 라,
+  //  `[data-theme="light"]` 를 셸 `<div>` 에 걸어 둔 `/admin` 에서 이 목록만 `:root`(다크)로
+  //  풀린다. 컨테이너를 셸 안으로 옮기면 조상의 `overflow` 에 잘릴 위험이 생기므로, **연 자리의
+  //  테마를 읽어 콘텐츠에 그대로 찍는다.** 없으면 안 찍고 `:root` 기본을 따른다.
+  //  다이얼로그 안에서 열릴 때도 이 한 줄이 답을 낸다 — 다이얼로그 박스가 자기 모드를 선언하므로
+  //  (primitives/dialog.tsx) 포털 안의 앵커가 `closest` 로 그 선언을 찾는다.
+  const [openedTheme, setOpenedTheme] = useState<string | null>(null);
   const optionRefs = useRef<Array<HTMLLIElement | null>>([]);
 
   const selectedValues: any[] = multiple ? (Array.isArray(value) ? value : []) : [];
@@ -194,14 +202,14 @@ export function SelectMenu({
         {shown.map((entry) => (
           <span
             key={String(entry)}
-            className="inline-flex max-w-full items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5"
+            className="inline-flex max-w-full items-center gap-1 rounded bg-bg-raised px-1.5 py-0.5"
           >
             <span className="truncate">{labelFor(entry)}</span>
             {!readOnly && !disabled && (
               <button
                 type="button"
                 aria-label={`${labelFor(entry)} 제거`}
-                className={cn(ICON_HIT_AREA, "text-gray-500 hover:text-gray-700")}
+                className={cn(ICON_HIT_AREA, "text-ink-muted hover:text-ink")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onChange(selectedValues.filter((existing) => existing !== entry));
@@ -212,14 +220,21 @@ export function SelectMenu({
             )}
           </span>
         ))}
-        {hiddenCount > 0 && <span className="text-gray-500">+{hiddenCount}</span>}
+        {hiddenCount > 0 && <span className="text-ink-muted">+{hiddenCount}</span>}
       </span>
     );
   };
 
   return (
-    <PopoverPrimitive.Root open={open} onOpenChange={(next) => !readOnly && !disabled && setOpen(next)}>
-      <div className="relative w-full" style={{ width }}>
+    <PopoverPrimitive.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (readOnly || disabled) return;
+        if (next) setOpenedTheme(anchorRef.current?.closest("[data-theme]")?.getAttribute("data-theme") ?? null);
+        setOpen(next);
+      }}
+    >
+      <div ref={anchorRef} className="relative w-full" style={{ width }}>
         <PopoverPrimitive.Trigger asChild>
           <button
             type="button"
@@ -232,16 +247,18 @@ export function SelectMenu({
             aria-readonly={readOnly || undefined}
             style={{ height }}
             className={cn(
-              "flex w-full items-center justify-between gap-1 rounded border px-3 py-1.5 text-left text-sm text-gray-900",
-              "focus:outline-none focus:ring-2 focus:ring-blue-500/40",
-              "disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400",
-              readOnly ? "cursor-default bg-gray-50" : "cursor-pointer bg-white",
-              isInvalid ? "border-[#d9534f]" : "border-gray-300",
+              // 포커스 표시는 globals.css 의 `:focus-visible` outline 한 자리가 정본이다.
+              "flex w-full items-center justify-between gap-1 rounded border px-3 py-1.5 text-left text-sm text-ink",
+              "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted",
+              // 채움은 `FIELD_INPUT_CLASS` 와 같은 규칙이다 — 기본은 `--bg-base`(입력을 담는
+              // 그릇이 안 쓰는 유일한 표면 토큰), 못 고치는 상태는 `--bg-raised`.
+              readOnly ? "cursor-default bg-bg-raised" : "cursor-pointer bg-bg-base",
+              isInvalid ? "border-danger" : "border-line",
               clearVisible ? "pr-12" : "",
             )}
           >
             {renderTriggerContent()}
-            <span aria-hidden="true" className="shrink-0 text-gray-400">
+            <span aria-hidden="true" className="shrink-0 text-ink-muted">
               ▾
             </span>
           </button>
@@ -253,7 +270,7 @@ export function SelectMenu({
             aria-label="선택 지우기"
             // right-5 는 24 폭 상자를 트리거가 비워 둔 자리(`pr-12`) 안에 넣으면서 × 의 가운데를
             // 종전 자리에 유지한다 — 상자는 오른쪽 20~44px, ▾ 는 49~56px 이라 겹치지 않는다.
-            className={cn(ICON_HIT_AREA, "absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600")}
+            className={cn(ICON_HIT_AREA, "absolute right-5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink")}
             onClick={() => onChange(multiple ? [] : null)}
           >
             ×
@@ -263,9 +280,10 @@ export function SelectMenu({
 
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
+          data-theme={openedTheme ?? undefined}
           align="start"
           sideOffset={4}
-          className="z-[1100] max-h-64 w-[var(--radix-popover-trigger-width)] overflow-auto rounded border border-gray-300 bg-white py-1 text-sm shadow-lg motion-safe:data-[state=open]:animate-dialog-fade-in motion-safe:data-[state=closed]:animate-dialog-fade-out"
+          className="z-[1100] max-h-64 w-[var(--radix-popover-trigger-width)] overflow-auto rounded border border-line bg-bg-panel py-1 text-sm text-ink shadow-lg motion-safe:data-[state=open]:animate-dialog-fade-in motion-safe:data-[state=closed]:animate-dialog-fade-out"
           onOpenAutoFocus={(e) => {
             // 검색이 있으면 입력으로, 없으면 목록으로 포커스를 옮긴다(Radix 기본 대상은 첫
             // 포커스 가능 요소라 항목 버튼으로 튀어 검색을 못 치는 경우가 생긴다).
@@ -287,7 +305,10 @@ export function SelectMenu({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                // 팝오버 안이라도 **자기 바탕을 칠한다** — 안 칠하면 브라우저 기본으로 떨어져
+                // 팝오버(`--bg-panel`)와 다른 색이 된다. #281 이 고친 그 형태다.
+                // 팝오버가 `--bg-panel` 이라 입력칸은 한 단 아래(`--bg-base`)를 써 파인 자리로 읽힌다.
+                className="w-full rounded border border-line bg-bg-base px-2 py-1 text-sm text-ink placeholder:text-ink-muted"
               />
             </div>
           )}
@@ -304,7 +325,7 @@ export function SelectMenu({
             }}
             className="focus:outline-none"
           >
-            {visibleItems.length === 0 && <li className="px-3 py-2 text-gray-500">{noDataText}</li>}
+            {visibleItems.length === 0 && <li className="px-3 py-2 text-ink-muted">{noDataText}</li>}
             {visibleItems.map((item, index) => {
               const itemValue = readValue(item, valueExpr);
               const isSelected = multiple ? selectedValues.includes(itemValue) : itemValue === value;
@@ -321,18 +342,15 @@ export function SelectMenu({
                   onClick={() => commit(itemValue)}
                   className={cn(
                     "flex cursor-pointer items-center gap-2 px-3 py-1.5",
-                    index === activeIndex ? "bg-blue-50" : "",
-                    isSelected ? "font-medium text-blue-700" : "text-gray-900",
+                    // 목록이 `focus:outline-none` 으로 정본 outline 을 눌러 두므로, 키보드 위치는
+                    // **이 표시 하나뿐**이다. 바탕만으로는 `--bg-raised` on `--bg-panel` 1.09:1 이라
+                    // 눈에 안 띈다 — 비텍스트 3:1 을 넘는 선(`--ink-muted`)을 함께 두른다.
+                    index === activeIndex ? "bg-bg-raised ring-1 ring-inset ring-ink-muted" : "",
+                    isSelected ? "font-medium text-ink-strong" : "text-ink",
                   )}
                 >
                   {showSelectionControls && (
-                    <input
-                      type="checkbox"
-                      readOnly
-                      checked={isSelected}
-                      tabIndex={-1}
-                      className="h-4 w-4 accent-blue-600"
-                    />
+                    <input type="checkbox" readOnly checked={isSelected} tabIndex={-1} className="h-4 w-4" />
                   )}
                   {itemRender ? itemRender(item) : readLabel(item, displayExpr)}
                   {/* 선택 표시를 색·굵기로만 하지 않는다 — 체크 문자를 함께 둔다. */}
@@ -350,8 +368,11 @@ export function SelectMenu({
             <button
               type="button"
               onClick={commitCustomValue}
-              className="w-full px-3 py-1.5 text-left text-blue-700 hover:bg-blue-50"
+              // 이건 목록 항목이 아니라 **동작**이다. 선택된 항목도 `--ink-strong` 을 쓰므로
+              // 글자색만으로는 안 갈린다 — 구분선과 `+` 로 가른다(색에만 기대지 않는다).
+              className="flex w-full items-center gap-1.5 border-t border-line px-3 py-1.5 text-left text-ink-strong hover:bg-bg-raised"
             >
+              <span aria-hidden="true">+</span>
               &ldquo;{search.trim()}&rdquo; 추가
             </button>
           )}

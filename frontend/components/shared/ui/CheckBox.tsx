@@ -66,10 +66,13 @@ export function CheckBox<T = any>({
         }}
         style={boxSize}
         className={cn(
-          "h-4 w-4 rounded border accent-blue-600",
-          "focus:outline-none focus:ring-2 focus:ring-blue-500/40",
+          // 체크색은 네이티브 기본에 맡긴다 — 셸이 `color-scheme` 을 선언하므로 브라우저가
+          // 테마에 맞춰 고른다. 팔레트 색을 박으면 반대 테마에서 어긋나고 accent 토큰은 없다.
+          // 포커스 표시는 globals.css 의 `:focus-visible` outline 한 자리가 정본이다 —
+          // `focus:outline-none` 을 얹으면 명시도로 그것을 덮어 표시를 지운다.
+          "h-4 w-4 rounded border",
           readOnly ? "cursor-default" : "cursor-pointer",
-          isInvalid ? "border-[#d9534f]" : "border-gray-300",
+          isInvalid ? "border-danger" : "border-line",
         )}
       />
       {/* 라벨은 잉크 토큰 — gray-900 은 다크 패널 위에서 1.01:1 로 글자가 사라진다 (#203 실측). */}

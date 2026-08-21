@@ -423,6 +423,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_reason_redaction.py
 
+      # 바탕을 안 칠한 자리 (#281) — **대비 검사가 원리적으로 못 잡는** 구멍이다. 흰 바탕에
+      # 다크 잉크는 대비가 높아서 통과한다. 결함은 대비가 아니라 「바탕이 틀린 것」이다.
+      - name: 서피스 바탕 칠 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_surface_paints_background.py
+
       # 제품이 자기 상태를 잘못 말하는 것 (#290·#293) — 정문과 제품 홈이 **둘 다** 백테스트를
       # 「아직 없다」고 말하는 동안 라우터는 등록돼 있었고 격자는 값으로 차 있었다. 사람이 손으로
       # 고치는 것 말고 갱신 경로가 없어서 낡았다. 프론트 상수와 백엔드 등록을 함께 읽으므로
