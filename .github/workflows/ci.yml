@@ -211,9 +211,9 @@ jobs:
         with:
           python-version: "3.12"
 
-      # --skip 3종은 아래 backend-db 잡 소관 (서비스 컨테이너 + 파괴 동의 플래그 필요).
-      # 러너는 --skip 이름이 실제로 존재하지 않으면 실패한다 — 이름이 바뀌면 조용히
-      # "아무것도 안 뺀" 상태가 되는 대신 시끄럽게 깨진다.
+      # --skip 은 아래 DB 잡(backend-db·alembic-drift) 소관이다 (서비스 컨테이너 + 파괴 동의
+      # 플래그 필요). 러너는 --skip 이름이 실제로 존재하지 않으면 실패한다 — 이름이 바뀌면
+      # 조용히 "아무것도 안 뺀" 상태가 되는 대신 시끄럽게 깨진다.
       - name: 계약 검증 스크립트 (scripts/verify_*.py, fail-closed)
         if: ${{ !cancelled() }}
         run: |
@@ -221,7 +221,8 @@ jobs:
             --skip verify_workspace_member_default_unique.py \
             --skip verify_no_orphan_personal_workspaces.py \
             --skip verify_frontend_fk_referential_actions.py \
-            --skip verify_bot_round_trip.py
+            --skip verify_bot_round_trip.py \
+            --skip verify_schema_guard_on_downgraded_db.py
 
       - name: Standalone tests (tests/test_*.py, fail-closed)
         if: ${{ !cancelled() }}
@@ -431,6 +432,13 @@ jobs:
         env:
           BOT_ROUND_TRIP_DB_URL: postgresql://ci:ci@localhost:5432/ci
         run: uv run python scripts/verify_bot_round_trip.py --i-know-this-drops-tables
+
+      # 스키마 판 가드(#311) — 여기가 유일하게 "한 판 되돌린 실제 DB" 를 만들 수 있는 자리다.
+      # 스크립트가 downgrade -1 → 판정 → upgrade head 로 되돌려 놓는다.
+      - name: 스키마 판 가드 회귀 (한 판 되돌린 DB)
+        if: ${{ !cancelled() }}
+        working-directory: backend-service
+        run: uv run python scripts/verify_schema_guard_on_downgraded_db.py --i-know-this-downgrades-schema
 
   # ── MCP 서비스 5종 (uv — 서비스마다 venv 가 다르지만 한 잡에서 순차로 돈다) ──
   # portfolio(계산·redaction·테넌트 격리 계약 3종 + mock 신선도) · disclosure(사업연도 경계 +
