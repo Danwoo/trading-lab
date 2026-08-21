@@ -156,9 +156,26 @@ export interface BotRunListOut {
   total_count: number;
 }
 
+/**
+ * 이 결과가 무엇을 가정하고 체결했나 (#313). 비용 3종만 밝히면 화면은 「이 셋만 가정했구나」로
+ * 읽힌다 — 체결 단위·체결가·유동성은 비용보다 큰 왜곡인데 그 자리가 비어 있었다.
+ *
+ * 문구는 **엔진이 만든다**(`engine.FILL_ASSUMPTIONS`) — 여기서 다시 적으면 모형을 바꾼 날
+ * 화면만 옛말을 한다.
+ */
+export interface ExecutionAssumptionsOut {
+  order_unit: string;
+  fill_price: string;
+  liquidity_cap: string;
+  adj_policy: string;
+  /** 지금 엔진과 **다른 모형으로 돌았던** 실행이면 그 사실. 아니면 `null`. */
+  stale_reason: string | null;
+}
+
 export interface RunReportOut {
   run: RunSummaryOut;
   equity: EquityPointOut[];
   trades: TradeOut[];
   metrics: MetricOut[];
+  execution_assumptions: ExecutionAssumptionsOut;
 }

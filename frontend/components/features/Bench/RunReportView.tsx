@@ -3,7 +3,13 @@
 import { useEffect, useRef } from "react";
 import { createEquityChart, type EquityChartHandle, type EquityChartPoint } from "@/lib/bench/equityChart";
 import { downsampleLttb, drawdownRatios } from "@/lib/bench/equityMath";
-import type { MetricOut, RunReportOut, RunSummaryOut, TradeOut } from "@/schemas/backtest/backtest";
+import type {
+  ExecutionAssumptionsOut,
+  MetricOut,
+  RunReportOut,
+  RunSummaryOut,
+  TradeOut,
+} from "@/schemas/backtest/backtest";
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { redactReason } from "@/utils/common/errors/redactReason";
 
@@ -250,6 +256,51 @@ function CostComparison({
 }
 
 /**
+ * **체결 가정** — 비용 가정 바로 아래에 선다 (#313).
+ *
+ * 비용 3종만 밝히던 화면은 「이 셋만 가정했구나」로 읽혔다. 결과를 더 크게 흔드는 것은
+ * 체결 단위(1주냐 소수점이냐)·체결가·유동성 상한이고, **시작 자금은 1주 단위에서 비로소
+ * 판정에 참여한다** — 그래서 이 자리에 함께 선다.
+ *
+ * 한 줄로 이으면 항목 사이 구분점과 항목 안의 구분점이 섞여 어디서 끊기는지 안 보인다
+ * (372px 패널에서 실측) — 그래서 항목마다 한 줄이다.
+ */
+function ExecutionAssumptions({
+  assumptions,
+  initialCash,
+}: {
+  assumptions: ExecutionAssumptionsOut;
+  initialCash: number;
+}) {
+  const rows: [string, string][] = [
+    ["시작 자금", `${Math.round(initialCash).toLocaleString("ko-KR")}원`],
+    ["주문 단위", assumptions.order_unit],
+    ["체결가", assumptions.fill_price],
+    ["유동성 상한", assumptions.liquidity_cap],
+    ["조정 정책", assumptions.adj_policy],
+  ];
+
+  return (
+    <section aria-label="체결 가정" className="min-w-0">
+      <p className="break-keep text-2xs text-ink-muted">체결 가정</p>
+      <dl className="min-w-0">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex min-w-0 flex-wrap gap-x-1.5 text-2xs text-ink-muted">
+            <dt className="shrink-0">{label}</dt>
+            <dd className="min-w-0 break-keep text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {assumptions.stale_reason && (
+        <p className="mt-1 break-keep border border-hairline p-2 text-2xs text-ink" role="note">
+          {assumptions.stale_reason}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
  * 격자에서 고른 한 조합의 리포트 (#203) — 곡선·낙폭, 판정 지표, 거래목록이 **그 조합으로**
  * 바뀌는 자리다 (전파 규칙 §2.3).
  */
@@ -277,6 +328,8 @@ export function RunReportView({ report }: { report: RunReportOut }) {
               .map(([key, rate]) => `${COST_LABEL[key] ?? key} ${ratePercent(rate)}%`)
               .join(" · ")}
       </p>
+
+      <ExecutionAssumptions assumptions={report.execution_assumptions} initialCash={run.initial_cash} />
 
       {run.status === "failed" ? (
         <p className="break-keep border border-danger p-2 text-sm text-ink" role="alert">

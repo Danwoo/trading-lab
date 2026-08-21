@@ -161,6 +161,35 @@ class Strategy:
         self.version: str = str(module.STRATEGY.get("version", "1"))
 
 
+#: 주문 단위 — **1주**. KRX·미국 정규 주문은 주를 쪼갤 수 없고, 이 엔진이 겨누는 것은
+#: 「실제 거래 조건까지 반영한 검증」(제품 정의 §1 차별화 축 1 · §5 W4)이다. 쪼갤 수 있다고
+#: 두면 시작 자금은 성과의 분모를 곱하는 표시용 배수일 뿐 판정에 참여하지 못한다 (#313).
+MIN_ORDER_QTY = 1
+
+#: 이 엔진이 무엇을 가정하고 체결하나. **화면이 이 문구를 그대로 읽는다** — 같은 말을 화면에
+#: 따로 적어 두면 모형을 바꾼 날 화면만 옛말을 한다.
+FILL_ASSUMPTIONS = {
+    "order_unit": f"{MIN_ORDER_QTY}주 정수 내림 · 남는 현금은 현금으로 남습니다",
+    "fill_price": "신호가 난 그 봉의 종가 · 체결 지연 없음",
+    "liquidity_cap": "없음 · 그 봉의 거래량을 넘는 주문도 전량 체결됩니다",
+}
+
+
+def affordable_shares(cash: float, unit_cost: float) -> int:
+    """이 현금으로 살 수 있는 **정수** 주식 수. 남는 현금은 현금으로 남는다.
+
+    한 주 값(`unit_cost` — 단가에 매수 비용을 얹은 값)이 현금보다 크면 0 이다. 「그 종목은
+    못 산다」가 정직한 답이고, 0.000005주는 낼 수 없는 주문이다.
+    """
+    if unit_cost <= 0 or cash <= 0:
+        return 0
+    shares = int(cash // unit_cost)
+    # 부동소수 잔재로 마지막 한 주를 놓치지 않는다 — 봐주는 폭은 오차 수준(1e-9)까지다.
+    if (shares + 1) * unit_cost <= cash + 1e-9:
+        shares += 1
+    return shares if shares >= MIN_ORDER_QTY else 0
+
+
 def run_single(
     *,
     strategy: Strategy,
@@ -177,6 +206,9 @@ def run_single(
 
     **매수 조건이 없으면 매매도 없다**(스펙 §8.5.1). 이 함수는 신호가 없으면 초기자금을
     그대로 유지한다 — 0 이 아니다.
+
+    **살 수 없어도 매매는 없다**(#313). 체결은 1주 단위 정수라, 한 주 값이 현금보다 크면
+    신호가 나도 거래 0건으로 끝난다 — 그래서 `initial_cash` 가 결과를 바꾼다.
     """
     if len(series) == 0:
         return RunResult()
@@ -207,7 +239,7 @@ def run_single(
             if entered and price > 0:
                 # 비용을 감당할 수 있는 만큼만 산다 — 현금보다 많이 사면 원장이 안 닫힌다.
                 unit = price * (1 + costs.fee_rate + costs.slippage_rate)
-                qty = cash / unit if unit > 0 else 0.0
+                qty = float(affordable_shares(cash, unit))
                 if qty > 0:
                     notional = price * qty
                     cost = costs.buy_cost(notional)

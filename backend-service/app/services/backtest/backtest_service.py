@@ -14,7 +14,15 @@ import json
 from types import SimpleNamespace
 
 from core.exceptions import BadRequestError, NotFoundError
-from services.backtest.engine import BarSeries, CostModel, RunResult, Strategy, quantize, run_single
+from services.backtest.engine import (
+    FILL_ASSUMPTIONS,
+    BarSeries,
+    CostModel,
+    RunResult,
+    Strategy,
+    quantize,
+    run_single,
+)
 from services.backtest.grid import FREE_COSTS, axes_from_spec, run_grid
 from services.backtest.metrics import compute
 
@@ -528,6 +536,29 @@ class BacktestService:
         total = self.backtest_repository.count_runs_by_bot(int(args["bot_id"]), int(args["workspace_id"]))
         return {"items": items, "total_count": total}
 
+    @staticmethod
+    def _execution_assumptions(run: dict, trade_rows: list[dict]) -> dict:
+        """이 실행이 무엇을 가정했나 — 화면의 「체결 가정」 줄 (#313).
+
+        저장하지 않고 조회 때 만든다. 체결 모형은 실행 행이 아니라 **엔진 코드**에 있고,
+        저장된 값을 쓰면 모형을 바꾼 날 화면이 옛말을 한다.
+
+        그래서 「이 실행이 옛 모형으로 돌았나」는 **남은 수량에서 되읽는다** — 1주 단위
+        엔진은 정수 수량만 남기므로, 소수점 수량이 남아 있으면 그 실행은 소수점 체결이다.
+        거래가 0건인 옛 실행은 이 방법으로 가릴 수 없다(수량이 없다).
+        """
+        fractional = sum(1 for row in trade_rows if float(row["qty"]) != int(float(row["qty"])))
+        return {
+            **FILL_ASSUMPTIONS,
+            "adj_policy": (f"{run['adj_policy']} · 선언값입니다 (실제로 쓴 캔들의 조정 정책과 대조하지 않습니다)"),
+            "stale_reason": (
+                f"이 실행은 소수점 체결로 돌았습니다 — 거래 {fractional}건의 수량이 정수가 아닙니다."
+                " 지금 엔진은 1주 단위라 다시 돌리면 결과가 달라집니다"
+                if fractional
+                else None
+            ),
+        }
+
     def select_report(self, args: dict) -> dict:
         """한 조합의 리포트 — 곡선·거래에 **지표를 붙여** 낸다 (#203).
 
@@ -624,6 +655,9 @@ class BacktestService:
                 }
                 for row in trade_rows
             ],
+            # **이 결과가 무엇을 가정했나** (#313). 비용 3종만 밝히면 「이 셋만 가정했구나」로
+            # 읽힌다 — 체결 단위·체결가·유동성이 비용보다 큰 왜곡인데 화면이 침묵했다.
+            "execution_assumptions": self._execution_assumptions(run, trade_rows),
             # **맥락(#204)** — 「내가 잘한 건가, 그냥 시장이 좋았던 건가」. 유니버스 캔들이 없으면
             # 지어내지 않고 사유를 남긴다. 계산만 되고 결과에 안 실리면 「실행 결과」에 곡선·집중도가
             # 없다(리뷰 지적 #212).

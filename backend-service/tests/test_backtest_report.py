@@ -156,6 +156,57 @@ def test_decimal_rows_become_floats() -> None:
     check("비용이 먹은 수익률의 분모는 시작 자금", drag["value"], 0.8 / 1_000_000 * 100)
 
 
+def trade_row(qty: str) -> dict:
+    return {
+        "trade_id": 1,
+        "instrument_id": 10,
+        "side": "BUY",
+        "entry_ts": date(2026, 1, 2),
+        "exit_ts": date(2026, 1, 5),
+        "qty": Decimal(qty),
+        "fill_price": Decimal("189700"),
+        "exit_price": Decimal("184000"),
+        "fee": Decimal("0"),
+        "slippage": Decimal("0"),
+        "tax": Decimal("0"),
+        "realized_pnl": Decimal("-1"),
+        "mae": None,
+        "mfe": None,
+    }
+
+
+def test_report_states_how_it_filled() -> None:
+    """리포트가 **체결 가정**을 싣는다 — 비용 3종 옆에 설 자리 (#313).
+
+    문구는 엔진(`FILL_ASSUMPTIONS`)이 정본이라 여기서 다시 적지 않고, 「1주」와 「종가」가
+    실려 나오는지만 본다.
+    """
+    repo = FakeRepository(run_row(), equity_rows([100.0, 101.0]), [trade_row("3")])
+    report = service(repo).select_report({"run_id": 7, "workspace_id": 1})
+
+    fills = report["execution_assumptions"]
+    check("주문 단위가 1주라고 말한다", "1주" in fills["order_unit"], True)
+    check("체결가가 그 봉의 종가라고 말한다", "종가" in fills["fill_price"], True)
+    check("유동성 상한이 없다고 말한다", "없음" in fills["liquidity_cap"], True)
+    # 선언값을 사실인 척하지 않는다 — 캔들의 조정 정책과 대조하는 것은 아직 안 한다.
+    check("조정 정책이 선언값임을 밝힌다", "선언값" in fills["adj_policy"], True)
+    check("정수 수량 실행은 옛 모형 경고가 없다", fills["stale_reason"], None)
+
+
+def test_fractional_qty_run_is_marked_stale() -> None:
+    """소수점 수량이 남은 **옛 실행**은 그 사실이 결과에 실린다 (#313).
+
+    체결 모형은 실행 행이 아니라 엔진 코드에 있어 옛 실행에 표식이 없다. 그래서 저장된
+    수량에서 되읽는다 — 0.526806주는 지금 엔진이 만들 수 없는 수량이다.
+    """
+    repo = FakeRepository(run_row(), equity_rows([100.0, 99.0]), [trade_row("0.526806")])
+    report = service(repo).select_report({"run_id": 7, "workspace_id": 1})
+
+    stale = report["execution_assumptions"]["stale_reason"]
+    check("옛 실행임을 말한다", stale is not None and "소수점 체결" in stale, True)
+    check("다시 돌리면 달라진다고 말한다", stale is not None and "달라집니다" in stale, True)
+
+
 def test_other_workspace_run_is_hidden() -> None:
     repo = FakeRepository(run_row(workspace_id=99), equity_rows([100.0]), [])
     global CHECKED
