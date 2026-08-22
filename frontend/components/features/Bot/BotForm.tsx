@@ -29,13 +29,14 @@ interface Props {
   dense?: boolean;
 }
 
-/** 설정 한 줄이 어디서 왔는지 — 사람이 손댄 것과 선언 기본값이 섞이면 무엇을 정했는지 모른다. */
+/** 설정 한 줄이 어디서 왔는지 — 사람이 손댄 것과 전략 기본값이 섞이면 무엇을 정했는지 모른다.
+ *  세 갈래를 같은 층의 말로 쓴다 — 하나만 코드 어휘면 나란히 읽을 때 층이 어긋난다(#319). */
 function SourceTag({ source }: { source?: "USER" | "AI_SUGGESTED" }) {
-  const label = source === "AI_SUGGESTED" ? "AI 제안 수락" : source === "USER" ? "내가 정함" : "선언 기본값";
+  const label = source === "AI_SUGGESTED" ? "AI 제안 수락" : source === "USER" ? "내가 정함" : "기본값 그대로";
   return <span className="font-mono text-2xs text-ink-muted">{label}</span>;
 }
 
-/** `sourced` 는 **전략 파라미터 줄에만** 준다 — 봇 자체 설정에는 「선언」이 없어서 꼬리표가 거짓말이 된다. */
+/** `sourced` 는 **전략 파라미터 줄에만** 준다 — 봇 자체 설정에는 전략 기본값이 없어서 꼬리표가 거짓말이 된다. */
 function Row({
   label,
   help,

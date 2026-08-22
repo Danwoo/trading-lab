@@ -119,10 +119,10 @@ export function GridRunForm({
       {strategy?.form && (
         <fieldset className="min-w-0">
           <legend className="break-keep text-2xs text-ink-muted">
-            훑을 축 — {strategy.form.name}의 범위 선언에서 왔습니다
+            훑을 축 — {strategy.form.name} 전략이 정해 둔 범위입니다
           </legend>
           {axes.length === 0 ? (
-            <p className="break-keep text-sm text-ink">이 전략에는 범위가 선언된 숫자 파라미터가 없습니다.</p>
+            <p className="break-keep text-sm text-ink">이 전략에는 범위를 정해 둔 숫자 파라미터가 없습니다.</p>
           ) : (
             <ul className="mt-1 flex min-w-0 flex-col gap-1">
               {axes.map((axis, index) => (
