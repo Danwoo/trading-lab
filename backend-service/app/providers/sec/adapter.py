@@ -20,7 +20,7 @@ from providers.sec.mapper import SkippedRow, to_instrument
 _MARKETS = ("NASDAQ", "NYSE", "AMEX")
 _NO_PRICE_REASON = "SEC 는 공시·재무 공개기관으로 가격 데이터를 제공하지 않습니다"
 _NO_CONTACT_REASON = (
-    "SEC 는 연락처(이메일)가 담긴 User-Agent 를 요구합니다 — MARKET_DATA_CONTACT 를 채우세요 "
+    "SEC 는 연락처(이메일)가 담긴 User-Agent 를 요구합니다 — MARKET_DATA_CONTACT 에 연락처가 필요합니다 "
     "(API 키가 아니라 우리를 밝히는 문자열입니다)"
 )
 

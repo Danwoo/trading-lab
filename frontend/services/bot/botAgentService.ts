@@ -35,7 +35,10 @@ export const selectBotAgentReadiness = async (): Promise<BotAgentReadiness> => {
   } catch {
     return {
       ready: false,
-      reasons: ["봇 대화 서비스에 연결하지 못했습니다 (로컬 배포 모드에서만 함께 뜹니다)."],
+      reasons: [
+        "봇 대화 서비스(:8011)가 떠 있지 않습니다 — process-compose 에 없어 손으로 띄웁니다.",
+        "cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload --port 8011",
+      ],
       strategies_dir: "",
     };
   }
