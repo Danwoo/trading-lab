@@ -42,7 +42,7 @@ ls -d */app/main.py 2>/dev/null | sed 's|/app/main.py||'
 | `--diff` | 변경분 |
 
 ### 전체 모드 (default)
-- backend 1개 → `git ls-files --cached --others --exclude-standard '{backend}/app/**/*.py'`, 바로 검토 (tracked + untracked 포함)
+- backend 1개 → `git ls-files --cached --others --exclude-standard ':(glob){backend}/app/**/*.py'`, 바로 검토 (tracked + untracked 포함)
 - backend 2+ → 아래 **Backend 선택 ask** 진행
 
 ### 변경분 모드 (`--diff`)
@@ -75,6 +75,8 @@ options:
 **핵심 흐름**: 룰 1 (Phase A → Phase B) → 룰 2 (Phase A → Phase B) → ... 순차. 룰 단위로 차례차례, 룰 1 의 Phase B 끝나기 전엔 룰 2 시작 금지.
 
 룰 번호와 grep 명령은 **`anti-patterns-backend.md` 각 룰의 `**Detection**` 박스에서 그대로 가져온다**. 명령 안의 `{backend}` 는 디스커버리에서 찾은 폴더명으로 치환 (여러 개면 backend 마다 반복).
+
+pathspec 의 `:(glob)` 접두는 **떼지 않는다** — 떼면 `**/` 가 「디렉터리 한 단계 이상」으로 읽혀 각 서비스의 `app/main.py`·`modules.py` 가 검사에서 빠진다 (`anti-patterns-backend.md` 의 「Pathspec」).
 
 ### Phase A — 탐지 (recall 보장)
 
@@ -113,7 +115,7 @@ options:
 
 ```bash
 # --diff 모드에서 변경된 prefix 추출
-git diff HEAD -- '*/app/routers/**/*_router.py' | grep -E '^[+-].*APIRouter\(prefix=' | grep -oE '"/[^"]*"'
+git diff HEAD -- ':(glob)*/app/routers/**/*_router.py' | grep -E '^[+-].*APIRouter\(prefix=' | grep -oE '"/[^"]*"'
 # 그 prefix 를 호출하는 frontend proxy 가 일치하는지
 grep -rn '_SERVICE_URL + "/<changed-prefix>"' frontend/app/api/external/ 2>/dev/null
 ```
