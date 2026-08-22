@@ -228,6 +228,69 @@ jobs:
           fi
           exit 0
 
+  # ── pre-commit 훅이 걸지만 CI 가 안 걸던 검사 (포맷·린트·시크릿) ──────────
+  # `.pre-commit-config.yaml` 은 `ruff-check`·`ruff-format`·`gitleaks` 를 **레포 전체**에
+  # 건다. 그런데 CI 의 ruff 는 `ci.yml` 의 `uv run ruff check app/` 둘뿐이었고 — `format` 이
+  # 아니고 `scripts/` 도 아니다 — gitleaks 는 아예 없었다. 그래서 드리프트는 **로컬 훅을
+  # 거치는 사람에게만** 빨간불이었고, 그 훅을 안 거치는 경로(다른 워커·CI)는 통과시켰다.
+  # 실측: `scripts/verify_stage_claims.py` 가 표준을 위반한 채 main 에 앉아 있었다.
+  #
+  # **여기(repo-scans.yml)에 두는 이유**는 이 파일 머리의 분담 그대로다 — 이 검사는 대상을
+  # 서비스 이름으로 가리지 않고 `git ls-files` 로 **스스로 찾는다.** `ci.yml` 에 두면 그
+  # `FILTER_PATTERNS` 가 서비스 폴더와 개별 스크립트를 이름으로 적으므로, 목록에 없는 파일만
+  # 고친 PR 에서 잡이 통째로 `skipped` 가 된다 — 그리고 위 실측 파일이 정확히 그 경우다
+  # (`scripts/verify_stage_claims.py` 는 어느 워크플로의 목록에도 없다).
+  #
+  # 두 검사 다 검사한 대상 수를 출력에 남기고 **0건이면 실패**한다 (fail-closed).
+  repo-lint:
+    name: "test: repo-lint"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 스크립트가 `uvx ruff@<rev>` 로 훅과 같은 ruff 를 받는다 — 버전은 스크립트가
+      # `.pre-commit-config.yaml` 에서 읽으므로 여기에 적지 않는다 (lockstep).
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: 파이썬 포맷·린트 전수 (pre-commit 과 같은 범위, fail-closed)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_python_format.py
+
+      # 훅과 **같은 버전**을 릴리스 해시로 고정해 받는다. 버전을 여기에만 적으면 훅과 갈리므로
+      # `.pre-commit-config.yaml` 의 rev 와 대조해 어긋나면 실패한다.
+      # 바이너리는 `$RUNNER_TEMP` 에 푼다 — 작업 트리에 두면 스캔 대상에 자기 자신이 섞인다.
+      - name: 시크릿 스캔 (gitleaks — 훅과 같은 버전, fail-closed)
+        if: ${{ !cancelled() }}
+        env:
+          GITLEAKS_VERSION: "8.21.2"
+          GITLEAKS_SHA256: "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba"
+        run: |
+          set -euo pipefail
+          HOOK_REV=$(sed -n '/gitleaks\/gitleaks/,+3{s/^[[:space:]]*rev:[[:space:]]*v\{0,1\}//p;}' .pre-commit-config.yaml | head -1)
+          if [ -z "$HOOK_REV" ]; then
+            echo "::error::.pre-commit-config.yaml 에서 gitleaks rev 를 못 읽었습니다 — 훅과 같은 버전이라는 근거가 사라집니다"
+            exit 1
+          fi
+          if [ "$HOOK_REV" != "$GITLEAKS_VERSION" ]; then
+            echo "::error::훅의 gitleaks v${HOOK_REV} 와 이 잡의 ${GITLEAKS_VERSION} 이 어긋납니다 — 버전과 GITLEAKS_SHA256 을 함께 올리세요"
+            exit 1
+          fi
+          TRACKED=$(git ls-files | wc -l)
+          echo "gitleaks ${GITLEAKS_VERSION} (훅 rev 와 일치) · 추적 파일 ${TRACKED}건"
+          if [ "$TRACKED" -eq 0 ]; then
+            echo "::error::스캔 대상을 0건 수집했습니다 — 통과가 아닙니다"
+            exit 1
+          fi
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          tar xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" detect --no-git --redact --source .
+
   # ── stdlib 전용 전수 스캔 ────────────────────────────────────────────────
   repo-scan:
     name: "test: repo-scan"
@@ -360,6 +423,13 @@ jobs:
       - name: required 게이트 판정 검사
         if: ${{ !cancelled() }}
         run: python3 scripts/test_upstream_gate.py
+
+      # pre-commit 훅 ↔ CI 대조 판정 (`test: ci-coverage` 가 부르는 순수 판정). 이 대조는
+      # 초록일 때 아무 일도 안 하는 검사라 관대해져도 티가 안 난다 — 새 훅을 모른 척하거나
+      # 사라진 대응을 배선된 것으로 세는 방향을 케이스로 못박는다. 0건 수집이면 실패.
+      - name: pre-commit ↔ CI 대조 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_ci_check_coverage.py
 
       # 리뷰 기록기 판정 (#23 Task 7) — review-record.yml 이 부르는 순수 판정. 공개 레포의
       # 위조 표면(비-멤버 마커·접두 sha·낡은 sha·source=manual·major 봇 PR·제목 파싱 실패)이

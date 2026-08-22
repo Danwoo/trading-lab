@@ -33,7 +33,7 @@ from utils.env_file.env_writer import EnvWriteRejected, set_env_value  # noqa: E
 FAILURES: list[str] = []
 CHECKED = 0
 
-SECRET = "sk-live-CANARY-0123456789"
+SECRET = "sk-live-CANARY-0123456789"  # gitleaks:allow — 합성 카나리아 (실 키 아님)
 
 # 픽스처의 변수 이름은 **중립**이다 — `env_writer` 는 이름을 모르는 범용 모듈이고, 실제 설정
 # 이름(`MARKET_DATA_*`)을 여기 적으면 단일 로더 그물(`verify_data_key_env_boundary.py`)에 걸린다.
