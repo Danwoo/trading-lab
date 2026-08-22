@@ -3,6 +3,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Header, Sidebar, GlobalTabs } from "@/components/shared/Layout";
+import { MenuUnreadableScreen } from "@/components/shared/Layout/MenuUnreadableScreen";
 import { useMenuAccessGate } from "@/hooks/shared/useMenuAccessGate";
 import { useCodeStore } from "@/stores/shared/codeStore";
 import { useNavStore } from "@/stores/shared/navStore";
@@ -61,7 +62,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const { getGroupCodes } = useCodeStore();
   const navItems = useNavStore((s) => s.items);
   const openTab = useTabStore((s) => s.openTab);
-  const { loaded, authorized } = useMenuAccessGate(ALWAYS_ALLOWED_PATHS, CHASSIS_HOME_PATHS);
+  const { loaded, authorized, denial } = useMenuAccessGate(ALWAYS_ALLOWED_PATHS, CHASSIS_HOME_PATHS);
 
   // iframe 내부인지 감지 (MDI 탭 콘텐츠로 로드된 경우 chrome 생략)
   useEffect(() => {
@@ -91,6 +92,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   // 순간 화면이 검정에서 흰색으로 튄다.
   if (isEmbed === null || !loaded || authorized === null)
     return <div data-theme="light" className="h-screen bg-bg-base" />;
+
+  // 메뉴를 못 읽으면 섀시를 세우지 않는다 — 사이드바·탭이 전부 메뉴로 그려져 빈 크롬만 남는다.
+  if (denial === "unreadable")
+    return (
+      <div data-theme="light" className="h-screen bg-bg-base text-ink">
+        <MenuUnreadableScreen />
+      </div>
+    );
 
   // **관리 화면은 라이트다** — 그 사실을 선언한다.
   //

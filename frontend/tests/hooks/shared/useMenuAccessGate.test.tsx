@@ -88,7 +88,9 @@ describe("메뉴 게이트의 예외 경로 (#73 S2 — 레일의 「설정」)"
       if (allowed) {
         expect(replace, `${path} 가 되돌려졌다`).not.toHaveBeenCalled();
       } else {
-        expect(replace, `${path} 가 게이트를 그냥 통과했다`).toHaveBeenCalledWith("/");
+        // 되돌릴 때 **사유를 실어 보낸다** — 사유 없이 로그인 화면에 도착하면 세션이 멀쩡한
+        // 사람이 로그아웃된 줄 안다(#333). 목적지 자체는 종전과 같다.
+        expect(replace, `${path} 가 게이트를 그냥 통과했다`).toHaveBeenCalledWith("/?reason=forbidden");
       }
     });
   }
