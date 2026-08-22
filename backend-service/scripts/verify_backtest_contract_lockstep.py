@@ -37,7 +37,15 @@ BACK_SCHEMA = BACKEND / "app" / "schemas" / "backtest" / "backtest_schema.py"
 BACK_SERVICE = BACKEND / "app" / "services" / "backtest" / "backtest_service.py"
 
 #: 짝지을 이름 — 프론트 인터페이스 ↔ 백엔드 모델. 이름이 같으면 짝이다.
-PAIRS = ("GridCellOut", "GridOut", "GridAxisOut", "GridCellMetrics", "RunReportOut", "ExecutionAssumptionsOut")
+PAIRS = (
+    "GridCellOut",
+    "GridOut",
+    "GridAxisOut",
+    "GridCellMetrics",
+    "RunReportOut",
+    "ExecutionAssumptionsOut",
+    "OpenPositionOut",
+)
 #: 프론트 `GridCellMetrics` 의 백엔드 짝은 이름이 다르다 (Out 접미사 관례).
 ALIASES = {"GridCellMetrics": "GridCellMetricsOut"}
 

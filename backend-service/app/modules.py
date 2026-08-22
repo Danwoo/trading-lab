@@ -40,6 +40,7 @@ ROUTER_MODULES: list[str] = [
     "routers.chat.chat_router",
     "routers.scheduler.scheduler_router",
     "routers.bar.bar_router",
+    "routers.instrument.instrument_router",
     "routers.quote.quote_router",
     "routers.ingest.ingest_router",
     "routers.capability.capability_router",

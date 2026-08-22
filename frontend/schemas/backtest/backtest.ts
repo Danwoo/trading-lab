@@ -172,10 +172,32 @@ export interface ExecutionAssumptionsOut {
   stale_reason: string | null;
 }
 
+/**
+ * 구간 끝에 청산되지 않고 남은 자리.
+ *
+ * 자산곡선의 마지막 점은 이 자리의 **평가액**을 담는데 실현손익은 없다 — 그래서 「거래 0건」과
+ * 「+268%」가 한 화면에 나란히 섰다. `entry_cost` 가 `null` 이면 진입 기록이 없는 옛 실행이고,
+ * **0 원이 아니라 모르는 것**이다 (`absent_reason` 이 왜인지 말한다).
+ */
+export interface OpenPositionOut {
+  count: number;
+  /** 구간 끝 평가액 (원). */
+  value: number;
+  entry_ts: string | null;
+  entry_cost: number | null;
+  unrealized_pnl: number | null;
+  /** 이 실행의 총손익 중 미실현 비중 (%). 100 이면 성과 전부가 아직 안 판 자리다. */
+  unrealized_share_pct: number | null;
+  derived_from: string;
+  absent_reason: string | null;
+}
+
 export interface RunReportOut {
   run: RunSummaryOut;
   equity: EquityPointOut[];
   trades: TradeOut[];
   metrics: MetricOut[];
   execution_assumptions: ExecutionAssumptionsOut;
+  /** 열린 자리가 없으면 `null` — 「청산 안 함」과 「거래 없음」을 화면이 갈라 말하는 근거다. */
+  open_position: OpenPositionOut | null;
 }

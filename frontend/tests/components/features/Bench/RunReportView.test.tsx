@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 
 import { RunReportView } from "@/components/features/Bench/RunReportView";
-import type { MetricOut, RunReportOut } from "@/schemas/backtest/backtest";
+import type { MetricOut, OpenPositionOut, RunReportOut } from "@/schemas/backtest/backtest";
 
 // jsdom 에는 캔버스가 없다 — 차트 팩토리는 브라우저 실측이 정본이고, 여기서는 데이터·문구만 본다.
 vi.mock("@/lib/bench/equityChart", () => ({
@@ -61,6 +61,7 @@ function report(overrides: Partial<RunReportOut> = {}): RunReportOut {
       adj_policy: "unadjusted · 선언값입니다 (실제로 쓴 캔들의 조정 정책과 대조하지 않습니다)",
       stale_reason: null,
     },
+    open_position: null,
     metrics: [
       metric({
         key: "longest_underwater",
@@ -262,6 +263,110 @@ describe("RunReportView", () => {
     const text = document.body.textContent ?? "";
     expect(text).toContain("실행이 끝나면 채워집니다");
     expect(text).not.toContain("옛 실행");
+  });
+
+  // ── 구간 끝에 열린 자리 (#314) ──────────────────────────────────────────
+  //
+  // 실측: 거래 목록 0건 · 승률 「거래 없음」 · 치른 비용 0원 인데 수익률이 +268.14% 로 떴다.
+  // 성과의 100%가 미실현인데 화면 어디도 그 사실을 말하지 않았다.
+
+  function openPosition(overrides: Partial<OpenPositionOut> = {}): OpenPositionOut {
+    return {
+      count: 1,
+      value: 36814411.12,
+      entry_ts: "2025-08-05",
+      entry_cost: 6495.78,
+      unrealized_pnl: 26814411.12,
+      unrealized_share_pct: 100,
+      derived_from: "2025-08-05 진입 · 자산곡선 마지막 점의 평가액 36,814,411원 − 진입 원금 10,000,000원",
+      absent_reason: null,
+      ...overrides,
+    };
+  }
+
+  it("열린 자리를 안고 끝난 실행은 그 사실을 문장으로 말한다", () => {
+    render(<RunReportView report={report({ open_position: openPosition() })} />);
+
+    const section = screen.getByRole("region", { name: "구간 끝에 열린 자리" });
+    expect(section.textContent).toContain("구간 끝에 열린 자리 1건");
+    expect(section.textContent).toContain("2025-08-05 진입");
+    expect(section.textContent).toContain("36,814,411");
+    expect(section.textContent).toContain("이 성과의 100% 가 아직 안 판 자리의 평가액입니다");
+  });
+
+  it("열린 자리가 없으면 그 자리를 만들지 않는다", () => {
+    render(<RunReportView report={report()} />);
+
+    expect(screen.queryByRole("region", { name: "구간 끝에 열린 자리" })).toBeNull();
+  });
+
+  it("「청산 안 함」을 「거래 없음」으로 뭉개지 않는다 — 거래 목록이 둘을 가른다", () => {
+    render(
+      <RunReportView
+        report={report({
+          open_position: openPosition({
+            entry_ts: null,
+            entry_cost: null,
+            unrealized_pnl: null,
+            unrealized_share_pct: null,
+            absent_reason: "열린 자리의 진입 기록이 없는 옛 실행입니다 — 다시 실행하면 채워집니다",
+          }),
+        })}
+      />,
+    );
+
+    const section = screen.getByRole("region", { name: "거래 목록" });
+    expect(section.textContent).toContain("청산된 거래 없음 — 구간 끝에 열린 자리 1건이 있습니다");
+    expect(section.textContent).not.toContain("청산은커녕 진입도 없었습니다");
+  });
+
+  it("미실현 비중을 못 구하면 0% 라 하지 않고 사유를 낸다", () => {
+    render(
+      <RunReportView
+        report={report({
+          open_position: openPosition({
+            unrealized_share_pct: null,
+            absent_reason: "열린 자리의 진입 기록이 없는 옛 실행입니다 — 다시 실행하면 채워집니다",
+          }),
+        })}
+      />,
+    );
+
+    const section = screen.getByRole("region", { name: "구간 끝에 열린 자리" });
+    expect(section.textContent).toContain("진입 기록이 없는 옛 실행입니다");
+    expect(section.textContent).not.toContain("0% 가 아직 안 판");
+  });
+
+  it("열린 자리가 거래 목록에 한 줄로 선다 — 미청산임이 행에서도 읽힌다", () => {
+    render(
+      <RunReportView
+        report={report({
+          open_position: openPosition(),
+          trades: [
+            {
+              trade_id: 9,
+              instrument_id: 10,
+              side: "long",
+              entry_ts: "2025-08-05",
+              exit_ts: null,
+              qty: 100,
+              fill_price: 99935,
+              exit_price: null,
+              fee: 1499,
+              slippage: 4996,
+              tax: 0,
+              realized_pnl: null,
+              mae: null,
+              mfe: null,
+            },
+          ],
+        })}
+      />,
+    );
+
+    const section = screen.getByRole("region", { name: "거래 목록" });
+    expect(section.textContent).toContain("보유 중");
+    expect(section.textContent).toContain("미청산");
   });
 
   it("실패한 실행은 지표를 지어내지 않고 사유를 낸다", () => {

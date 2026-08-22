@@ -23,6 +23,17 @@
 
 `{backend}` 는 `app/main.py` 가 있는 폴더 (예: `backend/`, `api/`). 프로젝트마다 여러 개 가능 — review 에이전트가 디스커버리로 찾아서 치환.
 
+## Pathspec — `:(glob)` 를 붙인 채로 실행한다
+
+Detection 의 pathspec 은 전부 `':(glob)...'` 로 시작한다. **이 접두를 떼면 같은 글자가 다른 뜻이 된다** — git 기본 매직에서는 `*` 가 `/` 를 넘고 `**/` 는 「디렉터리가 한 단계 이상」이 되어 **깊이 1 파일이 통째로 빠진다**. `':(glob)'` 아래에서만 `*` 가 한 세그먼트 안에 머물고 `/**/` 가 「0개 이상의 디렉터리」로 읽힌다.
+
+```bash
+git ls-files 'backend-service/app/**/*.py'         | wc -l   # 127 — main.py·modules.py 가 없다 (pathspec-check: 반례)
+git ls-files ':(glob)backend-service/app/**/*.py'  | wc -l   # 129
+```
+
+접두가 빠지거나 pathspec 이 한 파일도 못 맞히면 `scripts/verify_detection_pathspec.py` 가 실패한다.
+
 ## 목차
 
 **레이어 분리**
@@ -74,7 +85,7 @@ async def get_user(id: int, user_service: UserService = Depends(...)):
 
 **Detection**:
 ```bash
-git grep --untracked -nE 'conn\.execute|\btext\(|raw_connection' -- '{backend}/app/routers/**/*.py'
+git grep --untracked -nE 'conn\.execute|\btext\(|raw_connection' -- ':(glob){backend}/app/routers/**/*.py'
 ```
 0 hit → SQL 직접 사용 측면 통과. 1+ hit → 각 후보 Read 후 아래 분류 적용.
 
@@ -112,7 +123,7 @@ def insert_X(self, args):
 
 **Detection**:
 ```bash
-git grep --untracked -nE '^\s*params\s*=\s*\{' -- '{backend}/app/repositories/**/*.py'
+git grep --untracked -nE '^\s*params\s*=\s*\{' -- ':(glob){backend}/app/repositories/**/*.py'
 ```
 0 hit → 통과. 1+ hit → Read 후 `args.get(..., default)` 같이 Pydantic 디폴트 덮어쓰는지 검사.
 
@@ -137,7 +148,7 @@ def update_X(self, args):
 
 **Detection**:
 ```bash
-git grep --untracked -nE '^\s*(await\s+)?self\.select_\w+\(' -- '{backend}/app/services/**/*.py'
+git grep --untracked -nE '^\s*(await\s+)?self\.select_\w+\(' -- ':(glob){backend}/app/services/**/*.py'
 ```
 0 hit → 통과. 1+ hit → Read 후 반환값 미할당이면 위반 (sync `self.select_X(...)` / async `await self.select_X(...)` 둘 다 대상).
 
@@ -165,7 +176,7 @@ with self.sql_client.connect() as conn:
 
 **Detection**:
 ```bash
-git grep --untracked -nE 'db\.query\(|session\.(add|commit|merge|delete|flush|refresh|rollback)\(' -- '{backend}/app/**/*.py'
+git grep --untracked -nE 'db\.query\(|session\.(add|commit|merge|delete|flush|refresh|rollback)\(' -- ':(glob){backend}/app/**/*.py'
 ```
 0 hit → 통과. 1+ hit → 모두 위반.
 
@@ -188,7 +199,7 @@ UPDATE TN_X SET ..., mod_id = :mod_id, mod_dt = CURRENT_TIMESTAMP WHERE id = :id
 
 **Detection** (negative-pattern 📍 — hit 자체는 정상, Read 후 누락 검사가 본질):
 ```bash
-git grep --untracked -lE 'INSERT\s+INTO\s+\w+|UPDATE\s+\w+\s+SET' -- '{backend}/app/repositories/**/*.py'
+git grep --untracked -lE 'INSERT\s+INTO\s+\w+|UPDATE\s+\w+\s+SET' -- ':(glob){backend}/app/repositories/**/*.py'
 ```
 hit = 후보 파일 목록. 각 파일 Read 후 INSERT/UPDATE 마다 컬럼 포함 여부 검사.
 
@@ -218,7 +229,7 @@ SELECT * FROM (
 
 **Detection** (negative-pattern 📍):
 ```bash
-git grep --untracked -nE 'def\s+select_\w+_list\(' -- '{backend}/app/repositories/**/*.py'
+git grep --untracked -nE 'def\s+select_\w+_list\(' -- ':(glob){backend}/app/repositories/**/*.py'
 ```
 hit = list 반환 메서드. 각 함수 Read 후 `ROW_NUMBER()` + `:skip` + `:take` 포함 여부 검사. 누락 시 위반.
 
@@ -255,7 +266,7 @@ async def list_samples(...) -> SamplesOut:
 
 **Detection** (negative-pattern 📍):
 ```bash
-git grep --untracked -nE '@router\.(get|post|put|delete|patch)' -- '{backend}/app/routers/**/*.py'
+git grep --untracked -nE '@router\.(get|post|put|delete|patch)' -- ':(glob){backend}/app/routers/**/*.py'
 ```
 hit = endpoint 모음. 각 endpoint Read 후 `response_model=` 명시 + list 응답 wrapper 여부 검사.
 
@@ -279,7 +290,7 @@ router = APIRouter(dependencies=[Depends(verify_access_token)])
 
 **Detection** (negative-pattern 📍):
 ```bash
-git grep --untracked -nE 'APIRouter\(|@router\.(get|post|put|delete|patch)' -- '{backend}/app/routers/**/*.py'
+git grep --untracked -nE 'APIRouter\(|@router\.(get|post|put|delete|patch)' -- ':(glob){backend}/app/routers/**/*.py'
 ```
 hit = router/endpoint 모음. 각 router 파일 Read 후 인증 dependency 존재 여부 검사.
 
@@ -310,12 +321,13 @@ def delete_X(self, args):
 
 **Detection**:
 ```bash
-git grep --untracked -nE 'except\s+Exception' -- '{backend}/app/**/*.py'
+git grep --untracked -nE 'except\s+Exception' -- ':(glob){backend}/app/**/*.py'
 ```
 0 hit → 통과. 1+ hit → Read 후 block 안에서 `raise HTTPException(...)` 변환 또는 silent swallow 시 위반.
 
 **예외**: catch-all 이어도 정당한 케이스 ↓
 - **Resource cleanup**: I/O 리소스 (connection / file / lock 등) lifecycle 정리의 `try/finally` 또는 best-effort cleanup. 원본 예외 마스킹하지 않는 형태.
+  - 판정 완료 ([#330](https://github.com/Danwoo/trading-lab/issues/330)): `backend-service/app/main.py` 의 `_stop_managers()` · `_dispose_sql_client()` · `lifespan` 의 매니저 start 롤백 3건이 여기 해당한다 — 정리만 하고 원본 예외를 `raise` 로 그대로 올린다. 매번 다시 판정하지 않는다.
 - **Daemon loop continuation**: 무한 루프 / 백그라운드 worker 의 iteration 격리 (`log + back-off + continue`). 한 회차 실패가 전체 worker 종료 막아야 할 때.
 - **Bulk skip-and-continue**: 일괄 처리에서 항목별 실패 격리. 일부 실패해도 나머지 진행이 의도된 설계.
 - **Router 의 client-disconnect → `HTTPException(499)`**: `except asyncio.CancelledError` 변환, 또는 endpoint 진입 시 `if await request.is_disconnected(): raise HTTPException(499)` 사전 체크.
@@ -350,7 +362,7 @@ def select_X(self, args):
 
 **Detection**:
 ```bash
-git grep --untracked -nE 'from\s+fastapi\s+import.*HTTPException|HTTPException\(' -- '{backend}/app/services/**/*.py' '{backend}/app/repositories/**/*.py'
+git grep --untracked -nE 'from\s+fastapi\s+import.*HTTPException|HTTPException\(' -- ':(glob){backend}/app/services/**/*.py' ':(glob){backend}/app/repositories/**/*.py'
 ```
 0 hit → Service/Repository 측면 통과 (Router 는 grep 대상 외 — HTTP 경계라 자연스러움). 1+ hit (Service/Repository) → 위반.
 
@@ -382,7 +394,7 @@ async def endpoint(
 
 **Detection**:
 ```bash
-git grep --untracked -nE '=\s*\w+(Service|Repository)\(' -- '{backend}/app/**/*.py' \
+git grep --untracked -nE '=\s*\w+(Service|Repository)\(' -- ':(glob){backend}/app/**/*.py' \
   | grep -v 'core/container.py' \
   | grep -vE 'Depends\(|Provide\['
 ```
@@ -410,7 +422,7 @@ HTTP/파일 외부 I/O 는 async 가 기본 (`httpx.AsyncClient`, `asyncssh` 등
 
 **Detection**:
 ```bash
-git grep --untracked -nE '^\s*async\s+def\s+(select|insert|update|delete)_' -- '{backend}/app/repositories/**/*.py'
+git grep --untracked -nE '^\s*async\s+def\s+(select|insert|update|delete)_' -- ':(glob){backend}/app/repositories/**/*.py'
 ```
 0 hit → 통과. 1+ hit → repository DB 메서드는 sync `def` 가 표준이므로 위반.
 
@@ -456,7 +468,7 @@ async def _process_dataset_background(self, data_id: int, recipe_id: str):
 **Detection** (negative-pattern 📍):
 ```bash
 # asyncio.to_thread / run_in_executor(None) 잔존 검출 (스레드 offload 는 전부 run_in_threadpool 로 통일; ProcessPoolExecutor 만 예외)
-git grep --untracked -nE 'asyncio\.to_thread|run_in_executor\(\s*None' -- '{backend}/app/**/*.py'
+git grep --untracked -nE 'asyncio\.to_thread|run_in_executor\(\s*None' -- ':(glob){backend}/app/**/*.py'
 ```
 0 hit → 통과. 1+ hit → `run_in_threadpool` 로 변환 필요.
 
@@ -496,11 +508,11 @@ class SchedulerService:
 **Detection**:
 ```bash
 # (1) 서비스가 남의 모듈 리포지토리를 import — 파일 경로의 모듈명과 import 의 모듈명 비교
-git grep --untracked -nE '^\s*from repositories\.' -- '{backend}/app/services/**/*.py'
+git grep --untracked -nE '^\s*from repositories\.' -- ':(glob){backend}/app/services/**/*.py'
 # (2) 리포지토리가 서비스를 import — hit 자체가 위반
-git grep --untracked -nE '^\s*from services\.' -- '{backend}/app/repositories/**/*.py'
+git grep --untracked -nE '^\s*from services\.' -- ':(glob){backend}/app/repositories/**/*.py'
 # (3) file 모듈 우회 — FileService 를 안 거치고 SFTP 클라이언트·file 리포지토리를 직접 잡는다
-git grep --untracked -nE '^\s*from (clients\.file|repositories\.file)\.' -- '{backend}/app/**/*.py'
+git grep --untracked -nE '^\s*from (clients\.file|repositories\.file)\.' -- ':(glob){backend}/app/**/*.py'
 ```
 (1) hit = 후보. 각 hit 의 파일 경로 `services/<M>/` 와 import 의 `repositories.<N>` 을 대조해 `N != M` 이면 위반. (2) 0 hit → 통과, 1+ hit → 위반.
 (3) hit = 후보. `core/container.py`(DI 배선이 그 일)·`services/file/`·`repositories/file/`(file 모듈 자기 것) 은 정상. 그 밖의 모듈에서 나오면 위반 — 아래 「file 모듈 접근」 예외가 금지한 경로다.
@@ -532,7 +544,7 @@ provider = get_provider(source, api_key)   # source 는 잡·설정에서 온 �
 # 소스 패키지 목록을 파일시스템에서 읽어 그 이름만 금지한다 (fail-closed — 0건 수집 시 실패)
 uv run python scripts/verify_provider_boundary.py
 # 어댑터가 settings 를 읽는가 — hit 자체가 위반
-git grep --untracked -nE '^\s*from core\.config import' -- '{backend}/app/providers/**/*.py'
+git grep --untracked -nE '^\s*from core\.config import' -- ':(glob){backend}/app/providers/**/*.py'
 ```
 첫 명령은 검사한 소스 패키지 수·파일 수를 출력에 남긴다(통과가 "위반 없음"인지 "아무것도 안 봤음"인지 구분하기 위해). 두 번째는 0 hit → 통과, 1+ hit → 위반.
 
