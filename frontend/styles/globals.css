@@ -185,6 +185,11 @@
   --touch-rail-target: 30px;
   /* 좁은 화면에서 촘촘한 목록·탭이 갖는 최소 높이. 같은 이유로 손가락 축이다. */
   --touch-min: 26px;
+  /* 아이콘 전용 조작부(`ICON_HIT_AREA`)의 표적. 마우스는 WCAG 2.5.8 AA 하한(24px)에 맞추고
+     손가락에서만 권장치로 올린다 — 주 사용 환경이 웹·데스크탑이라 24 를 전역으로 키우면
+     마우스 화면에서 조작부가 이유 없이 커진다 (#289 리드 결정 2026-08-21 ②).
+     글리프는 어느 갈래에서도 안 커진다: 커지는 것은 상자뿐이다. */
+  --touch-icon-target: 24px;
   --shell-panel: 372px;
   --shell-panel-compact: 300px;
   --shell-panel-expanded: 620px;
@@ -200,6 +205,7 @@
   :root {
     --touch-rail-target: 44px;
     --touch-min: 44px;
+    --touch-icon-target: 44px;
   }
 }
 

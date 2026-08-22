@@ -89,10 +89,16 @@ export const theme = {
       // 누를 수 있는 영역 — 셸 폭과 다른 축(손가락)이다. #230
       "touch-rail-target": "var(--touch-rail-target)",
       "touch-min": "var(--touch-min)",
+      // 아이콘 전용 조작부의 표적 (#289). 마우스 24 · 손가락 44 — 갈래는 globals.css 가 정한다.
+      "touch-icon": "var(--touch-icon-target)",
     },
     minHeight: {
       // 좁은 화면·터치 기기에서 촘촘한 표적이 갖는 하한 (#230). spacing 과 별개 스케일이다.
       "touch-min": "var(--touch-min)",
+      "touch-icon": "var(--touch-icon-target)",
+    },
+    minWidth: {
+      "touch-icon": "var(--touch-icon-target)",
     },
     boxShadow: {
       e1: "var(--e1)",
