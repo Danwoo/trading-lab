@@ -70,7 +70,7 @@ describe("SymbolSidebar — 탭 3개(FR-006)", () => {
     await user.click(screen.getByRole("tab", { name: "보유" }));
 
     await waitFor(() => expect(selectPortfolioList).toHaveBeenCalled());
-    // HoldingTab 이 #332 로 서버 실패와 정상 0건을 구분하려고 throwOnFailure 를 함께 넘긴다 —
+    // HoldingTab 은 서버 실패와 정상 0건을 구분하려고 throwOnFailure 를 함께 넘긴다 —
     // 호출 시그니처가 늘어난 것뿐, 조회 자체(portfolio_id)는 그대로다.
     await waitFor(() =>
       expect(selectHoldingList).toHaveBeenCalledWith({ portfolio_id: "core" }, { throwOnFailure: true }),

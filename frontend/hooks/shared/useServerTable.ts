@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getApiErrorMessage } from "@/utils/common/errors";
+import { ApiCallFailure } from "@/utils/common/api/client";
 import { showToast } from "@/components/shared/Feedback/toastQueue";
 import { PAGE_SIZE } from "@/constants/app";
 import { applyClientQuery, buildGridQuery } from "@/hooks/shared/gridQuery";
@@ -14,6 +15,12 @@ export interface ServerTableState<T> {
   rows: T[];
   totalCount: number;
   isLoading: boolean;
+  /**
+   * 마지막 요청이 실패했으면 그 사유, 성공했으면 null. **`rows: []` 하나로는 「못 읽음」과
+   * 「정상 0건」이 구별되지 않는다** — 빈 상태 문구를 그리기 전에 이 값을 먼저 봐야 한다.
+   * 새 요청이 나가는 순간 null 로 돌아간다(로딩 중에는 지난 실패를 주장하지 않는다).
+   */
+  error: unknown | null;
   query: GridQuery;
   pageIndex: number;
   pageSize: number;
@@ -44,6 +51,7 @@ export function useServerTable<T>({
   const [serverRows, setServerRows] = useState<T[]>([]);
   const [serverTotalCount, setServerTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<unknown>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
   const fetchGridRef = useRef(fetchGrid);
@@ -58,25 +66,41 @@ export function useServerTable<T>({
 
   const reloadTokenRef = useRef(0);
 
+  const applyResponse = useCallback((response: { items: T[]; total_count: number } | null) => {
+    // `apiCall` 은 `{success:false}` 를 `null` 로 돌려준다 — 격자 경로에서는 그 `null` 을 실패로
+    // 읽는다. 여기서 안 가르면 서버가 거절한 것이 「총 0건」으로 화면에 적힌다.
+    if (!response) throw new ApiCallFailure();
+    setError(null);
+    setServerRows(response.items ?? []);
+    setServerTotalCount(response.total_count ?? 0);
+  }, []);
+
+  const applyFailure = useCallback((cause: unknown) => {
+    showToast(getApiErrorMessage(cause), "error");
+    // 토스트는 2초 뒤 사라진다 — 사유가 화면에 남으려면 상태로도 들고 있어야 한다.
+    // `null`·`undefined` 로 거절된 프로미스도 실패이므로 빈 사유를 만들지 않는다.
+    setError(cause ?? new ApiCallFailure());
+    setServerRows([]);
+    setServerTotalCount(0);
+  }, []);
+
   // 서버 모드 — 페이지·정렬·필터·의존성이 바뀔 때마다 재요청한다.
   useEffect(() => {
     if (clientSide) return;
 
     const token = ++reloadTokenRef.current;
     setIsLoading(true);
+    setError(null);
 
     fetchGridRef
       .current({ skip: query.skip, take: query.take, filter: query.filter, sort: query.sort })
       .then((response) => {
         if (token !== reloadTokenRef.current) return;
-        setServerRows(response?.items ?? []);
-        setServerTotalCount(response?.total_count ?? 0);
+        applyResponse(response);
       })
-      .catch((error: unknown) => {
+      .catch((cause: unknown) => {
         if (token !== reloadTokenRef.current) return;
-        showToast(getApiErrorMessage(error), "error");
-        setServerRows([]);
-        setServerTotalCount(0);
+        applyFailure(cause);
       })
       .finally(() => {
         if (token !== reloadTokenRef.current) return;
@@ -100,19 +124,17 @@ export function useServerTable<T>({
 
     const token = ++reloadTokenRef.current;
     setIsLoading(true);
+    setError(null);
 
     fetchGridRef
       .current({})
       .then((response) => {
         if (token !== reloadTokenRef.current) return;
-        setServerRows(response?.items ?? []);
-        setServerTotalCount(response?.total_count ?? 0);
+        applyResponse(response);
       })
-      .catch((error: unknown) => {
+      .catch((cause: unknown) => {
         if (token !== reloadTokenRef.current) return;
-        showToast(getApiErrorMessage(error), "error");
-        setServerRows([]);
-        setServerTotalCount(0);
+        applyFailure(cause);
       })
       .finally(() => {
         if (token !== reloadTokenRef.current) return;
@@ -148,6 +170,7 @@ export function useServerTable<T>({
     rows,
     totalCount,
     isLoading,
+    error,
     query,
     pageIndex,
     pageSize,

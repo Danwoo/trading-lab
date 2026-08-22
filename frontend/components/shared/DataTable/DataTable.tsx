@@ -216,6 +216,9 @@ export function DataTable<T>({
   );
 
   const isEmpty = table.rows.length === 0;
+  // 「못 읽음」은 「0건」이 아니다 — 실패한 요청은 행도 총건수도 세지 못한 것이라, 빈 상태
+  // 문구도 총건수도 그리지 않는다. 로딩 중이면 지난 실패 대신 다음 응답을 기다린다.
+  const hasError = table.error !== null && table.error !== undefined && !table.isLoading;
 
   // 커널은 `showPager` 와 무관하게 항상 페이지 크기로 자른다(서버 모드는 take, clientSide 는
   // applyClientQuery 의 slice). 그래서 페이저를 끈 채 목록이 페이지 크기를 넘기면 그 뒤 행에
@@ -225,11 +228,12 @@ export function DataTable<T>({
   // **잘리고 있으면 페이저는 무조건 뜬다.** 페이저를 끈다는 것은 "이 목록은 한 화면에 다
   // 들어간다"는 주장이고, 그 주장이 틀린 순간 주장 대신 데이터를 택한다.
   const isTruncated = table.totalCount > table.pageSize;
-  const pagerVisible = showPager || isTruncated;
+  // 실패했으면 페이저를 통째로 뺀다 — 「총 0건」도 「1 / 1」도 세어 본 적 없는 수다.
+  const pagerVisible = !hasError && (showPager || isTruncated);
   // 가상 스크롤은 화면에 보이는 행만 DOM 에 둔다 — aria-rowcount 로 전체 행 수(헤더 포함)를
   // 알려야 스크린리더가 "N행짜리 표"를 정확히 읽는다. 아직 최초 응답 전(로딩 중 + 데이터
-  // 없음)이면 전체 행 수를 모르므로 ARIA 가 정의한 "미상" 값 -1 을 쓴다.
-  const ariaRowCount = table.isLoading && isEmpty ? -1 : bodyRows.length + 1;
+  // 없음)이거나 요청이 실패했으면 전체 행 수를 모르므로 ARIA 가 정의한 "미상" 값 -1 을 쓴다.
+  const ariaRowCount = hasError || (table.isLoading && isEmpty) ? -1 : bodyRows.length + 1;
 
   return (
     <div className="flex min-h-0 flex-col border" style={{ height }}>
@@ -258,6 +262,8 @@ export function DataTable<T>({
             isLoading={table.isLoading}
             isEmpty={isEmpty}
             emptyText={emptyText}
+            hasError={hasError}
+            onRetry={table.reload}
             showSelectionColumn={showSelectionColumn}
             selectionMode={selectionMode}
             rowKeyOf={(row) => rowKeyOf(row, keyField)}
