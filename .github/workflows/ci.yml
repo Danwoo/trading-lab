@@ -364,6 +364,20 @@ jobs:
             *) echo "::error::검사가 실제로 돌지 않았다 — 건너뜀은 통과가 아니다"; exit 1 ;;
           esac
 
+      # 종목 검색의 값은 전부 SQL 안에 있다 — LIKE 이스케이프·순위 CASE·조회 상한 (#318).
+      # 리포지토리를 대역으로 갈아 끼운 단위 테스트는 그 SQL 을 DB 앞에 한 번도 세우지 않는다.
+      - name: 종목 마스터 검색 SQL 검증
+        if: ${{ !cancelled() }}
+        env:
+          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+        run: |
+          out=$(uv run python scripts/verify_instrument_search.py)
+          echo "$out"
+          case "$out" in
+            *"REQUIRE=db 실행됨"*) : ;;
+            *) echo "::error::검사가 실제로 돌지 않았다 (DB URL 이 안 닿았다) — 건너뜀은 통과가 아니다"; exit 1 ;;
+          esac
+
       - name: frontend FK 참조 동작 계약 검증
         if: ${{ !cancelled() }}
         run: uv run python scripts/verify_frontend_fk_referential_actions.py --i-know-this-drops-tables
