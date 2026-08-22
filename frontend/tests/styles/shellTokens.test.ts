@@ -85,6 +85,8 @@ describe("터치 표적 — 손가락 축 (#230)", () => {
   it("기본값은 마우스 치수다 — 데스크톱 디자인이 안 바뀐다", () => {
     expect(GLOBALS_CSS).toMatch(/--touch-rail-target:\s*30px;/);
     expect(GLOBALS_CSS).toMatch(/--touch-min:\s*26px;/);
+    // 아이콘 조작부는 규격 하한(WCAG 2.5.8 AA)에 딱 맞춘다 — 마우스 화면에서 더 키우지 않는다.
+    expect(GLOBALS_CSS).toMatch(/--touch-icon-target:\s*24px;/);
   });
 
   it("손가락으로 누르는 기기에서 권장치까지 커진다", () => {
@@ -93,6 +95,8 @@ describe("터치 표적 — 손가락 축 (#230)", () => {
     expect(block, "`pointer: coarse` 블록이 없다").toBeTruthy();
     expect(block).toMatch(/--touch-rail-target:\s*44px;/);
     expect(block).toMatch(/--touch-min:\s*44px;/);
+    // #289 리드 결정 2026-08-21 ② — 갈래가 사라지면(=coarse 선언이 빠지면) 여기서 실패한다.
+    expect(block).toMatch(/--touch-icon-target:\s*44px;/);
   });
 
   it("레일 폭 자체는 그대로다 — 표적을 키우려고 셸 결정을 바꾸지 않는다", () => {
@@ -110,8 +114,8 @@ describe("터치 표적 — 손가락 축 (#230)", () => {
       px: Number(value),
     }));
 
-    // 선언이 사라져도 「위반 0건」으로 초록이 되지 않게 — 기본 2개 + coarse 2개.
-    expect(declared.length, `--touch-* 선언이 ${declared.length}건이다`).toBe(4);
+    // 선언이 사라져도 「위반 0건」으로 초록이 되지 않게 — 기본 3개 + coarse 3개.
+    expect(declared.length, `--touch-* 선언이 ${declared.length}건이다`).toBe(6);
     for (const { name, px } of declared) {
       expect(px, `${name} 가 ${px}px 이다 — WCAG 2.5.8 하한(24px) 아래다`).toBeGreaterThanOrEqual(24);
     }
@@ -124,5 +128,10 @@ describe("터치 표적 — 손가락 축 (#230)", () => {
 
     expect(spacing["touch-rail-target"]).toBe("var(--touch-rail-target)");
     expect(minHeight["touch-min"]).toBe("var(--touch-min)");
+    // `ICON_HIT_AREA` 는 `min-h-touch-icon min-w-touch-icon` 을 낸다 — 둘 다 없으면 클래스가
+    // 값 없이 죽어 상자가 글리프 크기로 되돌아간다 (#289).
+    const minWidth = extend.minWidth as Record<string, string>;
+    expect(minHeight["touch-icon"]).toBe("var(--touch-icon-target)");
+    expect(minWidth["touch-icon"]).toBe("var(--touch-icon-target)");
   });
 });

@@ -41,9 +41,7 @@ EVIDENCE: dict[str, tuple[str, str]] = {
 ARRIVED = {"now"}
 NOT_YET = {"next", "later"}
 
-STAGE_RE = re.compile(
-    r'\{\s*id:\s*"(?P<id>[^"]+)"[^}]*?state:\s*"(?P<state>[^"]+)"', re.DOTALL
-)
+STAGE_RE = re.compile(r'\{\s*id:\s*"(?P<id>[^"]+)"[^}]*?state:\s*"(?P<state>[^"]+)"', re.DOTALL)
 
 
 def main() -> int:
@@ -55,10 +53,7 @@ def main() -> int:
             )
             return 1
 
-    declared = {
-        m.group("id"): m.group("state")
-        for m in STAGE_RE.finditer(STAGES.read_text(encoding="utf-8"))
-    }
+    declared = {m.group("id"): m.group("state") for m in STAGE_RE.finditer(STAGES.read_text(encoding="utf-8"))}
     if not declared:
         print(
             f"::error::단계를 0건 찾았습니다: {STAGES} — 선언 모양이 바뀌었을 수 있습니다",
@@ -72,9 +67,7 @@ def main() -> int:
     for stage_id, (router, screen) in EVIDENCE.items():
         state = declared.get(stage_id)
         if state is None:
-            violations.append(
-                f"{stage_id}: 이 그물이 아는 단계인데 stages.ts 에 없습니다"
-            )
+            violations.append(f"{stage_id}: 이 그물이 아는 단계인데 stages.ts 에 없습니다")
             continue
         checked += 1
         has_router = f'"{router}"' in registered
@@ -86,9 +79,7 @@ def main() -> int:
             )
         elif state in ARRIVED and not arrived:
             missing = "라우터" if not has_router else "화면"
-            violations.append(
-                f"{stage_id}: state={state!r}(왔다)인데 {missing}이 없습니다"
-            )
+            violations.append(f"{stage_id}: state={state!r}(왔다)인데 {missing}이 없습니다")
 
     print(f"단계 {checked}건 대조 (stages.ts ↔ modules.py 등록 + 화면 파일)")
     if checked < len(EVIDENCE):
