@@ -324,6 +324,38 @@ def test_not_canonical_row_is_guidance_not_a_deficiency() -> str:
     return "test_not_canonical_row_is_guidance_not_a_deficiency (판정 3종)"
 
 
+def test_reversed_period_is_named_by_screen_fields() -> str:
+    """구간을 거꾸로 넣었을 때의 사유가 **화면의 칸 이름**으로 온다 (#317).
+
+    `date_from`·`date_to` 는 요청 본문의 이름이고 화면 어디에도 없다 — 그 이름으로 답하면
+    두 칸 중 어느 것이 잘못됐는지 사용자가 알아낼 수 없다. 격자 폼의 칸은 「구간 시작」·「구간 끝」이다.
+
+    두 출구(일봉 조회·결측 조회)를 다 본다 — 한쪽만 고치면 다른 쪽으로 옛 문장이 그대로 나간다.
+    """
+    reversed_args = {
+        "market": "KOSPI",
+        "symbol": "005930",
+        "date_from": dt.date(2026, 8, 20),
+        "date_to": dt.date(2023, 8, 21),
+        "limit": None,
+        "workspace_id": 1,
+    }
+    exits = {
+        "select_daily_bar_list": lambda: _bar_service().select_daily_bar_list(dict(reversed_args)),
+        "find_gaps": lambda: _bar_service().find_gaps(dict(reversed_args)),
+    }
+    for name, call in exits.items():
+        try:
+            call()
+        except BadRequestError as exc:
+            said = str(exc)
+            assert "구간 시작" in said and "구간 끝" in said, f"{name} 의 사유가 칸 이름을 안 쓴다: {said}"
+            assert "date_from" not in said and "date_to" not in said, f"{name} 의 사유에 요청 필드명이 샜다: {said}"
+        else:
+            raise AssertionError(f"{name} 이 뒤집힌 구간을 거절하지 않았다")
+    return f"test_reversed_period_is_named_by_screen_fields (출구 {len(exits)}곳)"
+
+
 TESTS = [
     test_key_required_sources_build_without_key_and_explain_why,
     test_not_canonical_row_is_guidance_not_a_deficiency,
@@ -335,6 +367,7 @@ TESTS = [
     test_five_minute_synthesis_matches_manual_fold,
     test_duplicate_bars_in_one_response_merge_by_rule,
     test_malformed_scope_is_rejected_not_silently_empty,
+    test_reversed_period_is_named_by_screen_fields,
 ]
 
 

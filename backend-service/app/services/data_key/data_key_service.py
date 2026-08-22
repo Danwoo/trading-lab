@@ -348,19 +348,22 @@ class DataKeyService:
         """키가 없는 이유 + 리드가 무엇을 하면 열리는지. 화면이 그대로 보여줄 문장이다.
 
         **키 값도, 앞자리 몇 글자도 싣지 않는다** — 이 문장은 API 응답으로 나간다.
+
+        **파일을 열라고 하지 않는다** — 여기 적는 항목 이름은 설정 화면의 그 줄 이름과 같아,
+        읽은 사람이 화면에서 바로 그 줄을 찾을 수 있다.
         """
         if source in NON_SECRET_CONTACT_SOURCES:
-            return f".env 의 {CONTACT_SETTING} 에 연락처를 채우세요 (비밀값이 아닙니다 — 소스가 우리를 식별하는 문자열)"
+            return f"{CONTACT_SETTING} 에 연락처가 필요합니다 (비밀값이 아닙니다 — 소스가 우리를 식별하는 문자열)"
 
         composite = COMPOSITE_KEY_SETTINGS.get(source)
         if composite is not None:
             hint = KEY_ACQUISITION_HINT.get(source)
-            reason = f".env 의 {composite[0]}·{composite[1]} 이 다 있어야 합니다"
+            reason = f"{composite[0]}·{composite[1]} 이 다 있어야 합니다"
             return f"{reason}. 발급 경로: {hint}" if hint else reason
 
         setting = SOURCE_KEY_SETTINGS.get(source)
         if setting is None:
             return f"{source} 는 키로 여는 소스가 아닙니다"
         hint = KEY_ACQUISITION_HINT.get(source)
-        reason = f".env 의 {setting} 이 비어 있습니다"
+        reason = f"{setting} 이 아직 비어 있습니다"
         return f"{reason}. 발급 경로: {hint}" if hint else reason

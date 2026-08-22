@@ -506,6 +506,31 @@ describe("#288 막힌 것이 화면을 덮지 않는다", () => {
     expect(reason.open).toBe(false);
   });
 
+  // #317 — 「키를 넣으면 열리는 것」이 가리키는 곳이 파일이 아니라 화면이어야 한다.
+  // 그 일을 하는 설정 화면(`/settings`)이 이미 있는데 이 자리에서 갈 길이 없었다.
+  it("키를 넣는 자리로 가는 조작부가 그 블록 안에 선다", () => {
+    given({ capabilities: mixedBlocked(), symbol: null });
+    render(<IngestConsole />);
+
+    const link = screen.getByRole("link", { name: "설정에서 키 넣기" });
+    expect(link.getAttribute("href")).toBe("/settings");
+    expect(section("소스").contains(link)).toBe(true);
+  });
+
+  it("열 수 있는 것이 하나도 없으면 그 조작부도 서지 않는다 — 없는 일을 시키지 않는다", () => {
+    given({
+      capabilities: panel<unknown[]>({
+        data: [
+          { source: "sec", market: "NASDAQ", dataKind: "daily_bar", available: false, reason: NO_PRICE, code: null },
+        ],
+      }),
+      symbol: null,
+    });
+    render(<IngestConsole />);
+
+    expect(screen.queryByRole("link", { name: "설정에서 키 넣기" })).toBeNull();
+  });
+
   it("머리글이 「막힌 이유 N가지」로 시작하지 않는다 — 셈은 접힌 자리가 진다", () => {
     given({ capabilities: mixedBlocked(), symbol: null });
     render(<IngestConsole />);
