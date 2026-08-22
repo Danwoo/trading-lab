@@ -35,7 +35,7 @@ tools: Read, Grep, Glob, Bash
 
 ### 전체 모드 (default)
 ```bash
-git ls-files --cached --others --exclude-standard 'frontend/**/*.ts' 'frontend/**/*.tsx'
+git ls-files --cached --others --exclude-standard ':(glob)frontend/**/*.ts' ':(glob)frontend/**/*.tsx'
 ```
 > tracked + untracked (gitignore 존중) 모두 포함. 신규 작성 파일도 검토 대상.
 
@@ -53,6 +53,8 @@ git ls-files --cached --others --exclude-standard 'frontend/**/*.ts' 'frontend/*
 **핵심 흐름**: 룰 1 (Phase A → Phase B) → 룰 2 (Phase A → Phase B) → ... 순차. 룰 단위로 차례차례, 룰 1 의 Phase B 끝나기 전엔 룰 2 시작 금지.
 
 룰 번호와 grep 명령은 **`anti-patterns-frontend.md` 각 룰의 `**Detection**` 박스에서 그대로 가져온다**.
+
+pathspec 의 `:(glob)` 접두는 **떼지 않는다** — 떼면 `**/` 가 「디렉터리 한 단계 이상」으로 읽혀 `frontend/proxy.ts`·`env.ts` 같은 깊이 1 파일이 검사에서 빠진다 (`anti-patterns-frontend.md` 의 「Pathspec」).
 
 ### Phase A — 탐지 (recall 보장)
 
