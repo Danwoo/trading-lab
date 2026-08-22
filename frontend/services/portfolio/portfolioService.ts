@@ -21,7 +21,7 @@ const stringifyGridParams = (params: any): Record<string, any> => {
 };
 
 interface SelectListOptions {
-  /** #332 — 서버 실패(`success:false`)와 정상 응답 0건을 구분해야 하는 호출부용. 기본 false. */
+  /** 서버 실패(`success:false`)와 정상 응답 0건을 구분해야 하는 호출부용. 기본 false. */
   throwOnFailure?: boolean;
 }
 
