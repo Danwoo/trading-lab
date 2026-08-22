@@ -20,6 +20,17 @@
 
 `### N. {룰명}` 헤더의 **번호와 텍스트는 review-frontend.md 출력 표 + frontend/CLAUDE.md 체크리스트와 정확히 동일**. 룰 추가/삭제 시 3곳 동시 갱신 필수.
 
+## Pathspec — `:(glob)` 를 붙인 채로 실행한다
+
+Detection 의 pathspec 은 전부 `':(glob)...'` 로 시작한다. **이 접두를 떼면 같은 글자가 다른 뜻이 된다** — git 기본 매직에서는 `*` 가 `/` 를 넘고 `**/` 는 「디렉터리가 한 단계 이상」이 되어 **깊이 1 파일이 통째로 빠진다**. `':(glob)'` 아래에서만 `*` 가 한 세그먼트 안에 머물고 `/**/` 가 「0개 이상의 디렉터리」로 읽힌다.
+
+```bash
+git ls-files 'frontend/**/*.ts'         | wc -l   # 289 — proxy.ts·env.ts 등 7개가 없다 (pathspec-check: 반례)
+git ls-files ':(glob)frontend/**/*.ts'  | wc -l   # 296
+```
+
+접두가 빠지거나 pathspec 이 한 파일도 못 맞히면 `scripts/verify_detection_pathspec.py` 가 실패한다.
+
 ## 목차
 
 **재사용 / 위치**
@@ -74,7 +85,7 @@ const { dataSource, selectedData, handleSelect, handleCreate, handleRefresh }
 
 **Detection** (negative-pattern 📍):
 ```bash
-git ls-files --cached --others --exclude-standard 'frontend/components/features/**/*Container.tsx'
+git ls-files --cached --others --exclude-standard ':(glob)frontend/components/features/**/*Container.tsx'
 ```
 hit = Container 후보. 각 파일 Read 후 `useState` + `useEffect` + `fetch` 패턴이 있고 `useMasterGridData` / `useFormState` 미사용 시 위반.
 
@@ -99,9 +110,9 @@ hit = Container 후보. 각 파일 Read 후 `useState` + `useEffect` + `fetch` �
 
 **Detection**:
 ```bash
-git ls-files --cached --others --exclude-standard 'frontend/components/**/*.tsx' \
+git ls-files --cached --others --exclude-standard ':(glob)frontend/components/**/*.tsx' \
   | grep -vE '^frontend/components/(features|shared|providers|layouts)/'
-git ls-files --cached --others --exclude-standard 'frontend/app/**/_components/**/*.tsx'
+git ls-files --cached --others --exclude-standard ':(glob)frontend/app/**/_components/**/*.tsx'
 ```
 0 hit → 통과. 1+ hit → 위반.
 
@@ -129,7 +140,7 @@ interface Props {
 
 **Detection**:
 ```bash
-git grep --untracked -nE '(interface|type)\s+\w*Props\b' -- 'frontend/components/features/**/*.tsx'
+git grep --untracked -nE '(interface|type)\s+\w*Props\b' -- ':(glob)frontend/components/features/**/*.tsx'
 ```
 0 hit → 통과. 1+ hit → 각 파일 Read 후 Props 정의 필드에 `snake_case` 식별자 존재 시 위반.
 
@@ -171,7 +182,7 @@ import { DataTable } from '@/components/shared/DataTable';   // 새 화면 (컬�
 
 **Detection**:
 ```bash
-git grep -nE "['\"](devextreme|devexpress-|@devexpress/|@devextreme/)" -- 'frontend/**/*.ts' 'frontend/**/*.tsx' 'frontend/**/*.css' \
+git grep -nE "['\"](devextreme|devexpress-|@devexpress/|@devextreme/)" -- ':(glob)frontend/**/*.ts' ':(glob)frontend/**/*.tsx' ':(glob)frontend/**/*.css' \
   | grep -v "devextreme-exceljs-fork"
 ```
 0 hit → 통과. **예외는 위 MIT 포크 하나뿐**이고, 그 하나를 뒤 파이프가 걸러내므로 hit 는 곧
@@ -224,7 +235,7 @@ shared 훅·배럴을 거쳐 devextreme 을 전이로 물면 0 hit 로 빠져나
 
 **Detection** (negative-pattern 📍):
 ```bash
-git ls-files --cached --others --exclude-standard 'frontend/components/features/**/*Container.tsx'
+git ls-files --cached --others --exclude-standard ':(glob)frontend/components/features/**/*Container.tsx'
 ```
 hit = Container 파일. 각 파일 Read 후 `SplitPane` + `MasterPanel` + `DetailPanel` 구조 누락 시 위반.
 
@@ -264,7 +275,7 @@ const res = await proxyApiRequest('/users', { method: 'GET', headers: { Authoriz
 **Detection**:
 ```bash
 git grep --untracked -nE '\b(fetch\(|axios\.(get|post|put|delete|patch)\()' \
-  -- 'frontend/**/*.ts' 'frontend/**/*.tsx' \
+  -- ':(glob)frontend/**/*.ts' ':(glob)frontend/**/*.tsx' \
   | grep -vE 'frontend/utils/common/api/(client|server|responses|sse)\.ts'
 ```
 0 hit → 통과. 1+ hit → 위반 (헬퍼 본체는 grep 에서 자연 제외됨).
@@ -318,7 +329,7 @@ export const GET = withAuth(async (request, session) => {
 
 **Detection** (negative-pattern 📍):
 ```bash
-git ls-files --cached --others --exclude-standard 'frontend/app/api/**/route.ts'
+git ls-files --cached --others --exclude-standard ':(glob)frontend/app/api/**/route.ts'
 ```
 hit = 모든 API route. 각 파일 Read 후 `withAuth(...)` wrapper 사용 여부 + `frontend/proxy.ts` 의 `PUBLIC_RULES` 등록 여부 확인:
 ```bash
@@ -357,7 +368,7 @@ const useYnCodes = getCode('USE_YN');
 **Detection**:
 ```bash
 git grep --untracked -nE "(fetch|apiCall)\([^)]*['\"]\/api/(codes|common/code)" \
-  -- 'frontend/**/*.ts' 'frontend/**/*.tsx'
+  -- ':(glob)frontend/**/*.ts' ':(glob)frontend/**/*.tsx'
 ```
 0 hit → 통과. 1+ hit → 위반 (`fetch` / `apiCall` 둘 다 codeStore 우회로 간주).
 
@@ -390,7 +401,7 @@ const Schema = object({
 **Detection**:
 ```bash
 git grep --untracked -nE '\bz\.(string|number|object|array|enum|literal|date|boolean|union)\(' \
-  -- 'frontend/schemas/**/*.ts' 'frontend/components/**/*.tsx'
+  -- ':(glob)frontend/schemas/**/*.ts' ':(glob)frontend/components/**/*.tsx'
 ```
 0 hit → 통과. 1+ hit → 후보별 Read 후 아래 2개 예외 검사.
 
@@ -415,7 +426,7 @@ npm run dev:prisma:push
 **Detection**:
 ```bash
 git grep --untracked -nE 'prisma\s+migrate\b' \
-  -- 'frontend/package.json' 'frontend/scripts/**' '*.md' 'frontend/**/*.ts'
+  -- ':(glob)frontend/package.json' ':(glob)frontend/scripts/**' ':(glob)**/*.md' ':(glob)frontend/**/*.ts'
 ```
 0 hit → 통과. 1+ hit → 위반.
 
@@ -449,7 +460,7 @@ export default async function Page() {
 **Detection**:
 ```bash
 git grep --untracked -lE '\b(useState|useEffect|useRef|useReducer|useMemo|useCallback)\(' \
-  -- 'frontend/**/*.tsx'
+  -- ':(glob)frontend/**/*.tsx'
 ```
 hit = React hook 사용 파일. 각 파일 Read 후 첫 줄에 `'use client'` 또는 `"use client"` 없으면 위반.
 
@@ -508,7 +519,7 @@ const symbol = useTerminalSymbol();
 
 **Detection** (positive-grep, hit=판정 대상):
 ```bash
-git grep -nE "from ['\"]@/stores/terminal/(contextActions|contextStore)" -- 'frontend/components/features/**/*.tsx'
+git grep -nE "from ['\"]@/stores/terminal/(contextActions|contextStore)" -- ':(glob)frontend/components/features/**/*.tsx'
 ```
 **이 룰은 hit 가 정상적으로 나온다** — 아래 예외 3곳(및 그 하위 컴포넌트)이 실제로 문맥을 쓴다. 0 hit 를 기대하지 않는다. 각 hit 를 Read 해 `Terminal/TerminalContainer.tsx` 또는 아래 예외 컴포넌트인지 판정 — 예외 밖이면 위반.
 
@@ -535,7 +546,7 @@ const { data, isLoading, error, provenance } = useRealtimeQuote();
 
 **Detection**:
 ```bash
-git grep -nE "\b(apiCall\(|new WebSocket\()" -- 'frontend/components/features/*Panel/**'
+git grep -nE "\b(apiCall\(|new WebSocket\()" -- ':(glob)frontend/components/features/*Panel/**'
 ```
 0 hit → 통과. 1+ hit → 위반(예외 없음).
 
@@ -555,7 +566,7 @@ export function useFoo(): PanelData<Foo[]> { ... }
 
 **Detection** (negative-pattern 📍):
 ```bash
-git grep -nL "PanelData<" -- 'frontend/hooks/terminal/use*.ts'
+git grep -nL "PanelData<" -- ':(glob)frontend/hooks/terminal/**/use*.ts'
 ```
 hit = `PanelData<` 문자열이 없는 파일(후보 — hit 자체는 정상, Read 후 누락 검사가 본질). 각 파일 Read 후 반환 객체에 `provenance` 필드가 실제로 있는지 판정.
 
@@ -580,7 +591,7 @@ candleChart.setCandles(
 
 **Detection** (positive-grep, hit=판정 대상):
 ```bash
-git grep -nE "from ['\"].*[sS]ample[A-Z]" -- 'frontend/**/*.ts' 'frontend/**/*.tsx'
+git grep -nE "from ['\"].*[sS]ample[A-Z]" -- ':(glob)frontend/**/*.ts' ':(glob)frontend/**/*.tsx'
 ```
 **이 룰은 hit 가 정상적으로 나올 수 있다** — 샘플 모듈을 import 하는 것 자체는 위반이 아니다. 0 hit 를 기대하지 않는다. 각 hit 파일을 Read 해 `provenance.kind === "placeholder"` 분기 **안**에서만 쓰는지 판정 — 분기 밖(무조건 실행되는 경로)에서 쓰면 위반.
 
