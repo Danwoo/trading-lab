@@ -257,6 +257,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_root_doc_hygiene.py
 
+      # 리뷰 룰의 Detection pathspec (#330) — review-* 에이전트가 그대로 실행하는 글롭이
+      # `:(glob)` 매직을 선언하고, 대상 파일을 실제로 맞히는지. 종전에는 `**/` 가 깊이 1 을
+      # 빼서 각 서비스의 app/main.py 12개가 룰 5개의 사정권 밖이었는데 보고서는 「통과」였다.
+      - name: 리뷰 룰 Detection pathspec 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_detection_pathspec.py
+
       # 리뷰어 배정 판정 (cross-review.yml 의 route 잡이 부르는 순수 판정) — 저자 판별·위험도
       # 판독·리뷰어 배정. 종전엔 YAML 안 bash 라 단위 테스트가 없었다.
       - name: 리뷰어 배정 판정 회귀 그물
