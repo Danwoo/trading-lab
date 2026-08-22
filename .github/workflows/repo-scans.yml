@@ -245,6 +245,9 @@ jobs:
   repo-lint:
     name: "test: repo-lint"
     runs-on: ubuntu-latest
+    # 체크아웃과 스크립트 실행 말고는 아무것도 안 한다 — 토큰 권한을 그만큼만 준다.
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
