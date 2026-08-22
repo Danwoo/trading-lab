@@ -240,7 +240,7 @@ export function BotForm({
             />
           )}
         </Row>
-        <Row label="손절">
+        <Row label="손절" help="산 값보다 이만큼 내리면 접습니다 (0~100%). 비우면 손절하지 않습니다.">
           {(control) => (
             <NumberBox
               {...control}
@@ -254,7 +254,7 @@ export function BotForm({
             />
           )}
         </Row>
-        <Row label="익절">
+        <Row label="익절" help="산 값보다 이만큼 오르면 챙깁니다 (0% 이상). 비우면 익절하지 않습니다.">
           {(control) => (
             <NumberBox
               {...control}
@@ -267,7 +267,10 @@ export function BotForm({
             />
           )}
         </Row>
-        <Row label="종목당 비중">
+        <Row
+          label="종목당 비중"
+          help="한 종목에 넣을 비중 (0% 이상). 무엇 대비인지는 봇을 굴리는 엔진이 정하는데 아직 없습니다. 비우면 배분을 정하지 않습니다."
+        >
           {(control) => (
             <NumberBox
               {...control}
@@ -280,7 +283,7 @@ export function BotForm({
             />
           )}
         </Row>
-        <Row label="최대 보유 종목">
+        <Row label="최대 보유 종목" help="동시에 들고 갈 종목 수 (1종목 이상). 비우면 제한하지 않습니다.">
           {(control) => (
             <NumberBox
               {...control}
@@ -293,7 +296,7 @@ export function BotForm({
             />
           )}
         </Row>
-        <Row label="하루 최대 매매">
+        <Row label="하루 최대 매매" help="하루에 낼 매매 횟수 (1회 이상). 비우면 제한하지 않습니다.">
           {(control) => (
             <NumberBox
               {...control}
