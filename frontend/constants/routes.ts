@@ -46,3 +46,26 @@ export const POST_LOGIN_PATH = BENCH_PATH;
  * URL 직접 입력 같은 비정상 흐름에서만 도달한다(정상 사용자는 레일·사이드바를 거친다).
  */
 export const UNAUTHORIZED_FALLBACK_PATH = "/";
+
+/**
+ * 되돌린 이유를 도착지에 실어 보내는 쿼리 파라미터.
+ *
+ * `UNAUTHORIZED_FALLBACK_PATH` 는 로그인 화면이라, 사유 없이 도착하면 **로그인이 풀린 것으로
+ * 읽힌다.** 세션은 멀쩡한데 로그인하라는 화면을 보는 것이 #333 이 적은 결함이고, 사유를
+ * 실어야 도착지가 그것을 부정할 수 있다.
+ */
+export const RETURN_REASON_PARAM = "reason";
+
+/**
+ * 되돌린 사유 — **계정 상태 이야기만 여기 온다.** 「메뉴를 못 읽었다」는 되돌리지 않고
+ * 제품 셸 안에서 사유 화면으로 선다 — 못 읽은 것은 로그아웃 상태가 아니다.
+ *
+ * `session-expired` 는 그 반대편이다: 쿠키는 남았는데 서버가 세션을 거부한(401) 상태라
+ * **정말로 로그아웃됐다.** 제품 셸에는 로그아웃 수단이 없어(`signOut` 은 관리 섀시의
+ * `Header` 하나뿐이다) 여기서 되돌리지 않으면 나갈 길이 없다.
+ */
+export type ReturnReason = "forbidden" | "no-menu" | "session-expired";
+
+/** 되돌릴 자리 + 사유. 도착지(로그인 화면)가 이 값을 읽어 왜 왔는지 말한다. */
+export const fallbackPathWithReason = (reason: ReturnReason): string =>
+  `${UNAUTHORIZED_FALLBACK_PATH}?${RETURN_REASON_PARAM}=${reason}`;

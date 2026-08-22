@@ -3,6 +3,7 @@
 import { type ReactNode } from "react";
 // 배럴(`@/components/shared/Layout`)로 들어오면 그 안의 모든 것이 딸려 온다 — 제품 셸은
 // 모든 화면이 지나가는 자리라 그 비용이 전 화면에 실린다. 직접 경로로 집는다 (#341 ②와 같은 사유).
+import { MenuUnreadableScreen } from "@/components/shared/Layout/MenuUnreadableScreen";
 import { ProductPanel } from "@/components/shared/Layout/ProductPanel";
 import { ProductRail } from "@/components/shared/Layout/ProductRail";
 import { RAIL_PANEL_CONTENT } from "@/components/shared/Layout/railPanelContent";
@@ -52,7 +53,7 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
   const closePanel = useProductPanelStore((s) => s.close);
   const toggleExpanded = useProductPanelStore((s) => s.toggleExpanded);
   const clearFocusRequest = useProductPanelStore((s) => s.clearFocusRequest);
-  const { loaded, authorized } = useMenuAccessGate(NO_PREFIX_ALLOWED, SHELL_ENTRY_PATHS);
+  const { loaded, authorized, denial } = useMenuAccessGate(NO_PREFIX_ALLOWED, SHELL_ENTRY_PATHS);
   // 폭·배분은 CSS 가 정한다. JS 가 아직 답해야 하는 것은 이 하나 — 덮는가(그래서 보드가 죽는가).
   const panelOverlaysBoard = usePanelOverlaysBoard();
 
@@ -80,7 +81,8 @@ export default function ProductLayout({ children }: { children: ReactNode }) {
       {/* 패널은 이 상자 안에서만 논다 — 덮을 때(§21.6)도 레일까지 덮지는 않는다 */}
       <div className="relative flex min-w-0 flex-1">
         <main className="min-w-0 flex-1 overflow-auto" inert={panelCoversBoard || undefined}>
-          {settled && authorized ? children : null}
+          {/* 못 읽은 것은 셸 **안에서** 말한다 — 되돌리면 로그인 화면이 사유 없이 뜬다(#333). */}
+          {denial === "unreadable" ? <MenuUnreadableScreen /> : settled && authorized ? children : null}
         </main>
 
         {openPanel && (

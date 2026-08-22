@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { signIn } from "@/lib/auth/auth-client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -12,38 +12,29 @@ import { Button } from "@/components/shared/ui/Button";
 import { TextBox } from "@/components/shared/ui/TextBox";
 import { showMessage } from "@/stores/shared/messageStore";
 import { useNavStore } from "@/stores/shared/navStore";
-import { POST_LOGIN_PATH } from "@/constants/routes";
-
-const findFirstPath = (items: { path?: string; items?: any[] }[]): string | null => {
-  for (const item of items) {
-    if (item.path) return item.path;
-    if (item.items) {
-      const found = findFirstPath(item.items);
-      if (found) return found;
-    }
-  }
-  return null;
-};
-
-const hasPath = (items: { path?: string; items?: any[] }[], target: string): boolean =>
-  items.some((item) => item.path === target || (item.items ? hasPath(item.items, target) : false));
+import { resolvePostLoginDestination } from "@/lib/auth/postLoginDestination";
+import { RETURN_REASON_PARAM, type ReturnReason } from "@/constants/routes";
 
 /**
- * 로그인 후 착지점.
- *
- * 예전에는 「접근 가능한 첫 메뉴」였다 — 메뉴 정렬 순서가 곧 홈이라, 메뉴 하나를 위로
- * 올리면 홈이 조용히 바뀌었다. 실험대가 홈이 되면서(화면 결정 §20.2) 착지점을 상수로
- * 못박는다. 다만 **메뉴 게이트가 fail-closed** 라 그 경로 권한이 없는 사용자를 그리로 보내면
- * 셸이 곧바로 로그인 화면으로 되돌려 왕복한다 — 그래서 네비게이션에 있을 때만 쓰고,
- * 없으면 종전대로 첫 메뉴로 내려간다.
+ * 왜 이 화면으로 되돌아왔나. **로그인이 풀린 것이 아니라는 말이 먼저다** — 사유 없이 도착하면
+ * 세션이 멀쩡한 사람이 자기 계정을 의심한다(#333).
  */
-const resolveLandingPath = (items: { path?: string; items?: any[] }[]): string | null =>
-  hasPath(items, POST_LOGIN_PATH) ? POST_LOGIN_PATH : findFirstPath(items);
+const RETURN_REASON_LINES: Record<ReturnReason, string> = {
+  forbidden: "로그인은 그대로입니다 — 방금 연 화면에 접근 권한이 없어 여기로 돌아왔습니다.",
+  "no-menu": "로그인은 됐지만 이 계정에 열려 있는 화면이 없습니다. 관리 화면에서 메뉴 권한을 먼저 열어 주세요.",
+  "session-expired": "로그인이 풀렸습니다 — 서버가 이 세션을 더 이상 받지 않습니다. 다시 로그인해 주세요.",
+};
 
 export const Login = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl");
+  const returnReason = searchParams.get(RETURN_REASON_PARAM);
+  // 표에 없는 값은 무시한다 — 쿼리는 사용자가 치는 것이라 `["constructor"]` 같은 것도 온다.
+  const returnReasonLine =
+    returnReason !== null && Object.hasOwn(RETURN_REASON_LINES, returnReason)
+      ? RETURN_REASON_LINES[returnReason as ReturnReason]
+      : null;
   const [loginT, setLoginT] = useState("credentials");
   const [loading, setLoading] = useState(false);
 
@@ -76,21 +67,22 @@ export const Login = () => {
             // **스토어를 태워 받는다.** 스토어 밖에서 받으면 그 결과가 캐시에 안 남아,
             // 착지 화면의 셸이 같은 API 를 한 번 더 왕복한다 (`fetchNav` 는 `loaded` 면 건너뛴다).
             await useNavStore.getState().fetchNav();
-            const landingPath = resolveLandingPath(useNavStore.getState().items);
-            if (!landingPath) {
-              // 접근 가능한 메뉴 없음 — 비정상 상태, 안내 후 admin 밖으로
+            const { items, failure } = useNavStore.getState();
+            const destination = resolvePostLoginDestination({ items, failure });
+            if (destination.kind !== "landing") {
               await showMessage(
-                "알림",
+                destination.title,
                 <div>
-                  접근 가능한 메뉴가 없습니다.
-                  <br />
-                  관리자에게 문의해 주세요.
+                  {destination.lines.map((line, index) => (
+                    <Fragment key={line}>
+                      {index > 0 && <br />}
+                      {line}
+                    </Fragment>
+                  ))}
                 </div>,
               );
-              router.replace("/");
-              return;
             }
-            router.replace(landingPath);
+            router.replace(destination.path);
             return;
           } else if (error?.message?.includes("RejectedUser")) {
             await showMessage(
@@ -200,6 +192,13 @@ export const Login = () => {
           <div className="rounded-panel border border-line bg-bg-panel/95 p-7 shadow-e1 sm:p-8">
             <h2 className="text-base font-semibold tracking-tight text-ink-strong">로그인</h2>
             <p className="mt-1 text-2xs text-ink-muted">계정으로 들어가면 실험대가 열립니다.</p>
+
+            {returnReasonLine && (
+              // 되돌아온 사유는 폼 위에 **남는다** — 토스트로 내면 2초 뒤 사라져 도착지가 다시 말이 없어진다.
+              <p role="status" className="mt-4 break-keep border border-line px-3 py-2 text-2xs text-ink">
+                {returnReasonLine}
+              </p>
+            )}
 
             <form action="#" method="POST" className="mt-7 flex flex-col gap-5" onSubmit={handleSubmit}>
               <div className="flex flex-col gap-1.5">
