@@ -15,6 +15,7 @@ from repositories.bot.bot_repository import BotRepository
 from repositories.file.file_repository import FileRepository
 from repositories.file.sftp_file_repository import SftpFileRepository
 from repositories.ingest.ingest_repository import IngestRepository
+from repositories.instrument.instrument_repository import InstrumentRepository
 from repositories.message_queue.message_queue_repository import MessageQueueRepository
 from repositories.nav.nav_repository import NavRepository
 from repositories.portfolio.portfolio_repository import PortfolioRepository
@@ -32,6 +33,7 @@ from services.chat.portfolio_chat_service import PortfolioChatService
 from services.data_key.data_key_service import DataKeyService
 from services.file.file_service import FileService
 from services.ingest.ingest_service import IngestService
+from services.instrument.instrument_service import InstrumentService
 from services.message_queue.message_queue_service import MessageQueueService
 from services.nav.nav_service import NavService
 from services.portfolio.portfolio_service import PortfolioService
@@ -70,6 +72,7 @@ class Container(containers.DeclarativeContainer):
     bar_repository = providers.Factory(BarRepository, sql_client=backend_sql_client)
     backtest_repository = providers.Factory(BacktestRepository, sql_client=backend_sql_client)
     ingest_repository = providers.Factory(IngestRepository, sql_client=backend_sql_client)
+    instrument_repository = providers.Factory(InstrumentRepository, sql_client=backend_sql_client)
     bot_repository = providers.Factory(BotRepository, sql_client=backend_sql_client)
 
     # Service
@@ -116,6 +119,7 @@ class Container(containers.DeclarativeContainer):
     ingest_service = providers.Factory(
         IngestService, ingest_repository=ingest_repository, data_key_service=data_key_service
     )
+    instrument_service = providers.Factory(InstrumentService, instrument_repository=instrument_repository)
     # 갈래 3 — 일괄 조회 + TTL 캐시. 구독 API 를 갖지 않는다 (MD-AD-19).
     quote_batch_service = providers.Singleton(QuoteBatchService, data_key_service=data_key_service)
     portfolio_chat_service = providers.Factory(

@@ -137,13 +137,25 @@ class RunResult:
     """엔진이 남기는 것 전부 — 스펙 §6 의 네 테이블 + 현금 원장에 그대로 대응한다."""
 
     equity: list[EquityPoint] = field(default_factory=list)
+    #: **청산된 거래만** 들어온다 — 구간 끝에 남은 자리는 `open_position` 이 든다.
     trades: list[Trade] = field(default_factory=list)
     signals: list[dict] = field(default_factory=list)
     cash_events: list[CashEvent] = field(default_factory=list)
+    #: 구간 끝에 청산되지 않고 남은 자리. 자산곡선 마지막 점은 이 자리의 **평가액**을 담으므로,
+    #: 이것을 버리면 화면이 「거래 0건인데 수익률 +268%」를 설명할 근거를 잃는다 (#314).
+    open_position: Trade | None = None
 
     @property
     def final_equity(self) -> float:
         return self.equity[-1].equity if self.equity else 0.0
+
+    def positions(self) -> list[Trade]:
+        """청산된 거래 + 구간 끝에 열린 자리 — **원장에 남겨야 할 것 전부**.
+
+        열린 자리의 진입 비용은 이미 치른 돈이다. 청산된 것만 남기면 그 비용이 어느 합계에도
+        안 잡혀 「치른 비용 0원」이 된다.
+        """
+        return [*self.trades, *([self.open_position] if self.open_position else [])]
 
 
 class Strategy:
@@ -298,6 +310,8 @@ def run_single(
 
     # 구간 끝에 열려 있는 것은 청산하지 않는다 — 청산한 척하면 없는 거래를 만든 것이다.
     # 자산곡선의 마지막 점이 평가액으로 남고, 그 거래는 `trades` 에 들어가지 않는다.
+    # **대신 버리지도 않는다** — `open_position` 이 진입 시각·수량·이미 치른 비용을 들고 나간다.
+    result.open_position = open_trade
     return result
 
 
