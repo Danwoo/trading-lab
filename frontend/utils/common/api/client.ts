@@ -45,6 +45,18 @@ export class ApiCallFailure extends Error {
   }
 }
 
+/**
+ * 던져진 것에서 HTTP 상태 코드를 꺼낸다. **응답이 없는 실패는 `undefined`** — 네트워크 단절·
+ * DNS 실패·타임아웃에는 상태 코드가 없고, 그것을 0 이나 500 으로 뭉뚱그리면 호출부가 「서버가
+ * 이렇게 답했다」와 「답이 아예 없었다」를 못 가른다.
+ *
+ * 상태 코드를 아는 것은 전송 계층뿐이다(axios 예외 모양은 여기서만 안다). 호출부가
+ * `error.response?.status` 를 직접 파면 그 지식이 화면까지 번진다.
+ */
+export function httpStatusOf(error: unknown): number | undefined {
+  return axios.isAxiosError(error) ? error.response?.status : undefined;
+}
+
 export async function apiCall<T>(url: string, options: ApiCallConfig = {}): Promise<T | null> {
   const { throwOnFailure, ...requestOptions } = options;
   const isFormData = requestOptions.data instanceof FormData;

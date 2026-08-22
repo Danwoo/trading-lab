@@ -59,8 +59,12 @@ export const RETURN_REASON_PARAM = "reason";
 /**
  * 되돌린 사유 — **계정 상태 이야기만 여기 온다.** 「메뉴를 못 읽었다」는 되돌리지 않고
  * 제품 셸 안에서 사유 화면으로 선다 — 못 읽은 것은 로그아웃 상태가 아니다.
+ *
+ * `session-expired` 는 그 반대편이다: 쿠키는 남았는데 서버가 세션을 거부한(401) 상태라
+ * **정말로 로그아웃됐다.** 제품 셸에는 로그아웃 수단이 없어(`signOut` 은 관리 섀시의
+ * `Header` 하나뿐이다) 여기서 되돌리지 않으면 나갈 길이 없다.
  */
-export type ReturnReason = "forbidden" | "no-menu";
+export type ReturnReason = "forbidden" | "no-menu" | "session-expired";
 
 /** 되돌릴 자리 + 사유. 도착지(로그인 화면)가 이 값을 읽어 왜 왔는지 말한다. */
 export const fallbackPathWithReason = (reason: ReturnReason): string =>

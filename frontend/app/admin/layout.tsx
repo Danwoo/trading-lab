@@ -87,19 +87,24 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
   }, [isEmbed, loaded, authorized, pathname, navItems, openTab]);
 
-  // 게이트가 열리기 전에도 **라이트 바탕을 깐다.** `null` 을 돌려주면 그 구간의 문서 캔버스가
-  // 보이는데, `:root` 의 `color-scheme: dark` 때문에 그 캔버스는 어둡다 — 라이트 셸이 뜨는
-  // 순간 화면이 검정에서 흰색으로 튄다.
-  if (isEmbed === null || !loaded || authorized === null)
-    return <div data-theme="light" className="h-screen bg-bg-base" />;
-
   // 메뉴를 못 읽으면 섀시를 세우지 않는다 — 사이드바·탭이 전부 메뉴로 그려져 빈 크롬만 남는다.
+  //
+  // **아래 로딩 분기보다 먼저 본다.** 「다시 시도」는 `loaded` 를 false 로 내렸다가 다시 올리는데,
+  // 로딩 분기가 앞서면 그 사이 사유 화면이 빈 라이트 화면으로 바뀌었다가 실패하면 되돌아온다 —
+  // 게이트가 직전 판정을 보존하는 이유(`useMenuAccessGate` 주석)가 여기서 무효가 된다.
+  // 제품 셸은 이미 이 순서다(`app/(main)/layout.tsx` — `denial` 을 `settled` 보다 먼저 본다).
   if (denial === "unreadable")
     return (
       <div data-theme="light" className="h-screen bg-bg-base text-ink">
         <MenuUnreadableScreen />
       </div>
     );
+
+  // 게이트가 열리기 전에도 **라이트 바탕을 깐다.** `null` 을 돌려주면 그 구간의 문서 캔버스가
+  // 보이는데, `:root` 의 `color-scheme: dark` 때문에 그 캔버스는 어둡다 — 라이트 셸이 뜨는
+  // 순간 화면이 검정에서 흰색으로 튄다.
+  if (isEmbed === null || !loaded || authorized === null)
+    return <div data-theme="light" className="h-screen bg-bg-base" />;
 
   // **관리 화면은 라이트다** — 그 사실을 선언한다.
   //

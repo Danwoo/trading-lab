@@ -7,13 +7,15 @@ import { useNavStore } from "@/stores/shared/navStore";
 import { fallbackPathWithReason } from "@/constants/routes";
 
 /**
- * 화면을 안 연 사유 — **「못 읽음」과 「권한 없음」은 다른 사건이다.**
+ * 화면을 안 연 사유 — **「못 읽음」·「로그아웃됨」·「권한 없음」은 서로 다른 사건이다.**
  *
  * - `unreadable` — 메뉴를 못 읽었다. 권한이 있는지 **모르는** 상태라 막을 뿐, 계정 상태와는
  *   무관하다. 되돌리지 않고 셸 안에서 사유를 세운다
+ * - `unauthenticated` — 서버가 세션을 거부했다(401). 계정 상태 이야기이고 **정말로 로그아웃된
+ *   것**이라 제품 밖으로 되돌린다. 셸에 로그아웃 수단이 없어 여기서 안 되돌리면 갇힌다
  * - `forbidden` — 메뉴를 읽었고, 이 경로가 거기 없다. 계정 상태 이야기라 제품 밖으로 되돌린다
  */
-export type MenuGateDenial = "unreadable" | "forbidden";
+export type MenuGateDenial = "unreadable" | "unauthenticated" | "forbidden";
 
 /** 기본값을 모듈 상수로 둔다 — 인자에 `[]` 리터럴을 쓰면 렌더마다 새 배열이라 이펙트가 무한히 돈다. */
 const NO_ALWAYS_ALLOWED_PATHS: readonly string[] = [];
@@ -47,7 +49,7 @@ export function useMenuAccessGate(
   const [denial, setDenial] = useState<MenuGateDenial | null>(null);
   const pathname = usePathname();
   const router = useRouter();
-  const { fetchNav, getAllPaths, loaded, error } = useNavStore();
+  const { fetchNav, getAllPaths, loaded, failure } = useNavStore();
 
   useEffect(() => {
     fetchNav();
@@ -60,9 +62,20 @@ export function useMenuAccessGate(
     const isAlwaysAllowed =
       exactAllowedPaths.includes(pathname) || alwaysAllowedPaths.some((p) => matchesPath(pathname, p));
 
-    // 네비를 **못 읽은 것**은 fail-closed 로 막되 되돌리지는 않는다 — 세션은 유효하므로
+    // 서버가 세션을 거부했으면(401) **되돌린다** — 예외 경로도 봐주지 않는다. 이건 「권한을
+    // 모른다」가 아니라 「로그아웃됐다」라, 셸 안에 세워 두면 사용자가 사실이 아닌 안내를 읽고
+    // 갇힌다(제품 셸에는 로그아웃 버튼이 없어 스스로 나갈 수단이 없다). 예외 경로(`/settings`)
+    // 도 자기 데이터 API 가 같은 401 을 받으므로 열어 봐야 빈 화면이다.
+    if (failure === "unauthenticated") {
+      setDenial("unauthenticated");
+      setAuthorized(false);
+      router.replace(fallbackPathWithReason("session-expired"));
+      return;
+    }
+
+    // 네비를 **못 읽은 것**은 fail-closed 로 막되 되돌리지는 않는다 — 세션은 끊기지 않았으므로
     // 로그인 화면으로 보내면 로그아웃된 것으로 읽힌다. 셸이 이 판정으로 사유 화면을 세운다.
-    if (error) {
+    if (failure === "unreadable") {
       setDenial(isAlwaysAllowed ? null : "unreadable");
       setAuthorized(isAlwaysAllowed);
       return;
@@ -78,7 +91,7 @@ export function useMenuAccessGate(
     }
     setDenial(null);
     setAuthorized(true);
-  }, [loaded, error, pathname, getAllPaths, router, alwaysAllowedPaths, exactAllowedPaths]);
+  }, [loaded, failure, pathname, getAllPaths, router, alwaysAllowedPaths, exactAllowedPaths]);
 
   return { loaded, authorized, denial };
 }

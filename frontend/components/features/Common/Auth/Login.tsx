@@ -22,6 +22,7 @@ import { RETURN_REASON_PARAM, type ReturnReason } from "@/constants/routes";
 const RETURN_REASON_LINES: Record<ReturnReason, string> = {
   forbidden: "로그인은 그대로입니다 — 방금 연 화면에 접근 권한이 없어 여기로 돌아왔습니다.",
   "no-menu": "로그인은 됐지만 이 계정에 열려 있는 화면이 없습니다. 관리 화면에서 메뉴 권한을 먼저 열어 주세요.",
+  "session-expired": "로그인이 풀렸습니다 — 서버가 이 세션을 더 이상 받지 않습니다. 다시 로그인해 주세요.",
 };
 
 export const Login = () => {
@@ -66,8 +67,8 @@ export const Login = () => {
             // **스토어를 태워 받는다.** 스토어 밖에서 받으면 그 결과가 캐시에 안 남아,
             // 착지 화면의 셸이 같은 API 를 한 번 더 왕복한다 (`fetchNav` 는 `loaded` 면 건너뛴다).
             await useNavStore.getState().fetchNav();
-            const { items, error: navError } = useNavStore.getState();
-            const destination = resolvePostLoginDestination({ items, error: navError });
+            const { items, failure } = useNavStore.getState();
+            const destination = resolvePostLoginDestination({ items, failure });
             if (destination.kind !== "landing") {
               await showMessage(
                 destination.title,

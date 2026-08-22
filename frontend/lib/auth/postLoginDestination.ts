@@ -1,14 +1,18 @@
 import { POST_LOGIN_PATH, fallbackPathWithReason } from "@/constants/routes";
+import type { NavFailure } from "@/stores/shared/navStore";
 
 interface NavNode {
   path?: string;
   items?: NavNode[];
 }
 
-/** 메뉴를 읽은 결과 — `error` 는 「못 읽음」이고, 빈 `items` 는 「0건」이다. 둘은 다르다. */
+/**
+ * 메뉴를 읽은 결과 — 셋을 가른다. `failure` 가 「못 읽음/로그아웃됨」이고, `failure === null`
+ * 인데 `items` 가 빈 것이 「0건」이다. 하나로 뭉치면 어느 한쪽에는 거짓을 말하게 된다.
+ */
 export interface NavSnapshot {
   items: NavNode[];
-  error: boolean;
+  failure: NavFailure | null;
 }
 
 /**
@@ -21,8 +25,10 @@ export interface NavSnapshot {
 export type PostLoginDestination =
   /** 메뉴에 열린 화면이 있다 — 제품 안으로 들어간다 */
   | { kind: "landing"; path: string; title?: undefined; lines?: undefined }
-  /** 메뉴를 못 읽었다 — 세션은 유효하므로 제품 안으로 들여보내고, 셸이 사유 화면을 세운다 */
+  /** 메뉴를 못 읽었다 — 세션은 끊기지 않았으므로 제품 안으로 들여보내고, 셸이 사유 화면을 세운다 */
   | { kind: "menu-unreadable"; path: string; title: string; lines: string[] }
+  /** 방금 로그인했는데 서버가 세션을 거부했다(401) — 제품 안으로 들여보내면 안 된다 */
+  | { kind: "session-expired"; path: string; title: string; lines: string[] }
   /** 메뉴를 읽었고 0건이다 — 계정 상태 이야기라 제품 밖으로 되돌리되 도착지가 사유를 안다 */
   | { kind: "no-menu"; path: string; title: string; lines: string[] };
 
@@ -52,7 +58,19 @@ const resolveLandingPath = (items: NavNode[]): string | null =>
   hasPath(items, POST_LOGIN_PATH) ? POST_LOGIN_PATH : findFirstPath(items);
 
 export function resolvePostLoginDestination(nav: NavSnapshot): PostLoginDestination {
-  if (nav.error) {
+  // 로그인 직후의 401 은 드물지만(방금 세션을 받았다) 표현 가능한 상태다 — 세션 비밀키가
+  // 교체됐거나 그 사이 세션이 폐기되면 온다. 여기서 안 가르면 `items` 가 비었다는 이유로
+  // 「이 계정에 열려 있는 화면이 없습니다」라는 **사실이 아닌 진단**으로 새어 나간다.
+  if (nav.failure === "unauthenticated") {
+    return {
+      kind: "session-expired",
+      path: fallbackPathWithReason("session-expired"),
+      title: "알림",
+      lines: ["로그인은 됐지만 서버가 그 세션을 받지 않았습니다.", "다시 로그인해 주세요."],
+    };
+  }
+
+  if (nav.failure === "unreadable") {
     return {
       kind: "menu-unreadable",
       // 못 읽었다고 로그인 화면에 세워 두지 않는다 — 셸이 사유와 다시 시도를 그대로 들고 있다.

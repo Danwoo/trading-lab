@@ -69,7 +69,7 @@ const CASES: Case[] = [
 describe("메뉴 게이트의 예외 경로 (#73 S2 — 레일의 「설정」)", () => {
   beforeEach(() => {
     replace.mockClear();
-    useNavStore.setState({ items: NAV_ITEMS, loaded: true, error: false });
+    useNavStore.setState({ items: NAV_ITEMS, loaded: true, failure: null });
   });
 
   afterEach(cleanup);
