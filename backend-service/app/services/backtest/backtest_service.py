@@ -24,7 +24,7 @@ from services.backtest.engine import (
     run_single,
 )
 from services.backtest.grid import FREE_COSTS, axes_from_spec, run_grid
-from services.backtest.metrics import compute
+from services.backtest.metrics import compute, summarize_open_position
 
 # 스펙 §8.5.1 — 위탁수수료 0.15% 는 **10배 오차**였고 그 오차가 "연 비용 원금의 145%" 경고를
 # 만들었다. 첫 화면부터 뜨는 경고는 경고를 무시하는 법을 학습시킨다.
@@ -284,7 +284,10 @@ class BacktestService:
                 "mae": quantize(t.mae, 6) if t.mae is not None else None,
                 "mfe": quantize(t.mfe, 6) if t.mfe is not None else None,
             }
-            for t in result.trades
+            # **청산된 것만 남기면 열린 자리의 진입 비용이 어느 합계에도 안 잡힌다** (#314).
+            # `exit_ts`·`exit_price`·`realized_pnl` 이 NULL 인 행이 곧 「진입만 한 자리」다 —
+            # 청산한 척하지 않으면서 이미 치른 돈은 남긴다.
+            for t in result.positions()
         ]
 
         signals = [
@@ -583,27 +586,49 @@ class BacktestService:
             + float(costs.get("sell_tax_rate") or 0)
         )
 
+        equity_dt = [str(row["dt"]) for row in equity_rows]
+        equity_values = [float(row["equity"]) for row in equity_rows]
+        # `trades` 는 청산된 거래와 **구간 끝에 열린 자리**가 섞여 온다 — 뒤엣것은 실현손익이 없다.
+        # metrics.compute 는 engine.Trade 의 속성 계약만 요구한다 — DB 행을 그 모양으로 입힌다.
+        trade_facts = [
+            SimpleNamespace(
+                realized_pnl=float(row["realized_pnl"]) if row["realized_pnl"] is not None else None,
+                entry_ts=str(row["entry_ts"])[:10],
+                entry_price=float(row["fill_price"]),
+                qty=float(row["qty"]),
+                # **비용 3종을 함께 넘긴다.** 안 넘기면 「치른 비용」이 조용히 0원이 된다 —
+                # `getattr` 기본값이 그것을 감춘다(실측: 25거래에 0원으로 나왔다).
+                fee=float(row["fee"] or 0),
+                slippage=float(row["slippage"] or 0),
+                tax=float(row["tax"] or 0),
+            )
+            for row in trade_rows
+        ]
+
+        # **구간 끝에 열린 자리** — 자산곡선의 마지막 점이 그 자리의 평가액을 담는데 `trades` 의
+        # 실현손익은 비어 있다. 한 번 세워 지표와 화면이 **같은 값**을 읽게 한다 (#314).
+        last_point = equity_rows[-1] if equity_rows else None
+        open_position = (
+            summarize_open_position(
+                position_count=int(last_point["position_count"]),
+                gross_exposure=float(last_point["gross_exposure"]),
+                trades=trade_facts,
+                initial_cash=float(run["initial_cash"]),
+                final_equity=equity_values[-1],
+            )
+            if last_point is not None
+            else None
+        )
+
         metrics = compute(
-            equity_dt=[str(row["dt"]) for row in equity_rows],
-            equity=[float(row["equity"]) for row in equity_rows],
-            # metrics.compute 는 engine.Trade 의 속성 계약만 요구한다 — DB 행을 그 모양으로 입힌다.
-            trades=[
-                SimpleNamespace(
-                    realized_pnl=float(row["realized_pnl"]) if row["realized_pnl"] is not None else None,
-                    entry_price=float(row["fill_price"]),
-                    qty=float(row["qty"]),
-                    # **비용 3종을 함께 넘긴다.** 안 넘기면 「치른 비용」이 조용히 0원이 된다 —
-                    # `getattr` 기본값이 그것을 감춘다(실측: 25거래에 0원으로 나왔다).
-                    fee=float(row["fee"] or 0),
-                    slippage=float(row["slippage"] or 0),
-                    tax=float(row["tax"] or 0),
-                )
-                for row in trade_rows
-            ],
+            equity_dt=equity_dt,
+            equity=equity_values,
+            trades=trade_facts,
             round_trip_cost_rate=round_trip,
             initial_cash=float(run["initial_cash"]),
             sell_tax_rate=float(costs.get("sell_tax_rate") or 0),
             costless_summary=run.get("costless_summary"),
+            open_position=open_position,
         )
 
         return {
@@ -662,6 +687,22 @@ class BacktestService:
             # 지어내지 않고 사유를 남긴다. 계산만 되고 결과에 안 실리면 「실행 결과」에 곡선·집중도가
             # 없다(리뷰 지적 #212).
             "context": _build_context(args.get("universe_series"), float(run["initial_cash"])),
+            # 「청산 안 함」과 「거래 없음」은 다른 상태다 — 화면이 그 둘을 갈라 말하려면 지표
+            # 목록 말고 **구조화된 사실**이 필요하다 (#314). 열린 자리가 없으면 `None` 이다.
+            "open_position": (
+                {
+                    "count": open_position.count,
+                    "value": open_position.value,
+                    "entry_ts": open_position.entry_ts,
+                    "entry_cost": open_position.entry_cost,
+                    "unrealized_pnl": open_position.unrealized_pnl,
+                    "unrealized_share_pct": open_position.unrealized_share_pct,
+                    "derived_from": open_position.derived_from,
+                    "absent_reason": open_position.absent_reason,
+                }
+                if open_position
+                else None
+            ),
             "metrics": [
                 {
                     "key": m.key,

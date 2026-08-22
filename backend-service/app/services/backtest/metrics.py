@@ -78,6 +78,87 @@ class Metric:
         return self.value is None
 
 
+@dataclass(frozen=True)
+class OpenPosition:
+    """구간 끝에 청산되지 않고 남은 자리 (#314).
+
+    엔진은 이 자리를 **청산한 척하지 않는다** — 그래서 실현손익도, 승률도, 거래당 평균도
+    없다. 그런데 자산곡선의 마지막 점은 이 자리의 **평가액**을 그대로 담는다. 두 사실을
+    같이 말하지 않으면 화면에 「거래 0건」과 「+268%」가 나란히 서고, 어느 쪽이 거짓인지
+    사용자가 화면 안에서 가릴 방법이 없다.
+
+    `entry_cost` 가 `None` 이면 진입 기록이 없는 옛 실행이다 — 0 원이 아니라 **모르는 것**이다.
+    """
+
+    count: int
+    #: 구간 끝 평가액 — 자산곡선 마지막 점의 `gross_exposure`.
+    value: float
+    entry_ts: str | None
+    #: 진입에서 **이미 치른** 수수료 + 슬리피지. 매도 비용은 아직 안 물렸다.
+    entry_cost: float | None
+    unrealized_pnl: float | None
+    #: 이 실행의 손익 중 미실현이 차지하는 비중. 100% 면 성과 전부가 아직 안 판 자리다.
+    unrealized_share_pct: float | None
+    derived_from: str
+    absent_reason: str | None = None
+
+
+def summarize_open_position(
+    *,
+    position_count: int,
+    gross_exposure: float,
+    trades: list,
+    initial_cash: float,
+    final_equity: float,
+) -> OpenPosition | None:
+    """자산곡선 마지막 점과 거래 기록에서 「구간 끝에 열린 자리」를 세운다.
+
+    `position_count` 는 자산곡선 마지막 점의 것이고, 열린 자리의 진입 기록은 `trades` 안의
+    **실현손익 없는 행**이다. 곡선은 자리가 있다는데 그 행이 없으면 이 변경 이전에 저장된
+    실행이다 — 지어내지 않고 사유를 남긴다.
+    """
+    if position_count <= 0:
+        return None
+
+    recorded = [t for t in trades if getattr(t, "realized_pnl", None) is None]
+    if not recorded:
+        return OpenPosition(
+            count=position_count,
+            value=gross_exposure,
+            entry_ts=None,
+            entry_cost=None,
+            unrealized_pnl=None,
+            unrealized_share_pct=None,
+            derived_from=f"자산곡선 마지막 점 — 보유 {position_count}자리 · 평가액 {gross_exposure:,.0f}원",
+            absent_reason=(
+                "열린 자리의 진입 기록이 없는 옛 실행입니다 — 언제 얼마에 들어갔는지 말할 수 없습니다. "
+                "다시 실행하면 채워집니다"
+            ),
+        )
+
+    entry_cost = sum(
+        (getattr(t, "fee", 0.0) or 0.0) + (getattr(t, "slippage", 0.0) or 0.0) + (getattr(t, "tax", 0.0) or 0.0)
+        for t in recorded
+    )
+    entry_notional = sum(float(t.entry_price) * float(t.qty) for t in recorded)
+    unrealized = gross_exposure - (entry_notional + entry_cost)
+    total_pnl = final_equity - initial_cash
+    entry_ts = min(str(t.entry_ts) for t in recorded)
+    return OpenPosition(
+        count=position_count,
+        value=gross_exposure,
+        entry_ts=entry_ts,
+        entry_cost=entry_cost,
+        unrealized_pnl=unrealized,
+        # 손익이 0 이면 비중이라는 값 자체가 없다 — 0% 로 답하면 「미실현이 없다」로 읽힌다.
+        unrealized_share_pct=(unrealized / total_pnl * 100) if total_pnl else None,
+        derived_from=(
+            f"{entry_ts} 진입 · 자산곡선 마지막 점의 평가액 {gross_exposure:,.0f}원 "
+            f"− 진입 원금 {entry_notional + entry_cost:,.0f}원 (매도 비용은 아직 안 물렸다)"
+        ),
+    )
+
+
 def _peak_series(equity: list[float]) -> list[float]:
     """각 시점까지의 누적 고점."""
     peaks: list[float] = []
@@ -156,15 +237,19 @@ def compute(
     initial_cash: float,
     sell_tax_rate: float,
     costless_summary: dict | None,
+    open_position: OpenPosition | None,
 ) -> list[Metric]:
     """스펙 D-Q2 의 순서대로 지표를 낸다.
 
-    `trades` 는 `engine.Trade` 목록. `round_trip_cost_rate` 는 왕복 비용률(수수료 왕복 +
-    슬리피지 + 증권거래세)로, **값에서 빼지 않고** 거래당 평균 실현수익 옆에 가정으로 적는다 —
+    `trades` 는 `engine.Trade` 목록 — **청산된 것과 구간 끝에 열린 것이 섞여 온다**(열린 것은
+    `realized_pnl` 이 없다). `round_trip_cost_rate` 는 왕복 비용률(수수료 왕복 + 슬리피지 +
+    증권거래세)로, **값에서 빼지 않고** 거래당 평균 실현수익 옆에 가정으로 적는다 —
     실현손익은 이미 순액이라 다시 빼면 비용을 두 번 문다.
     `initial_cash`·`sell_tax_rate` 는 비용 지표가 무엇으로 나누고 무엇을 기록으로 인정할지를
     가른다 — 기본값을 두지 않는 것은 안 넘기면 조용히 틀린 값이 나오기 때문이다.
     `costless_summary` 는 같은 조합을 비용 0으로 다시 돌린 결과다(없으면 `None`).
+    `open_position` 은 `summarize_open_position` 이 세운 「구간 끝에 열린 자리」다 — 이것이
+    `None` 이면 수익률·치른 비용이 **전부 실현된 것**이라고 말하게 되므로 기본값을 두지 않는다.
     """
     out: list[Metric] = []
 
@@ -221,12 +306,25 @@ def compute(
 
     total_return = (equity[-1] - equity[0]) / equity[0] if equity[0] else 0.0
 
+    # **수익률이 무엇 위에 서 있는지 유도 문구가 말한다** (#314). 자산곡선의 마지막 점은 청산하지
+    # 않은 자리의 평가액을 담는데, 그 자리는 `trades` 에 없어 거래 목록·승률이 「없음」이라 답한다.
+    # 두 사실을 한 화면에 놓고 아무 말도 안 하면 어느 쪽이 거짓인지 가릴 방법이 없다.
+    unrealized_note = (
+        f" · 마지막 점은 청산하지 않은 자리 {open_position.count}건의 평가액 {open_position.value:,.0f}원을 포함한다"
+        if open_position
+        else ""
+    )
+
     # CAGR — 표본이 짧으면 환산하지 않는다.
     if span >= MIN_ANNUALIZE_DAYS and equity[0] > 0 and equity[-1] > 0:
         years = span / 365.0
         cagr = ((equity[-1] / equity[0]) ** (1 / years) - 1) * 100
         cagr_metric = Metric(
-            key="cagr", label="연환산 수익률", value=cagr, unit="%", derived_from=f"자산곡선 시작·끝과 구간 {span}일"
+            key="cagr",
+            label="연환산 수익률",
+            value=cagr,
+            unit="%",
+            derived_from=f"자산곡선 시작·끝과 구간 {span}일{unrealized_note}",
         )
     else:
         cagr = None
@@ -247,7 +345,7 @@ def compute(
                 label="구간 총수익률",
                 value=total_return * 100,
                 unit="%",
-                derived_from="자산곡선 시작·끝",
+                derived_from=f"자산곡선 시작·끝{unrealized_note}",
             )
         )
 
@@ -315,6 +413,14 @@ def compute(
         )
     else:
         # **0% 가 아니다.** 거래가 없으면 승률이라는 값 자체가 존재하지 않는다.
+        #
+        # 그리고 **「청산 안 함」과 「거래 없음」은 다른 상태다** (#314). 열린 자리를 안고 끝난
+        # 실행에 「거래 없음」이라 답하면, 그 옆의 +268% 가 어디서 났는지 화면 안에서 못 가린다.
+        no_trade_reason = (
+            f"청산된 거래 없음 — 구간 끝에 열린 자리 {open_position.count}건이 있습니다. 청산해야 실현손익이 생깁니다"
+            if open_position
+            else "거래 없음 — 청산된 거래가 0건입니다"
+        )
         for key, label in (("avg_trade_vs_cost", AVG_TRADE_LABEL), ("win_rate", "승률")):
             out.append(
                 Metric(
@@ -323,11 +429,37 @@ def compute(
                     value=None,
                     unit="%",
                     derived_from="청산된 거래",
-                    absent_reason="거래 없음 — 청산된 거래가 0건입니다",
+                    absent_reason=no_trade_reason,
                 )
             )
 
     out.append(cagr_metric)
+
+    # ── 구간 끝에 열린 자리 — **성과의 얼마가 아직 안 판 것인가** (#314) ────────
+    if open_position is not None:
+        out.append(
+            Metric(
+                key="open_position_value",
+                label="구간 끝에 열린 자리 평가액",
+                value=open_position.value,
+                unit="원",
+                derived_from=open_position.derived_from,
+                note=f"{open_position.count}건 미청산",
+            )
+        )
+        share_absent = None
+        if open_position.unrealized_share_pct is None:
+            share_absent = open_position.absent_reason or "이 실행의 총손익이 0이라 비중을 낼 수 없습니다"
+        out.append(
+            Metric(
+                key="unrealized_share_pct",
+                label="성과 중 미실현 비중",
+                value=open_position.unrealized_share_pct,
+                unit="%",
+                derived_from="열린 자리의 평가손익 ÷ 이 실행의 총손익(끝난 자산 − 시작 자금)",
+                absent_reason=share_absent,
+            )
+        )
 
     # ── 비용 — **이 성과가 무엇을 치르고 남은 것인가** (#271) ────────────────
     #
@@ -339,16 +471,30 @@ def compute(
         for t in trades
     )
     # `tax` 축은 나중에 들어왔고 기존 행은 `server_default="0"` 으로 채워졌다. 그 0 은 「안 냈다」가
-    # 아니라 **「기록이 없다」**다. `trades` 에는 청산된 거래만 들어오므로 매도세율이 걸려 있으면
-    # 세금은 반드시 0보다 크다 — 전부 0이면 합계를 내는 대신 기록이 없다고 말한다.
-    tax_unrecorded = sell_tax_rate > 0 and bool(trades) and not any((getattr(t, "tax", 0.0) or 0.0) > 0 for t in trades)
-    # 「구간 끝에 열려 있는 자리」의 진입 비용은 이미 치렀지만 `trades` 에 없다 (engine 이 청산한
-    # 척하지 않는다). 그래서 유도 문구가 **청산된 거래**라고 범위를 밝힌다.
-    paid_derivation = f"청산된 거래 {len(trades)}건의 수수료 + 슬리피지 + 증권거래세 합"
+    # 아니라 **「기록이 없다」**다. **판정 대상은 청산된 거래뿐이다** — 매도세는 팔아야 붙으므로
+    # 열린 자리의 세금 0 은 정상이고, 그것까지 세면 진입만 한 실행이 늘 「옛 실행」이 된다.
+    tax_unrecorded = sell_tax_rate > 0 and bool(closed) and not any((getattr(t, "tax", 0.0) or 0.0) > 0 for t in closed)
+    open_recorded = [t for t in trades if getattr(t, "realized_pnl", None) is None]
+    # 「구간 끝에 열려 있는 자리」의 진입 비용도 **이미 치른 돈**이다 — 청산된 것만 세면 그 돈이
+    # 합계에서 조용히 빠져, 진입만 한 실행이 「치른 비용 0원」이 된다 (#314).
+    paid_derivation = f"청산된 거래 {len(closed)}건의 수수료 + 슬리피지 + 증권거래세 합"
+    if open_recorded:
+        paid_derivation += f" + 구간 끝에 열린 자리 {len(open_recorded)}건의 진입 비용 (매도 비용은 아직 안 물렸다)"
+    # 곡선은 자리가 열려 있다는데 그 진입 기록이 없으면, 얼마를 냈는지 **모르는 것**이다.
+    # 0 원이라 답하면 실제로 낸 돈을 안 낸 것으로 말하게 된다 — `tax_unrecorded` 와 같은 규약이다.
+    open_cost_unrecorded = open_position is not None and open_position.entry_cost is None
     # 분모는 **시작 자금**이다. `equity[0]` 은 첫 봉 종료 시점 평가액이라 그 봉에서 진입했다면
     # 이미 매수 비용이 빠져 있어, 이름(「시작 자금」)과 값이 어긋난다.
     start_equity = initial_cash
-    if tax_unrecorded:
+    if tax_unrecorded or open_cost_unrecorded:
+        absent = (
+            "증권거래세 기록이 없는 옛 실행입니다 — 세금을 뺀 합계를 내면 적게 말하게 됩니다. 다시 실행하면 채워집니다"
+            if tax_unrecorded
+            else (
+                f"구간 끝에 열린 자리 {open_position.count}건의 진입 비용이 기록되지 않은 옛 실행입니다 — "
+                "이미 치른 돈을 0원이라 말하게 됩니다. 다시 실행하면 채워집니다"
+            )
+        )
         for key, label, unit in (("cost_paid", "치른 비용", "원"), ("cost_drag_pct", "비용이 먹은 수익률", "p")):
             out.append(
                 Metric(
@@ -357,7 +503,7 @@ def compute(
                     value=None,
                     unit=unit,
                     derived_from=paid_derivation,
-                    absent_reason="증권거래세 기록이 없는 옛 실행입니다 — 세금을 뺀 합계를 내면 적게 말하게 됩니다. 다시 실행하면 채워집니다",
+                    absent_reason=absent,
                 )
             )
     else:

@@ -213,6 +213,28 @@ class ExecutionAssumptionsOut(BaseModel):
     stale_reason: str | None
 
 
+class OpenPositionOut(BaseModel):
+    """구간 끝에 청산되지 않고 남은 자리.
+
+    자산곡선의 마지막 점은 이 자리의 **평가액**을 담는데 실현손익은 없다 — 그래서 「거래 0건」과
+    「+268%」가 한 화면에 나란히 섰다. 이 필드가 없으면 화면은 그 모순을 설명할 근거가 없다.
+
+    `entry_cost` 가 `None` 이면 진입 기록이 없는 옛 실행이다 — **0 원이 아니라 모르는 것**이고
+    `absent_reason` 이 왜인지 말한다.
+    """
+
+    count: int
+    #: 구간 끝 평가액 (원).
+    value: float
+    entry_ts: str | None
+    entry_cost: float | None
+    unrealized_pnl: float | None
+    #: 이 실행의 총손익 중 미실현 비중 (%). 100 이면 성과 전부가 아직 안 판 자리다.
+    unrealized_share_pct: float | None
+    derived_from: str
+    absent_reason: str | None = None
+
+
 class RunReportOut(BaseModel):
     """한 조합의 리포트 — 곡선·거래·지표가 한 번에 온다 (칸 클릭은 계산이 아니라 조회다)."""
 
@@ -221,3 +243,5 @@ class RunReportOut(BaseModel):
     trades: list[TradeOut]
     metrics: list[MetricOut]
     execution_assumptions: ExecutionAssumptionsOut
+    #: **이 필드를 선언하지 않으면 FastAPI 가 통째로 버린다** — 화면은 열린 자리를 영영 못 본다.
+    open_position: OpenPositionOut | None = None

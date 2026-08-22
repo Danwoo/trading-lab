@@ -62,6 +62,16 @@ def strategy_from(entry_days: set[int], exit_days: set[int]) -> Strategy:
 FREE = CostModel(fee_rate=0.0, slippage_rate=0.0, sell_tax_rate=0.0)
 
 
+def require_open_position(result, label: str):
+    """열린 자리가 없으면 **사유를 남기고** None 을 준다 — `AttributeError` 는 무엇이 틀렸는지 안 적는다."""
+    global CHECKED
+    CHECKED += 1
+    if result.open_position is None:
+        FAILURES.append(f"{label}: 구간 끝에 열린 자리가 결과에 없다 (엔진이 버렸다)")
+        return None
+    return result.open_position
+
+
 def test_buy_and_hold() -> None:
     """① 한 종목 · 10봉 · 1일차 매수 후 보유 → 자산 = 초기자금 × (종가/매수가).
 
@@ -75,6 +85,15 @@ def test_buy_and_hold() -> None:
     check("① 첫날 자산은 매수가 평가", r.equity[0].equity, 1000.0)
     check("① 미청산이므로 거래 기록 0건", len(r.trades), 0)
     check("① 현금은 0", r.equity[-1].cash, 0.0)
+    # **버리지는 않는다** (#314). 청산한 척은 안 하되, 열린 자리를 통째로 흘리면 자산곡선의
+    # 마지막 점(1,500)이 어디서 왔는지 화면이 설명할 근거를 잃는다.
+    op = require_open_position(r, "①")
+    if op is None:
+        return
+    check("① 열린 자리의 진입일", op.entry_ts, "2026-01-01")
+    check("① 열린 자리는 청산되지 않았다", op.exit_ts, None)
+    check("① 실현손익이 없다", op.realized_pnl, None)
+    check("① 원장에 남길 것 = 청산 0건 + 열린 자리 1건", len(r.positions()), 1)
 
 
 def test_costs_reduce_exactly() -> None:
@@ -147,6 +166,37 @@ def test_sell_tax_only_on_sell() -> None:
     # 매도 대금 1,000 × 1% = 10. 이 단언이 없으면 `open_trade.tax += …` 를 지워도 초록이다.
     check("거래에 적힌 세금", r.trades[0].tax, 10.0)
     check("수수료는 0", r.trades[0].fee, 0.0)
+
+
+def test_open_position_carries_entry_cost() -> None:
+    """열린 자리는 **이미 치른 진입 비용**을 들고 나간다 — 「치른 비용 0원」의 뿌리다 (#314).
+
+    수수료 1% · 슬리피지 0%, 100 에 매수 후 보유. 1주 단위 체결(#313)이라 주당 지출 101원으로
+    1,000원에 살 수 있는 것은 9주다 — 진입 수수료 = 9 × 100 × 0.01 = 9.0.
+    """
+    s = series([100, 120, 150])
+    costs = CostModel(fee_rate=0.01, slippage_rate=0.0, sell_tax_rate=0.0)
+    r = run_single(
+        strategy=strategy_from({0}, set()), params={}, series=s, rows=s.rows(), initial_cash=1000.0, costs=costs
+    )
+    check("청산 거래는 0건", len(r.trades), 0)
+    op = require_open_position(r, "열린 자리 진입 비용")
+    if op is None:
+        return
+    check("열린 자리의 진입 수수료", op.fee, 9.0 * 100.0 * 0.01, tol=1e-9)
+    check("매도세는 아직 안 물렸다", op.tax, 0.0)
+    check("수량", op.qty, 9.0, tol=1e-9)
+
+
+def test_closed_run_has_no_open_position() -> None:
+    """구간 끝에 자리가 없으면 `open_position` 은 `None` 이다 — 없는 자리를 만들지 않는다."""
+    s = series([100, 110, 120])
+    r = run_single(
+        strategy=strategy_from({0}, {2}), params={}, series=s, rows=s.rows(), initial_cash=1000.0, costs=FREE
+    )
+    check("청산 1건", len(r.trades), 1)
+    check("열린 자리 없음", r.open_position, None)
+    check("원장에 남길 것은 청산 1건뿐", len(r.positions()), 1)
 
 
 def test_mae_mfe() -> None:
