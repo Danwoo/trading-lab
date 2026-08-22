@@ -83,7 +83,7 @@ INVENTORY_AXES: list[tuple[str, str, int]] = [
     # 클래스라 채운다 (#23 Task 2).
     ("scripts", "test_*.py", 14),
     ("*/tests", "test_*.py", 35),  # 서비스별 standalone 테스트 (#335)
-    ("frontend/scripts", "check-*.js", 4),  # frontend 정적 스캔
+    ("frontend/scripts", "check-*.js", 5),  # frontend 정적 스캔
     ("frontend/scripts", "generate-*.js", 1),  # 생성물 재현 대조 (--check 모드, #361)
     ("scripts", "generate_*.py", 1),  # 루트 생성물 재현 대조 (--check 모드)
     # 주입 프로브 — 「그 검사가 무엇을 막는지」를 증명하는 자리다. 이 축이 없던 동안

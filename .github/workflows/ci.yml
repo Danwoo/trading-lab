@@ -118,6 +118,9 @@ jobs:
             # 생성기·생성물만 바뀌면 트리거가 안 걸려 그 그물이 조용히 안 도는 상태였다.
             frontend/prisma/init/tables.sql
             frontend/prisma/table-generator.cjs
+            # tables.sql 의 소스다 (#331) — 이것만 바뀌면 backend-db 잡이 낡은 커밋본으로
+            # scratch DB 를 세운 채 초록이었다.
+            frontend/prisma/schema.prisma
             # backend-tests 의 test_alembic_head_freshness.py 가 이 루트 스크립트의 판정 함수를
             # 검증한다 — 체커만 고치고 검사가 안 도는 구멍을 막는다 (#387)
             scripts/verify_alembic_head_freshness.py

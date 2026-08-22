@@ -15,6 +15,7 @@
     "scripts/check-terminal-devextreme-transitive.js", // frontend-ci.yml "전이 devextreme 의존 검사"
     "scripts/check-no-kst-time-in-routes.js", // frontend-ci.yml "app/api 라우트 getKSTTime() 재유입 검사"
     "scripts/check-dead-code.js", // frontend-ci.yml "죽은 코드 상한" — 이 설정을 읽는 스크립트 자신
+    "scripts/check-tables-sql-reproducible.js", // frontend-ci.yml "tables.sql 재현 대조"
     "scripts/generate-brand-assets.js", // frontend-ci.yml "브랜드 자산 재현 대조" + scripts/verify_public_release_tree.py
     // package.json 의 pretest·predev 훅이 부른다 (npm 이 실행 — import 하는 TS 파일은 없다)
     "scripts/check-deps-sync.js",
@@ -56,7 +57,7 @@
   // 파일 **안에서** 쓰이는 export 는 죽은 코드가 아니라 「과다 노출」이다 — 지우는 손질은
   // `export` 키워드를 떼는 것이지 코드를 지우는 것이 아니다. 그런데 이 레포에서는 그 손질이
   // 안전하지 않다: 파이썬 그물이 `export const DATA_KINDS = [` 같은 **소스 텍스트**를 정규식으로
-  // 찾는다 (backend-service/scripts/verify_capability_kind_lockstep.py:29). 그래서 이 축은
+  // 찾는다 (scripts/verify_capability_kind_lockstep.py). 그래서 이 축은
   // 목록에서 뺀다 — 죽은 코드 상한이 재는 것은 「아무도 안 부르는 코드」다.
   "ignoreExportsUsedInFile": true,
 }

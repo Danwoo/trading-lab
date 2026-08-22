@@ -18,6 +18,16 @@ CHECKER="$FRONTEND_DIR/scripts/check-terminal-devextreme-transitive.js"
 # "진입점에서 직접 import" 만 검증하게 된다. 이 파일은 DataTable 커널이 import 하는 모듈이라
 # 배럴·상대경로를 거친 **전이 체인**까지 함께 두들긴다.
 TARGET="$FRONTEND_DIR/components/shared/DataTable/gridColumnLayout.ts"
+
+# fail-closed — 대상이 사라지면 시험은 자기 머리에 적은 근거(전이 체인)를 잃는다. 그런데
+# `printf >>` 가 없던 경로에 새 파일을 만들어 7건이 전부 「기대대로」 나오고, trap 이 빈
+# 백업을 덮어써 0바이트 파일까지 남았다 — 「전수 통과」로 끝나는 강등이었다 (#331).
+if [ ! -f "$TARGET" ]; then
+  echo "[injection-probe] 주입 대상이 없습니다: $TARGET"
+  echo "[injection-probe] 리네임·이동됐다면 이 스크립트의 TARGET 도 함께 옮기세요 (전이 체인을 무는 실재 파일이어야 합니다)."
+  exit 1
+fi
+
 BACKUP="$(mktemp)"
 
 # 차단돼야 하는 6종 — #341 이 package.json 에서 걷어낸 전부.
@@ -34,10 +44,15 @@ ALLOWED=(
   'devextreme-exceljs-fork'
 )
 
-restore() { cp "$BACKUP" "$TARGET"; }
+# 실패해도 여기서 종료하지 않는다 — 끝의 `cmp` 가 원복 결과를 판정한다 (트랩 안 exit 은
+# 종료 코드를 덮어써 주입 결과를 가린다).
+restore() { cp "$BACKUP" "$TARGET" || echo "[injection-probe] 원복 실패: $TARGET"; }
 trap 'restore; rm -f "$BACKUP"' EXIT
 
-cp "$TARGET" "$BACKUP"
+cp "$TARGET" "$BACKUP" || {
+  echo "[injection-probe] 백업을 뜨지 못했습니다: $TARGET → $BACKUP"
+  exit 1
+}
 
 failures=()
 checked=0
@@ -83,6 +98,12 @@ done
 
 restore
 
+# 시험이 소스를 망가뜨리고 끝나는 경로를 닫는다 — 원복이 바이트 동일해야 한다.
+if ! cmp -s "$BACKUP" "$TARGET"; then
+  echo "[injection-probe] 원복이 원본과 다릅니다: $TARGET — 주입 잔재가 남았습니다."
+  exit 1
+fi
+
 # fail-closed — 케이스가 0건이면 "위반 없음"이 아니라 "아무것도 안 두들겼음"이다.
 expected=$(( ${#BANNED[@]} + ${#ALLOWED[@]} ))
 if [ "$checked" -ne "$expected" ]; then
@@ -97,4 +118,4 @@ if [ ${#failures[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "[injection-probe] 주입 ${checked}건(차단 ${#BANNED[@]} · 허용 ${#ALLOWED[@]}) 전수 통과."
+echo "[injection-probe] 주입 ${checked}건(차단 ${#BANNED[@]} · 허용 ${#ALLOWED[@]}) 전수 통과 · 대상 원복 바이트 동일."

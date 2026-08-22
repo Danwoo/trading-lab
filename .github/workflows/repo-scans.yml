@@ -468,6 +468,19 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_proxy_route_consumers.py
 
+      # 프론트↔백엔드 lockstep 2종 (#331) — 입력이 두 서비스에 걸쳐 있어 어느 한쪽의 경로
+      # 목록에도 온전히 안 담긴다. ci.yml 의 `test: backend` 스위트에 있던 동안, 이 그물이
+      # 막으려던 실수가 들어오는 유일한 경로(프론트만 바뀐 PR)에서 잡이 통째로 skipped 였다
+      # — 최근 머지 40건 중 8건이 그 경우였고 2건은 그물 글롭에 드는 파일을 고쳤다.
+      # stdlib 텍스트·AST 대조라 이 잡의 클래스다.
+      - name: capability data_kind·job_kind·status lockstep 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_capability_kind_lockstep.py
+
+      - name: 백테스트 응답 계약 lockstep 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_backtest_contract_lockstep.py
+
   # ── 앱 모듈을 import 하는 전수 스캔 (uv 필요) ────────────────────────────
   repo-scan-app:
     name: "test: repo-scan-app"
