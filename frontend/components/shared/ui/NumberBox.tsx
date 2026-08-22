@@ -87,8 +87,14 @@ const UNREADABLE_MESSAGE = "숫자로 읽을 수 없습니다 — 숫자와 쉼�
  * `showSpinButtons=false` 면 CSS 로 그 버튼만 감춘다(`[appearance:textfield]`) — 값 계약과
  * 키보드 ↑↓ 동작은 그대로 남는다.
  *
- * 읽기 전용일 때는 단위(`format` 접미사)를 값 옆에 덧붙여 보여준다 — 편집 중에는 숨긴다
- * (네이티브 숫자 입력은 리터럴을 값으로 받지 못한다).
+ * **단위(`format` 접미사)는 읽기 전용이든 편집 중이든 언제나 보인다 (#316).** 값이 비어 있어도
+ * 보이므로, 칸을 처음 보는 사람도 무엇을 치는 자리인지 안다. 단위는 값이 아니라 **입력 옆에
+ * 겹쳐 그리는 글자**다 — 네이티브 숫자 입력은 리터럴을 값으로 받지 못하므로 값에 섞을 수 없다.
+ * 그래서 겹치지 않게 입력의 오른쪽 여백을 단위 길이만큼 벌리고, 그 글자를 `aria-describedby`
+ * 로 이어 보조기술도 함께 읽게 한다. `groupDigits` 모드는 값 자체가 `10,000,000원` 이라
+ * 여기서 덧붙이지 않는다.
+ *
+ * `showSpinButtons` 와 단위는 같은 자리(입력의 오른쪽 끝)를 다투므로 함께 켜지 않는다.
  *
  * @example
  * <NumberBox fieldName="salary" min={0} format="#,##0원" showSpinButtons />
@@ -115,6 +121,7 @@ export function NumberBox<T = any>({
   tabIndex,
 }: Props<T>) {
   const errorMessageId = useId();
+  const suffixId = useId();
   const { isInvalid, errorMessage, effectiveWidth } = resolveFieldState(getFieldProps, fieldName, width);
   // 편집 중인 원문. 구분 기호를 넣은 표기 위에 커서를 올리면 자릿수가 밀리므로, 편집하는 동안은
   // 이 원문을 그대로 보여 준다.
@@ -126,6 +133,8 @@ export function NumberBox<T = any>({
 
   const suffix = suffixOf(format);
   const editing = draft !== null;
+  // `groupDigits` 는 값 문자열에 단위를 이미 담는다 — 여기서 또 그리면 `10,000,000원원` 이 된다.
+  const showsSuffix = suffix !== "" && !groupDigits;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -150,6 +159,10 @@ export function NumberBox<T = any>({
 
   const shownError = isInvalid ? errorMessage : unreadable ? UNREADABLE_MESSAGE : undefined;
   const showsError = isInvalid || unreadable;
+  const describedByIds =
+    [showsError && shownError ? errorMessageId : describedBy, showsSuffix ? suffixId : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   const displayValue = groupDigits
     ? editing
@@ -189,9 +202,11 @@ export function NumberBox<T = any>({
         }
         onChange={handleChange}
         aria-invalid={showsError || undefined}
-        // 검증 오류가 있으면 그쪽이 이긴다 — 지금 고쳐야 할 것이 먼저 읽혀야 한다.
-        aria-describedby={showsError && shownError ? errorMessageId : describedBy}
-        style={{ height }}
+        // 검증 오류가 있으면 도움말 대신 그쪽이 읽힌다 — 지금 고쳐야 할 것이 먼저다. 단위는
+        // 어느 쪽이든 뒤에 붙는다(무엇을 치는 자리인지는 오류 중에도 알아야 한다).
+        aria-describedby={describedByIds}
+        // 단위 글자와 값이 겹치지 않게 오른쪽만 벌린다 — `px-3`(0.75rem) 의 오른쪽을 덮어쓴다.
+        style={{ height, paddingRight: showsSuffix ? `calc(0.75rem + ${suffix.length}em)` : undefined }}
         className={cn(
           FIELD_INPUT_CLASS,
           "text-right tabular-nums",
@@ -200,11 +215,14 @@ export function NumberBox<T = any>({
           showSpinButtons
             ? ""
             : "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-          readOnly && suffix && !groupDigits ? "pr-8" : "",
         )}
       />
-      {readOnly && suffix && !groupDigits && (
-        <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-muted">
+      {showsSuffix && (
+        // 클릭이 통과해야 오른쪽 끝을 눌러도 칸에 포커스가 간다.
+        <span
+          id={suffixId}
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-muted"
+        >
           {suffix}
         </span>
       )}
