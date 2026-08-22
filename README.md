@@ -17,8 +17,14 @@ result.
 per-source capability — what you can pull now, what is blocked, and which blocks a key would unlock.
 
 **Ask an investment question.** A multi-agent pipeline gathers data from six financial MCP servers
-and answers **with sources attached** — every number traces back to the tool call that produced it,
-and unsourced figures are blocked.
+and answers **with sources attached** — every number traces back to the tool call that produced it.
+Nothing is blocked: an answer with no tool evidence behind it still comes out, labeled
+`no_evidence`, and figures that appear nowhere in the tool output are marked as unsourced in the
+answer itself. The label is deterministic — it is read off the tool-call trace, not from the model.
+
+**Describe a bot in plain words.** `bot-agent-service` embeds the Claude Agent SDK and turns the
+conversation into the bot's settings — the form fills in as you talk, and what you save is what the
+form shows. Local deployments only; it is never started in a hosted setup.
 
 Also working: watchlists, portfolios and holdings, a NAV time series, research documents, file
 upload over SFTP, a weekly email summary, and an admin area.
@@ -61,9 +67,16 @@ Signing up through the UI works too, without a mail server: leave `EMAIL_HOST` e
 `frontend/.env.development` (the default) and the verification code is printed to the frontend's
 console instead of being emailed. Production never takes that path.
 
-**No API keys needed.** Every MCP server ships with mock financial data, so the whole stack boots
-and the research chat answers out of the box. For real data, put your own key in that service's
-`.env.development` and set `USE_REAL_API=true`.
+**No API keys needed for the data.** Every MCP server ships with mock financial data, so the whole
+stack boots and every data tool answers out of the box. For real data, put your own key in that
+service's `.env.development` and set `USE_REAL_API=true`.
+
+**The research chat is the exception — it needs an LLM.** Mock data replaces the data sources, not
+the model, so `bootstrap_local_env.py` leaves `ROUTER_LLM_API_KEY` and `GENERATOR_LLM_API_KEY` in
+`multi-agent-service/app/.env.development` for you to fill in, and the shipped `*_LLM_BASE_URL`
+defaults point at RFC 5737 documentation addresses that do not route. Set the base URL, model and
+key for both roles before asking a question; `GET /agent/llm` says what is configured and
+`POST /agent/llm/probe` says whether it actually answers.
 
 For staging or production, use Docker Compose instead:
 
@@ -102,12 +115,16 @@ flowchart LR
 | `doc-search-mcp-service` | 8008 | Search over your own research notes (Milvus + BM25) |
 | `template-mcp-service` | 8009 | Starting point for a new MCP server |
 | `single-agent-service` | 8010 | A minimal agent, kept as a worked example |
+| `bot-agent-service` | 8011 | Turns a conversation into a bot's settings (local deployments only) |
 
-The last two aren't in `process-compose.yaml` — start them by hand when you need them.
+The last three aren't in `process-compose.yaml` — start them by hand when you need them; each one's
+`README.md` has the command.
 
-**One rule holds the design together:** no service calls an external financial API directly. It
-goes through an MCP server. Adding a data source touches one place, and the agent's sources stay
-traceable.
+**Two data paths, one owner each.** The agent never reaches a financial API itself — it asks an MCP
+server, which is what keeps its sources traceable. Market data ingestion is the other path, and it
+calls vendors directly from source adapters under `backend-service/app/providers/<source>/` (Toss,
+Alpaca, SEC, data.go.kr, OpenFIGI). So: a new source for the agent is a new MCP server; a new
+source for ingestion is a new provider adapter. Nothing else opens a socket to a vendor.
 
 ## Built with
 
@@ -137,7 +154,10 @@ Issues and pull requests come here — there's no mirror or upstream. What you s
   `pre-commit run --all` before you commit. Conventions live in [`CLAUDE.md`](CLAUDE.md).
 - **Keys stay yours.** This repo ships adapters, never credentials — some data providers forbid
   redistributing their data. Mock data means you don't need a key to contribute. Never commit a
-  file with a key in it; `.env*` is gitignored and CI blocks credential patterns too.
+  file with a key in it. `.env*` is gitignored, and `pre-commit run --all` runs gitleaks over the
+  tree — run `pre-commit install` so it runs on every commit, because **CI does not scan for
+  credentials**. GitHub push protection is the only server-side net, and it only knows
+  provider-format keys.
 
 Contributions ship under the MIT license below.
 

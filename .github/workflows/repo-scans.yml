@@ -437,6 +437,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_stage_claims.py
 
+      # 정문이 말하는 사실이 낡는 것 (#329) — 서비스 표·모듈 목록·아키텍처 규칙 7건이 동시에
+      # 코드와 어긋나 있었다. 위 단계 그물과 같은 부류이고(사람이 손으로 고치는 것 말고 갱신
+      # 경로가 없다), README·루트 CLAUDE.md·process-compose·backend 등록을 함께 읽으므로
+      # 경로 필터가 없는 이 잡의 클래스다.
+      - name: 정문 문서 주장 대조
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_front_door_claims.py
+
       # 비텍스트 토큰을 글자에 쓰는 것 (#73 리드 결정 ㉡) — 위 두 그물 **사이**에 난 구멍이다.
       # 대비 검사는 「비텍스트니 검사 안 함」으로, 색 사용 검사는 「등록된 토큰이니 위반 아님」으로
       # 넘겨, 규격상 못 읽는 값이 글자로 새어 나간다(실측: PR #161). 검사 0건이면 실패.
