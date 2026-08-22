@@ -45,6 +45,10 @@ def main(argv: list[str]) -> int:
     )
     args = parser.parse_args(argv[1:])
 
+    # 자식은 곧바로 쓰고 이 프로세스의 print 는 비-tty(=CI)에서 블록 버퍼링된다 —
+    # 그대로 두면 스크립트 머리 줄이 전부 로그 끝에 몰려 어느 출력이 어느 것인지 사라진다.
+    sys.stdout.reconfigure(line_buffering=True)
+
     scripts_dir = Path(args.scripts_dir)
     if not scripts_dir.is_dir():
         print(f"::error::검증 스크립트 디렉터리가 없습니다: {scripts_dir}")
