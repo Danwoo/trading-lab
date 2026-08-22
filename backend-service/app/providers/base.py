@@ -54,7 +54,11 @@ class ProviderResponseInvalid(BadGatewayError):
 # **한 곳에서 정의한 상수**를 쓰기 위해 여기 둔다 — 어느 계층이 이 사유에 "그럼 어디서 받나"를
 # 덧붙일지 판단하는 근거가 된다(`services/capability/`). 어댑터가 각자 다른 문장을 쓰면 그
 # 판단이 조용히 빗나가므로, 키가 필요한 어댑터는 이 상수를 사유에 포함시킨다.
-CREDENTIAL_MISSING_HINT = ".env 에 데이터 소스 키를 채우세요"
+#
+# **어디에 넣는지는 여기서 말하지 않는다** — 백엔드는 프론트 경로를 모르고, 키를 넣는 자리는
+# 화면(`/settings`)이다. 이 문장이 파일 편집을 지시하면 그 화면이 있는데도 사용자가 파일을
+# 찾아 나서게 된다.
+CREDENTIAL_MISSING_HINT = "키를 넣으면 열립니다"
 
 # 위 사유를 **기계가 읽는 값**으로도 흘린다. 화면은 「키가 아직 없다」와 「진짜 장애」를 달리
 # 다뤄야 하는데(전자는 임시 데이터로 골조를 보여주고, 후자는 숨기면 안 된다 — 결정 로그
@@ -86,7 +90,7 @@ class ProviderKeyMissing(ServiceUnavailableError):
     def __init__(self, source: str, env_hint: str):
         self.source = source
         self.env_hint = env_hint
-        super().__init__(f"{source} 소스의 API 키가 없습니다. .env 에 데이터 소스 키({env_hint})를 채우세요.")
+        super().__init__(f"{source} 소스의 API 키가 없습니다 — 필요한 값: {env_hint}")
 
 
 class MarketDataProvider(Protocol):

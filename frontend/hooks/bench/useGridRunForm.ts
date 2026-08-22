@@ -143,6 +143,13 @@ export function useGridRunForm(): GridRunFormController {
       setFormError("구간을 YYYY-MM-DD 로 다 적으세요.");
       return null;
     }
+    // 두 값 다 화면이 이미 갖고 있어 서버까지 갈 필요가 없다. 사유는 **폼의 칸 이름**으로 적는다 —
+    // 서버가 내는 같은 판정은 요청 본문의 이름(`date_from`)을 모르는 사람에게 닿는다.
+    // `YYYY-MM-DD` 는 사전순이 날짜순이라 문자열 비교로 갈린다.
+    if (form.period_from > form.period_to) {
+      setFormError("구간 시작이 구간 끝보다 뒤입니다 — 두 날짜를 바꿔 적으세요.");
+      return null;
+    }
     if (form.initial_cash === null || !(form.initial_cash > 0)) {
       setFormError("시작 자금을 0보다 크게 적으세요 — 성과를 재는 분모입니다.");
       return null;

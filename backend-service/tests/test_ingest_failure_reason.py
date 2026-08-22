@@ -223,7 +223,11 @@ def check_stored_reasons() -> None:
 
     key_missing = stored_reason(ProviderKeyMissing("toss", "ID:SECRET 형식"), "toss")
     check("저장: 키 없음 — 소스 이름이 한 번만", key_missing.count("toss"), 1)
-    check("저장: 키 없음 — .env 를 가리킨다", ".env" in key_missing, True)
+    # #317 로 판정 축이 「`.env` 를 가리킨다」에서 「무엇이 필요한지 말한다」로 바뀌었다. 지키려던
+    # 것(사유가 다음 행동을 담는다)은 그대로다 — 다만 그 값을 넣는 자리가 파일이 아니라 설정
+    # 화면(`/settings`)이라, 파일 이름을 부르면 화면이 있는데도 사용자를 파일로 보내게 된다.
+    check("저장: 키 없음 — 무엇이 필요한지 말한다", "ID:SECRET 형식" in key_missing, True)
+    check("저장: 키 없음 — 파일 편집을 시키지 않는다", "채우세요" in key_missing, False)
 
 
 def check_adapters_carry_status() -> None:
