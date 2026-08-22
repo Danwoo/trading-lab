@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
 from graphs.plan_execute.map_reduce import _map_domain_answer  # noqa: E402
 from utils.redaction.redactor import redact_operational_info  # noqa: E402
 
-_SECRET = "SECRETKEY1234567890"
+_SECRET = "SECRETKEY1234567890"  # gitleaks:allow — 합성 카나리아 (실 키 아님)
 
 
 def _check_redactor(problems: list[str]) -> None:
