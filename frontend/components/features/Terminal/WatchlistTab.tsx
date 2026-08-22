@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useServerTable } from "@/hooks/shared/useServerTable";
 import { useQuoteBatch } from "@/hooks/terminal/useQuoteBatch";
 import { selectWatchlistList } from "@/services/watchlist/watchlistService";
@@ -9,6 +10,7 @@ import { PanelSkeleton } from "./PanelSkeleton";
 import { PanelUnavailable } from "./PanelUnavailable";
 import { ProvenanceBadge } from "./ProvenanceBadge";
 import { SidebarSymbolRow } from "./SidebarSymbolRow";
+import { SymbolSearch } from "./SymbolSearch";
 
 export interface WatchlistTabProps {
   activeTicker: string | undefined;
@@ -25,8 +27,13 @@ const SIDEBAR_LIST_PAGE_SIZE = 200;
 /**
  * 관심종목 탭(FR-006) — `selectWatchlistList`(O5) 실데이터. 다종목 시세는 `useQuoteBatch`
  * (FR-048) 하나로만 조회한다.
+ *
+ * 종목을 담는 자리도 여기다(#318). 종전에는 0건 상태의 유일한 출구가 `/admin/watchlist` 링크라
+ * 첫 종목 하나를 넣으려면 **관리자 셸로 나가 티커를 손으로 쳐야** 했다 — 제품 정의(결정
+ * 2026-07-28)가 `/admin` 으로 뺀 것은 시스템관리이지 관심종목이 아니다.
  */
 export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const table = useServerTable<WatchlistOut>({
     fetchGrid: selectWatchlistList,
     clientSide: true,
@@ -38,10 +45,24 @@ export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
   const symbols = table.rows.flatMap((row) => (row.market ? [{ ticker: row.ticker, market: row.market }] : []));
   const { quotes, provenance } = useQuoteBatch(symbols);
 
+  // 담은 종목으로 문맥까지 옮긴다 — 담기만 하고 화면이 그대로면 사용자가 한 걸음을 더 해야 한다.
+  const handleAdded = (symbol: SymbolRef) => {
+    setIsSearchOpen(false);
+    table.reload();
+    onSelect(symbol);
+  };
+
   // 못 읽은 것을 「없다」고 하면 등록해 둔 종목 위에 다시 등록하러 가게 만든다 —
-  // 실패를 먼저 가른다(같은 폴더 `HoldingTab` 과 같은 순서·같은 어휘).
+  // 실패를 먼저 가른다(같은 폴더 `HoldingTab` 과 같은 순서·같은 어휘). 검색 자리보다도 앞이다:
+  // 목록을 못 읽은 상태에서 열린 검색은 `rows.length === 0` 이라 닫는 자리가 없어 갇힌다.
   if (table.error) {
     return <PanelUnavailable reason="관심종목을 불러오지 못했습니다 — 잠시 후 다시 시도하세요." />;
+  }
+
+  if (isSearchOpen) {
+    return (
+      <SymbolSearch onAdded={handleAdded} onClose={table.rows.length > 0 ? () => setIsSearchOpen(false) : undefined} />
+    );
   }
 
   if (table.isLoading) {
@@ -52,7 +73,7 @@ export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
     return (
       <PanelUnavailable
         reason="관심종목이 없습니다 — 여기에 종목을 등록하면 차트·호가가 그 종목으로 채워집니다."
-        action={{ href: "/admin/watchlist", label: "관심종목 등록하러 가기" }}
+        action={{ onClick: () => setIsSearchOpen(true), label: "종목 찾아 담기" }}
       />
     );
   }
@@ -66,6 +87,13 @@ export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
       <div className="flex flex-shrink-0 items-center gap-1.5 border-b border-line px-2 py-1">
         <span className="text-ink-muted">시세</span>
         <ProvenanceBadge provenance={provenance} />
+        <button
+          type="button"
+          onClick={() => setIsSearchOpen(true)}
+          className="ml-auto rounded-control border border-line px-2 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+        >
+          종목 추가
+        </button>
       </div>
       <ul className="min-h-0 flex-1 overflow-auto">
         {table.rows.map((row) => (

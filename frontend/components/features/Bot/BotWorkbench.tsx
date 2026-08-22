@@ -8,6 +8,7 @@ import { getApiErrorMessage } from "@/utils/common/errors";
 import { createBot, selectBot, selectStrategyCatalog, updateBot } from "@/services/bot/botService";
 import { BotConversation, type BotProposal } from "./BotConversation";
 import { BotForm } from "./BotForm";
+import { deleteBotWithConfirm } from "./deleteBotWithConfirm";
 import {
   NEW_BOT_DRAFT,
   newStrategyDraft,
@@ -45,11 +46,18 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
    * 저장하면 나머지가 조용히 사라진다. 「못 고친다」는 괜찮지만 「부순다」는 안 된다.
    */
   const [loadedStrategyCount, setLoadedStrategyCount] = useState(0);
+  /**
+   * 서버에서 실제로 읽어 온 봇 이름. 지우기는 **이 값이 있을 때만** 선다 — 없는 봇의 주소로
+   * 되돌아왔을 때(지운 뒤 뒤로가기) 폼은 빈 초안이라, `draft` 를 믿으면 확인창이 「」 를
+   * 지운다고 말하고 404 가 뻔한 요청이 나간다.
+   */
+  const [loadedBotName, setLoadedBotName] = useState<string | null>(null);
   const [strategyForms, setStrategyForms] = useState<StrategyForm[]>([]);
   const [catalogErrors, setCatalogErrors] = useState<{ source: string; message: string }[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +75,7 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
 
         if (bot) {
           setDraft(toDraft(bot));
+          setLoadedBotName(bot.bot_nm);
           // 저장된 값을 그대로 되돌려 놓는다 — 다시 열었을 때 조건이 그대로 보이는 것이
           // 마일스톤 2 의 완료 조건이다. 전략 파일이 사라졌으면 `form` 이 null 로 온다.
           setLoadedStrategyCount(bot.strategies.length);
@@ -185,6 +194,25 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
     }
   };
 
+  /**
+   * 불러온 봇만 지운다 — 아직 없는 것·이미 없는 것을 지우는 조작부는 뜻이 없다.
+   *
+   * 이름은 폼(`draft`)이 아니라 **읽어 온 값**을 쓴다. 확인창이 말하는 대상은 사용자가 지금
+   * 타이핑 중인 이름이 아니라 서버에 저장된 그 봇이다.
+   *
+   * 전략이 여럿이라 저장을 막은 봇도 지우는 것은 막지 않는다. 저장을 막은 이유는 「이 화면이
+   * 모르는 것을 조용히 버린다」인데, 삭제는 무엇이 사라지는지 확인에서 다 말하고 지운다.
+   */
+  const handleDelete = async () => {
+    if (botId === undefined || loadedBotName === null) return;
+    setIsDeleting(true);
+    try {
+      if (await deleteBotWithConfirm({ bot_id: botId, bot_nm: loadedBotName })) router.push("/bench/bot");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className={cn("flex h-full min-h-0 flex-col gap-4", inPanel ? "p-0" : "p-6")}>
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -201,6 +229,15 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
           </div>
         )}
         <div className="flex gap-2">
+          {loadedBotName !== null && (
+            <Button
+              text={isDeleting ? "삭제 중…" : "삭제"}
+              type="danger"
+              stylingMode="outlined"
+              disabled={isDeleting || isLoading}
+              onClick={() => void handleDelete()}
+            />
+          )}
           <Button text="취소" onClick={() => router.push("/bench/bot")} />
           <Button text={isSaving ? "저장 중…" : "저장"} disabled={isSaving || isLoading} onClick={handleSave} />
         </div>

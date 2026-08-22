@@ -93,7 +93,15 @@ export function HoldingTab({ activeTicker, onSelect }: HoldingTabProps) {
   }
 
   if (holdings.length === 0) {
-    return <PanelUnavailable reason="보유종목이 없습니다 — 포트폴리오 화면에서 먼저 등록하세요." />;
+    // 「포트폴리오 화면」이라고만 적으면 레일의 「포트폴리오」(아직 못 여는 자리)로 읽힌다 —
+    // 보유를 실제로 등록하는 자리는 관리 화면의 포트폴리오 상세다. 관심종목 탭과 같은 규칙:
+    // 「어디로 가라」를 적으면 그 자리로 가는 조작부를 함께 준다.
+    return (
+      <PanelUnavailable
+        reason="보유종목이 없습니다 — 등록하면 여기에서 그 종목을 고를 수 있습니다."
+        action={{ href: "/admin/portfolio", label: "보유종목 등록하러 가기" }}
+      />
+    );
   }
 
   return (

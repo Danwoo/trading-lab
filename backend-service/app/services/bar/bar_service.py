@@ -117,8 +117,10 @@ class BarService:
         market, symbol = args["market"].upper(), args["symbol"].upper()
         date_from, date_to = args["date_from"], args["date_to"]
         limit = self._validated_limit(args.get("limit"))
+        # 사유는 **화면의 칸 이름**으로 적는다 — `date_from` 은 화면 어디에도 없는 이름이라
+        # 어느 칸이 잘못됐는지 읽는 사람이 알아낼 수 없다.
         if date_from > date_to:
-            raise BadRequestError("date_from 이 date_to 보다 늦습니다.")
+            raise BadRequestError("구간 시작이 구간 끝보다 뒤입니다.")
 
         instrument = self.bar_repository.select_instrument({"market": market, "symbol": symbol})
         if not instrument:
@@ -282,7 +284,7 @@ class BarService:
         market, symbol = args["market"].upper(), args["symbol"].upper()
         date_from, date_to = args["date_from"], args["date_to"]
         if date_from > date_to:
-            raise BadRequestError("date_from 이 date_to 보다 늦습니다.")
+            raise BadRequestError("구간 시작이 구간 끝보다 뒤입니다.")
 
         instrument = self._instrument(market, symbol)
         # 상장 전·상장폐지 후는 애초에 거래일이 아니다 — 종목 마스터의 기간으로 먼저 좁힌다.

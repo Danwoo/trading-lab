@@ -84,7 +84,29 @@ def equity_rows(values: list[float]) -> list[dict]:
     ]
 
 
-def service(repo: FakeRepository) -> BacktestService:
+class CapturingRepository:
+    """`_persist` 가 각 테이블에 **무엇을 넣는지** 붙잡는다 — DB 없이 저장 계약을 본다."""
+
+    def __init__(self) -> None:
+        self.trades: list[dict] = []
+        self.equity: list[dict] = []
+
+    def insert_equity(self, rows):
+        self.equity = rows
+        return len(rows)
+
+    def insert_trades(self, rows):
+        self.trades = rows
+        return len(rows)
+
+    def insert_signals(self, rows):
+        return len(rows)
+
+    def insert_cash_events(self, rows):
+        return len(rows)
+
+
+def service(repo) -> BacktestService:
     return BacktestService(backtest_repository=repo, bar_service=None, strategy_loader=lambda key: None)
 
 
@@ -274,11 +296,140 @@ def test_grid_cell_twin_failure_is_recorded_not_swallowed() -> None:
     )
 
 
+# ── 구간 끝에 열린 자리 (#314) ───────────────────────────────────────────────
+
+
+def open_equity_rows(values: list[float], *, gross_exposure: float) -> list[dict]:
+    """마지막 점에 자리가 **열려 있는** 자산곡선. 그 평가액이 곧 마지막 점의 노출액이다."""
+    rows = equity_rows(values)
+    rows[-1]["position_count"] = 1
+    rows[-1]["gross_exposure"] = Decimal(str(gross_exposure))
+    return rows
+
+
+def open_trade_row() -> dict:
+    """진입만 하고 청산되지 않은 자리 — `exit_ts`·`exit_price`·`realized_pnl` 이 전부 NULL 이다."""
+    return {
+        "trade_id": 1,
+        "instrument_id": 10,
+        "side": "long",
+        "entry_ts": date(2026, 1, 3),
+        "exit_ts": None,
+        "qty": Decimal("9"),
+        "fill_price": Decimal("100"),
+        "exit_price": None,
+        "fee": Decimal("0.9"),
+        "slippage": Decimal("3.0"),
+        "tax": Decimal("0"),
+        "realized_pnl": None,
+        "mae": None,
+        "mfe": None,
+    }
+
+
+def test_open_position_is_persisted_as_an_unclosed_row() -> None:
+    """엔진의 열린 자리가 **거래 원장에 남는다** — 청산한 척하지 않되 버리지도 않는다.
+
+    남기지 않으면 그 자리의 진입 비용이 어느 합계에도 안 잡혀 「치른 비용 0원」이 된다.
+    """
+    from services.backtest.engine import BarSeries, CostModel, Strategy, run_single
+
+    closes = [100.0, 120.0, 150.0]
+    series = BarSeries(
+        instrument_id=1,
+        dt=["2026-01-02", "2026-01-03", "2026-01-04"],
+        open=list(closes),
+        high=list(closes),
+        low=list(closes),
+        close=list(closes),
+        volume=[1000.0] * 3,
+    )
+    strategy = Strategy(
+        SimpleNamespace(
+            STRATEGY={"key": "fixture", "name": "고정", "timeframe": "1d", "params": []},
+            indicators=lambda bars, params: {},
+            entry=lambda ctx: ctx["index"] == 0,
+            exit=lambda ctx: False,
+        )
+    )
+    result = run_single(
+        strategy=strategy,
+        params={},
+        series=series,
+        rows=series.rows(),
+        initial_cash=1000.0,
+        costs=CostModel(fee_rate=0.01, slippage_rate=0.0, sell_tax_rate=0.0),
+    )
+
+    repo = CapturingRepository()
+    written = service(repo)._persist(7, result)
+    check("거래 행이 1건 저장된다", written["trade_rows"], 1)
+    if not repo.trades:
+        FAILURES.append("열린 자리가 거래 원장에 안 남았다 — 진입 비용이 어느 합계에도 안 잡힌다")
+        return
+    check("청산 시각이 비어 있다", repo.trades[0]["exit_ts"], None)
+    check("실현손익이 비어 있다", repo.trades[0]["realized_pnl"], None)
+    check("진입 비용이 남는다", float(repo.trades[0]["fee"]) > 0, True)
+
+
+def test_open_position_rides_the_report() -> None:
+    """리포트가 열린 자리를 **1급 정보로** 싣고, 지표가 그 사실을 반영한다.
+
+    진입 원금 100 × 9 = 900 · 진입 비용 0.9 + 3.0 = 3.9 · 끝 평가액 1,400
+      → 미실현 = 1,400 − 903.9 = 496.1
+    """
+    repo = FakeRepository(
+        run_row(), open_equity_rows([1000.0, 900.0, 1400.0], gross_exposure=1400.0), [open_trade_row()]
+    )
+    report = service(repo).select_report({"run_id": 7, "workspace_id": 1})
+
+    op = report["open_position"]
+    check("열린 자리가 응답에 있다", op is not None, True)
+    check("자리 수", op["count"], 1)
+    check("평가액", op["value"], 1400.0)
+    check("진입일", op["entry_ts"], "2026-01-03")
+    # 진입 원금 = 100 × 9 + (0.9 + 3.0) = 903.9 → 미실현 = 1,400 − 903.9 = 496.1
+    check("미실현 손익", round(op["unrealized_pnl"], 6), 496.1)
+
+    # 「치른 비용」이 열린 자리의 진입 비용을 센다 — 이슈의 「0원」이 여기서 갈린다.
+    paid = next(m for m in report["metrics"] if m["key"] == "cost_paid")
+    check("치른 비용이 0원이 아니다", round(paid["value"], 6), 3.9)
+    check("유도가 열린 자리를 밝힌다", "열린 자리 1건의 진입 비용" in (paid["derived_from"] or ""), True)
+
+    # 「거래 없음」과 「청산 안 함」을 가른다.
+    win = next(m for m in report["metrics"] if m["key"] == "win_rate")
+    check("청산된 거래 없음이라 말한다", "청산된 거래 없음" in (win["absent_reason"] or ""), True)
+
+    # 거래 목록에도 그 자리가 한 줄로 선다 — 세 곳이 같은 사실을 말한다.
+    check("거래 목록에 열린 자리가 있다", len(report["trades"]), 1)
+    check("청산 시각이 없다", report["trades"][0]["exit_ts"], None)
+
+
+def test_old_run_with_open_position_does_not_claim_zero_cost() -> None:
+    """진입 기록 없이 자리만 열린 옛 실행은 「치른 비용 0원」이라 답하지 않는다."""
+    repo = FakeRepository(run_row(), open_equity_rows([1000.0, 1400.0], gross_exposure=1400.0), [])
+    report = service(repo).select_report({"run_id": 7, "workspace_id": 1})
+
+    op = report["open_position"]
+    check("자리는 안다", op["count"], 1)
+    check("진입 비용은 모른다", op["entry_cost"], None)
+    paid = next(m for m in report["metrics"] if m["key"] == "cost_paid")
+    check("치른 비용은 값이 없다", paid["value"], None)
+    check("사유가 열린 자리를 말한다", "열린 자리" in (paid["absent_reason"] or ""), True)
+
+
+def test_closed_run_has_no_open_position_field() -> None:
+    """자리가 안 열린 실행은 `open_position` 이 `None` — 없는 자리를 만들지 않는다."""
+    repo = FakeRepository(run_row(), equity_rows([100.0, 101.0, 102.0]), [])
+    report = service(repo).select_report({"run_id": 7, "workspace_id": 1})
+    check("열린 자리 없음", report["open_position"], None)
+
+
 def main() -> int:
     for fn in [v for k, v in sorted(globals().items()) if k.startswith("test_")]:
         fn()
     print(f"검사한 케이스 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과, {len(FAILURES)}건 실패")
-    if CHECKED < 10:
+    if CHECKED < 25:
         print(f"::error::단언이 {CHECKED}건뿐이다 — 그물이 죽어 있다", file=sys.stderr)
         return 1
     for line in FAILURES:

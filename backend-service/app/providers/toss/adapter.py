@@ -46,6 +46,11 @@ ENV_HINT = (
 #: 200봉×2000페이지 = 40만 봉 ≈ 분봉 4년치. 커서가 안 도는 경우는 상한이 아니라 아래에서 직접 잡는다.
 MAX_PAGES = 2000
 
+# 아래 두 사유는 화면에 그대로 나간다 — `providers/models.py` 의 `Capability.reason` 규칙을 따른다.
+# 상류 엔드포인트 이름(`/api/v1/prices`)과 구현 단위 이름은 위 모듈 주석에만 둔다.
+_NO_QUOTE_REASON = "토스증권이 주는 현재가에는 등락·등락률·거래량이 없어 시세를 채울 수 없습니다"
+_NO_ORDERBOOK_REASON = "토스증권 호가는 아직 받아오지 않습니다 — 소스에는 있지만 연결하지 않았습니다"
+
 
 def _market_tz(market: str) -> dt.tzinfo:
     """소스에 보낼 **커서**용 tz. 저장 시각은 매퍼가 `market_local_naive` 로 고정한다."""
@@ -80,8 +85,8 @@ class TossProvider:
                 "instrument_master": master,
                 "daily_bar": (key_reason is None, key_reason),
                 "minute_bar": (key_reason is None, key_reason),
-                "quote": (False, "prices 응답에 등락·등락률·거래량이 없어(사양) 시세 계약을 채울 수 없습니다"),
-                "orderbook": (False, "호가 어댑터를 아직 붙이지 않았습니다"),
+                "quote": (False, _NO_QUOTE_REASON),
+                "orderbook": (False, _NO_ORDERBOOK_REASON),
             }.items():
                 rows.append(Capability(market=market, data_kind=kind, available=ok, reason=reason))
         return rows
@@ -163,7 +168,7 @@ class TossProvider:
         return await self._paged_bars(symbol, market, "1m", keep_from=ts_from, keep_to=ts_to)
 
     async def fetch_quotes(self, symbols: list[tuple[str, str]]) -> list[NormalizedQuote]:
-        raise ProviderResponseInvalid("toss 는 시세 계약을 채울 수 없습니다 — capabilities 의 quote 사유 참조")
+        raise ProviderResponseInvalid(_NO_QUOTE_REASON)
 
 
 register_provider(SOURCE, TossProvider)

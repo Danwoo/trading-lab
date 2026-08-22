@@ -54,7 +54,11 @@ class ProviderResponseInvalid(BadGatewayError):
 # **한 곳에서 정의한 상수**를 쓰기 위해 여기 둔다 — 어느 계층이 이 사유에 "그럼 어디서 받나"를
 # 덧붙일지 판단하는 근거가 된다(`services/capability/`). 어댑터가 각자 다른 문장을 쓰면 그
 # 판단이 조용히 빗나가므로, 키가 필요한 어댑터는 이 상수를 사유에 포함시킨다.
-CREDENTIAL_MISSING_HINT = ".env 에 데이터 소스 키를 채우세요"
+#
+# **어디에 넣는지는 여기서 말하지 않는다** — 백엔드는 프론트 경로를 모르고, 키를 넣는 자리는
+# 화면(`/settings`)이다. 이 문장이 파일 편집을 지시하면 그 화면이 있는데도 사용자가 파일을
+# 찾아 나서게 된다.
+CREDENTIAL_MISSING_HINT = "키를 넣으면 열립니다"
 
 # 위 사유를 **기계가 읽는 값**으로도 흘린다. 화면은 「키가 아직 없다」와 「진짜 장애」를 달리
 # 다뤄야 하는데(전자는 임시 데이터로 골조를 보여주고, 후자는 숨기면 안 된다 — 결정 로그
@@ -65,7 +69,8 @@ CREDENTIAL_MISSING_CODE = "credential_missing"
 # 「이 시장·종류의 정본은 내가 아니다」(MD-AD-17)를 말하는 사유. **결손이 아니라 안내**다 —
 # 이 줄이 섞였다고 화면이 「키 없음」 판정을 잃으면, 소스를 하나 더 붙일 때마다 빈 보드가
 # 이유를 잃는다 (실측: 토스 어댑터를 붙이자 국내 일봉의 `credential_missing` 이 사라졌다).
-NOT_CANONICAL_HINT = "MD-AD-17 — 시장마다 정본 소스 하나"
+# 이 문구는 화면에 그대로 나간다 — 결정 번호(MD-AD-17)는 이 주석에 두고 문장에는 넣지 않는다.
+NOT_CANONICAL_HINT = "시장마다 값을 주는 소스를 하나로 정해 둡니다"
 NOT_CANONICAL_CODE = "not_canonical"
 
 
@@ -86,7 +91,7 @@ class ProviderKeyMissing(ServiceUnavailableError):
     def __init__(self, source: str, env_hint: str):
         self.source = source
         self.env_hint = env_hint
-        super().__init__(f"{source} 소스의 API 키가 없습니다. .env 에 데이터 소스 키({env_hint})를 채우세요.")
+        super().__init__(f"{source} 소스의 API 키가 없습니다 — 필요한 값: {env_hint}")
 
 
 class MarketDataProvider(Protocol):

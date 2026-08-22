@@ -2,6 +2,11 @@
 //
 // 두 결함의 회귀 그물 — ① 서버 실패가 "데이터 없음"으로 보임 ② 같은 종목이 여러 포트폴리오에
 // 있으면 중복 표시.
+//
+// #317 로 빈 상태 문구가 바뀌었다 — 옛 문구(「포트폴리오 화면에서 먼저 등록하세요」)가 가리킨
+// 레일의 「포트폴리오」는 `constants/shell.ts` 에서 준비 중이라 열리지 않는다. 그래서 실제로
+// 등록할 수 있는 자리(`/admin/portfolio`)를 조작부로 준다. 아래 단언이 지키는 불변식은
+// 「실패와 정상 0건을 가른다」로 그대로이고, 문구만 새 목적지를 따라간다.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
@@ -27,6 +32,9 @@ afterEach(() => {
   vi.mocked(selectHoldingList).mockReset();
 });
 
+/** 보유가 0건일 때의 문구 — 「실패」와 갈리는 축이라 한 곳에서 정의한다. */
+const EMPTY_REASON = "보유종목이 없습니다 — 등록하면 여기에서 그 종목을 고를 수 있습니다.";
+
 const PORTFOLIOS: PortfolioOut[] = [
   { portfolio_id: "core", portfolio_nm: "코어", sort_ordr: 1, use_at: "Y" },
   { portfolio_id: "growth", portfolio_nm: "성장", sort_ordr: 2, use_at: "Y" },
@@ -39,7 +47,7 @@ describe("HoldingTab — 서버 실패와 정상 0건 구분", () => {
     render(<HoldingTab activeTicker={undefined} onSelect={vi.fn()} />);
 
     expect(await screen.findByText("보유종목을 불러오지 못했습니다 — 잠시 후 다시 시도하세요.")).toBeTruthy();
-    expect(screen.queryByText("보유종목이 없습니다 — 포트폴리오 화면에서 먼저 등록하세요.")).toBeNull();
+    expect(screen.queryByText(EMPTY_REASON)).toBeNull();
   });
 
   it("보유 조회가 서버 실패면 '불러오지 못했습니다'를 보여준다", async () => {
@@ -56,8 +64,17 @@ describe("HoldingTab — 서버 실패와 정상 0건 구분", () => {
 
     render(<HoldingTab activeTicker={undefined} onSelect={vi.fn()} />);
 
-    expect(await screen.findByText("보유종목이 없습니다 — 포트폴리오 화면에서 먼저 등록하세요.")).toBeTruthy();
+    expect(await screen.findByText(EMPTY_REASON)).toBeTruthy();
     expect(screen.queryByText("보유종목을 불러오지 못했습니다 — 잠시 후 다시 시도하세요.")).toBeNull();
+  });
+
+  it("빈 상태가 가리키는 곳이 실제로 등록할 수 있는 화면이다 (#317)", async () => {
+    vi.mocked(selectPortfolioList).mockResolvedValue({ items: [], total_count: 0 });
+
+    render(<HoldingTab activeTicker={undefined} onSelect={vi.fn()} />);
+
+    const link = await screen.findByRole("link", { name: "보유종목 등록하러 가기" });
+    expect(link.getAttribute("href")).toBe("/admin/portfolio");
   });
 
   it("두 서비스 함수 모두 throwOnFailure: true 로 호출한다 — 이 계약이 빠지면 위 테스트들이 다시 실패로 돌아간다", async () => {

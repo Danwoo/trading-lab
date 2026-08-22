@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { ProvenanceBadge } from "@/components/features/Terminal/ProvenanceBadge";
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { useBarGaps } from "@/hooks/terminal/useBarGaps";
@@ -11,6 +12,7 @@ import { insertIngestRun } from "@/services/terminal/ingestService";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import type { DataKind, IngestRunOut } from "@/schemas/terminal/ingest";
 import type { MarketCapability } from "@/services/terminal/marketService";
+import { SETTINGS_PATH } from "@/constants/routes";
 import { CREDENTIAL_MISSING_CODE } from "@/lib/terminal/marketDataError";
 import { redactReason } from "@/utils/common/errors/redactReason";
 
@@ -191,12 +193,22 @@ function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; load
           </ul>
         </>
       )}
-      {/* 키가 없어 막힌 것만 접힌 자리 **밖**에 둔다 — 사용자가 오늘 손댈 수 있는 유일한 항목이다. */}
+      {/* 키가 없어 막힌 것만 접힌 자리 **밖**에 둔다 — 사용자가 오늘 손댈 수 있는 유일한 항목이다.
+          그 「손대는 자리」가 설정 화면이라 여기서 바로 갈 수 있게 한다 — 사유는 어느 항목이
+          비었는지까지 말하지만, 그 항목을 넣는 곳을 아는 것은 화면이다. */}
       {fixable.length > 0 && (
         <>
-          <p className="break-keep text-2xs text-ink">
-            키를 넣으면 열리는 것 <span className="text-ink-muted">({fixableCount}건)</span>
-          </p>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <p className="break-keep text-2xs text-ink">
+              키를 넣으면 열리는 것 <span className="text-ink-muted">({fixableCount}건)</span>
+            </p>
+            <Link
+              href={SETTINGS_PATH}
+              className="inline-flex min-h-touch-min items-center rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            >
+              설정에서 키 넣기
+            </Link>
+          </div>
           <ul aria-label="키를 넣으면 열리는 것" className="flex min-w-0 flex-col gap-0.5">
             {fixable.map((group) => (
               <li key={group.reason} className="min-w-0 text-2xs">

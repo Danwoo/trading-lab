@@ -58,6 +58,8 @@ const EMPTY_TEXT = "표시할 데이터가 없습니다.";
 const ZERO_COUNT_TEXT = "총 0건";
 const WATCHLIST_EMPTY_TEXT = "관심종목이 없습니다 — 여기에 종목을 등록하면 차트·호가가 그 종목으로 채워집니다.";
 const WATCHLIST_UNREADABLE_TEXT = "관심종목을 불러오지 못했습니다 — 잠시 후 다시 시도하세요.";
+// 빈 상태가 내미는 출구 — #318 이 관리자 링크를 터미널 안 검색으로 바꾼 뒤의 라벨이다.
+const WATCHLIST_ADD_LABEL = "종목 찾아 담기";
 
 // jsdom 에는 ResizeObserver 가 없다 — @tanstack/react-virtual 이 마운트 시점에 요구한다.
 beforeAll(() => {
@@ -173,12 +175,14 @@ describe("#332 — 관리자 격자가 실패를 「총 0건」이라 말하지 
     RENDER_HEAVY_TIMEOUT_MS,
   );
 
-  // `/terminal` 관심종목 탭도 같은 커널을 탄다 — 여기만 「없다」고 말하면서 **없는 것을 등록하러
+  // `/terminal` 관심종목 탭도 같은 커널을 탄다 — 여기만 「없다」고 말하면서 **없는 것을 담으러
   // 가라**고 내밀었다. 옆자리 `HoldingTab` 이 이미 갈라 말하던 그 방식으로 맞춘다.
+  // 빈 상태의 출구는 #318 로 관리자 링크에서 터미널 안 검색(「종목 찾아 담기」)으로 바뀌었다 —
+  // 이 그물이 지키는 것은 목적지가 아니라 **못 읽은 상태에서 그 출구를 내밀지 않는다**는 쪽이다.
   describe("/terminal 관심종목 탭", () => {
     for (const failureMode of ["dead", "successFalse"] as const) {
       it(
-        `${failureMode}: 「관심종목이 없습니다」도 등록 링크도 내밀지 않는다`,
+        `${failureMode}: 「관심종목이 없습니다」도 담을 자리도 내밀지 않는다`,
         async () => {
           mode = failureMode;
           const { WatchlistTab } = await import("@/components/features/Terminal/WatchlistTab");
@@ -186,21 +190,21 @@ describe("#332 — 관리자 격자가 실패를 「총 0건」이라 말하지 
 
           await waitFor(() => expect(screen.getByText(WATCHLIST_UNREADABLE_TEXT)).toBeTruthy());
           expect(screen.queryByText(WATCHLIST_EMPTY_TEXT)).toBeNull();
-          expect(screen.queryByRole("link", { name: "관심종목 등록하러 가기" })).toBeNull();
+          expect(screen.queryByRole("button", { name: WATCHLIST_ADD_LABEL })).toBeNull();
         },
         RENDER_HEAVY_TIMEOUT_MS,
       );
     }
 
     it(
-      "정상 200 + 빈 목록이면 그대로 「없습니다」와 등록 링크다",
+      "정상 200 + 빈 목록이면 그대로 「없습니다」와 담을 자리다",
       async () => {
         mode = "empty0";
         const { WatchlistTab } = await import("@/components/features/Terminal/WatchlistTab");
         render(<WatchlistTab activeTicker={undefined} onSelect={() => {}} />);
 
         await waitFor(() => expect(screen.getByText(WATCHLIST_EMPTY_TEXT)).toBeTruthy());
-        expect(screen.getByRole("link", { name: "관심종목 등록하러 가기" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: WATCHLIST_ADD_LABEL })).toBeTruthy();
         expect(screen.queryByText(WATCHLIST_UNREADABLE_TEXT)).toBeNull();
       },
       RENDER_HEAVY_TIMEOUT_MS,

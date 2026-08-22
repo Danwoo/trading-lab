@@ -6,6 +6,7 @@ import { downsampleLttb, drawdownRatios } from "@/lib/bench/equityMath";
 import type {
   ExecutionAssumptionsOut,
   MetricOut,
+  OpenPositionOut,
   RunReportOut,
   RunSummaryOut,
   TradeOut,
@@ -65,9 +66,51 @@ function MetricsList({ metrics }: { metrics: MetricOut[] }) {
   );
 }
 
-function TradeList({ trades }: { trades: TradeOut[] }) {
+/** 원 단위 정수 표기 — 소수점은 평가액에서 읽을 것이 없다. */
+function won(value: number): string {
+  return Math.round(value).toLocaleString("ko-KR");
+}
+
+/**
+ * **구간 끝에 열린 자리** — 「거래 0건인데 +268%」의 정체를 화면이 문장으로 말하는 자리 (#314).
+ *
+ * 엔진은 구간 끝의 자리를 청산하지 않는다(청산한 척하면 없는 거래를 만든 것이다). 그래서
+ * 거래 목록·승률은 「없음」이라 답하는데 자산곡선의 마지막 점은 그 자리의 평가액을 담는다.
+ * 두 사실을 나란히 놓고 아무 말도 안 하면 어느 쪽이 거짓인지 화면 안에서 가릴 수 없다.
+ */
+function OpenPositionNotice({ position }: { position: OpenPositionOut }) {
+  return (
+    <section
+      aria-label="구간 끝에 열린 자리"
+      className="min-w-0 border border-hairline p-2"
+      // 판정을 뒤집는 사실이라 지표보다 먼저 읽혀야 한다 — 경고가 아니라 사실 고지다.
+    >
+      <p className="break-keep text-sm text-ink">
+        구간 끝에 열린 자리 {position.count}건 — {position.entry_ts ?? "진입일 미기록"} 진입, 평가액{" "}
+        <span className="tabular-nums">{won(position.value)}</span>원. 아직 팔지 않았습니다.
+      </p>
+      <p className="mt-1 break-keep text-2xs text-ink-muted">
+        {position.unrealized_share_pct === null
+          ? (redactReason(position.absent_reason) ?? "미실현 비중을 낼 수 없습니다.")
+          : `이 성과의 ${position.unrealized_share_pct.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}% 가 아직 안 판 자리의 평가액입니다 — 매도 비용은 아직 안 물렸습니다.`}
+      </p>
+      <p className="mt-0.5 break-keep text-2xs text-ink-muted">유도: {position.derived_from}</p>
+    </section>
+  );
+}
+
+function TradeList({ trades, openPosition }: { trades: TradeOut[]; openPosition: OpenPositionOut | null }) {
   if (trades.length === 0) {
-    return <p className="break-keep text-sm text-ink">거래 없음 — 이 조합에서는 청산은커녕 진입도 없었습니다.</p>;
+    // **「청산 안 함」과 「거래 없음」은 다른 상태다.** 자리가 열린 채 끝났는데 진입 기록이 남지
+    // 않은 옛 실행이 여기로 온다 — 「진입도 없었습니다」로 뭉개면 거짓말이 된다.
+    return openPosition ? (
+      <p className="break-keep text-sm text-ink">
+        청산된 거래 없음 — 구간 끝에 열린 자리 {openPosition.count}건이 있습니다.{" "}
+        {redactReason(openPosition.absent_reason) ?? "진입 기록이 이 목록에 없습니다."}
+      </p>
+    ) : (
+      <p className="break-keep text-sm text-ink">거래 없음 — 이 조합에서는 청산은커녕 진입도 없었습니다.</p>
+    );
   }
 
   return (
@@ -217,7 +260,6 @@ function CostComparison({
     return <p className="break-keep text-2xs text-ink-muted">비용 미반영 대비 — 자산곡선이 없어 견줄 수 없습니다.</p>;
   }
 
-  const won = (value: number) => Math.round(value).toLocaleString("ko-KR");
   const twinEquity = twin.final_equity as number;
   return (
     <table className="min-w-0 text-2xs">
@@ -343,6 +385,8 @@ export function RunReportView({ report }: { report: RunReportOut }) {
             <EquityCurve report={report} />
           )}
 
+          {report.open_position && <OpenPositionNotice position={report.open_position} />}
+
           <section aria-label="판정 지표" className="min-w-0">
             <h3 className="break-keep text-sm font-ui text-ink-strong">판정 지표</h3>
             <MetricsList metrics={report.metrics} />
@@ -359,7 +403,7 @@ export function RunReportView({ report }: { report: RunReportOut }) {
 
           <section aria-label="거래 목록" className="min-w-0">
             <h3 className="break-keep text-sm font-ui text-ink-strong">거래 목록</h3>
-            <TradeList trades={report.trades} />
+            <TradeList trades={report.trades} openPosition={report.open_position} />
           </section>
         </>
       )}
