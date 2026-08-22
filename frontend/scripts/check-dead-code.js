@@ -48,7 +48,8 @@ const CEILINGS = {
   binaries: 0,
   unresolved: 0,
   // 공용 UI 프리미티브·서비스 CRUD·zod 헬퍼 — 신규 엔티티 스캐폴드가 쓰는 어휘라 남겼다.
-  exports: 27,
+  // `botService.deleteBot` 은 화면이 부르기 시작해 이 목록에서 빠졌다 (#315).
+  exports: 26,
   types: 10,
   enumMembers: 0,
   // 스키마 배럴의 의도적 별칭(`XCreateInSchema = XSchema`)과 `export default` 재노출.
