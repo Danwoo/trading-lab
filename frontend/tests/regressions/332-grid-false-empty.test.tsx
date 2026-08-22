@@ -21,6 +21,7 @@
 import React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { LIST_UNREADABLE_TEXT } from "@/components/shared/DataTable/DataTableBody";
 
@@ -139,6 +140,24 @@ describe("#332 — 관리자 격자가 실패를 「총 0건」이라 말하지 
       }
     });
   }
+
+  it(
+    "「다시 시도」가 실제로 다시 읽는다 — 사유 옆에 놓인 버튼이 장식이 아니다",
+    async () => {
+      mode = "dead";
+      const user = userEvent.setup();
+      const { default: Container } = await ADMIN_SCREENS[8].load(); // /admin/watchlist
+      render(<Container />);
+      await waitFor(() => expect(screen.getByText(LIST_UNREADABLE_TEXT)).toBeTruthy());
+
+      mode = "empty0";
+      await user.click(screen.getByRole("button", { name: "다시 시도" }));
+
+      await waitFor(() => expect(screen.getByText(EMPTY_TEXT)).toBeTruthy());
+      expect(screen.queryByText(LIST_UNREADABLE_TEXT)).toBeNull();
+    },
+    RENDER_HEAVY_TIMEOUT_MS,
+  );
 
   it(
     "정상 200 + 빈 목록은 그대로 빈 상태다 — 실패 문구를 쓰지 않는다",
