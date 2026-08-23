@@ -857,7 +857,7 @@ See https://www.prisma.io/terms for details.
 ```
 </details>
 
-<details><summary>변형 6 — 1개 패키지: `@swc/helpers@0.5.15`</summary>
+<details><summary>변형 6 — 1개 패키지: `@swc/helpers@0.5.23`</summary>
 
 ```
 Apache License
@@ -2643,13 +2643,13 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 |---|---|---|
 | `@asamuzakjp/css-color` | 6.0.5 | MIT |
 | `@asamuzakjp/dom-selector` | 8.3.0 | MIT |
-| `@better-auth/core` | 1.6.27 | MIT |
-| `@better-auth/drizzle-adapter` | 1.6.27 | MIT |
-| `@better-auth/kysely-adapter` | 1.6.27 | MIT |
-| `@better-auth/memory-adapter` | 1.6.27 | MIT |
-| `@better-auth/mongo-adapter` | 1.6.27 | MIT |
-| `@better-auth/prisma-adapter` | 1.6.27 | MIT |
-| `@better-auth/telemetry` | 1.6.27 | MIT |
+| `@better-auth/core` | 1.7.1 | MIT |
+| `@better-auth/drizzle-adapter` | 1.7.1 | MIT |
+| `@better-auth/kysely-adapter` | 1.7.1 | MIT |
+| `@better-auth/memory-adapter` | 1.7.1 | MIT |
+| `@better-auth/mongo-adapter` | 1.7.1 | MIT |
+| `@better-auth/prisma-adapter` | 1.7.1 | MIT |
+| `@better-auth/telemetry` | 1.7.1 | MIT |
 | `@better-auth/utils` | 0.4.2 | MIT |
 | `@better-auth/utils` | 0.5.0 | MIT |
 | `@better-fetch/fetch` | 1.3.1 | MIT |
@@ -2671,11 +2671,11 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@img/colour` | 1.1.0 | MIT |
 | `@jridgewell/sourcemap-codec` | 1.5.5 | MIT |
 | `@kurkle/color` | 0.3.4 | MIT |
-| `@next/env` | 16.3.0 | MIT |
-| `@next/swc-linux-x64-gnu` | 16.3.0 | MIT |
-| `@noble/ciphers` | 2.1.1 | MIT |
+| `@next/env` | 16.3.1 | MIT |
+| `@next/swc-linux-x64-gnu` | 16.3.1 | MIT |
+| `@noble/ciphers` | 2.3.0 | MIT |
 | `@noble/hashes` | 2.2.0 | MIT |
-| `@oxc-project/types` | 0.139.0 | MIT |
+| `@oxc-project/types` | 0.146.0 | MIT |
 | `@radix-ui/number` | 1.1.3 | MIT |
 | `@radix-ui/primitive` | 1.1.3 | MIT |
 | `@radix-ui/primitive` | 1.1.7 | MIT |
@@ -2744,15 +2744,15 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@radix-ui/react-use-size` | 1.1.4 | MIT |
 | `@radix-ui/react-visually-hidden` | 1.2.11 | MIT |
 | `@radix-ui/rect` | 1.1.3 | MIT |
-| `@rolldown/binding-linux-x64-gnu` | 1.1.5 | MIT |
+| `@rolldown/binding-linux-x64-gnu` | 1.2.5 | MIT |
 | `@rolldown/pluginutils` | 1.0.1 | MIT |
 | `@standard-schema/spec` | 1.1.0 | MIT |
 | `@t3-oss/env-core` | 0.13.11 | MIT |
 | `@t3-oss/env-nextjs` | 0.13.11 | MIT |
 | `@tanstack/react-table` | 8.21.3 | MIT |
-| `@tanstack/react-virtual` | 3.14.9 | MIT |
+| `@tanstack/react-virtual` | 3.14.10 | MIT |
 | `@tanstack/table-core` | 8.21.3 | MIT |
-| `@tanstack/virtual-core` | 3.17.7 | MIT |
+| `@tanstack/virtual-core` | 3.17.8 | MIT |
 | `@types/chai` | 5.2.3 | MIT |
 | `@types/debug` | 4.1.13 | MIT |
 | `@types/deep-eql` | 4.0.2 | MIT |
@@ -2769,13 +2769,13 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@types/unist` | 2.0.11 | MIT |
 | `@types/unist` | 3.0.3 | MIT |
 | `@ungap/structured-clone` | 1.3.1 | ISC |
-| `@vitest/expect` | 4.1.10 | MIT |
-| `@vitest/mocker` | 4.1.10 | MIT |
-| `@vitest/pretty-format` | 4.1.10 | MIT |
-| `@vitest/runner` | 4.1.10 | MIT |
-| `@vitest/snapshot` | 4.1.10 | MIT |
-| `@vitest/spy` | 4.1.10 | MIT |
-| `@vitest/utils` | 4.1.10 | MIT |
+| `@vitest/expect` | 4.1.11 | MIT |
+| `@vitest/mocker` | 4.1.11 | MIT |
+| `@vitest/pretty-format` | 4.1.11 | MIT |
+| `@vitest/runner` | 4.1.11 | MIT |
+| `@vitest/snapshot` | 4.1.11 | MIT |
+| `@vitest/spy` | 4.1.11 | MIT |
+| `@vitest/utils` | 4.1.11 | MIT |
 | `abort-controller` | 3.0.0 | MIT |
 | `agent-base` | 6.0.2 | MIT |
 | `ajv` | 8.20.0 | MIT |
@@ -2789,7 +2789,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `bail` | 2.0.2 | MIT |
 | `balanced-match` | 4.0.4 | MIT |
 | `base64-js` | 1.5.1 | MIT |
-| `better-auth` | 1.6.27 | MIT |
+| `better-auth` | 1.7.1 | MIT |
 | `better-call` | 1.4.0 | MIT |
 | `better-result` | 2.9.2 | MIT |
 | `bidi-js` | 1.0.3 | MIT |
@@ -2992,8 +2992,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `mysql2` | 3.15.3 | MIT |
 | `named-placeholders` | 1.1.6 | MIT |
 | `nanoid` | 3.3.18 | MIT |
-| `nanostores` | 1.5.0 | MIT |
-| `next` | 16.3.0 | MIT |
+| `nanostores` | 1.5.2 | MIT |
+| `next` | 16.3.1 | MIT |
 | `node-int64` | 0.4.0 | MIT |
 | `nodemailer` | 9.0.5 | MIT-0 |
 | `normalize-path` | 3.0.0 | MIT |
@@ -3038,7 +3038,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `react-markdown` | 10.1.0 | MIT |
 | `react-remove-scroll-bar` | 2.3.8 | MIT |
 | `react-remove-scroll` | 2.7.2 | MIT |
-| `react-resizable-panels` | 4.12.2 | MIT |
+| `react-resizable-panels` | 4.12.3 | MIT |
 | `react-style-singleton` | 2.2.3 | MIT |
 | `react` | 19.2.8 | MIT |
 | `readable-stream` | 2.3.8 | MIT |
@@ -3054,7 +3054,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `remeda` | 2.33.4 | MIT |
 | `require-from-string` | 2.0.2 | MIT |
 | `retry` | 0.12.0 | MIT |
-| `rolldown` | 1.1.5 | MIT |
+| `rolldown` | 1.2.5 | MIT |
 | `rou3` | 0.9.2 | MIT |
 | `safe-buffer` | 5.1.2 | MIT |
 | `safe-buffer` | 5.2.1 | MIT |
@@ -3115,13 +3115,13 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `use-callback-ref` | 1.3.3 | MIT |
 | `use-sidecar` | 1.1.3 | MIT |
 | `util-deprecate` | 1.0.2 | MIT |
-| `uuid` | 14.0.1 | MIT |
+| `uuid` | 14.0.2 | MIT |
 | `valibot` | 1.2.0 | MIT |
 | `vfile-location` | 5.0.3 | MIT |
 | `vfile-message` | 4.0.3 | MIT |
 | `vfile` | 6.0.3 | MIT |
-| `vite` | 8.1.5 | MIT |
-| `vitest` | 4.1.10 | MIT |
+| `vite` | 8.2.2 | MIT |
+| `vitest` | 4.1.11 | MIT |
 | `w3c-xmlserializer` | 5.0.0 | MIT |
 | `web-namespaces` | 2.0.1 | MIT |
 | `webidl-conversions` | 8.0.1 | BSD-2-Clause |
