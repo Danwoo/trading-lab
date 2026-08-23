@@ -6,6 +6,7 @@ import { classifyMarketDataError, provenanceForUnavailable } from "@/lib/termina
 import { selectCandles } from "@/services/terminal/marketService";
 import type { Candle } from "@/services/terminal/marketService";
 import { useTerminalInterval, useTerminalRange, useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
+import { barSignalKey, useIngestRevision } from "@/stores/terminal/ingestSignalStore";
 import type { PanelData } from "@/types/terminal/provenance";
 
 /**
@@ -27,6 +28,8 @@ export function useLoadedSeries(): PanelData<Candle[]> {
   const symbol = useTerminalSymbol();
   const interval = useTerminalInterval();
   const range = useTerminalRange();
+  // 적재가 이 종목의 적재본을 바꾸면 세대가 올라간다 — 종목·주기·기간이 그대로여도 다시 받는 유일한 통로다(#350).
+  const ingestRevision = useIngestRevision(symbol === null ? null : barSignalKey(symbol.market, symbol.ticker));
 
   const [state, setState] = useState<PanelData<Candle[]>>(NO_CONTEXT_STATE);
 
@@ -88,7 +91,7 @@ export function useLoadedSeries(): PanelData<Candle[]> {
       cancelled = true;
       requestQueue.abortGroup(group);
     };
-  }, [symbol?.ticker, symbol?.market, interval, range?.from, range?.to]);
+  }, [symbol?.ticker, symbol?.market, interval, range?.from, range?.to, ingestRevision]);
 
   return state;
 }
