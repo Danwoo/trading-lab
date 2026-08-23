@@ -1,4 +1,5 @@
 import { betterAuth, APIError } from "better-auth";
+import { createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { jwt } from "better-auth/plugins";
 import { prisma } from "@/lib/prisma/client";
@@ -214,6 +215,27 @@ export const auth = betterAuth({
       "/sign-up/email": { window: 60, max: 3 },
       "/forget-password": { window: 60, max: 3 },
     },
+  },
+
+  /**
+   * **Better Auth 의 가입 엔드포인트는 바깥에 열지 않는다** (#343).
+   *
+   * `emailAndPassword.enabled` 는 `POST /api/auth/sign-up/email` 을 함께 노출하는데, 그 경로는
+   * 이 제품의 가입 절차(이메일 OTP → `POST /api/common/signup`)를 통째로 건너뛴다. 실제로
+   * 로그인하지 않은 호출자가 임의 주소로 `tn_user` 행을 만들 수 있었고, 그러면 진짜 주인은
+   * 「이미 사용 중인 이메일」로 막혀 가입하지 못했다(주소 선점).
+   *
+   * `emailAndPassword.disableSignUp` 은 쓸 수 없다 — 그 스위치는 엔드포인트 핸들러 안에서
+   * 검사되므로 서버가 직접 부르는 `auth.api.signUpEmail`(가입 라우트가 쓰는 그 호출)까지 같이
+   * 막는다. 그래서 **HTTP 요청으로 들어온 호출만** 막는다: `ctx.request` 는 라우터가 넘겨주는
+   * 실제 Request 이고, 서버 내부 호출(`auth.api.*` 에 body 만 넘김)에는 없다.
+   */
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/sign-up/email" && ctx.request) {
+        throw new APIError("NOT_FOUND", { message: "Not found" });
+      }
+    }),
   },
 
   plugins: [

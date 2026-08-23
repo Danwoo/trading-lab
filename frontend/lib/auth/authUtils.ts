@@ -8,10 +8,10 @@ export { hashPassword } from "better-auth/crypto";
 // (prisma·env 를 물지 않는 순수 함수라 vitest 가 가볍게 검증한다). 기존 호출부가
 // `@/lib/auth/authUtils` 하나만 보고 있으므로 여기서 재수출해 import 경로를 늘리지 않는다.
 export { normalizeEmail } from "@/lib/auth/normalizeEmail";
-export { EMAIL_VERIFICATION_OTP_PREFIX } from "@/lib/auth/verificationIdentifier";
+export { EMAIL_VERIFICATION_OTP_PREFIX, EMAIL_VERIFIED_GRANT_PREFIX } from "@/lib/auth/verificationIdentifier";
 // 아래 deleteUserCascade 가 직접 쓰므로 재수출만으로는 부족하다 (재수출은 지역 스코프에 안 들어온다).
-import { emailVerificationOtpIdentifier } from "@/lib/auth/verificationIdentifier";
-export { emailVerificationOtpIdentifier };
+import { emailVerificationOtpIdentifier, emailVerifiedGrantIdentifier } from "@/lib/auth/verificationIdentifier";
+export { emailVerificationOtpIdentifier, emailVerifiedGrantIdentifier };
 
 /**
  * 가입 도중 실패했을 때 Better Auth 가 만들어 둔 사용자·계정을 되돌린다 (보상 삭제).
@@ -233,14 +233,16 @@ export const deletedUserAuditId = (userId: string) => `deleted-user-${userId}`;
  *
  * **인증 토큰(`ba_verification`)도 사용자 축에서 지운다** — 2026-08-07 리드 결정(#3): 만료
  * 토큰이라 남길 감사 가치가 없고, 같은 PII 축인 `th_email_log` 결정과 짝을 맞춘다. FK 가 없어
- * 조용히 남는 자리다. 이 테이블은 **두 종류의 행이 섞여 있어 키가 둘**이다
- * (`verificationIdentifier.ts` 가 두 경로를 정리해 둔다):
+ * 조용히 남는 자리다. 이 테이블은 **세 종류의 행이 섞여 있어 키가 셋**이다
+ * (`verificationIdentifier.ts` 가 평문 키 둘의 조립을 정리해 둔다):
  * - 가입 OTP 행 — `identifier` 가 평문 `email-verification-otp-<이메일>` 이다. 발송 라우트와
  *   같은 조립 함수(`emailVerificationOtpIdentifier`)로 키를 만들어 **완전일치**로 지운다.
  *   `LIKE`·접두어 검색을 쓰지 않는 이유는 그 순간 `a@x.com` 이 `a@x.com.attacker.test` 를 함께
  *   끌고 오기 때문이다. 대소문자 무관 비교는 `th_email_log` 와 같은 근거다(정규화 규칙 이전 행) —
  *   대소문자만 다른 별개 계정이 과거에 만들어졌다면 그쪽의 **미사용 OTP 1건**까지 지워질 수
  *   있으나, 15분 만료 토큰이고 재발송으로 복구된다.
+ * - OTP 통과 증거 행(#343) — `identifier` 가 평문 `email-verified-grant-<이메일>` 이다.
+ *   OTP 행과 같은 이유·같은 방식(완전일치·대소문자 무관)으로 지운다.
  * - 비밀번호 재설정 행 — `identifier` 는 `storeIdentifier: "hashed"` 때문에 SHA-256 해시라
  *   이메일로 못 찾는다. 대신 `value` 가 `tn_user.id` 원문이므로 그 완전일치로 지운다
  *   (uuid 라 남의 행과 겹치지 않는다). 남겨 두면 탈퇴자의 **아직 안 쓴 재설정 토큰**이 만료까지
@@ -282,6 +284,10 @@ export async function deleteUserCascade(email: string): Promise<void> {
     // 가입 인증 OTP — identifier 평문에 이메일이 들어간다 (리드 결정 #3).
     prisma.baVerification.deleteMany({
       where: { identifier: { equals: emailVerificationOtpIdentifier(email), mode: "insensitive" } },
+    }),
+    // OTP 를 통과했다는 증거도 같은 축이다 — identifier 에 이메일이 평문으로 들어간다 (#343).
+    prisma.baVerification.deleteMany({
+      where: { identifier: { equals: emailVerifiedGrantIdentifier(email), mode: "insensitive" } },
     }),
     ...(user
       ? [
