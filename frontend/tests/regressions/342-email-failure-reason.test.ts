@@ -139,10 +139,11 @@ describe("#342 메일 발송 실패 사유", () => {
       expect(generic.has(message), `${code} 가 일반 상태 문구로 뭉개졌다`).toBe(false);
 
       shown.set(code, message);
+      console.info(`[#342] ${code.padEnd(24)} HTTP ${status}  화면: ${JSON.stringify(message)}`);
     }
 
     // 검사한 건수를 남긴다 — 통과가 「위반 없음」인지 「아무것도 안 봤음」인지 읽는 사람이 가르게.
-    console.info(`[#342] 발송 실패 사유 ${shown.size}건 검사 — ${[...shown.keys()].join(", ")}`);
+    console.info(`[#342] 발송 실패 사유 ${shown.size}건 검사 — 화면 문구 ${new Set(shown.values()).size}가지`);
 
     expect(shown.size).toBe(EMAIL_FAILURE_CODES.length);
     expect(new Set(shown.values()).size, "갈래마다 다른 문구여야 한다").toBe(EMAIL_FAILURE_CODES.length);
