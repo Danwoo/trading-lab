@@ -247,19 +247,83 @@ describe("ParamGrid", () => {
     }
   });
 
+  /**
+   * 비교 기준 격자의 **셋째 칸을 「거래는 있었는데 값이 진짜 0」으로** 바꾼다.
+   *
+   * 이게 없으면 이 비교는 회귀를 못 가린다: 값 0 을 최댓값 집합에 넣든 빼든 `max(|v|)` 는
+   * 그대로라 알파가 안 움직여, 고치기 전에도 초록이다. 진짜 0 인 칸을 넣어야 「거래 0건을
+   * 거르려다 값 0 까지 거르는」 과잉 필터가 여기서 잡힌다.
+   */
+  function gridWithGenuineZeroCell(): GridOut {
+    const base = grid();
+    return {
+      ...base,
+      cells: [
+        base.cells[0],
+        base.cells[1],
+        {
+          ...base.cells[2],
+          metrics: {
+            longest_underwater: 0,
+            still_underwater: false,
+            mdd_pct: 0,
+            total_return_pct: 0,
+            closed_trades: 2,
+            open_positions: 0,
+            absent_reason: null,
+          },
+        },
+        base.cells[3],
+      ],
+    };
+  }
+
+  it("거래가 있는 칸의 값이 진짜 0 이면 그 0 은 성적으로 칠해진다 — 과잉 필터가 아니다", () => {
+    render(<ParamGrid grid={gridWithGenuineZeroCell()} selectedRunId={null} onSelect={vi.fn()} />);
+
+    const zero = screen.getByRole("button", { name: /최장 미회복 기간 0봉/ });
+    expect(zero.textContent).toBe("0봉");
+    // 척도의 가장 좋은 끝(alpha 0.08)이 맞다 — 거래가 있었으니 그건 성적이다.
+    expect(zero.style.backgroundColor).toBe("rgb(var(--market-down) / 0.08)");
+    expect(zero.getAttribute("aria-label")).toContain("청산된 거래 2건");
+  });
+
   it("거래 0건 칸이 섞여도 거래가 있는 칸의 채색은 그대로다 — 척도가 흔들리지 않는다", () => {
-    const { unmount } = render(<ParamGrid grid={grid()} selectedRunId={null} onSelect={vi.fn()} />);
-    const before = ["14봉", "3봉", "6봉"].map(
-      (shown) => screen.getByRole("button", { name: new RegExp(`최장 미회복 기간 ${shown}`) }).style.backgroundColor,
+    const base = gridWithGenuineZeroCell();
+    const shown = ["14봉", "3봉", "0봉"];
+
+    const { unmount } = render(<ParamGrid grid={base} selectedRunId={null} onSelect={vi.fn()} />);
+    const before = shown.map(
+      (text) => screen.getByRole("button", { name: new RegExp(`최장 미회복 기간 ${text}`) }).style.backgroundColor,
     );
     expect(before.every((color) => color !== "")).toBe(true);
     unmount();
 
-    render(<ParamGrid grid={gridWithNoTradeCell()} selectedRunId={null} onSelect={vi.fn()} />);
-    const after = ["14봉", "3봉", "6봉"].map(
-      (shown) => screen.getByRole("button", { name: new RegExp(`최장 미회복 기간 ${shown}`) }).style.backgroundColor,
+    // 같은 세 칸에 거래 0건 칸 하나를 더한 격자 — 세 칸의 색이 한 자리도 달라지면 안 된다.
+    const withIdle: GridOut = { ...base, cells: [...base.cells.slice(0, 3), gridWithNoTradeCell().cells[3]] };
+    render(<ParamGrid grid={withIdle} selectedRunId={null} onSelect={vi.fn()} />);
+    const after = shown.map(
+      (text) => screen.getByRole("button", { name: new RegExp(`최장 미회복 기간 ${text}`) }).style.backgroundColor,
     );
     expect(after).toEqual(before);
+  });
+
+  it("사유가 가림에 전부 지워져도 그 칸은 척도 밖에 남는다 — 「말할 수 없다」가 「없다」로 뒤집히지 않는다", () => {
+    // `redactReason` 은 다듬은 뒤 빈 문구가 되면 null 을 돌려준다(공백뿐인 사유가 그렇다).
+    // 판정이 그 결과에 묶여 있으면 그 칸이 척도로 되돌아온다 — 판정은 원본 사유의 유무로만.
+    const base = gridWithNoTradeCell();
+    const redacted: GridOut = {
+      ...base,
+      cells: [
+        ...base.cells.slice(0, 3),
+        { ...base.cells[3], metrics: { ...base.cells[3].metrics!, absent_reason: "   " } },
+      ],
+    };
+    render(<ParamGrid grid={redacted} selectedRunId={null} onSelect={vi.fn()} />);
+
+    const cell = screen.getByRole("button", { name: /ma_period=20 · pullback_pct=3 — 사유를 낼 수 없습니다/ });
+    expect(cell.style.backgroundColor).toBe("");
+    expect(cell.textContent).toBe("거래 0건");
   });
 
   it("사유가 실린 칸은 값이 숫자로 와도 척도 밖이다 — 한쪽만 고쳐도 0 이 성적으로 새지 않는다", () => {
