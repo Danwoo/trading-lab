@@ -34,7 +34,7 @@ class SchedulerRepository:
         base_sql = self.query_select_scheduler()
         sql_where, sql_params = build_filter_params(args)
         sql_params["workspace_id"] = args["workspace_id"]
-        order_by = parse_sort(args.get("sort")) or "scheduler_id ASC NULLS LAST"
+        order_by = parse_sort(args.get("sort")) or "scheduler_id ASC"
         skip = int(args.get("skip", 0))
         take = args.get("take")
 
@@ -146,7 +146,7 @@ class SchedulerRepository:
              WHERE scheduler_id = :scheduler_id
                AND workspace_id   = :workspace_id
         """
-        order_by = parse_sort(args.get("sort")) or "account_id ASC NULLS LAST"
+        order_by = parse_sort(args.get("sort")) or "account_id ASC"
         params = {"scheduler_id": args["scheduler_id"], "workspace_id": args["workspace_id"]}
         with self.sql_client.connect() as conn:
             rows = conn.execute(text(f"{base_sql} ORDER BY {order_by}"), params).mappings().all()

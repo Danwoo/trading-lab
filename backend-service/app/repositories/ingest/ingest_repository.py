@@ -53,7 +53,7 @@ class IngestRepository:
     def select_ingest_run_list(self, args: dict) -> tuple[list[dict], int]:
         base_sql = self.query_select_ingest_run()
         sql_where, sql_params = build_filter_params(args)
-        order_by = parse_sort(args.get("sort")) or "run_id DESC NULLS LAST"
+        order_by = parse_sort(args.get("sort")) or "run_id DESC"
         skip = int(args.get("skip", 0))
         take = args.get("take")
 

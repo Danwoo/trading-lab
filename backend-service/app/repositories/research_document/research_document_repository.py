@@ -34,7 +34,7 @@ class ResearchDocumentRepository:
 
         sql_where, sql_params = build_filter_params(args)
         sql_params["workspace_id"] = args["workspace_id"]
-        order_by = parse_sort(args.get("sort")) or "research_doc_id DESC NULLS LAST"
+        order_by = parse_sort(args.get("sort")) or "research_doc_id DESC"
 
         skip = int(args.get("skip", 0))
         take = args.get("take")

@@ -47,7 +47,7 @@ class BotRepository:
 
         sql_where, sql_params = build_filter_params(args)
         sql_params["workspace_id"] = args["workspace_id"]
-        order_by = parse_sort(args.get("sort")) or "bot_nm ASC NULLS LAST"
+        order_by = parse_sort(args.get("sort")) or "bot_nm ASC"
 
         skip = int(args.get("skip", 0))
         take = args.get("take")

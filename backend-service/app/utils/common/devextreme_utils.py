@@ -74,7 +74,14 @@ def parse_filter_sort(
 #
 # ASC 에서는 PostgreSQL 기본과 결과가 같지만 그래도 명시한다 — 방향마다 규칙이 갈리면 다음 사람이
 # 다시 이 함정을 판단해야 하고, 이 유틸은 이미 방언 중립이 아니다(ILIKE). 규칙을 SQL 에 적어 두면
-# 읽는 사람이 방언 기본값을 몰라도 정렬 결과를 안다.
+# 읽는 사람이 방언 기본값을 몰라도 정렬 결과를 안다. `ASC NULLS LAST` 는 btree 인덱스의 정렬과 같아
+# 실행계획도 그대로다(실측).
+#
+# 값은 치른다 — `DESC NULLS LAST` 는 인덱스 정렬과 어긋나 정렬 없는 역방향 스캔을 못 쓴다
+# (실측 PostgreSQL 16.2: `Index Scan Backward` → `Sort` + `Seq Scan`). 사용자가 고른 열이라
+# nullable 인지 미리 알 수 없고, 빈 칸이 1등으로 오는 것보다는 정렬 비용이 낫다. 반대로 호출부의
+# **기본** 정렬 절은 작성자가 컬럼을 고르므로 여기 규율을 강제하지 않는다 —
+# tests/test_sort_null_ordering.py 가 그 경계와 근거를 적고 있다.
 _NULLS_POSITION = "NULLS LAST"
 
 

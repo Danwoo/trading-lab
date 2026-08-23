@@ -4,13 +4,24 @@
     cd backend-service && uv run python tests/test_sort_null_ordering.py
 
 지키는 불변식:
-- **정렬 절은 NULL 위치를 항상 적는다.** PostgreSQL 은 `DESC` 에서 NULL 을 가장 큰 값으로 보므로,
-  위치를 안 적으면 목표가 내림차순의 1등이 「목표가가 없는 행」이 된다 (#352 재현).
-- **호출부의 기본 정렬 절도 같은 규율을 따른다.** 사용자가 열을 안 눌렀을 때 쓰는 문자열이라
-  파서를 안 거친다 — 지금은 NOT NULL 컬럼뿐이라 결과가 같지만, nullable 컬럼으로 바뀌는 순간
-  같은 함정이 파서 바깥에서 되살아난다.
+- **파서가 만드는 정렬 절은 NULL 위치를 항상 적는다.** PostgreSQL 은 `DESC` 에서 NULL 을 가장 큰
+  값으로 보므로, 위치를 안 적으면 목표가 내림차순의 1등이 「목표가가 없는 행」이 된다 (#352 재현).
 - **사용자 sort 는 이 파서 말고 다른 길로 SQL 이 되지 않는다.** 한 자리라도 새로 직접 조립하면
-  #352 가 그 자리에서만 되살아난다 — 그래서 호출부를 세고, 0건이면 실패한다(fail-closed).
+  #352 가 그 자리에서만 되살아난다 — 그래서 호출부를 세고, 기대치보다 적으면 실패한다(fail-closed).
+
+**호출부의 기본 정렬 절에는 NULL 위치를 강제하지 않는다.** 사용자가 열을 안 눌렀을 때 쓰는
+작성자 소유 문자열이고, 지금 9곳 중 `DESC` 는 `run_id DESC`·`research_doc_id DESC` 둘뿐인데 둘 다
+PK(NOT NULL)라 `NULLS LAST` 를 적어도 의미가 같다. 반면 값은 있다 — `DESC NULLS LAST` 는 btree
+인덱스의 정렬과 어긋나 정렬 없는 역방향 스캔을 못 쓴다 (실측, PostgreSQL 16.2):
+
+    set enable_seqscan=off;
+    explain (costs off) select * from tn_ingest_run order by run_id desc limit 20;
+      -> Limit -> Index Scan Backward using tn_ingest_run_pkey
+    explain (costs off) select * from tn_ingest_run order by run_id desc nulls last limit 20;
+      -> Limit -> Sort (Sort Key: run_id DESC NULLS LAST) -> Seq Scan
+
+`ASC` 는 PostgreSQL 기본이 이미 NULLS LAST 라 nullable 컬럼(`tn_file.reg_dt`·`tn_portfolio.sort_ordr`)
+에서도 #352 가 안 난다. 그래서 기본 절은 세기만 하고 문법만 본다.
 
 문법 유효성은 stdlib sqlite3 를 독립 심판으로 세워 본다. **의미는 sqlite3 로 못 본다** —
 sqlite3 는 NULL 을 가장 작은 값으로 봐서 `x DESC` 만으로도 NULL 이 뒤로 간다. 방언마다 기본이
@@ -96,8 +107,8 @@ def test_parse_sort_pins_null_position() -> str:
     return "test_parse_sort_pins_null_position"
 
 
-def test_default_order_by_at_every_call_site_pins_null_position() -> str:
-    """호출부의 기본 정렬 절도 NULL 위치를 적는다 — 그리고 호출부가 0건이면 실패한다."""
+def test_every_call_site_is_counted_and_its_default_clause_is_valid() -> str:
+    """호출부가 기대치보다 적으면 실패하고(fail-closed), 기본 정렬 절은 문법만 본다."""
     assert _REPOSITORIES_DIR.is_dir(), f"검사 대상 디렉터리가 없다 — {_REPOSITORIES_DIR}"
 
     files = sorted(_REPOSITORIES_DIR.rglob("*.py"))
@@ -116,11 +127,9 @@ def test_default_order_by_at_every_call_site_pins_null_position() -> str:
 
     for name, default_order_by in found:
         _assert_valid_sql(default_order_by)
-        for term in _terms(default_order_by):
-            assert _NULLS_POSITION_RE.search(term), f"{name}: 기본 정렬 절에 NULL 위치가 없다 — {term!r}"
 
     print(f"     (정렬 호출부 {len(found)}곳 검사: {', '.join(sorted({n for n, _ in found}))})")
-    return "test_default_order_by_at_every_call_site_pins_null_position"
+    return "test_every_call_site_is_counted_and_its_default_clause_is_valid"
 
 
 def test_user_sort_has_no_second_path_into_sql() -> str:
@@ -154,7 +163,7 @@ def test_user_sort_has_no_second_path_into_sql() -> str:
 def _main() -> int:
     tests = [
         test_parse_sort_pins_null_position,
-        test_default_order_by_at_every_call_site_pins_null_position,
+        test_every_call_site_is_counted_and_its_default_clause_is_valid,
         test_user_sort_has_no_second_path_into_sql,
     ]
     failed = []
