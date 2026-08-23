@@ -7,11 +7,7 @@ import dns from "dns/promises";
 import { prisma } from "@/lib/prisma/client";
 import { getClientIp, rateLimit } from "@/lib/rateLimit";
 import { emailVerificationOtpIdentifier, normalizeEmail } from "@/lib/auth/authUtils";
-import {
-  classifyEmailFailure,
-  describeSmtpError,
-  EMAIL_FAILURE_STATUS,
-} from "@/utils/common/errors/emailFailure";
+import { classifyEmailFailure, describeSmtpError, EMAIL_FAILURE_STATUS } from "@/utils/common/errors/emailFailure";
 import { EMAIL_FAILURE_MESSAGES } from "@/utils/common/locale/ko/apierrors";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -151,9 +147,6 @@ export async function POST(request: NextRequest) {
       data: { to, subject, status: "FAIL", error_msg: diagnosis, reg_dt: new Date() },
     });
     console.error(`[email] 발송 실패 (${code}):`, diagnosis);
-    return NextResponse.json(
-      { code, message: EMAIL_FAILURE_MESSAGES[code] },
-      { status: EMAIL_FAILURE_STATUS[code] },
-    );
+    return NextResponse.json({ code, message: EMAIL_FAILURE_MESSAGES[code] }, { status: EMAIL_FAILURE_STATUS[code] });
   }
 }
