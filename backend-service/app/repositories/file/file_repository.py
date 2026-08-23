@@ -26,7 +26,7 @@ class FileRepository:
         base_sql = self.query_select_file()
 
         sql_where, sql_params = build_filter_params(args)
-        order_by = parse_sort(args.get("sort")) or "reg_dt ASC"
+        order_by = parse_sort(args.get("sort")) or "reg_dt ASC NULLS LAST"
 
         skip = int(args.get("skip", 0))
         take = args.get("take")

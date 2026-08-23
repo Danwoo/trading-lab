@@ -30,7 +30,7 @@ class PortfolioRepository:
         base_sql = self.query_select_portfolio()
         sql_where, sql_params = build_filter_params(args)
         sql_params["workspace_id"] = args["workspace_id"]
-        order_by = parse_sort(args.get("sort")) or "sort_ordr ASC, portfolio_id ASC"
+        order_by = parse_sort(args.get("sort")) or "sort_ordr ASC NULLS LAST, portfolio_id ASC NULLS LAST"
 
         skip = int(args.get("skip", 0))
         take = args.get("take")
@@ -160,7 +160,7 @@ class PortfolioRepository:
     def select_holding_list(self, args: dict) -> tuple[list[dict], int]:
         base_sql = self.query_select_holding()
         sql_where, sql_params = build_filter_params(args)
-        order_by = parse_sort(args.get("sort")) or "ticker ASC"
+        order_by = parse_sort(args.get("sort")) or "ticker ASC NULLS LAST"
         sql_params["portfolio_id"] = args["portfolio_id"]
         sql_params["workspace_id"] = args["workspace_id"]
 
