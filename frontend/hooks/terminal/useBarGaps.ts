@@ -3,6 +3,7 @@
 import { useOnDemand } from "@/hooks/terminal/useOnDemand";
 import { selectBarGaps, type BarGaps } from "@/services/terminal/marketService";
 import { useTerminalRange, useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
+import { barSignalKey, useIngestRevision } from "@/stores/terminal/ingestSignalStore";
 import type { PanelData } from "@/types/terminal/provenance";
 
 /**
@@ -16,9 +17,11 @@ export function useBarGaps(enabled: boolean): PanelData<BarGaps> {
   const symbol = useTerminalSymbol();
   const range = useTerminalRange();
   const ready = enabled && symbol !== null && symbol.market !== "" && range !== null;
+  // 세대 키에 섞는다 — `useOnDemand` 는 `group` 이 바뀌면 다시 요청한다(#350).
+  const ingestRevision = useIngestRevision(symbol === null ? null : barSignalKey(symbol.market, symbol.ticker));
 
   return useOnDemand<BarGaps>({
-    group: `bar-gaps:${symbol?.market ?? ""}:${symbol?.ticker ?? ""}:${range?.from ?? ""}:${range?.to ?? ""}`,
+    group: `bar-gaps:${symbol?.market ?? ""}:${symbol?.ticker ?? ""}:${range?.from ?? ""}:${range?.to ?? ""}:${ingestRevision}`,
     enabled: ready,
     source: "적재 완결성",
     fetcher: async () => {
