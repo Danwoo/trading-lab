@@ -14,6 +14,8 @@ import { TextBox } from "@/components/shared/ui/TextBox";
 import PolicyPopup from "@/components/features/Common/Policy/PolicyPopup";
 import { showMessage } from "@/stores/shared/messageStore";
 import { signup } from "@/services/common/authService";
+import { SIGNUP_VERIFICATION_TOKEN_KEY } from "@/constants/signup";
+import { httpStatusOf } from "@/utils/common/api/client";
 import { signupSchema } from "@/schemas/common/signup";
 
 interface Props {}
@@ -45,8 +47,16 @@ export const SignupInfo: FC<Props> = () => {
     }
 
     try {
-      const data = await signup(decodedEmail, parsed.data.password, parsed.data.name, parsed.data.dept ?? "");
+      const verificationToken = sessionStorage.getItem(SIGNUP_VERIFICATION_TOKEN_KEY) ?? "";
+      const data = await signup(
+        decodedEmail,
+        parsed.data.password,
+        parsed.data.name,
+        parsed.data.dept ?? "",
+        verificationToken,
+      );
       sessionStorage.removeItem("verifiedSignupEmail");
+      sessionStorage.removeItem(SIGNUP_VERIFICATION_TOKEN_KEY);
       if (!data?.result) {
         if (data?.name === "password") {
           showMessage("알림", <div>비밀번호 8자리 이상 입력해주세요.</div>);
@@ -57,6 +67,22 @@ export const SignupInfo: FC<Props> = () => {
       }
       router.push("/signup/complete");
     } catch (error) {
+      // 서버가 이메일 인증 증거를 거절한 경우(403) — 증거가 없거나 만료됐다. 되돌릴 곳은
+      // 1단계이므로 그렇게 말하고 보낸다. 일반 오류 문구로 뭉뚱그리면 사용자가 여기서 막힌다.
+      if (httpStatusOf(error) === 403) {
+        sessionStorage.removeItem("verifiedSignupEmail");
+        sessionStorage.removeItem(SIGNUP_VERIFICATION_TOKEN_KEY);
+        showMessage(
+          "알림",
+          <p>
+            이메일 인증이 만료되었습니다.
+            <br />
+            인증을 다시 받아주세요.
+          </p>,
+        );
+        router.push("/signup");
+        return;
+      }
       console.error("Error sending email:", error);
       showMessage("오류", <div>회원가입 중 오류가 발생했습니다.</div>);
     }

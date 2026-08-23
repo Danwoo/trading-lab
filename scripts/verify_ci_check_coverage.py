@@ -43,6 +43,18 @@
 `--skip` 된 파일은 **다른 잡에서 실행돼야** 커버로 인정된다 — 제외했는데 아무도 안 돌리면
 그대로 미배선이다.
 
+## pre-commit 훅 ↔ CI 대조 (#331 계열의 같은 클래스)
+
+위 두 축은 **파일과 명명 명령**만 본다. 그래서 `.pre-commit-config.yaml` 이 거는 검사가
+CI 에 통째로 없어도 조용히 초록이었다 — 실측: `ruff format` 은 워크플로 어디에도 없었고,
+`ruff check` 는 두 서비스의 `app/` 만 봤다. 그 사이로 `scripts/verify_stage_claims.py` 의
+포맷 드리프트가 main 에 앉아 있었다.
+
+`PRECOMMIT_PARITY` 가 훅 하나하나에 CI 대응을 못박는다. 훅을 새로 추가하면 이 표에도
+적어야 하고(안 적으면 실패), 표에만 있고 훅이 사라져도 실패한다(낡은 표 차단).
+CI 대응이 **없는 것이 옳은** 훅은 `LOCAL_ONLY` 로 이유와 함께 선언한다 — 빠뜨린 것과
+일부러 안 건 것이 코드에서 갈린다.
+
 ## 예외 (라이브러리 — 검사 단위가 아님)
 
 `EXEMPT` 에 이유와 함께 명시한다. 예외 항목이 실재하지 않으면 실패한다(낡은 예외 차단).
@@ -58,6 +70,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
+PRECOMMIT_CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
 
 # 검사 단위가 아닌 것 — 이유를 적는다. 실재하지 않으면 실패한다.
 EXEMPT: dict[str, str] = {
@@ -75,15 +88,15 @@ EXEMPT: dict[str, str] = {
 # 축이 통째로 사라져도 조용하다. 하한은 현재 실측치이며, 파일을 정당하게 지웠다면 함께 내린다.
 INVENTORY_AXES: list[tuple[str, str, int]] = [
     ("*/scripts", "verify_*.py", 26),  # 서비스별 계약 검증
-    ("scripts", "verify_*.py", 14),  # 루트 계약 검증
+    ("scripts", "verify_*.py", 27),  # 루트 계약 검증
     ("scripts", "verify_*.mjs", 2),  # 루트 계약 검증 (node)
     # 루트 실행형 테스트. 이 축이 없던 동안 `scripts/test_public_release_gate.py` 는 배선돼
     # 있었지만 **인벤토리에는 없었다** — 배선을 지워도 이 검사가 초록이었다는 뜻이다. 서비스
     # 쪽 `*/tests` 축이 있는데 루트만 비어 있던 자리이고, 이 스크립트가 막으려는 바로 그
     # 클래스라 채운다 (#23 Task 2).
-    ("scripts", "test_*.py", 14),
+    ("scripts", "test_*.py", 15),
     ("*/tests", "test_*.py", 35),  # 서비스별 standalone 테스트 (#335)
-    ("frontend/scripts", "check-*.js", 4),  # frontend 정적 스캔
+    ("frontend/scripts", "check-*.js", 5),  # frontend 정적 스캔
     ("frontend/scripts", "generate-*.js", 1),  # 생성물 재현 대조 (--check 모드, #361)
     ("scripts", "generate_*.py", 1),  # 루트 생성물 재현 대조 (--check 모드)
     # 주입 프로브 — 「그 검사가 무엇을 막는지」를 증명하는 자리다. 이 축이 없던 동안
@@ -102,6 +115,50 @@ NAMED_COMMANDS: dict[str, str] = {
     "npx eslint .": "frontend 린트 (--fix 없이, #265)",
     "npx tsc --noEmit": "frontend 타입체크 (#265)",
 }
+
+# ── pre-commit 훅 ↔ CI 대조표 ────────────────────────────────────────────────
+# 값은 (대응, 근거) 다. 대응이 파일 경로면 그 파일이 어느 워크플로에서든 실행돼야 하고,
+# 그 밖의 문자열이면 워크플로 run 블록 원문에 그대로 있어야 한다.
+# `LOCAL_ONLY` 는 CI 대응이 **없는 것이 옳은** 훅이다 — 이유를 반드시 적는다.
+LOCAL_ONLY = "LOCAL_ONLY"
+
+PRECOMMIT_PARITY: dict[str, tuple[str, str]] = {
+    "no-commit-to-branch": (
+        LOCAL_ONLY,
+        "main 직접 커밋 차단은 서버 ruleset `main protection` 이 한다 — CI 는 이미 PR 만 본다.",
+    ),
+    "gitleaks": (
+        "detect --no-git --redact --source .",
+        "repo-scans.yml `test: repo-lint` 이 훅과 같은 버전으로 트리 전수를 스캔한다.",
+    ),
+    "ruff-check": (
+        "scripts/verify_python_format.py",
+        "ci.yml 의 `ruff check app/` 은 두 서비스만 본다 — 레포 전수는 이 스크립트가 본다.",
+    ),
+    "ruff-format": (
+        "scripts/verify_python_format.py",
+        "CI 에 `ruff format` 이 아예 없던 자리 — 이 스크립트가 레포 전수로 본다.",
+    ),
+    "eslint": ("npx eslint .", "frontend-ci.yml `test: frontend` (--fix 없이, #265)."),
+    "tsc": ("npx tsc --noEmit", "frontend-ci.yml `test: frontend` (#265)."),
+    "backend-claude-md": (
+        "scripts/verify_backend_claude_md.py",
+        "ci.yml `test: repo-contracts`.",
+    ),
+    "vitest": ("npm test", "frontend-ci.yml `test: frontend`."),
+    "mcp-lockstep": (
+        "multi-agent-service/scripts/verify_mcp_lockstep.py",
+        "ci.yml `test: multi-agent` 의 run_verify_scripts.py 스위트에 포함된다.",
+    ),
+}
+
+# 훅을 0건 읽으면 대조가 통째로 사라진다 — 하한을 걸고 실측 수를 출력에 남긴다.
+PRECOMMIT_HOOK_MINIMUM = 9
+
+# 대응 문자열이 「파일 경로」인지 「명령 조각」인지 가르는 기준. 파일시스템을 안 보므로
+# 테스트에서도 같은 판정이 나온다.
+_PATH_SUFFIXES = (".py", ".mjs", ".js", ".sh")
+
 
 # 워크플로 파싱에 쓰는 최소 문법 — 잡 헤더는 들여쓰기 2, 스텝은 '- ' 로 시작한다.
 JOB_HEADER = re.compile(r"^  ([A-Za-z0-9_][A-Za-z0-9_-]*):\s*$")
@@ -251,6 +308,65 @@ def collect_coverage() -> tuple[Coverage, int]:
     return cov, len(workflows)
 
 
+def parse_precommit_hooks(text: str) -> list[str]:
+    """`.pre-commit-config.yaml` 의 훅 id 를 선언 순서대로 낸다."""
+    return [m.group(1) for m in re.finditer(r"^\s*-\s*id:\s*(\S+)\s*$", text, re.M)]
+
+
+def check_precommit_parity(
+    hook_ids: list[str],
+    cov_files: set[str],
+    joined_commands: str,
+    *,
+    table: dict[str, tuple[str, str]] | None = None,
+    minimum: int = PRECOMMIT_HOOK_MINIMUM,
+) -> tuple[list[str], list[str]]:
+    """훅 전수 ↔ CI 대응을 대조한다. (사람이 읽을 줄, 문제 목록) 을 낸다.
+
+    fail-closed 는 세 겹이다: 훅을 0건(또는 하한 미만) 읽으면 실패 · 표에 없는 훅이 있으면
+    실패 · 표에만 있고 훅이 사라졌으면 실패. 그리고 대응이 워크플로에 실재하지 않으면 실패다.
+    """
+    table = PRECOMMIT_PARITY if table is None else table
+    lines = [f"pre-commit 훅 {len(hook_ids)}개 (하한 {minimum}) ↔ CI 대조표 {len(table)}개"]
+    problems: list[str] = []
+
+    if len(hook_ids) < minimum:
+        problems.append(
+            f"pre-commit 훅을 {len(hook_ids)}개 읽었습니다 — 하한 {minimum}개 미만입니다. "
+            "설정 파일이 사라졌거나 파싱이 깨졌습니다. 훅을 정당하게 지웠다면 "
+            "PRECOMMIT_HOOK_MINIMUM 과 PRECOMMIT_PARITY 도 함께 줄이세요."
+        )
+
+    for hook in hook_ids:
+        entry = table.get(hook)
+        if entry is None:
+            problems.append(
+                f"pre-commit 훅 {hook!r} 이 CI 대조표에 없습니다 — 로컬에서만 도는 검사는 "
+                "그 훅을 안 거치는 경로(다른 워커·CI)를 통과시킵니다. "
+                "PRECOMMIT_PARITY 에 CI 대응을 적거나, 대응이 없는 것이 옳다면 "
+                "LOCAL_ONLY 로 이유와 함께 선언하세요."
+            )
+            continue
+        target, reason = entry
+        if target == LOCAL_ONLY:
+            lines.append(f"  · {hook}: CI 대응 없음(선언됨) — {reason}")
+            continue
+        if target.endswith(_PATH_SUFFIXES) and "/" in target:
+            covered = target in cov_files
+            kind = "파일"
+        else:
+            covered = target in joined_commands
+            kind = "명령"
+        lines.append(f"  · {hook}: {kind} {target!r} — {'배선됨' if covered else '미배선'}")
+        if not covered:
+            problems.append(f"pre-commit 훅 {hook!r} 의 CI 대응({kind} {target!r})이 워크플로에 없습니다 — {reason}")
+
+    for hook in sorted(set(table) - set(hook_ids)):
+        problems.append(f"CI 대조표에 있는 훅 {hook!r} 이 .pre-commit-config.yaml 에 없습니다 — 표가 낡았습니다")
+
+    return lines, problems
+
+
 def axis_label(parent_glob: str, child_glob: str) -> str:
     return f"{parent_glob}/{child_glob}"
 
@@ -335,6 +451,23 @@ def main() -> int:
         for c in missing_cmds:
             _fail(f"  · {c!r} — {NAMED_COMMANDS[c]}")
         ok = False
+
+    # pre-commit 훅 ↔ CI 대조 — 파일·명명 명령 두 축이 못 보던 자리다.
+    if not PRECOMMIT_CONFIG.is_file():
+        _fail(f"훅 설정이 없습니다: {PRECOMMIT_CONFIG} — 대조할 목록이 사라졌습니다")
+        ok = False
+        hook_ids: list[str] = []
+    else:
+        hook_ids = parse_precommit_hooks(PRECOMMIT_CONFIG.read_text(encoding="utf-8"))
+    parity_lines, parity_problems = check_precommit_parity(hook_ids, cov.files, joined)
+    print()
+    for line in parity_lines:
+        print(line)
+    for problem in parity_problems:
+        _fail(problem)
+    if parity_problems:
+        ok = False
+    print()
 
     exempt_count = sum(1 for u in inventory if u in EXEMPT)
     print(

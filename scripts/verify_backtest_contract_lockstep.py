@@ -19,7 +19,11 @@
 
 **fail-closed**: 대조한 인터페이스가 0건이거나 파일을 못 읽으면 실패한다. 검사한 수를 늘 출력한다.
 
-실행: `cd backend-service && python3 scripts/verify_backtest_contract_lockstep.py`
+**루트 `scripts/` 에 사는 이유**: 입력이 프론트와 백엔드에 걸쳐 있다. 경로 필터가 있는
+워크플로에 두면 이 그물이 지켜야 할 바로 그 PR 클래스(프론트만 바뀐 PR)에서 skip 된다 (#331).
+경로 필터 없이 도는 `repo-scans.yml` 의 `test: repo-scan` 잡이 실행한다.
+
+실행: `python3 scripts/verify_backtest_contract_lockstep.py`
 """
 
 from __future__ import annotations
@@ -29,8 +33,8 @@ import re
 import sys
 from pathlib import Path
 
-BACKEND = Path(__file__).resolve().parents[1]
-REPO_ROOT = BACKEND.parent
+REPO_ROOT = Path(__file__).resolve().parents[1]
+BACKEND = REPO_ROOT / "backend-service"
 
 FRONT_TYPES = REPO_ROOT / "frontend" / "schemas" / "backtest" / "backtest.ts"
 BACK_SCHEMA = BACKEND / "app" / "schemas" / "backtest" / "backtest_schema.py"

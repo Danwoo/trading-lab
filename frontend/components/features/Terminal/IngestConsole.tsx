@@ -485,7 +485,9 @@ export function IngestConsole() {
           <span className="break-keep text-ink-muted">
             {capabilities.isLoading
               ? "소스를 확인하는 중입니다"
-              : "지금 종목 목록을 줄 소스가 없습니다 — 아래 「소스」의 사유를 보세요."}
+              : capabilities.data === null
+                ? "소스 목록을 읽지 못해 종목 목록을 받을 수 없습니다"
+                : "지금 종목 목록을 줄 소스가 없습니다 — 아래 「소스」의 사유를 보세요."}
           </span>
         ) : (
           <>

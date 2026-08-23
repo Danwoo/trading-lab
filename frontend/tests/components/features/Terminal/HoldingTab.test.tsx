@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
-// 이슈 #332 — 발견 1(서버 실패가 "데이터 없음"으로 보임)·발견 2(같은 종목이 여러 포트폴리오에
-// 있으면 중복 표시). 두 결함 다 이 파일이 회귀 그물을 진다.
+// 두 결함의 회귀 그물 — ① 서버 실패가 "데이터 없음"으로 보임 ② 같은 종목이 여러 포트폴리오에
+// 있으면 중복 표시.
 //
 // #317 로 빈 상태 문구가 바뀌었다 — 옛 문구(「포트폴리오 화면에서 먼저 등록하세요」)가 가리킨
 // 레일의 「포트폴리오」는 `constants/shell.ts` 에서 준비 중이라 열리지 않는다. 그래서 실제로
@@ -40,7 +40,7 @@ const PORTFOLIOS: PortfolioOut[] = [
   { portfolio_id: "growth", portfolio_nm: "성장", sort_ordr: 2, use_at: "Y" },
 ];
 
-describe("HoldingTab — 서버 실패와 정상 0건 구분 (#332 발견 1)", () => {
+describe("HoldingTab — 서버 실패와 정상 0건 구분", () => {
   it("포트폴리오 조회가 서버 실패(success:false → throwOnFailure 로 예외)면 '불러오지 못했습니다'를 보여준다 — 빈 상태 문구가 아니다", async () => {
     vi.mocked(selectPortfolioList).mockRejectedValue(new ApiCallFailure());
 
@@ -90,7 +90,7 @@ describe("HoldingTab — 서버 실패와 정상 0건 구분 (#332 발견 1)", (
   });
 });
 
-describe("HoldingTab — 같은 종목이 여러 포트폴리오에 있으면 중복 표시되지 않는다 (#332 발견 2)", () => {
+describe("HoldingTab — 같은 종목이 여러 포트폴리오에 있으면 중복 표시되지 않는다", () => {
   it("삼성전자를 core·growth 둘 다 보유해도 사이드바엔 한 번만 뜬다", async () => {
     vi.mocked(selectPortfolioList).mockResolvedValue({ items: PORTFOLIOS, total_count: PORTFOLIOS.length });
     vi.mocked(selectHoldingList).mockImplementation(async (params: { portfolio_id: string }) => {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma/client";
 import { emailVerificationOtpIdentifier, normalizeEmail } from "@/lib/auth/authUtils";
+import { issueSignupVerificationGrant } from "@/lib/auth/signupVerificationGrant";
 
 export async function POST(request: NextRequest) {
   // 본문 파싱 실패를 그대로 빠져나가게 두면 Next 가 500 으로 응답한다 — 같은 가입 흐름 위의
@@ -54,5 +55,9 @@ export async function POST(request: NextRequest) {
   }
 
   await prisma.baVerification.delete({ where: { id: record.id } });
-  return NextResponse.json({ result: true });
+
+  // 인증에 성공했다는 사실을 **서버에** 남긴다 — 가입은 이 증거를 소비해야 계정을 만든다(#343).
+  // 종전에는 이 사실이 브라우저 상태로만 남아 가입 API 를 직접 부르면 그대로 통과했다.
+  const verificationToken = await issueSignupVerificationGrant(email);
+  return NextResponse.json({ result: true, verificationToken });
 }

@@ -19,7 +19,7 @@ export interface HoldingTabProps {
  * 같은 종목을 두 포트폴리오가 각각 보유하면(예: 삼성전자를 "core"·"growth" 둘 다 보유) 데이터로는
  * 정확한 두 행이지만, 이 사이드바의 목적은 "종목을 골라 문맥(전역 symbol)을 바꾸는" 것뿐이라 —
  * `SidebarSymbolRow` 는 포트폴리오별 수량을 보여주지 않는다 — 같은 티커가 두 번 뜨는 것은
- * 클릭 결과가 똑같은 항목의 중복일 뿐이다(#332 발견 2). 먼저 나온 포트폴리오의 보유를 대표로
+ * 클릭 결과가 똑같은 항목의 중복일 뿐이다. 먼저 나온 포트폴리오의 보유를 대표로
  * 남긴다 — 어떤 포트폴리오인지가 아니라 "이 종목을 보유 중"이라는 사실이 이 목록의 단위다.
  */
 function dedupeByTicker(holdings: HoldingOut[]): HoldingOut[] {
@@ -42,11 +42,11 @@ function dedupeByTicker(holdings: HoldingOut[]): HoldingOut[] {
  * 이 UNKNOWN 으로 판정해 시장을 지어내지 않는다. `PanelSlot` 의 MARKET_MISSING_VERDICT 가
  * "시장 값이 비어 있다"고 있는 그대로 말한다 — "종목이 이상하다"로 오인시키지 않는다).
  *
- * #332 — `throwOnFailure: true` 로 호출해 서버 실패(`success:false`)를 `catch` 로 보낸다.
- * 기본(`apiCall`) 계약은 실패와 "정상 0건"을 둘 다 `null` 로 뭉개 사이드바가 "보유종목이
- * 없습니다"를 보여준다 — 사용자는 서버 오류를 정상적인 빈 상태로 오인한다. 이 화면만 개별
- * 대응한다: `apiCall`/서비스 계층 전체를 바꾸는 것은 40여 호출부에 번지는 별도 작업이라
- * 이슈로 분리했다(#332 코멘트).
+ * `throwOnFailure: true` 로 호출해 서버 실패(`success:false`)를 `catch` 로 보낸다. 기본
+ * (`apiCall`) 계약은 실패와 "정상 0건"을 둘 다 `null` 로 뭉개므로, 그것을 그대로 두면 사이드바가
+ * 서버 오류를 "보유종목이 없습니다"로 말한다. 이 탭은 격자 커널(`useServerTable`)을 타지 않고
+ * 직접 서비스 함수를 부르므로 호출부에서 갈라야 한다
+ * ([#332](https://github.com/Danwoo/trading-lab/issues/332) 은 격자 경로 쪽을 닫았다).
  */
 export function HoldingTab({ activeTicker, onSelect }: HoldingTabProps) {
   const [holdings, setHoldings] = useState<HoldingOut[] | null>(null);

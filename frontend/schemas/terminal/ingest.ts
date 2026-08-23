@@ -2,7 +2,10 @@
 import { z } from "zod";
 import { StrRange, Optional, Field, enums, object } from "@/lib/zod/helpers";
 
-/** 백엔드 `ingest_schema.py` 의 `JobKind` 와 값이 같아야 한다 (backend 가 SoT). */
+/**
+ * 백엔드 `ingest_schema.py` 의 `JobKind` 와 값이 같아야 한다 (backend 가 SoT).
+ * `scripts/verify_capability_kind_lockstep.py` 가 두 목록을 집합으로 대조한다.
+ */
 export const JOB_KINDS = ["instrument_master", "daily_bar", "minute_bar"] as const;
 
 /**
@@ -17,7 +20,10 @@ export const DATA_KINDS = ["instrument_master", "daily_bar", "minute_bar", "quot
 
 export type DataKind = (typeof DATA_KINDS)[number];
 
-/** 백엔드 `ingest_schema.py` 의 `RunStatus`. `rate_limited` 는 실패가 아니라 이어받을 지점이 있는 상태다(설계 §7.2). */
+/**
+ * 백엔드 `ingest_schema.py` 의 `RunStatus`. `rate_limited` 는 실패가 아니라 이어받을 지점이 있는 상태다(설계 §7.2).
+ * `scripts/verify_capability_kind_lockstep.py` 가 두 목록을 집합으로 대조한다.
+ */
 export const RUN_STATUSES = ["queued", "running", "succeeded", "failed", "rate_limited"] as const;
 
 export type JobKind = (typeof JOB_KINDS)[number];

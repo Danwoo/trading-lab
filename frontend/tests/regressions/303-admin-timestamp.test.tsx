@@ -86,6 +86,9 @@ function stubSource(rows: Array<{ dt: string }>): LegacyGridSource<{ dt: string 
     rows,
     totalCount: rows.length,
     isLoading: false,
+    // 이 스텁은 "정상 응답 0건 이상" 상태다 — 실패를 싣지 않는다(실으면 그리드가 행 대신
+    // 「목록을 읽지 못했습니다」를 그려 이 파일이 보려는 표시 변환 자체가 사라진다).
+    error: null,
     query: { skip: 0, take: 20 },
     pageIndex: 0,
     pageSize: 20,

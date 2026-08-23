@@ -57,7 +57,7 @@ from services.data_key.data_key_service import (  # noqa: E402
 FAILURES: list[str] = []
 CHECKED = 0
 
-SECRET = "sk-live-0123456789abcdefGHIJKLMNOP"
+SECRET = "sk-live-0123456789abcdefGHIJKLMNOP"  # gitleaks:allow — 합성 카나리아 (실 키 아님)
 
 
 def check(name: str, actual, expected) -> None:

@@ -52,6 +52,13 @@ export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
     onSelect(symbol);
   };
 
+  // 못 읽은 것을 「없다」고 하면 등록해 둔 종목 위에 다시 등록하러 가게 만든다 —
+  // 실패를 먼저 가른다(같은 폴더 `HoldingTab` 과 같은 순서·같은 어휘). 검색 자리보다도 앞이다:
+  // 목록을 못 읽은 상태에서 열린 검색은 `rows.length === 0` 이라 닫는 자리가 없어 갇힌다.
+  if (table.error) {
+    return <PanelUnavailable reason="관심종목을 불러오지 못했습니다 — 잠시 후 다시 시도하세요." />;
+  }
+
   if (isSearchOpen) {
     return (
       <SymbolSearch onAdded={handleAdded} onClose={table.rows.length > 0 ? () => setIsSearchOpen(false) : undefined} />

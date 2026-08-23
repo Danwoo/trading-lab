@@ -5,7 +5,11 @@ import type { CSSProperties } from "react";
 import { type Row, flexRender } from "@tanstack/react-table";
 import type { VirtualItem } from "@tanstack/react-virtual";
 import type { GridColumn } from "@/types/grid";
+import { ICON_HIT_AREA } from "@/components/shared/ui/primitives/hitArea";
 import { type ColumnLayoutMap, STICKY_SHADOW_CLASS, type StickyPlacement } from "./gridColumnLayout";
+
+/** 실패한 목록이 화면에 남기는 문장. 회귀 테스트가 이 상수를 그대로 찾는다. */
+export const LIST_UNREADABLE_TEXT = "목록을 읽지 못했습니다 — 잠시 후 다시 시도하세요.";
 
 const ALIGN_CLASS: Record<"left" | "center" | "right", string> = {
   left: "text-left",
@@ -19,6 +23,9 @@ interface DataTableBodyProps<T> {
   isLoading: boolean;
   isEmpty: boolean;
   emptyText: string;
+  /** 마지막 요청이 실패했나. 참이면 `emptyText` 대신 못 읽었다는 사실과 재시도를 그린다. */
+  hasError: boolean;
+  onRetry: () => void;
   showSelectionColumn: boolean;
   selectionMode: "single" | "multiple" | "none";
   rowKeyOf: (row: T) => string | number;
@@ -57,6 +64,8 @@ export function DataTableBody<T>({
   isLoading,
   isEmpty,
   emptyText,
+  hasError,
+  onRetry,
   showSelectionColumn,
   selectionMode,
   rowKeyOf,
@@ -71,6 +80,30 @@ export function DataTableBody<T>({
   paddingBottom,
   measureRowElement,
 }: DataTableBodyProps<T>) {
+  // 못 읽은 것을 「없다」고 하지 않는다 — 사유는 토스트가 사라진 뒤에도 여기 남는다.
+  if (hasError) {
+    return (
+      <tbody>
+        <tr>
+          <td
+            colSpan={columns.length + (showSelectionColumn ? 1 : 0)}
+            role="status"
+            className="px-2 py-12 text-center text-red-700"
+          >
+            <p>{LIST_UNREADABLE_TEXT}</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className={`mt-2 ${ICON_HIT_AREA} rounded border border-red-200 px-2 py-0.5 text-red-900 hover:bg-red-50`}
+            >
+              다시 시도
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    );
+  }
+
   if (isLoading && isEmpty) {
     return (
       <tbody>

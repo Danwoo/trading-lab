@@ -29,10 +29,12 @@ interface ApiCallConfig extends Omit<AxiosRequestConfig, "headers"> {
   headers?: Record<string, any>;
   onUploadProgress?: (progressEvent: any) => void;
   /**
-   * 기본값 false — 백엔드가 `{success:false}` 를 응답하면 지금처럼 `null` 을 돌려준다(기존
-   * 40여 호출부의 계약을 그대로 유지, #332). `true` 로 넘기면 그 대신 `ApiCallFailure` 를
-   * 던진다 — 호출부가 "서버 실패"와 "정상 응답인데 0건"을 구분해야 할 때(예: 목록 화면의
-   * 빈 상태 문구가 실제 결함을 가리면 안 되는 곳) 쓴다. 기존 계약을 깨지 않는 opt-in.
+   * 기본값 false — 백엔드가 `{success:false}` 를 응답하면 `null` 을 돌려준다(호출부 137곳의
+   * 기존 계약). `true` 로 넘기면 그 대신 `ApiCallFailure` 를 던진다 — 호출부가 "서버 실패"와
+   * "정상 응답인데 0건"을 구분해야 할 때 쓴다. 기존 계약을 깨지 않는 opt-in.
+   *
+   * **격자를 타는 목록은 이 옵션이 필요 없다** — `useServerTable` 이 `null` 응답을 실패로 읽어
+   * `error` 상태로 세운다([#332](https://github.com/Danwoo/trading-lab/issues/332)).
    */
   throwOnFailure?: boolean;
 }
@@ -43,6 +45,18 @@ export class ApiCallFailure extends Error {
     super(message);
     this.name = "ApiCallFailure";
   }
+}
+
+/**
+ * 던져진 것에서 HTTP 상태 코드를 꺼낸다. **응답이 없는 실패는 `undefined`** — 네트워크 단절·
+ * DNS 실패·타임아웃에는 상태 코드가 없고, 그것을 0 이나 500 으로 뭉뚱그리면 호출부가 「서버가
+ * 이렇게 답했다」와 「답이 아예 없었다」를 못 가른다.
+ *
+ * 상태 코드를 아는 것은 전송 계층뿐이다(axios 예외 모양은 여기서만 안다). 호출부가
+ * `error.response?.status` 를 직접 파면 그 지식이 화면까지 번진다.
+ */
+export function httpStatusOf(error: unknown): number | undefined {
+  return axios.isAxiosError(error) ? error.response?.status : undefined;
 }
 
 export async function apiCall<T>(url: string, options: ApiCallConfig = {}): Promise<T | null> {

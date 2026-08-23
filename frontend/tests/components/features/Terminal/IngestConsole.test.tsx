@@ -298,6 +298,15 @@ describe("적재 콘솔 — 사실이 아닌 것을 말하지 않는다", () => 
     expect(group.textContent).toContain("종목 목록을 줄 소스가 없습니다");
   });
 
+  it("소스 목록 조회가 실패하면 종목 목록도 원인을 소스 부재로 오인시키지 않는다", () => {
+    // 바로 위 적재 버튼은 이 셋을 이미 갈랐는데 종목 목록만 안 갈랐다.
+    given({ capabilities: panel<unknown[]>({ data: null, isLoading: false }), symbol: null });
+    render(<IngestConsole />);
+    const group = screen.getByRole("group", { name: "종목 목록 받기" });
+    expect(group.textContent).toContain("읽지 못해");
+    expect(group.textContent).not.toContain("종목 목록을 줄 소스가 없습니다");
+  });
+
   it("되는 것을 먼저 보인다 — 부분적으로 막힌 소스가 「안 되는 소스」로 읽히지 않게", () => {
     given({
       capabilities: panel<unknown[]>({
