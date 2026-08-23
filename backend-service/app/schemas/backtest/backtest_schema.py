@@ -80,20 +80,32 @@ class GridAxisOut(BaseModel):
 
 
 class GridCellMetricsOut(BaseModel):
-    """격자 칸이 지고 다니는 **1급 지표** (#220).
+    """격자 칸이 지고 다니는 **1급 지표** (#220) — 그리고 그 값이 **왜 없는지** (#349).
 
     격자는 조합을 **고르는** 자리라, 4급(수익률)만 보이면 「가장 많이 번 칸」이 가장 진해
     보이고 사용자는 그 칸을 고른다 — 스펙 D-Q2 가 뒤집어 놓은 순서와 정면으로 어긋난다.
+
+    자리를 한 번도 잡지 않은 조합은 자산곡선이 시작 자금 그대로 평평하다. 그 곡선에서 나오는
+    「미회복 0봉 · 낙폭 0% · 수익률 +0.0%」는 **성적이 아니라 아무 일도 없었다는 뜻**인데,
+    숫자로 실어 보내면 격자가 그 칸을 척도의 가장 좋은 끝으로 칠한다 (#349 실측 — 25칸 중
+    16칸). 그래서 값 자리는 비우고 `absent_reason` 이 대신 말한다.
     """
 
-    #: 1급 — 전 고점 아래에 머문 최장 (봉).
-    longest_underwater: float
+    #: 1급 — 전 고점 아래에 머문 최장 (봉). 없으면 `absent_reason` 이 왜인지 말한다.
+    longest_underwater: float | None
     #: 끝에서 미회복인가 — 「아직 회복 중」을 화면이 밝힌다.
-    still_underwater: bool
+    still_underwater: bool | None
     #: 2급 — 그때의 고점 대비 최대 하락률 (%, 음수).
-    mdd_pct: float
+    mdd_pct: float | None
     #: 4급 — 구간 총수익률 (%). 버리지 않되 기본 채색이 아니다.
-    total_return_pct: float | None = None
+    total_return_pct: float | None
+    #: 청산된 거래 건수. **0 은 「값 없음」이 아니라 「0건」이라는 사실이다** — 칸만 보고
+    #: 「거래가 없었다」를 읽을 수 있어야 한다.
+    closed_trades: int
+    #: 구간 끝에 열린 자리 건수 (#314) — 「청산 안 함」과 「거래 없음」은 다른 상태다.
+    open_positions: int
+    #: 지표가 없는 이유. 실리면 화면은 이 칸을 **채색 척도에서 빼고** 이 문구를 그대로 쓴다.
+    absent_reason: str | None = None
 
 
 class GridCellOut(BaseModel):

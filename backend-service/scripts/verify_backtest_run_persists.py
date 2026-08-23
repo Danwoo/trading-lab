@@ -380,6 +380,12 @@ def main() -> int:
     check("아직 회복 중인지도 온다", "still_underwater" in cm, True)
     check("수익률도 함께 (4급이지만 버리지 않는다)", "total_return_pct" in cm, True)
     check("최장 미회복 기간이 숫자다", isinstance(cm["longest_underwater"], float), True)
+    # 「거래가 없었다」와 「낙폭이 0 이었다」를 칸이 스스로 가를 수 있어야 한다 (#349) —
+    # 건수와 사유 자리가 없으면 화면은 0 을 성적으로 읽고 그 칸을 1등으로 칠한다.
+    check("청산된 거래 건수를 지고 온다", "closed_trades" in cm, True)
+    check("구간 끝에 열린 자리 건수도 온다", "open_positions" in cm, True)
+    check("값이 없을 때 왜인지 말할 자리가 있다", "absent_reason" in cm, True)
+    check("거래가 있던 칸은 사유가 없다", cm["absent_reason"], None)
 
     # ── 봇 고리 (#232) — 봇 번호가 실행에 남고, 그 봇의 이력으로 조회되는가 ───
     # 「만들고 → 검증하고 → 굴린다」의 가운데를 잇는 유일한 고리다. 늘 NULL 이면 봇 화면이

@@ -87,6 +87,24 @@ def service_cell_keys(tree: ast.Module) -> set[str]:
     return set()
 
 
+def service_cell_metric_dicts(tree: ast.Module) -> list[set[str]]:
+    """`cell_metrics = {...}` 각각의 키 목록 — 칸 지표를 만드는 **모든 갈래**.
+
+    갈래가 여럿인 것이 요점이다 (#349): 거래가 있던 칸과 거래 0건 칸이 서로 다른 dict 를
+    만든다. **한 갈래라도 필드를 빠뜨리면** 그 칸의 응답에서 그 필드가 사라지고, 화면은
+    「값 없음」과 「0」을 다시 못 가린다. 그래서 갈래마다 따로 대조한다.
+    """
+    out: list[set[str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "cell_metrics" for t in node.targets):
+            continue
+        if isinstance(node.value, ast.Dict):
+            out.append({k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)})
+    return out
+
+
 def main() -> int:
     for path in (FRONT_TYPES, BACK_SCHEMA, BACK_SERVICE):
         if not path.is_file():
@@ -125,11 +143,36 @@ def main() -> int:
         if dropped:
             failures.append(f"서비스가 만드는데 응답 모델이 선언하지 않아 **버려집니다**: {', '.join(dropped)}")
 
+    # 칸 **지표**도 같은 규약이다 — 갈래마다 응답 모델의 필드를 전부 채워야 한다 (#349).
+    metric_dicts = service_cell_metric_dicts(service_tree)
+    metric_fields = back_model_fields("GridCellMetricsOut", schema_tree) or set()
+    if not metric_dicts:
+        failures.append("서비스의 `cell_metrics = {...}` 를 찾지 못했습니다 — 검사가 죽었습니다")
+    elif not metric_fields:
+        failures.append("백엔드에 `GridCellMetricsOut` 모델이 없습니다 — 짝이 사라졌습니다")
+    else:
+        for index, keys in enumerate(metric_dicts, start=1):
+            dropped = sorted(keys - metric_fields)
+            if dropped:
+                failures.append(
+                    f"칸 지표 {index}번째 갈래: 서비스가 만드는데 모델이 선언하지 않아 **버려집니다**: "
+                    f"{', '.join(dropped)}"
+                )
+            unfilled = sorted(metric_fields - keys)
+            if unfilled:
+                failures.append(
+                    f"칸 지표 {index}번째 갈래: 모델이 선언했는데 서비스가 안 채웁니다 — "
+                    f"그 칸은 이 필드를 못 지고 갑니다: {', '.join(unfilled)}"
+                )
+
     if compared == 0:
         print("::error::대조한 인터페이스가 0건입니다 — fail-closed 종료")
         return 1
 
-    print(f"대조한 인터페이스 {compared}쌍 · 서비스가 만드는 칸 키 {len(cell_keys)}개")
+    print(
+        f"대조한 인터페이스 {compared}쌍 · 서비스가 만드는 칸 키 {len(cell_keys)}개 · "
+        f"칸 지표 갈래 {len(metric_dicts)}개 × 필드 {len(metric_fields)}개"
+    )
     if failures:
         print(f"::error::백테스트 계약 lockstep 위반 {len(failures)}건")
         for failure in failures:
