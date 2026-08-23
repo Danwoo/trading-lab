@@ -7,6 +7,8 @@ import { selectBotList } from "@/services/bot/botService";
 import { deleteBotWithConfirm } from "./deleteBotWithConfirm";
 import type { BotOut } from "@/schemas/bot/bot";
 import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
+import { WRITE_DENIED_SHORT } from "@/constants/writeAccess";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 
 /**
  * 내 봇 목록. **0개일 때가 첫 화면**이라, 빈 자리가 무엇이 올 자리인지 말한다 (§21.4) —
@@ -19,6 +21,7 @@ export function BotList() {
   const [bots, setBots] = useState<BotOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const writeAccess = useWriteAccess();
 
   useEffect(() => {
     let cancelled = false;
@@ -64,9 +67,14 @@ export function BotList() {
           봇은 &ldquo;어떤 종목을, 어떤 조건에서, 얼마나&rdquo; 를 적어둔 것입니다. 하나 만들면 여기 놓이고, 검증과
           운용이 그 뒤에 붙습니다.
         </p>
-        <Link href="/bench/bot/new" className="text-sm text-ink underline underline-offset-4">
-          첫 봇 만들기
-        </Link>
+        {/* 못 만드는 계정을 만들기 화면으로 보내지 않는다 — 거기서 「저장」을 눌러야 403 을 만난다 (#341). */}
+        {writeAccess.isDenied ? (
+          <p className="text-sm text-ink-muted">{WRITE_DENIED_SHORT}</p>
+        ) : (
+          <Link href="/bench/bot/new" className="text-sm text-ink underline underline-offset-4">
+            첫 봇 만들기
+          </Link>
+        )}
       </div>
     );
   }
@@ -89,7 +97,8 @@ export function BotList() {
             type="button"
             // 행마다 같은 「삭제」가 서므로 이름에 봇을 넣는다 — 소리로 듣는 사람에게는 그것만이 구분이다.
             aria-label={`${bot.bot_nm} 삭제`}
-            disabled={deletingId === bot.bot_id}
+            disabled={deletingId === bot.bot_id || !writeAccess.canWrite}
+            title={writeAccess.deniedHint}
             onClick={() => void handleDelete(bot)}
             className="shrink-0 px-2 py-2 text-2xs text-ink-muted underline underline-offset-2 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:text-ink-muted"
           >

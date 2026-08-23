@@ -7,6 +7,7 @@ import { showToast, showMessage } from "@/components/shared/Feedback";
 // (#381, `Feedback/index.ts` 주석).
 import { Loading } from "@/components/shared/Feedback/Loading";
 import { useUploadProgressStore } from "@/stores/shared/uploadProgressStore";
+import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
 
 type ModeType = "view" | "edit" | "create";
 
@@ -21,6 +22,16 @@ interface Props<T, F> {
   formProps?: any;
   defaultFormData?: Partial<F>;
   onComplete?: (data: T | null, action?: "create" | "update" | "delete") => void;
+  /**
+   * 역할이 이 자리의 쓰기를 막고 있다 (#341). 주면 등록·수정·삭제 조작부를 세우지 않고,
+   * **왜 막혔고 지금 무엇이 되는지**를 패널 머리에서 먼저 말한다. `halted` 는 이 화면에서
+   * 막히는 동작의 이름이다 — 화면마다 다르므로 부르는 쪽이 준다.
+   *
+   * 판정은 여기서 하지 않는다: 이 패널은 역할 게이트가 **없는** 자원에도 쓰이므로
+   * (`/admin` 의 코드·메뉴 관리는 Prisma 직접 경로라 `require_role` 이 없다) 게이트 여부는
+   * 부르는 쪽이 선언한다.
+   */
+  writeGated?: { halted: string[] };
   apiService?: {
     select: (data: any) => Promise<T | null>;
     create?: (data: any) => Promise<any>;
@@ -40,9 +51,13 @@ export function DetailPanel<T, F>({
   formProps = {},
   defaultFormData,
   onComplete,
+  writeGated,
   apiService,
 }: Props<T, F>) {
-  const [mode, setMode] = useState<ModeType>(initialMode);
+  const isWriteGated = writeGated !== undefined;
+  // 막힌 계정에는 등록 폼을 아예 세우지 않는다 — 다 채운 뒤 「저장」에서 403 을 만나는 것이
+  // 이 이슈의 증상이다.
+  const [mode, setMode] = useState<ModeType>(isWriteGated ? "view" : initialMode);
   const [currentData, setCurrentData] = useState<T | null>(data);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -50,9 +65,9 @@ export function DetailPanel<T, F>({
 
   useEffect(() => {
     setCurrentData(data);
-    setMode(initialMode);
+    setMode(isWriteGated ? "view" : initialMode);
     setRefreshKey((prev) => prev + 1);
-  }, [data, initialMode]);
+  }, [data, initialMode, isWriteGated]);
 
   const handleEdit = async (): Promise<boolean> => {
     if (!data || !apiService || !FormComponent) return false;
@@ -171,12 +186,14 @@ export function DetailPanel<T, F>({
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto py-2 px-2">
+        {writeGated && <WriteAccessNotice halted={writeGated.halted} className="mb-2" />}
+
         {mode === "view" && currentData && (
           <ViewComponent
             key={refreshKey}
             data={currentData}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
+            onEdit={isWriteGated ? undefined : handleEdit}
+            onDelete={isWriteGated ? undefined : handleDelete}
             {...viewProps}
           />
         )}
@@ -197,7 +214,11 @@ export function DetailPanel<T, F>({
             <div className="text-center">
               <div className="text-4xl mb-4">📋</div>
               <div className="text-lg mb-2">데이터가 없습니다</div>
-              <div className="text-sm">항목을 선택하거나 등록 버튼을 클릭하세요.</div>
+              <div className="text-sm">
+                {isWriteGated
+                  ? "왼쪽 목록에서 항목을 선택하면 여기에 내용이 보입니다."
+                  : "항목을 선택하거나 등록 버튼을 클릭하세요."}
+              </div>
             </div>
           </div>
         )}

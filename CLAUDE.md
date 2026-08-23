@@ -74,7 +74,7 @@ Client → services/ → app/api/common/ → withAuth → Prisma → PostgreSQL
 
 Frontend `lib/auth/`: `auth.ts` (서버), `auth-client.ts` (`signIn/signOut/signUp/useSession`), `withAuth.ts` (API Route 보호 — 세션 검증 후 `session.accessToken` 전달). 미들웨어 `frontend/proxy.ts` 의 경로별 규칙. Backend `core/security.py` 의 `verify_access_token` (JWT HS256).
 
-- 권한 3종: `admin`(시스템관리자·글로벌) / `operator`(운영자·자기 워크스페이스) / `user`(일반). `frontend/constants/protected.ts` 의 `SYS_ADMIN_AUTHOR_ID`/`GENERAL_ADMIN_AUTHOR_ID`/`DEFAULT_USER_AUTHOR_ID`.
+- 권한 3종: `admin`(시스템관리자·글로벌) / `operator`(운영자·자기 워크스페이스, **회원가입이 배정한다** — 리드 결정 2026-08-23) / `user`(초대받은 읽기전용 게스트 — `require_role` 이 걸린 쓰기 라우트가 전부 403). `frontend/constants/protected.ts` 의 `SYS_ADMIN_AUTHOR_ID`/`GENERAL_ADMIN_AUTHOR_ID`/`GUEST_AUTHOR_ID`, 가입 배정은 `SIGNUP_AUTHOR_ID`.
 - JWT payload = `{sub: user.id, email, role: authorId, workspace_id}`. frontend `auth.ts` 의 `definePayload`/`getSubject` 가 발급, backend 가 동일 키로 읽어 `core/auth_context.py` ContextVar 에 박음. **`JWT_SECRET` 은 frontend·backend 동일값 필수**.
 
 ---

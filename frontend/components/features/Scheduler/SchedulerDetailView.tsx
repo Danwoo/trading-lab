@@ -6,12 +6,13 @@ import { TableRow, TableCell, TableGroup } from "@/components/shared/Layout";
 import { showToast, showMessage } from "@/components/shared/Feedback";
 import { getApiErrorMessage } from "@/utils/common/errors";
 import { runScheduler } from "@/services/scheduler/schedulerService";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 import { SchedulerOut } from "@/schemas/scheduler/scheduler";
 import SchedulerMemberGrid from "./SchedulerMemberGrid";
 
 interface Props {
   data: SchedulerOut;
-  onEdit: () => void;
+  onEdit?: () => void;
   onDelete?: () => void;
   dayOfWeekItems?: { code: string; code_nm: string }[];
   useAtItems?: { code: string; code_nm: string }[];
@@ -26,6 +27,8 @@ export default function SchedulerDetailView({
   useAtItems = [],
   periodItems = [],
 }: Props) {
+  const writeAccess = useWriteAccess();
+
   const handleRun = () => {
     showMessage("실행 확인", <div>{data.scheduler_nm} 스케줄러를 지금 실행하시겠습니까?</div>, {
       type: "confirm",
@@ -48,8 +51,16 @@ export default function SchedulerDetailView({
     <div className="h-full flex flex-col">
       <div className="flex-shrink-0 mb-2">
         <div className="flex gap-2 justify-end">
-          <Button text="지금 실행" onClick={handleRun} type="success" />
-          <Button text="수정" onClick={onEdit} />
+          {/* 「지금 실행」도 `require_role` 이 걸린 쓰기(`POST /scheduler/{id}/run`)다 — 수정·삭제와
+              달리 이 화면이 직접 부르므로 판정도 여기서 한다 (#341). */}
+          <Button
+            text="지금 실행"
+            onClick={handleRun}
+            type="success"
+            disabled={!writeAccess.canWrite}
+            hint={writeAccess.deniedHint}
+          />
+          {onEdit && <Button text="수정" onClick={onEdit} />}
           {onDelete && <Button text="삭제" onClick={onDelete} stylingMode="outlined" type="danger" />}
         </div>
       </div>

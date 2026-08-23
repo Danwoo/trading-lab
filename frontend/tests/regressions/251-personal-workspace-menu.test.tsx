@@ -145,7 +145,8 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { ensurePersonalWorkspace } = await import("@/lib/auth/authUtils");
-const { PERSONAL_WORKSPACE_DEFAULT_MENU_IDS, DEFAULT_USER_AUTHOR_ID } = await import("@/constants/protected");
+const { PERSONAL_WORKSPACE_DEFAULT_MENU_IDS, SIGNUP_AUTHOR_ID, GUEST_AUTHOR_ID } =
+  await import("@/constants/protected");
 const { GET } = await import("@/app/api/common/system/menu/navigation/route");
 const { Sidebar } = await import("@/components/shared/Layout/Sidebar");
 const { useNavStore } = await import("@/stores/shared/navStore");
@@ -219,16 +220,17 @@ describe("개인 워크스페이스 사이드바 (#251)", () => {
     expect(terminal?.path).toBe("/terminal");
   });
 
-  it("권한 축과 워크스페이스 축이 어긋나지 않는다 — seed.sql 의 기본 권한이 기본 메뉴를 전부 갖는다", () => {
-    const defaultAuthorMenus = seedAuthorMenus
-      .filter((r) => r.author_id === DEFAULT_USER_AUTHOR_ID)
-      .map((r) => r.menu_id);
-    expect(defaultAuthorMenus.length, `seed.sql 에 ${DEFAULT_USER_AUTHOR_ID} 권한의 메뉴가 0건이다`).toBeGreaterThan(0);
+  // 가입이 주는 역할이 바뀌면(#341) 대조 대상도 같이 움직여야 한다 — 종전엔 게스트 한 축만
+  // 봤고, 그 상태로 가입 역할만 운영자로 옮기면 「사이드바가 조용히 빈다」는 이 그물이 다시
+  // 새 역할을 안 보게 된다. 게스트 축도 남긴다: 초대받은 사람도 **보기는** 해야 한다.
+  it.each([
+    ["가입이 주는 권한", SIGNUP_AUTHOR_ID],
+    ["읽기전용 게스트", GUEST_AUTHOR_ID],
+  ])("권한 축과 워크스페이스 축이 어긋나지 않는다 — seed.sql 의 %s 이 기본 메뉴를 전부 갖는다", (_label, authorId) => {
+    const authorMenus = seedAuthorMenus.filter((r) => r.author_id === authorId).map((r) => r.menu_id);
+    expect(authorMenus.length, `seed.sql 에 ${authorId} 권한의 메뉴가 0건이다`).toBeGreaterThan(0);
     for (const menuId of PERSONAL_WORKSPACE_DEFAULT_MENU_IDS) {
-      expect(
-        defaultAuthorMenus,
-        `기본 권한(${DEFAULT_USER_AUTHOR_ID})에 ${menuId} 가 없어 사이드바에서 사라진다`,
-      ).toContain(menuId);
+      expect(authorMenus, `${authorId} 권한에 ${menuId} 가 없어 사이드바에서 사라진다`).toContain(menuId);
     }
   });
 });

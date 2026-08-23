@@ -8,6 +8,7 @@ import { TextBox } from "@/components/shared/ui/TextBox";
 import type { GridRunFormController } from "@/hooks/bench/useGridRunForm";
 import type { BacktestGridIn } from "@/schemas/backtest/backtest";
 import type { BotOut } from "@/schemas/bot/bot";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 
 // bar 라우터가 받는 시장 목록과 같다 (backend-service/app/routers/bar/bar_router.py)
 const MARKETS = ["KOSPI", "KOSDAQ", "KONEX", "NASDAQ", "NYSE", "AMEX"].map((value) => ({ value, label: value }));
@@ -34,6 +35,8 @@ export function GridRunForm({
   onRun: (input: BacktestGridIn) => void;
 }) {
   const { strategy, axes, form, formError, botDetailError, comboCount } = controller;
+  // 격자 실행도 `require_role` 이 걸린 쓰기다 (`POST /backtest-run/grid`) — 누르기 전에 막는다 (#341).
+  const writeAccess = useWriteAccess();
 
   return (
     <form
@@ -159,11 +162,13 @@ export function GridRunForm({
             직접 그린다 — BenchPaths 와 같은 관례. 액센트 없는 시스템에서 버튼은 재질로 선다. */}
         <button
           type="submit"
-          disabled={isRunning}
+          disabled={isRunning || !writeAccess.canWrite}
+          title={writeAccess.deniedHint}
           className="rounded-control border border-btn-line bg-gradient-to-b from-btn-from to-btn-to px-3 py-1.5 text-sm font-ui text-ink disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-muted"
         >
           {isRunning ? "돌리는 중…" : "격자 실행"}
         </button>
+        {writeAccess.isDenied && <span className="break-keep text-2xs text-ink-muted">{writeAccess.deniedHint}</span>}
         {comboCount > 0 && (
           <span className="break-keep text-2xs text-ink-muted">
             {comboCount}칸 — 훑는 것도 시도라 시도 {comboCount}회를 씁니다.
