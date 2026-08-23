@@ -166,8 +166,9 @@ export function TextBox<T = any>({
       className={cn(
         FIELD_INPUT_CLASS,
         fieldBorderClass(isInvalid),
-        showClearButton && value ? "pr-8" : "",
-        showPasswordToggle ? "pr-8" : "",
+        // 겹쳐 놓인 아이콘 상자(`right-2`=8px + 표적)만큼을 비운다 — 값은 표적 토큰에서 파생한다.
+        showClearButton && value ? "pr-[calc(var(--touch-icon-target)+8px)]" : "",
+        showPasswordToggle ? "pr-[calc(var(--touch-icon-target)+8px)]" : "",
         className,
       )}
     />

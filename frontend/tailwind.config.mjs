@@ -93,6 +93,10 @@ export const theme = {
     minHeight: {
       // 좁은 화면·터치 기기에서 촘촘한 표적이 갖는 하한 (#230). spacing 과 별개 스케일이다.
       "touch-min": "var(--touch-min)",
+      "touch-icon": "var(--touch-icon-target)",
+    },
+    minWidth: {
+      "touch-icon": "var(--touch-icon-target)",
     },
     boxShadow: {
       e1: "var(--e1)",

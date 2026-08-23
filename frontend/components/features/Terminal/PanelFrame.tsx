@@ -28,9 +28,23 @@ export function PanelFrame({ instance, definition, provenance, onToggleCollapse,
     <div className="flex h-full flex-col overflow-hidden border border-line bg-bg-panel">
       <div className="group flex flex-shrink-0 items-center justify-between gap-2 border-b border-line px-2 py-1 font-mono text-xs">
         <span className="min-w-0 flex-1 truncate text-ink">{definition.title}</span>
-        <div className="flex flex-shrink-0 items-center gap-2">
-          <ProvenanceBadge provenance={provenance} />
-          <div className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none">
+        {/*
+          이 묶음은 **줄어들 수 있어야 한다.** 패널이 좁아지면(사이드바가 자리를 다 먹는 폭에서
+          72px 까지 간다 — #289 실측) `flex-shrink-0` 인 묶음은 폭을 안 내주고 패널 상자 밖으로
+          밀려나는데, 패널 뿌리가 `overflow-hidden` 이라 밀려난 부분은 **잘려서 못 누른다**.
+          크기가 24 여도 그 좌표를 히트 테스트하면 버튼이 아니라 뒤엣것이 잡힌다.
+          그래서 줄어드는 것은 출처 배지 쪽이고, `⋮` 만 `flex-shrink-0` 으로 자리를 지킨다.
+        */}
+        <div className="flex min-w-0 items-center gap-2">
+          {/* `h-4` 는 이 줄의 글줄 높이(text-xs = 16px)다 — 좁아진 배지가 여러 줄로 접히면서
+              패널 머리를 늘리는 것을 막는다(실측: 폭 390 에서 25px → 137px). 넘치는 부분은
+              잘린다: 배지는 줄어들 수 있는 쪽이고 `⋮` 는 자리를 지키는 쪽이다. */}
+          <span className="flex h-4 min-w-0 overflow-hidden">
+            <ProvenanceBadge provenance={provenance} />
+          </span>
+          {/* 호버가 없는 기기에서는 상시로 보인다 — `opacity: 0` 은 히트 테스트를 안 막으므로, 그대로
+              두면 손가락 기기에서 접기·닫기·⋮ 가 「안 보이는데 눌리는」 조작부가 된다. */}
+          <div className="flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100">
             <PanelMenu collapsed={instance.collapsed} onToggleCollapse={onToggleCollapse} onClose={onClose} />
           </div>
         </div>

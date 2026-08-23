@@ -120,7 +120,8 @@ export function GlobalTabs() {
                 <button
                   type="button"
                   aria-label={`${tab.title} 닫기`}
-                  // `-my-1` 은 24 짜리 표적이 탭 줄을 밀어 늘리지 않게 한다.
+                  // `-my-1` 은 표적이 탭 줄을 그만큼 덜 밀게 한다 — 마우스 갈래(24)에서는 줄이 안 늘고,
+                  // 손가락 갈래(44)에서는 표적이 줄보다 커 줄이 함께 늘어난다(#289 리드 결정 2026-08-21 ②).
                   className={cn(ICON_HIT_AREA, "-my-1 ml-auto flex-shrink-0 rounded hover:bg-gray-300")}
                   onClick={(e) => handleCloseClick(e, tab)}
                 >

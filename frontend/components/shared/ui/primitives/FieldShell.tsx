@@ -82,9 +82,14 @@ export function FieldShell({ children, isInvalid, errorMessage, errorMessageId, 
  * `focus:outline-none` 을 두면 명시도(0,2,0)가 그 정본(0,1,0)을 덮어 **키보드 포커스 표시를
  * 지우고**, 대신 남는 `ring-line-strong` 은 `--bg-panel` 대비 1.8:1 로 WCAG 1.4.11(3:1)에
  * 못 미친다.
+ *
+ * **`min-h-touch-icon`** 은 겹쳐 놓인 아이콘 상자가 입력 밖으로 삐져나오지 않게 한다 — 그 상자는
+ * `top-1/2 -translate-y-1/2` 라 입력보다 높으면 위아래로 같은 만큼 넘치고, 넘친 띠에는 클립이
+ * 없어 이웃 줄 위에 얹힌다. 입력이 표적만큼 높으면 그 띠가 생기지 않는다 (#289 리뷰).
  */
 export const FIELD_INPUT_CLASS =
   "w-full rounded border bg-bg-base px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted " +
+  "min-h-touch-icon " +
   "read-only:cursor-default read-only:bg-bg-raised " +
   "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted";
 
@@ -105,8 +110,13 @@ export function fieldBorderClass(isInvalid: boolean): string {
  * hover 는 **색이 아니라 바탕**으로 준다. 색을 밝히면 어두운 데서 좋아지고 밝은 데서 나빠진다 —
  * 한 색으로 양쪽을 다 올릴 수 없다. 바탕을 얹으면 글자 대비를 안 깎고 반응만 더한다.
  *
- * 크기는 `ICON_HIT_AREA` 가 정한다 — 24×24 상자 안에 글리프를 가운데 두므로 보이는 크기는
- * 그대로다(#289). `right-2`(8) + 24 = 32 = 입력의 `pr-8` 이라 글자를 안 덮는다.
+ * 크기는 `ICON_HIT_AREA` 가 정한다 — 상자 안에 글리프를 가운데 두므로 보이는 글리프 크기는
+ * 어느 갈래에서도 그대로다(#289).
+ *
+ * **입력이 비워 두는 자리는 이 상자와 같은 토큰에서 파생한다.** 이 상자는 `right-2`(8px) 에
+ * 겹쳐 놓이므로 입력은 `8 + 표적` 이상을 비워야 한다 — 소비자(`TextBox`·`DateBox`)가
+ * `pr-[calc(var(--touch-icon-target)+…)]` 로 적는다. 숫자로 적어 두면 표적이 움직일 때
+ * 따라오지 않아 글자를 덮는다(#289 리뷰 — `pr-8` 이 44 갈래에서 20px 을 덮었다).
  */
 export const FIELD_ICON_BUTTON_CLASS =
   `${ICON_HIT_AREA} absolute right-2 top-1/2 -translate-y-1/2 rounded text-ink-muted ` +
