@@ -76,6 +76,12 @@ jobs:
             THIRD-PARTY-NOTICES.md
             scripts/verify_notice_counts.py
             scripts/generate_notices.py
+            # verify_write_gate_coverage.py 가 읽는 다른 한쪽 축 (#341) — 백엔드에서 require_role 이
+            # 빠지거나 라우터 prefix 가 바뀌면 화면의 사전 설명이 어긋나는데, frontend/** 만 보면
+            # 그 변경에서 이 검사가 안 돈다.
+            backend-service/app/routers/**
+            backend-service/app/core/authorization.py
+            scripts/verify_write_gate_coverage.py
             # 게이트를 고치는 변경이 자기 검증을 못 받으면 러너 위 동작은 머지 후에야 드러난다 (#217)
             .github/workflows/**
         run: |
@@ -123,6 +129,14 @@ jobs:
       - name: 재도입 그물 커버리지 — 6종 주입 시험
         if: ${{ !cancelled() }}
         run: bash scripts/injection-probe-devextreme.sh
+
+      # 역할 게이트가 걸린 쓰기(21개 엔드포인트)를 화면이 **누르기 전에** 설명하는지 (#341).
+      # backend 의 require_role ↔ frontend 의 역할·prefix·조작부를 네 축으로 대조하고, 축마다
+      # 검사 건수를 출력에 남긴다. 대상이 0건이면 실패한다. 레포 루트 기준 경로를 쓴다.
+      - name: 역할 게이트 쓰기 사전 설명 대조
+        if: ${{ !cancelled() }}
+        working-directory: .
+        run: python3 scripts/verify_write_gate_coverage.py
 
       # app/api 라우트의 getKSTTime() 재유입 (#372) — #303 의 회귀 그물은 실제 라우트를
       # import 하지 않아 어느 라우트가 다시 써도 초록으로 남는 구멍이 있었다.

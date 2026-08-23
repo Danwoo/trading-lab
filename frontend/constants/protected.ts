@@ -8,17 +8,37 @@
  */
 export const SYS_ADMIN_AUTHOR_ID = "admin";
 
-/** 일반관리자 권한 ID — 워크스페이스별 사용자 관리 권한 */
+/** 운영자 권한 ID — 자기 워크스페이스의 주인. 저장·실행이 열리는 역할이다. */
 export const GENERAL_ADMIN_AUTHOR_ID = "operator";
 
-/** 일반사용자 권한 ID — 도메인 매핑된 가입자에게 자동 부여되는 디폴트 권한 */
-export const DEFAULT_USER_AUTHOR_ID = "user";
+/**
+ * 읽기전용 게스트 권한 ID — **초대받아 들어온 계정**의 자리다.
+ *
+ * 이 역할로는 backend 의 쓰기 라우트가 전부 403 이다(`core/authorization.py` 의
+ * `require_role(ROLE_ADMIN, ROLE_OPERATOR)`). 종전 이름은 `DEFAULT_USER_AUTHOR_ID` 였는데
+ * 그 "디폴트"는 **가입이 주는 역할**이라는 뜻이었고, 리드 결정 2026-08-23 으로 가입은
+ * 운영자를 준다 — 이름이 뜻과 어긋나 바꿨다(#341).
+ */
+export const GUEST_AUTHOR_ID = "user";
+
+/**
+ * 회원가입이 배정하는 권한 ID (리드 결정 2026-08-23, #341).
+ *
+ * 이 제품은 「로그인해서 쓰는 **개인** 투자 지휘소」이고 멀티테넌시를 「개인 워크스페이스 +
+ * 읽기전용 게스트 초대」로 읽는다(CONTEXT.md). 그 틀에서 가입자는 손님이 아니라 자기 공간의
+ * 주인이라 운영자를 받는다. 종전처럼 게스트를 주면 실험대·시세·관심종목의 저장·실행이
+ * 전부 403 이 되어 M2 완료 조건의 마지막 걸음(「봇 하나를 만들어 저장」)이 닫힌다.
+ *
+ * 별칭을 따로 두는 이유는 **두 뜻을 가르기 위해서**다 — "운영자라는 역할"을 가리키는 자리와
+ * "가입이 주는 역할"을 가리키는 자리는 지금 같은 값이지만 같은 개념이 아니다.
+ */
+export const SIGNUP_AUTHOR_ID = GENERAL_ADMIN_AUTHOR_ID;
 
 /** 여러 권한 보유 시 세션 대표 권한 선택 우선순위 (숫자 정렬 비의존 — 자유 권한은 후순위 fallback) */
-export const AUTHOR_PRIORITY = [SYS_ADMIN_AUTHOR_ID, GENERAL_ADMIN_AUTHOR_ID, DEFAULT_USER_AUTHOR_ID];
+export const AUTHOR_PRIORITY = [SYS_ADMIN_AUTHOR_ID, GENERAL_ADMIN_AUTHOR_ID, GUEST_AUTHOR_ID];
 
 /** 삭제 불가 권한 — admin/operator/user 시스템 권한은 백엔드가 의존하므로 삭제 차단 (버튼도 미노출) */
-export const PROTECTED_AUTHOR_IDS = [SYS_ADMIN_AUTHOR_ID, GENERAL_ADMIN_AUTHOR_ID, DEFAULT_USER_AUTHOR_ID];
+export const PROTECTED_AUTHOR_IDS = [SYS_ADMIN_AUTHOR_ID, GENERAL_ADMIN_AUTHOR_ID, GUEST_AUTHOR_ID];
 
 /** 삭제할 수 없는 메뉴 ID 접두사 목록 — 이 접두사로 시작하는 메뉴는 삭제와 미사용 처리가 차단된다 */
 export const PROTECTED_MENU_PREFIXES = ["msys"];
@@ -54,8 +74,10 @@ export const AUTO_SYSTEM_MENUS_BY_AUTHOR: Record<string, string[]> = {
  * `POST_LOGIN_PATH`)이라, 가입자에게 이 메뉴가 없으면 착지가 fail-closed 게이트에 막혀
  * 종전처럼 첫 메뉴로 되돌아간다(#73 S2, 화면 결정 §20.2).
  *
- * 교집합의 다른 한쪽(권한)은 `prisma/init/seed.sql` 의 `tn_author_menu` 가 정한다 — 기본
- * 권한(`DEFAULT_USER_AUTHOR_ID`)이 이 목록을 전부 갖지 않으면 여기 넣어도 안 보인다.
+ * 교집합의 다른 한쪽(권한)은 `prisma/init/seed.sql` 의 `tn_author_menu` 가 정한다 — 가입이
+ * 주는 권한(`SIGNUP_AUTHOR_ID`)과 게스트(`GUEST_AUTHOR_ID`) 둘 다 이 목록을 전부 갖지 않으면
+ * 그 계정의 사이드바에서 사라진다. 게스트도 포함하는 이유는 초대받은 사람이 **보기는**
+ * 해야 하기 때문이다.
  * 두 곳이 어긋나면 사이드바가 다시 조용히 비므로
  * `tests/regressions/251-personal-workspace-menu.test.ts` 가 둘을 대조한다.
  */

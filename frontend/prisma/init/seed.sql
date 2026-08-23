@@ -140,9 +140,11 @@ VALUES
 ('operator', 'mbiz1005', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1006', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('operator', 'mbiz1007', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
--- user: 개인 워크스페이스 기본 메뉴(constants/protected.ts 의 PERSONAL_WORKSPACE_DEFAULT_MENU_IDS)를
--- 전부 포함해야 한다. isVisible = 권한메뉴 ∩ 워크스페이스메뉴 라 한쪽만 부여하면 가입자의
--- 사이드바가 조용히 빈다(#251). 두 목록의 대조는 tests/regressions/251-personal-workspace-menu.test.ts.
+-- user: 초대받은 읽기전용 게스트다 (#341 — 회원가입은 operator 를 배정한다). 개인 워크스페이스
+-- 기본 메뉴(constants/protected.ts 의 PERSONAL_WORKSPACE_DEFAULT_MENU_IDS)를 전부 포함해야 한다.
+-- isVisible = 권한메뉴 ∩ 워크스페이스메뉴 라 한쪽만 부여하면 그 계정의 사이드바가 조용히
+-- 빈다(#251). 두 목록의 대조는 tests/regressions/251-personal-workspace-menu.test.tsx 가
+-- operator·user 두 축 모두에 대해 한다.
 ('user', 'mbiz1009', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('user', 'mbiz1008', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR'),
 ('user', 'mbiz1001', CURRENT_TIMESTAMP, 'MGR', CURRENT_TIMESTAMP, 'MGR');

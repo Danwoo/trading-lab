@@ -13,6 +13,8 @@ import { useDetailModal } from "@/hooks/shared/useDetailModal";
 import { useFormState } from "@/hooks/shared/useFormState";
 import { getApiErrorMessage } from "@/utils/common/errors";
 import { showToast, showMessage } from "@/components/shared/Feedback";
+import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
+import { WRITE_DENIED_SHORT } from "@/constants/writeAccess";
 
 const BUILTIN_CRUD_ICONS = new Set(["plus", "edit", "trash"]);
 
@@ -47,6 +49,12 @@ interface Props<T> {
     modalMode: "create" | "edit";
   }) => React.ReactNode;
   customActions?: ActionButton[];
+  /**
+   * 역할이 이 격자의 쓰기를 막고 있다 (#341). 주면 등록·수정·삭제 아이콘이 **비활성**으로
+   * 서고(사라지지 않는다 — 있는 기능을 감추면 없는 것으로 읽힌다) 격자 머리에서 사유를 말한다.
+   * `DetailPanel` 의 같은 이름 prop 과 같은 규율이다: 판정은 부르는 쪽이 한다.
+   */
+  writeGated?: { halted: string[] };
   onSelectionChanged?: (item: T) => void;
   onRowDblClick?: (item: T) => void;
   onDataChanged?: () => void;
@@ -80,6 +88,7 @@ const DetailGridPanelComponent = <T,>(
     formMaxHeight = "95vh",
     extraFormContent,
     customActions = [],
+    writeGated,
     onSelectionChanged,
     onRowDblClick,
     onDataChanged,
@@ -236,15 +245,24 @@ const DetailGridPanelComponent = <T,>(
     customActions,
   });
 
-  const visibleButtons = buttons.filter((button) => {
-    if (button.visible === false) return false;
-    if (BUILTIN_CRUD_ICONS.has(button.icon ?? "")) return editable;
-    if (button.icon === "refresh") return editable || showRefreshButton;
-    return true; // customActions는 editable 무관하게 표시
-  });
+  const visibleButtons = buttons
+    .filter((button) => {
+      if (button.visible === false) return false;
+      if (BUILTIN_CRUD_ICONS.has(button.icon ?? "")) return editable;
+      if (button.icon === "refresh") return editable || showRefreshButton;
+      return true; // customActions는 editable 무관하게 표시
+    })
+    // 새로고침은 읽기라 그대로 둔다 — 막힌 것만 막힌 것으로 보인다.
+    .map((button) =>
+      writeGated && BUILTIN_CRUD_ICONS.has(button.icon ?? "")
+        ? { ...button, disabled: true, hint: `${button.hint} — ${WRITE_DENIED_SHORT}` }
+        : button,
+    );
 
   return (
     <div className="detail-grid-container flex flex-col" style={{ height }}>
+      {writeGated && <WriteAccessNotice halted={writeGated.halted} className="mb-2" />}
+
       {visibleButtons.length > 0 && (
         <div className="flex-shrink-0 flex justify-end items-center mb-3">
           <div className="flex gap-2">
@@ -269,7 +287,7 @@ const DetailGridPanelComponent = <T,>(
         />
       </div>
 
-      {editable && apiService && FormComponent && (apiService.create || apiService.update) && (
+      {editable && !writeGated && apiService && FormComponent && (apiService.create || apiService.update) && (
         <FormModal
           visible={isModalOpen}
           title={modalMode === "create" ? "등록" : "수정"}

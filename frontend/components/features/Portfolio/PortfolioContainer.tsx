@@ -17,6 +17,7 @@ import { useCodeStore } from "@/stores/shared/codeStore";
 import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
 import { useExcelExport } from "@/hooks/shared/useExcelExport";
 import { useMasterGridActions } from "@/hooks/shared/useMasterGridActions";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 
 export default function PortfolioContainer() {
   const { getCode } = useCodeStore();
@@ -66,8 +67,11 @@ export default function PortfolioContainer() {
     fileName: "portfolios",
   });
 
+  // 등록은 `require_role` 이 걸린 쓰기다 — 막힌 계정에는 조작부를 세우지 않고, 패널이
+  // 사유를 대신 말한다 (#341).
+  const writeAccess = useWriteAccess();
   const buttons = useMasterGridActions({
-    onCreate: handleCreate,
+    onCreate: writeAccess.canWrite ? handleCreate : undefined,
     onRefresh: handleRefresh,
     onExcelDownload: handleExcelDownload,
     customActions: [],
@@ -94,6 +98,9 @@ export default function PortfolioContainer() {
               />
             </MasterPanel>,
             <DetailPanel
+              writeGated={
+                writeAccess.isDenied ? { halted: ["포트폴리오 등록", "수정", "삭제", "보유종목 편집"] } : undefined
+              }
               key="detail"
               title="포트폴리오 정보"
               data={selectedData}

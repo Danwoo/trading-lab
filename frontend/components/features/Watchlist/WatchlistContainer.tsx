@@ -21,6 +21,7 @@ import { useCodeStore } from "@/stores/shared/codeStore";
 import { useServerTable } from "@/hooks/shared/useServerTable";
 import { useTableExport } from "@/hooks/shared/useTableExport";
 import { useMasterGridActions } from "@/hooks/shared/useMasterGridActions";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 import { getApiErrorMessage } from "@/utils/common/errors";
 import { showToast } from "@/components/shared/Feedback";
 import { getCodeName } from "@/utils/common/codeUtils";
@@ -131,8 +132,11 @@ export default function WatchlistContainer() {
     fileName: "watchlists",
   });
 
+  // 등록은 `require_role` 이 걸린 쓰기다 — 막힌 계정에는 조작부를 세우지 않고, 패널이
+  // 사유를 대신 말한다 (#341).
+  const writeAccess = useWriteAccess();
   const buttons = useMasterGridActions({
-    onCreate: handleCreate,
+    onCreate: writeAccess.canWrite ? handleCreate : undefined,
     onRefresh: handleRefresh,
     onExcelDownload: handleExcelDownload,
     customActions: [],
@@ -154,6 +158,7 @@ export default function WatchlistContainer() {
               <DataTable table={table} columns={GRID_COLUMNS} selectedKeys={selectedKeys} onRowClick={handleRowClick} />
             </MasterPanel>,
             <DetailPanel
+              writeGated={writeAccess.isDenied ? { halted: ["관심종목 등록", "수정", "삭제"] } : undefined}
               key="detail"
               title="관심종목 정보"
               data={selectedData}

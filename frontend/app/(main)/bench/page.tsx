@@ -29,6 +29,8 @@ import {
 import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import { ProductStages } from "@/components/features/Bench/ProductStages";
+import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 
 /** 좁은 화면에서 하나씩 보여주는 둘 (§21.6 「보드가 먼저 양보한다」) */
 const TABBED_ZONE_IDS = ["grid", "curve"] as const;
@@ -80,6 +82,7 @@ export default function Page() {
   const board = useBacktestBoard();
   // 폼 상태는 페이지가 하나만 만든다 — 격자 자리가 두 배치에 두 벌 마운트돼도(§21.6) 입력은 하나다.
   const runForm = useGridRunForm();
+  const writeAccess = useWriteAccess();
 
   const bots = roster.data;
   const botCount = bots?.length ?? 0;
@@ -194,6 +197,9 @@ export default function Page() {
       </header>
 
       <ProductStages />
+
+      {/* 이 계정이 저장·실행을 못 한다면 보드에 손대기 전에 먼저 말한다 (#341). */}
+      {writeAccess.isDenied && <WriteAccessNotice halted={["봇 저장·삭제", "격자 실행"]} />}
 
       <QuoteFreshnessBanner />
 

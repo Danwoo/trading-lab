@@ -7,7 +7,7 @@ import { WatchlistOut } from "@/schemas/watchlist/watchlist";
 
 interface Props {
   data: WatchlistOut;
-  onEdit: () => void;
+  onEdit?: () => void;
   onDelete?: () => void;
   codeList?: any;
 }
@@ -17,7 +17,8 @@ export default function WatchlistDetailView({ data, onEdit, onDelete, codeList }
     <div className="h-full flex flex-col">
       <div className="flex-shrink-0 mb-2">
         <div className="flex gap-2 justify-end">
-          <Button text="수정" onClick={onEdit} />
+          {/* 조작부는 권한이 있을 때만 선다 — 판정은 `DataPanel/DetailPanel` 의 `writeGated` 가 한다 (#341). */}
+          {onEdit && <Button text="수정" onClick={onEdit} />}
           {onDelete && <Button text="삭제" onClick={onDelete} stylingMode="outlined" type="danger" />}
         </div>
       </div>

@@ -21,6 +21,7 @@ import { useCodeStore } from "@/stores/shared/codeStore";
 import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
 import { useExcelExport } from "@/hooks/shared/useExcelExport";
 import { useMasterGridActions } from "@/hooks/shared/useMasterGridActions";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 
 const DAY_OF_WEEK_ITEMS = [
   { code: "mon", code_nm: "월" },
@@ -99,8 +100,11 @@ export default function SchedulerContainer() {
     fileName: "scheduler",
   });
 
+  // 등록은 `require_role` 이 걸린 쓰기다 — 막힌 계정에는 조작부를 세우지 않고, 패널이
+  // 사유를 대신 말한다 (#341).
+  const writeAccess = useWriteAccess();
   const buttons = useMasterGridActions({
-    onCreate: handleCreate,
+    onCreate: writeAccess.canWrite ? handleCreate : undefined,
     onRefresh: handleRefresh,
     onExcelDownload: handleExcelDownload,
     customActions: [],
@@ -127,6 +131,11 @@ export default function SchedulerContainer() {
               />
             </MasterPanel>,
             <DetailPanel
+              writeGated={
+                writeAccess.isDenied
+                  ? { halted: ["스케줄러 등록", "수정", "삭제", "지금 실행", "구성원 편집"] }
+                  : undefined
+              }
               key="detail"
               title="스케줄러 정보"
               data={selectedData}

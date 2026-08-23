@@ -18,6 +18,8 @@ import {
   type StrategyDraft,
 } from "./botFormModel";
 import { cn } from "@/components/shared/ui/primitives/cn";
+import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 import type { StrategyForm } from "@/schemas/bot/bot";
 import { BotRunHistory } from "@/components/features/Bot/BotRunHistory";
 
@@ -58,6 +60,7 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const writeAccess = useWriteAccess();
 
   useEffect(() => {
     let cancelled = false;
@@ -234,14 +237,23 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
               text={isDeleting ? "삭제 중…" : "삭제"}
               type="danger"
               stylingMode="outlined"
-              disabled={isDeleting || isLoading}
+              disabled={isDeleting || isLoading || !writeAccess.canWrite}
+              hint={writeAccess.deniedHint}
               onClick={() => void handleDelete()}
             />
           )}
           <Button text="취소" onClick={() => router.push("/bench/bot")} />
-          <Button text={isSaving ? "저장 중…" : "저장"} disabled={isSaving || isLoading} onClick={handleSave} />
+          <Button
+            text={isSaving ? "저장 중…" : "저장"}
+            disabled={isSaving || isLoading || !writeAccess.canWrite}
+            hint={writeAccess.deniedHint}
+            onClick={handleSave}
+          />
         </div>
       </header>
+
+      {/* 벽은 **누르기 전에** 선다 — 종전엔 「저장」이 활성인 채로 누른 뒤에야 403 이 왔다 (#341). */}
+      {writeAccess.isDenied && <WriteAccessNotice halted={["봇 저장", "봇 삭제"]} />}
 
       {botId !== undefined && <BotRunHistory botId={botId} />}
 
