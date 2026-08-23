@@ -125,7 +125,7 @@ def test_every_call_site_is_counted_and_its_default_clause_is_valid() -> str:
         "옮겼거나 이름을 바꿨다면 이 테스트의 상수도 같이 갱신하라."
     )
 
-    for name, default_order_by in found:
+    for _name, default_order_by in found:
         _assert_valid_sql(default_order_by)
 
     print(f"     (정렬 호출부 {len(found)}곳 검사: {', '.join(sorted({n for n, _ in found}))})")
