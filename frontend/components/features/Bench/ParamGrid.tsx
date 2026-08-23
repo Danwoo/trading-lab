@@ -13,6 +13,37 @@ interface Props {
 }
 
 /**
+ * 이 칸의 지표를 **성적 척도에 올려도 되는가** (#349).
+ *
+ * 한 번도 사지 않은 조합은 자산곡선이 시작 자금 그대로 평평하다 — 거기서 나오는
+ * 「미회복 0봉 · 낙폭 0% · 수익률 +0.0%」는 성적이 아니라 **아무 일도 없었다**는 뜻이다.
+ * 그것을 값으로 칠하면 척도의 **가장 좋은 끝**에 놓여, 격자만 보고 고른 사람이
+ * 아무것도 하지 않는 봇을 고른다(실측: 25칸 중 16칸).
+ *
+ * `absent_reason` 이 실린 칸은 여기서 걸러 색·최댓값 계산 어디에도 들어가지 않는다.
+ */
+function shadeable(cell: GridCellOut) {
+  if (!cell.metrics || absentReasonOf(cell)) return null;
+  return cell.metrics;
+}
+
+/**
+ * 이 칸이 왜 성적을 못 내는가 — **가림을 지난 문구로만** 읽는다.
+ *
+ * 사유는 화면으로 나가는 값이라 `redactReason` 이 마지막 관문이다(#251). 읽는 자리를
+ * 여기 하나로 모아, 판정(척도에서 뺄까)과 표시(뭐라고 적을까)가 같은 문구를 본다.
+ */
+function absentReasonOf(cell: GridCellOut): string | null {
+  return redactReason(cell.metrics?.absent_reason);
+}
+
+/** 「몇 건 사고팔았나」 — 「청산 안 함」과 「거래 없음」을 가른다 (#314). */
+function tradeNote(metrics: NonNullable<GridCellOut["metrics"]>): string {
+  const closed = `청산된 거래 ${metrics.closed_trades}건`;
+  return metrics.open_positions > 0 ? `${closed} · 구간 끝에 열린 자리 ${metrics.open_positions}건` : closed;
+}
+
+/**
  * 격자를 무엇으로 칠할까 — **기본은 1급 지표다** (#220).
  *
  * 스펙 D-Q2 가 순서를 뒤집어 놨다: *"트레이더가 계좌를 닫는 이유는 샤프가 낮아서가 아니라
@@ -28,19 +59,22 @@ export const GRID_SHADING = {
     unit: "봉",
     /** 짧을수록 좋다 — 색 강도는 «나쁨»에 비례한다(길수록 진하다). */
     worseIsHigher: true,
-    of: (cell: GridCellOut) => cell.metrics?.longest_underwater ?? null,
+    of: (cell: GridCellOut) => shadeable(cell)?.longest_underwater ?? null,
   },
   mdd_pct: {
     label: "최대 낙폭",
     unit: "%",
     worseIsHigher: true,
-    of: (cell: GridCellOut) => (cell.metrics ? Math.abs(cell.metrics.mdd_pct) : null),
+    of: (cell: GridCellOut) => {
+      const mdd = shadeable(cell)?.mdd_pct;
+      return mdd === null || mdd === undefined ? null : Math.abs(mdd);
+    },
   },
   total_return_pct: {
     label: "구간 총수익률",
     unit: "%",
     worseIsHigher: false,
-    of: (cell: GridCellOut) => cell.metrics?.total_return_pct ?? null,
+    of: (cell: GridCellOut) => shadeable(cell)?.total_return_pct ?? null,
   },
 } as const;
 
@@ -85,28 +119,35 @@ function Cell({
   const value = spec.of(cell);
   const returnPct = cellReturnPct(cell, initialCash);
 
-  // **「실패」와 「지표 없음」을 가른다.** 매매가 0건이면 「최장 미회복 기간」은 정당하게 없는
-  // 값이다 — 그것을 실패로 그리면 화면이 사실이 아닌 것을 말한다 (FR-021 과 같은 계열).
+  // **세 가지를 가른다** — 「실패」·「거래 없음」·「이 지표만 없음」.
+  //
+  // 매매가 0건이면 「최장 미회복 기간」은 정당하게 없는 값이다. 그것을 실패로 그리면 화면이
+  // 사실이 아닌 것을 말하고(FR-021), 0 으로 그리면 **가장 좋은 칸**으로 말한다 (#349).
+  // 거래 0건 칸은 척도의 어느 끝도 아니라 **척도 밖**이므로 배경색을 주지 않는다.
   if (cell.status === "failed" || value === null) {
     const failed = cell.status === "failed";
+    const absentReason = absentReasonOf(cell);
+    const traded = cell.metrics ? cell.metrics.closed_trades + cell.metrics.open_positions : null;
+    const shown = failed ? "실패" : absentReason !== null && traded !== null ? `거래 ${traded}건` : "—";
+    const why = failed
+      ? (redactReason(cell.failed_reason) ?? undefined)
+      : absentReason !== null
+        ? `${absentReason} — 성적 척도에서 뺐습니다`
+        : `${spec.label} 값이 없습니다 — 눌러서 이유를 보세요`;
     return (
       <button
         type="button"
         onClick={() => onSelect(cell.run_id, label)}
-        title={
-          failed
-            ? (redactReason(cell.failed_reason) ?? undefined)
-            : `${spec.label} 값이 없습니다 — 눌러서 이유를 보세요`
-        }
-        aria-label={`${label} — ${failed ? "실패" : `${spec.label} 없음`}`}
+        title={why}
+        aria-label={`${label} — ${failed ? "실패" : absentReason !== null ? absentReason : `${spec.label} 없음`}`}
         className={cn(
-          "min-h-[26px] w-full min-w-0 break-keep rounded-badge px-1 py-0.5 text-2xs",
+          "min-h-[26px] w-full min-w-0 break-keep rounded-badge px-1 py-0.5 text-2xs tabular-nums",
           failed ? "text-danger" : "text-ink-muted",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
           selected ? "border-2 border-ink-strong" : failed ? "border border-line" : "border border-dashed border-line",
         )}
       >
-        {failed ? "실패" : "—"}
+        {shown}
       </button>
     );
   }
@@ -125,11 +166,16 @@ function Cell({
   const returnNote =
     returnPct === null ? "" : ` · 수익률 ${returnPct >= 0 ? "+" : "−"}${Math.abs(returnPct).toFixed(1)}%`;
 
+  // **거래 건수를 늘 함께 읽어 준다** — 「1건으로 낸 성적」과 「25건으로 낸 성적」은
+  // 같은 색이어도 같은 근거가 아니다 (#349).
+  const trades = cell.metrics ? ` · ${tradeNote(cell.metrics)}` : "";
+
   return (
     <button
       type="button"
       onClick={() => onSelect(cell.run_id, label)}
-      aria-label={`${label} — ${spec.label} ${shown}${returnNote}${cell.metrics?.still_underwater ? " · 아직 회복 중" : ""}`}
+      title={`${label} — ${spec.label} ${shown}${returnNote}${trades}`}
+      aria-label={`${label} — ${spec.label} ${shown}${returnNote}${trades}${cell.metrics?.still_underwater ? " · 아직 회복 중" : ""}`}
       aria-pressed={selected}
       style={{ backgroundColor: `rgb(var(${channel}) / ${alpha.toFixed(2)})` }}
       className={cn(
@@ -159,6 +205,9 @@ export function ParamGrid({ grid, selectedRunId, onSelect }: Props) {
 
   const values = grid.cells.map((cell) => spec.of(cell)).filter((v): v is number => v !== null);
   const maxAbsValue = values.length > 0 ? Math.max(...values.map(Math.abs)) : 0;
+  // 척도 밖에 둔 칸을 **세어서 말한다** — 몇 칸이 빠졌는지 모르면 격자가 몇 칸으로 판단한
+  // 그림인지 알 수 없다 (#349).
+  const outOfScale = grid.cells.filter((cell) => absentReasonOf(cell) !== null).length;
 
   const [rowAxis, colAxis] = grid.axes.length >= 2 ? [grid.axes[0], grid.axes[1]] : [null, grid.axes[0] ?? null];
 
@@ -204,6 +253,7 @@ export function ParamGrid({ grid, selectedRunId, onSelect }: Props) {
       <p className="break-keep text-2xs text-ink-muted">
         「{spec.label}」로 칠했습니다 — 진할수록 {spec.worseIsHigher ? "나쁩니다" : "많이 벌었습니다"}. 격자{" "}
         {grid.cells.length}칸 — 훑는 것도 시도라 시도 {grid.attempts_used}회를 썼습니다.
+        {outOfScale > 0 && ` 거래가 없던 ${outOfScale}칸은 성적이 아니라 「거래 0건」으로 두어 척도에서 뺐습니다.`}
       </p>
 
       {/* 3축 이상은 표로 못 편다 — 자르지 않고 목록으로 전부 낸다 */}

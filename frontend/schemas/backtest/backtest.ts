@@ -41,14 +41,24 @@ export interface GridAxisOut {
  * 때는 이미 고른 뒤다.
  */
 export interface GridCellMetrics {
-  /** 1급 — 전 고점 아래에 머문 최장 (봉). */
-  longest_underwater: number;
+  /** 1급 — 전 고점 아래에 머문 최장 (봉). `absent_reason` 이 있으면 null 이다. */
+  longest_underwater: number | null;
   /** 끝에서 미회복인가 — 「아직 회복 중」을 화면이 밝힌다. */
-  still_underwater: boolean;
+  still_underwater: boolean | null;
   /** 2급 — 그때의 고점 대비 최대 하락률 (%, 음수). */
-  mdd_pct: number;
+  mdd_pct: number | null;
   /** 4급 — 구간 총수익률 (%). 버리지 않되 기본 채색이 아니다. */
   total_return_pct: number | null;
+  /** 청산된 거래 건수 — **0 은 「값 없음」이 아니라 「0건」이라는 사실이다** (#349). */
+  closed_trades: number;
+  /** 구간 끝에 열린 자리 건수 (#314) — 「청산 안 함」과 「거래 없음」은 다른 상태다. */
+  open_positions: number;
+  /**
+   * 지표가 없는 이유. 실리면 그 칸은 **채색 척도에서 빠지고** 이 문구를 그대로 낸다.
+   * 자리를 한 번도 잡지 않은 조합의 「0봉 · 0% · +0.0%」를 성적으로 그리면 격자가
+   * 아무것도 하지 않는 조합을 1등으로 보여 준다 (#349).
+   */
+  absent_reason: string | null;
 }
 
 export interface GridCellOut {
