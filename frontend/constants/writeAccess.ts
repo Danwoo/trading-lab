@@ -15,6 +15,11 @@ export const WRITE_AUTHOR_IDS: readonly string[] = [SYS_ADMIN_AUTHOR_ID, GENERAL
  * 이 prefix 아래의 비-GET 요청은 전부 역할 게이트를 지난다 — 그래서 화면이 그 요청을 내는
  * 자리는 눌리기 **전에** 막힘을 말해야 한다. 목록은 `scripts/verify_write_gate_coverage.py` 가
  * 백엔드 라우터에서 직접 뽑아 이 상수와 정확히 대조한다(어긋나면 빨간불, 0건도 빨간불).
+ *
+ * 소비자가 TypeScript 밖에 있어 `@public` 을 단다 — 안 달면 knip 이 「아무도 안 부르는
+ * export」로 세고, 그 말을 믿고 지우면 대조가 통째로 죽는다.
+ *
+ * @public
  */
 export const ROLE_GATED_WRITE_PREFIXES: readonly string[] = [
   "/backtest-run",
