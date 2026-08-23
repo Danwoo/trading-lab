@@ -262,7 +262,9 @@ describe("#350 ③ 적재 완료를 아는 자리가 신호를 낸다", () => {
   it("이력을 폴링하는 화면이 판마다 observeIngestRuns 를 부른다", () => {
     const files = ["components", "hooks", "app"].flatMap((dir) => walk(path.join(FRONTEND_ROOT, dir)));
     const emitters = files.filter((file) => /\bobserveIngestRuns\s*\(/.test(fs.readFileSync(file, "utf8")));
-    console.log(`[#350 쓰는 쪽] ${files.length}개 파일 중 신호를 내는 자리 ${emitters.length}개: ${emitters.map(rel).join(", ")}`);
+    console.log(
+      `[#350 쓰는 쪽] ${files.length}개 파일 중 신호를 내는 자리 ${emitters.length}개: ${emitters.map(rel).join(", ")}`,
+    );
     // 0건이면 훅들이 영영 세대 0에 머문다 — 고친 것이 통째로 사라진 상태다.
     expect(emitters.length).toBeGreaterThan(0);
   });
