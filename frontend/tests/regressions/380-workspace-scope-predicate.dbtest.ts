@@ -34,6 +34,17 @@ vi.mock("@/lib/auth/auth", () => ({
   },
 }));
 
+// 인가 게이트는 세션 스냅샷이 아니라 **지금의 DB** 로 권한을 판정한다 (#354). 세션 자체가
+// 위처럼 대역이므로 그 판정도 같은 값을 내는 대역으로 맞춘다 — 어긋나면 게이트가 401 로 끊어
+// 이 그물이 보려는 축에 닿지 못한다. 게이트 자신은 `354-stale-authorization.test.ts` 가 본다.
+vi.mock("@/lib/auth/accountContext", () => ({
+  resolveAccountContext: vi.fn(async () => ({
+    block: null,
+    authorId: currentSession.session.authorId,
+    workspaceId: currentSession.session.workspaceId,
+  })),
+}));
+
 const { GET: workspaceUserGet } = await import("@/app/api/common/system/workspace/[workspace_id]/user/route");
 const { GET: adminUserOptionsGet } = await import("@/app/api/common/system/adminuser/options/route");
 

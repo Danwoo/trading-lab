@@ -162,6 +162,13 @@ vi.mock("@/lib/auth/auth", () => ({
   },
 }));
 
+// 인가 게이트는 세션 스냅샷이 아니라 **지금의 DB** 로 권한을 판정한다 (#354). 이 그물이
+// 보는 축은 그게 아니므로, 위 대역 세션과 같은 값을 내는 얇은 대역을 세워 게이트를 통과시킨다.
+// 게이트 자체는 `tests/regressions/354-stale-authorization.test.ts` 가 검사한다.
+vi.mock("@/lib/auth/accountContext", () => ({
+  resolveAccountContext: vi.fn(async () => ({ block: null, authorId: "operator", workspaceId: 1 })),
+}));
+
 // scopeEmailParam 을 쓰는 라우트는 이 20개 호출부에 없다(portfolio·watchlist·research-document·
 // scheduler 전부 미사용, app/api/external 소스 확인) — 그래도 withAuth.ts 가 정적 import 하므로
 // 무거운 prisma 연쇄(authUtils → lib/prisma/client → 실 DB 어댑터 생성)를 막기 위해 mock 한다.

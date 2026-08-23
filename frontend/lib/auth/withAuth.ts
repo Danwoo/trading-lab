@@ -6,6 +6,8 @@ import { createErrorResponse } from "@/utils/common/api/responses";
 import { SYS_ADMIN_AUTHOR_ID, GENERAL_ADMIN_AUTHOR_ID } from "@/constants/protected";
 import { assertSameWorkspaceOrSysAdmin, assertTargetNotSysAdmin, normalizeEmail } from "@/lib/auth/authUtils";
 import { findUnsafePathSegment } from "@/lib/auth/safePathSegment";
+import { resolveAccountContext } from "@/lib/auth/accountContext";
+import { env } from "@/env";
 
 // 일반 API 핸들러 (JSON 응답)
 type JsonHandler = (request: NextRequest, session: any, params?: any) => Promise<NextResponse> | NextResponse;
@@ -33,6 +35,23 @@ interface WithAuthOptions {
   protectSysAdminTarget?: boolean;
 }
 
+/**
+ * 인증 실패 응답(401) — 쿠키 캐시를 **함께 버린다.**
+ *
+ * 인가 게이트는 캐시를 우회하므로 API 는 곧바로 401 이 되지만, 화면의 `useSession()` 은
+ * Better Auth 의 `/api/auth/get-session` 을 보고 그건 캐시를 읽는다. 지우지 않으면 최대
+ * 5분간 "로그인된 것처럼 보이는데 모든 요청이 401" 인 상태가 남는다. 청크 쿠키까지 지우려고
+ * 접미사 몇 개를 함께 만료시킨다 (없는 쿠키를 만료시키는 것은 무해하다).
+ */
+function unauthenticated(operation: string) {
+  const response = createErrorResponse({ code: "AUTH", message: "Authentication required" }, operation);
+  const base = `${env.APP_KEY}.session_data`;
+  for (const name of [base, ...Array.from({ length: 5 }, (_, i) => `${base}.${i}`)]) {
+    response.cookies.set(name, "", { path: "/", maxAge: 0 });
+  }
+  return response;
+}
+
 export function withAuth(handler: AuthenticatedHandler, opts: WithAuthOptions = {}) {
   return async (request: NextRequest, props: any) => {
     const operation = "AUTH";
@@ -40,23 +59,43 @@ export function withAuth(handler: AuthenticatedHandler, opts: WithAuthOptions = 
     const sessionResponse = await auth.api.getSession({
       headers: await headers(),
       returnHeaders: true,
+      // 쿠키 캐시(JWE)는 **최적화지 인가의 정본이 아니다.** 이 한 줄이 빠지면 Better Auth 는
+      // 서명된 쿠키만 읽고 끝내서, 세션 행을 지우는 무효화(권한 회수·계정 비활성·관리자
+      // 강제 종료·비밀번호 재설정)가 캐시 수명만큼 통째로 무시된다 — 실측 최대 5분 (#354).
+      // 캐시 자체는 켜 둔 채다: 화면의 `useSession()`·`/api/auth/get-session` 같은 비인가
+      // 조회는 계속 쿠키로 답한다. 뚫는 자리는 인가 게이트인 여기 하나뿐이다.
+      query: { disableCookieCache: true },
     });
 
     const session = sessionResponse?.response;
 
     if (!session || !session.user) {
-      return createErrorResponse(
-        {
-          code: "AUTH",
-          message: "Authentication required",
-        },
-        operation,
-      );
+      return unauthenticated(operation);
+    }
+
+    // 권한·계정 상태의 정본은 **지금의 DB** 다. 세션 행이 담은 authorId/workspaceId 는 로그인
+    // 시점의 스냅샷이라, 무효화를 부르지 않는 변경 경로가 하나라도 있으면 그 사용자는 옛 권한을
+    // 무기한 유지한다 (`DELETE /api/common/system/author/[author_id]` 가 실제로 그랬다 — #354).
+    const account = await resolveAccountContext((session.user as any).id);
+    if (account.block) {
+      return unauthenticated(operation);
+    }
+
+    const authorId = account.authorId;
+    const workspaceId = account.workspaceId;
+
+    // 스냅샷과 어긋나면 끊는다. 살아 있는 값으로 계속 진행하지 않는 이유는 백엔드로 나가는
+    // JWT 때문이다 — `set-auth-jwt` 는 Better Auth 가 **세션 행**으로 서명하므로, 여기서만
+    // 값을 갈아끼우면 프론트는 새 권한으로 판정하고 백엔드는 옛 workspace_id 로 격리한다.
+    // 재로그인시키는 편이 두 축을 다시 맞추는 유일하게 안전한 길이다.
+    if (
+      authorId !== ((session.session as any)?.authorId ?? null) ||
+      workspaceId !== ((session.session as any)?.workspaceId ?? null)
+    ) {
+      return unauthenticated(operation);
     }
 
     const accessToken = sessionResponse?.headers?.get("set-auth-jwt") ?? undefined;
-    const authorId = (session.session as any)?.authorId ?? null;
-    const workspaceId = (session.session as any)?.workspaceId ?? null;
 
     // 기존 session 인터페이스 호환을 위해 accessToken 포함
     const sessionWithToken = {
