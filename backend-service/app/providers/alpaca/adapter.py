@@ -28,7 +28,8 @@ from providers.base import (
 from providers.merge import merge_duplicate_bars
 from providers.models import Capability, NormalizedBar, NormalizedInstrument, NormalizedQuote
 
-_MARKETS = ("NASDAQ", "NYSE", "AMEX")
+#: 이 어댑터가 `capabilities()` 에 싣는 시장. 마스터는 정본이 SEC 라 여기서 내지 않는다.
+MARKETS = ("NASDAQ", "NYSE", "AMEX")
 _ENV_HINT = "Alpaca API Key ID 와 Secret 을 'KEYID:SECRET' 형식으로"
 _NO_KEY_REASON = f"Alpaca API 키가 등록되지 않았습니다 — {CREDENTIAL_MISSING_HINT}"
 _MASTER_REASON = not_canonical_reason("미국 종목 마스터", "SEC")
@@ -44,7 +45,7 @@ class AlpacaProvider:
     def capabilities(self) -> list[Capability]:
         available = self.api_key is not None
         caps: list[Capability] = []
-        for market in _MARKETS:
+        for market in MARKETS:
             caps.append(
                 Capability(market=market, data_kind="instrument_master", available=False, reason=_MASTER_REASON)
             )

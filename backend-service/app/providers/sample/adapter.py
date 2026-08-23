@@ -22,6 +22,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 
 from providers import register_provider
+from providers.base import ProviderResponseInvalid
 from providers.models import Capability, NormalizedBar, NormalizedInstrument, NormalizedQuote
 from providers.sample import SOURCE
 from providers.sample.generator import SAMPLE_INSTRUMENTS, daily_bars
@@ -32,6 +33,10 @@ _SAMPLE_NOTE = "합성 샘플 데이터입니다 (실제 시세가 아닙니다)
 
 _CURRENCY = {"KR": "KRW", "US": "USD"}
 _COUNTRY = {"KR": "KR", "US": "US"}
+
+#: 이 어댑터가 `capabilities()` 에 싣는 시장 — **값을 가진 시장에서 뽑는다.** 손으로 적으면
+#: 종목이 하나도 없는 시장이 표에 남는다(#351 이 그 부류다).
+MARKETS = tuple(SAMPLE_INSTRUMENTS)
 
 
 class SampleProvider:
@@ -45,7 +50,7 @@ class SampleProvider:
 
     def capabilities(self) -> list[Capability]:
         out: list[Capability] = []
-        for market in SAMPLE_INSTRUMENTS:
+        for market in MARKETS:
             out.append(Capability(market=market, data_kind="instrument_master", available=True, reason=_SAMPLE_NOTE))
             out.append(Capability(market=market, data_kind="daily_bar", available=True, reason=_SAMPLE_NOTE))
             out.append(Capability(market=market, data_kind="minute_bar", available=False, reason=_NO_MINUTE_REASON))
@@ -54,7 +59,12 @@ class SampleProvider:
 
     async def list_instruments(self, market: str) -> list[NormalizedInstrument]:
         self.last_skipped = []
-        rows = SAMPLE_INSTRUMENTS.get(market.upper(), [])
+        market = market.upper()
+        if market not in MARKETS:
+            # 이 소스가 다루지 않는 시장 — 빈 목록이 아니라 capability 표가 답할 문제다
+            # (sec·data_go_kr 관례). 빈 목록은 「0건 적재 성공」으로 기록돼 이유를 지운다.
+            raise ProviderResponseInvalid(f"{SOURCE} 는 {market} 시장을 다루지 않습니다")
+        rows = SAMPLE_INSTRUMENTS[market]
         return [
             NormalizedInstrument(
                 country=_COUNTRY.get(market.upper(), market.upper()),
