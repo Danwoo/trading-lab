@@ -9,7 +9,12 @@ import { cn } from "@/components/shared/ui/primitives/cn";
 /** 화면이 값을 되읽지 않는다 — 입력칸은 넣는 자리일 뿐, 저장된 값은 어디서도 보이지 않는다. */
 type Outcome = { kind: "idle" } | { kind: "busy" } | { kind: "said"; ok: boolean; text: string };
 
-export function DataKeyRow({ row, onSaved }: { row: DataKeyStatus; onSaved: () => void }) {
+/**
+ * `canWrite` 는 **권한 판정이 아니라 그 결과를 그리는 것**이다 — 판정은 백엔드가 한다
+ * (`PUT /data-key`·`POST /data-key/probe` 는 `require_role(ROLE_ADMIN)`, #344). 여기서 입력칸을
+ * 내리는 이유는 감추기 위해서가 아니라 **누를 때마다 403 이 되는 버튼을 내밀지 않기 위해서**다.
+ */
+export function DataKeyRow({ row, canWrite, onSaved }: { row: DataKeyStatus; canWrite: boolean; onSaved: () => void }) {
   const [value, setValue] = useState("");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
 
@@ -55,33 +60,35 @@ export function DataKeyRow({ row, onSaved }: { row: DataKeyStatus; onSaved: () =
 
       {row.guidance && <p className="min-w-0 break-keep text-2xs text-ink-muted">{row.guidance}</p>}
 
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <input
-          type={row.secret ? "password" : "text"}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder={row.filled ? "새 값으로 바꾸려면 입력" : "값을 넣으세요"}
-          aria-label={`${row.source} ${row.setting}`}
-          autoComplete="off"
-          className="min-h-touch-min min-w-0 flex-1 border border-line bg-bg-base px-2 py-1 font-mono text-2xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
-        />
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() => void run("probe")}
-          className="min-h-touch-min rounded-control border border-line px-2 text-2xs text-ink disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
-        >
-          연결 확인
-        </button>
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() => void run("save")}
-          className="min-h-touch-min rounded-control border border-line-strong px-2 text-2xs text-ink-strong disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
-        >
-          저장
-        </button>
-      </div>
+      {canWrite && (
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <input
+            type={row.secret ? "password" : "text"}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder={row.filled ? "새 값으로 바꾸려면 입력" : "값을 넣으세요"}
+            aria-label={`${row.source} ${row.setting}`}
+            autoComplete="off"
+            className="min-h-touch-min min-w-0 flex-1 border border-line bg-bg-base px-2 py-1 font-mono text-2xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+          />
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() => void run("probe")}
+            className="min-h-touch-min rounded-control border border-line px-2 text-2xs text-ink disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+          >
+            연결 확인
+          </button>
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() => void run("save")}
+            className="min-h-touch-min rounded-control border border-line-strong px-2 text-2xs text-ink-strong disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+          >
+            저장
+          </button>
+        </div>
+      )}
 
       {outcome.kind === "busy" && <p className="text-2xs text-ink-muted">확인하고 있습니다…</p>}
       {outcome.kind === "said" && (
