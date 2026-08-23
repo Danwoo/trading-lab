@@ -249,6 +249,10 @@ export function SelectMenu({
             className={cn(
               // 포커스 표시는 globals.css 의 `:focus-visible` outline 한 자리가 정본이다.
               "flex w-full items-center justify-between gap-1 rounded border px-3 py-1.5 text-left text-sm text-ink",
+              // `min-h-touch-icon` 은 `FIELD_INPUT_CLASS` 와 같은 이유다 — 겹쳐 놓인 지우기 상자가
+              // 트리거보다 높으면 `-translate-y-1/2` 로 위아래에 클립 없는 띠가 생기고, 같은 폼의
+              // 입력(44)과 트리거(34)가 갈래마다 어긋난다.
+              "min-h-touch-icon",
               "disabled:cursor-not-allowed disabled:bg-bg-raised disabled:text-ink-muted",
               // 채움은 `FIELD_INPUT_CLASS` 와 같은 규칙이다 — 기본은 `--bg-base`(입력을 담는
               // 그릇이 안 쓰는 유일한 표면 토큰), 못 고치는 상태는 `--bg-raised`.
