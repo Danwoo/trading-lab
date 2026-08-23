@@ -50,7 +50,10 @@ export function SessionListPanel({ sessions, activeGid, onSelect, onNew, onDelet
                     aria-current={isActive ? "true" : undefined}
                     // 겹쳐 놓인 삭제 상자(`right-1`=4px + 표적 + 4 여유)만큼 제목이 비운다 — 값은
                     // 표적 토큰에서 파생한다(hitArea.ts 「겹쳐 놓는 자리」).
-                    className={`w-full truncate rounded-md py-2 pl-3 pr-[calc(var(--touch-icon-target)+8px)] text-left text-sm transition-colors ${
+                    // `min-h-touch-icon` 은 그 상자를 줄 **안에** 가둔다: 줄이 36px 인데 표적이 44px
+                    // 이면 `-translate-y-1/2` 로 위아래 4px 씩 새고, 그 띠가 줄 사이 여백(`space-y-1`)
+                    // 을 덮어 옆 대화를 고르려던 손가락이 삭제를 누른다.
+                    className={`min-h-touch-icon w-full truncate rounded-md py-2 pl-3 pr-[calc(var(--touch-icon-target)+8px)] text-left text-sm transition-colors ${
                       isActive ? "bg-blue-100 font-medium text-blue-800" : "text-gray-700 hover:bg-gray-100"
                     }`}
                     title={session.title || "새 대화"}

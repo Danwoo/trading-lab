@@ -36,6 +36,10 @@
 // 목록을 여는 `▾` 를 눌렀는데 선택이 지워진다 (#289 리뷰 2026-08-22, 세 자리에서 실측).
 // 그래서 아이콘 표적의 상자가 **다른 조작부의 content box**(글자가 사는 상자)와 겹치는지 잰다.
 //
+// 세로로 새는 것은 글자 상자만 봐서는 안 잡힌다 — 그래서 **겹쳐 놓인(absolute) 표적은 자기가 얹힌
+// 조작부의 상자 안에 있어야 한다**는 축을 따로 잰다. 44 짜리 상자를 높이 34 짜리 입력 위에 얹으면
+// 위아래로 5px 씩 새고, 그 띠에는 클립이 없어 이웃 줄 위에 얹힌다 (#289 리뷰).
+//
 // ## 보이지 않는데 눌림 — 호버가 없는 기기
 //
 // `opacity: 0` 은 포인터 이벤트를 안 막는다. 호버로만 드러나는 chrome 은 손가락 기기에서 영영
@@ -131,6 +135,9 @@ const MIN_ICON_HIT_AREA_PER_RUN = 15;
 /** 아이콘 표적 × 다른 조작부 짝이 한 회차에 이보다 적으면 짝짓기가 죽은 것이다 — 「덮음 0건」과 구분한다. */
 const MIN_COVER_PAIRS_PER_RUN = 30;
 
+/** 「얹힌 자리」를 찾아낸 절대 배치 표적이 한 회차에 이보다 적으면 삐져나옴 축이 죽은 것이다. */
+const MIN_OVERLAID_TARGETS_PER_RUN = 4;
+
 /** 호버가 없는 갈래에서 「안 보이는데 눌리는」 조작부는 하나도 없어야 한다. 예외를 두려면 여기 적고
  *  왜 안전한지(파괴적이지 않다·다른 경로가 있다)를 함께 남긴다 — 목록이 곧 리뷰 대상이다. */
 const EXPECTED_INVISIBLE_HITTABLE: string[] = [];
@@ -163,6 +170,10 @@ interface Measured {
   covers: string[];
   /** 짝지어 본 다른 조작부 수 — 0 이면 덮음 축이 아무것도 안 본 것이다. */
   coverPairs: number;
+  /** 겹쳐 놓인(absolute) 표적이 자기가 얹힌 조작부 상자 밖으로 삐져나온 양 — 비어 있어야 한다. */
+  spills: string[];
+  /** 「얹힌 자리」를 실제로 찾아낸 표적인가 — 이 수가 0 이면 삐져나옴 축이 아무것도 안 본 것이다. */
+  overlaid: boolean;
   /** 조상까지 곱한 실효 불투명도. 0 이면 화면에 없다. */
   opacity: number;
 }
@@ -514,6 +525,15 @@ const MEASURE_SCRIPT = `
       b: r.bottom - n(s.borderBottomWidth) - n(s.paddingBottom),
     };
   }
+  // 이 표적이 얹힌 자리 — 절대 배치된 표적이 right-*/top-* 로 좌표를 재는 기준 상자,
+  // 곧 offsetParent 다. 기하로 「가장 가까운 상자」를 추측하지 않는다: 추측은 옆에 놓인
+  // 칩·배지를 얹힌 자리로 잘못 골라 뜻 없는 빨간불을 냈다. offsetParent 는 브라우저가 실제
+  // 배치에 쓴 상자라 추측이 아니고, 「표적이 자기 기준 상자를 넘었다」가 곧 결함의 정의다.
+  function findAnchor(target) {
+    const host = target.el.offsetParent;
+    if (!host || host === document.body || host === document.documentElement) return null;
+    return host;
+  }
   // 조상까지 곱한 실효 불투명도 — opacity 0 은 히트 테스트를 안 막으므로 크기·닿음으로는 안 보인다.
   function effectiveOpacity(el) {
     let value = 1;
@@ -558,6 +578,8 @@ const MEASURE_SCRIPT = `
           blockedBy: describeHit(hit),
           covers: [],
           coverPairs: 0,
+          spills: [],
+          overlaid: false,
           opacity: Math.round(effectiveOpacity(el) * 1000) / 1000,
         },
       });
@@ -580,6 +602,27 @@ const MEASURE_SCRIPT = `
             '«' + name + '» 의 글자 자리를 ' + Math.round(overlapX) + 'x' + Math.round(overlapY) + 'px'
           );
         }
+      }
+    }
+    // 삐져나옴 — 겹쳐 놓인(절대 배치) 표적이 자기가 얹힌 기준 상자 밖으로 자라는가.
+    // 덮음 축은 글자 상자만 보므로 세로로 새는 띠를 못 잡는다 — 그 띠에는 클립이 없어 이웃 줄
+    // 위에 얹힌다 (#289 리뷰: coarse 44 짜리 상자가 높이 34 짜리 입력 위아래로 5px 씩 넘쳤다).
+    for (const a of entries) {
+      if (!a.info.iconHitArea) continue;
+      if (getComputedStyle(a.el).position !== 'absolute') continue;
+      const host = findAnchor(a);
+      if (!host) continue;
+      a.info.overlaid = true;
+      const hostRect = host.getBoundingClientRect();
+      const name = host.getAttribute('aria-label') || (host.textContent || '').trim().slice(0, 20) || host.tagName;
+      const sides = [
+        ['위', hostRect.top - a.rect.top],
+        ['아래', a.rect.bottom - hostRect.bottom],
+        ['왼쪽', hostRect.left - a.rect.left],
+        ['오른쪽', a.rect.right - hostRect.right],
+      ];
+      for (const pair of sides) {
+        if (pair[1] > 0.5) a.info.spills.push('«' + name + '» 밖으로 ' + pair[0] + ' ' + Math.round(pair[1]) + 'px');
       }
     }
     for (const entry of entries) out.push(entry.info);
@@ -642,6 +685,8 @@ it("아이콘 조작부의 표적이 두 입력 장치에서 각각 하한을 �
       `닿음 검사 ${operable.length}건 중 못 닿은 것 ${operable.filter((m) => !m.reachable).length}건. ` +
       `덮음 검사 ${measured.reduce((sum, m) => sum + m.coverPairs, 0)}짝 중 덮은 것 ${
         measured.filter((m) => m.covers.length > 0).length
+      }건. 겹쳐 놓인 표적 ${measured.filter((m) => m.overlaid).length}개 중 얹힌 상자 밖으로 삐져나온 것 ${
+        measured.filter((m) => m.spills.length > 0).length
       }건. 호버 없는 갈래에서 「안 보이는데 눌리는」 조작부 ${
         rawMeasured.filter((m) => !m.exempt && !m.notOperable && m.opacity === 0 && m.reachable).length
       }건(잰 것 ${rawMeasured.length}개, 호버 전용 chrome 픽스처 ${revealedFixtures.length}개). 가장 작은 다섯:\n` +
@@ -723,6 +768,18 @@ it("아이콘 조작부의 표적이 두 입력 장치에서 각각 하한을 �
     .filter((m) => m.covers.length > 0)
     .map((m) => `«${m.label}» ${m.w}x${m.h} — ${m.fixture}: ${m.covers.join(" · ")}`);
   expect(covering, `남의 글자 자리를 덮는 아이콘 표적:\n${covering.join("\n")}`).toEqual([]);
+
+  // ③-2 삐져나옴 — 겹쳐 놓인 표적이 자기가 얹힌 조작부의 상자를 넘으면 안 된다. 넘친 띠에는
+  //     클립이 없어 이웃 줄 위에 얹히고, 같은 폼에서 조작부 높이가 갈래마다 어긋난다.
+  const overlaidTargets = measured.filter((m) => m.overlaid).length;
+  expect(
+    overlaidTargets,
+    `겹쳐 놓인(absolute) 아이콘 표적을 ${overlaidTargets}개밖에 못 찾았다 — 삐져나옴 축이 빈다`,
+  ).toBeGreaterThanOrEqual(MIN_OVERLAID_TARGETS_PER_RUN * runs.length);
+  const spilling = measured
+    .filter((m) => m.spills.length > 0)
+    .map((m) => `«${m.label}» ${m.w}x${m.h} — ${m.fixture}: ${m.spills.join(" · ")}`);
+  expect(spilling, `얹힌 조작부 상자 밖으로 자라는 아이콘 표적:\n${spilling.join("\n")}`).toEqual([]);
 
   // ④ 보이지 않는데 눌림 — 호버가 없는 갈래에서 실효 불투명도가 0 인 채 히트 테스트를 받는 조작부.
   const invisibleButHittable = rawMeasured
