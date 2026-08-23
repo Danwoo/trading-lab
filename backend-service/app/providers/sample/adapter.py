@@ -60,7 +60,7 @@ class SampleProvider:
     async def list_instruments(self, market: str) -> list[NormalizedInstrument]:
         self.last_skipped = []
         market = market.upper()
-        if market not in MARKETS:
+        if market not in SAMPLE_INSTRUMENTS:
             # 이 소스가 다루지 않는 시장 — 빈 목록이 아니라 capability 표가 답할 문제다
             # (sec·data_go_kr 관례). 빈 목록은 「0건 적재 성공」으로 기록돼 이유를 지운다.
             raise ProviderResponseInvalid(f"{SOURCE} 는 {market} 시장을 다루지 않습니다")
