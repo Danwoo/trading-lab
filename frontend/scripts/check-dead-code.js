@@ -49,7 +49,8 @@ const CEILINGS = {
   unresolved: 0,
   // 공용 UI 프리미티브·서비스 CRUD·zod 헬퍼 — 신규 엔티티 스캐폴드가 쓰는 어휘라 남겼다.
   // `botService.deleteBot` 은 화면이 부르기 시작해 이 목록에서 빠졌다 (#315).
-  exports: 26,
+  // `auth-client.signUp` 은 Better Auth 가입 엔드포인트가 막히면서 내보내지 않는다 (#343).
+  exports: 25,
   types: 10,
   enumMembers: 0,
   // 스키마 배럴의 의도적 별칭(`XCreateInSchema = XSchema`)과 `export default` 재노출.

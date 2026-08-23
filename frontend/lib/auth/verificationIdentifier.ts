@@ -27,3 +27,16 @@ export const EMAIL_VERIFICATION_OTP_PREFIX = "email-verification-otp-";
 export function emailVerificationOtpIdentifier(email: string): string {
   return `${EMAIL_VERIFICATION_OTP_PREFIX}${normalizeEmail(email)}`;
 }
+
+/**
+ * OTP 를 통과했다는 **서버 측 증거**가 `ba_verification.identifier` 에 쓰는 키.
+ *
+ * OTP 키(위)와 접두어를 가르는 이유는 두 행의 수명이 다르기 때문이다 — OTP 는 "맞히면 소비"고,
+ * 이 행은 "맞힌 뒤 가입이 소비"한다. 같은 키를 재사용하면 검증 라우트가 남긴 흔적을 OTP 재발송이
+ * 덮어써, 이미 인증한 사람이 코드를 한 번 더 받는 순간 가입 자격을 잃는다.
+ */
+export const EMAIL_VERIFIED_GRANT_PREFIX = "email-verified-grant-";
+
+export function emailVerifiedGrantIdentifier(email: string): string {
+  return `${EMAIL_VERIFIED_GRANT_PREFIX}${normalizeEmail(email)}`;
+}

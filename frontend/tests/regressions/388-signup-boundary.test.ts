@@ -51,6 +51,12 @@ vi.mock("@/lib/prisma/client", () => ({
   },
 }));
 
+// #343 이 가입에 세운 이메일 인증 관문. 이 파일이 보는 것은 **요청 경계 검증**이라
+// 인증은 통과한 것으로 두고, 그 관문 자체는 `343-signup-requires-verification.test.ts` 가 본다.
+vi.mock("@/lib/auth/signupVerificationGrant", () => ({
+  consumeSignupVerificationGrant: vi.fn(async (_email: string, token: unknown) => token === VERIFICATION_TOKEN),
+}));
+
 vi.mock("@/lib/auth/authUtils", () => ({
   normalizeEmail: (e: string) => e.trim().toLowerCase(),
   ensurePersonalWorkspace: vi.fn(async () => 1),
@@ -73,7 +79,14 @@ async function callPost(body: string) {
   return (await mod.POST(postWithRawBody(body))) as Response;
 }
 
-const VALID = { email: "user@example.com", password: "abcd1234!", name: "홍길동", dept: "개발팀" };
+const VERIFICATION_TOKEN = "verified-by-otp";
+const VALID = {
+  email: "user@example.com",
+  password: "abcd1234!",
+  name: "홍길동",
+  dept: "개발팀",
+  verificationToken: VERIFICATION_TOKEN,
+};
 
 // regex(`[^\s@]+@[^\s@]+\.[^\s@]+`)는 통과하면서 100자를 넘는 이메일 — 정규식만으로는 안 막힌다.
 const LONG_EMAIL = `${"a".repeat(95)}@example.com`;
@@ -147,6 +160,7 @@ describe("#388 정상 가입은 그대로 통과한다 (거절이 정상 경로�
         password: "a1!".repeat(24), // 72자
         name: "가".repeat(100),
         dept: "가".repeat(50),
+        verificationToken: VERIFICATION_TOKEN,
       }),
     );
     expect(res.status).toBe(200);

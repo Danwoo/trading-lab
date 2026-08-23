@@ -19,7 +19,9 @@ const PUBLIC_RULES: readonly PathRule[] = [
 
   // Better Auth 인증 플로우
   { path: "/api/auth/sign-in/", prefix: true },
-  { path: "/api/auth/sign-up/", prefix: true },
+  // `/api/auth/sign-up/` 은 **공개 목록에 없다** — 이 제품의 가입은 `/api/common/signup` 이
+  // 유일한 문이고, Better Auth 가 딸려 노출하는 그 경로는 이메일 인증을 건너뛴다(#343).
+  // 실제 차단은 `lib/auth/auth.ts` 의 `hooks.before` 가 한다 (세션이 있는 호출자까지 막는다).
   { path: "/api/auth/callback/", prefix: true },
   { path: "/api/auth/sign-out", methods: ["POST"] },
   { path: "/api/auth/get-session", methods: ["GET"] },

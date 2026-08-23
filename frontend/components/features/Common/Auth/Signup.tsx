@@ -12,6 +12,7 @@ import { TextBox } from "@/components/shared/ui/TextBox";
 import PolicyPopup from "@/components/features/Common/Policy/PolicyPopup";
 import { showMessage } from "@/stores/shared/messageStore";
 import { sendEmail, verifySignupOTP, checkEmail } from "@/services/common/authService";
+import { SIGNUP_VERIFICATION_TOKEN_KEY } from "@/constants/signup";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 
 interface Props {}
@@ -95,11 +96,13 @@ export const Signup: FC<Props> = () => {
     try {
       const data = await verifySignupOTP(email, otp);
 
-      if (data?.result && otp !== "") {
+      if (data?.result && data.verificationToken && otp !== "") {
         showMessage("알림", <div>인증 완료 하였습니다.</div>);
         setResult(true);
         setVerifyToggle("");
         sessionStorage.setItem("verifiedSignupEmail", email);
+        // 다음 단계(비밀번호 만들기)가 가입 요청에 실어 보낼 서버 발급 증거 (#343).
+        sessionStorage.setItem(SIGNUP_VERIFICATION_TOKEN_KEY, data.verificationToken);
       } else {
         showMessage(
           "알림",
@@ -111,6 +114,7 @@ export const Signup: FC<Props> = () => {
         );
         setResult(false);
         setOtp("");
+        sessionStorage.removeItem(SIGNUP_VERIFICATION_TOKEN_KEY);
       }
     } catch (error) {
       console.error("Error verifying code:", error);
