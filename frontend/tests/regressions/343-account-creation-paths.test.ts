@@ -32,7 +32,9 @@ const ACCOUNT_CREATION_PATHS: ReadonlyArray<{ file: string; gate: string; why: s
   {
     file: "app/api/common/signup/route.ts",
     // 이메일 소유 증명이 문지기다 — OTP 를 맞혔다는 서버 증거를 소비해야 계정이 만들어진다.
-    gate: "consumeSignupVerificationGrant",
+    // 문자열이 아니라 **호출 형태**를 본다 — 이름만 보면 쓰지 않는 import 하나로도 통과한다
+    // (실측: 관문 본문만 지우고 import 를 남긴 돌연변이가 이 그물을 초록으로 지나갔다).
+    gate: "await consumeSignupVerificationGrant(email, verificationToken)",
     why: "공개 가입 — 세션이 없으므로 이메일 소유 증명이 유일한 문지기다 (#343)",
   },
   {

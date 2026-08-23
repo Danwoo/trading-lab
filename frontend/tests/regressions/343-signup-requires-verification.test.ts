@@ -12,6 +12,7 @@
 // (`lib/auth/signupVerificationGrant.ts`)은 **진짜 코드가 돈다**. mock 인 것은 DB 엔진뿐이다.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import { NextRequest } from "next/server";
 import { emailVerifiedGrantIdentifier } from "@/lib/auth/verificationIdentifier";
 
@@ -32,7 +33,9 @@ vi.mock("@/lib/prisma/client", () => ({
       update: vi.fn(async () => ({})),
     },
     baVerification: {
-      findFirst: vi.fn(async (args: any) => verificationRows.find((r) => r.identifier === args.where.identifier) ?? null),
+      findFirst: vi.fn(
+        async (args: any) => verificationRows.find((r) => r.identifier === args.where.identifier) ?? null,
+      ),
       create: vi.fn(async (args: any) => {
         verificationRows.push(args.data);
         return args.data;
@@ -43,6 +46,15 @@ vi.mock("@/lib/prisma/client", () => ({
         const count = verificationRows.length - kept.length;
         verificationRows.splice(0, verificationRows.length, ...kept);
         return { count };
+      }),
+      delete: vi.fn(async (args: any) => {
+        const i = verificationRows.findIndex((r) => r.id === args.where.id);
+        return i < 0 ? null : verificationRows.splice(i, 1)[0];
+      }),
+      update: vi.fn(async (args: any) => {
+        const row = verificationRows.find((r) => r.id === args.where.id);
+        if (row) Object.assign(row, args.data);
+        return row;
       }),
     },
     workspaceDomain: { findFirst: vi.fn(async () => null) },
@@ -55,6 +67,7 @@ vi.mock("@/lib/prisma/client", () => ({
 
 vi.mock("@/lib/auth/authUtils", () => ({
   normalizeEmail: (e: string) => e.trim().toLowerCase(),
+  emailVerificationOtpIdentifier: (e: string) => `email-verification-otp-${e.trim().toLowerCase()}`,
   ensurePersonalWorkspace: vi.fn(async () => 1),
   syncDefaultWorkspaceMembership: vi.fn(async () => undefined),
   resolveOemSharedWorkspace: vi.fn(async () => ({ id: 1 })),
@@ -162,6 +175,82 @@ describe("#343 인증을 통과한 가입은 그대로 만들어진다", () => {
     signUpEmail.mockClear();
     const second = await callSignup({ ...BASE, email: "second@example.com", verificationToken: token });
     expect(second.status).toBe(403);
+    expect(signUpEmail).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// **다리** — OTP 검증 라우트가 내주는 증거를 가입이 실제로 받는가.
+//
+// 위 블록들은 증거를 함수로 직접 발급해 가입만 시험한다. 그래서 검증 라우트가 증거를 내주지
+// 않게 되어도(예: 응답에서 `verificationToken` 이 빠져도) 전부 초록으로 남는다 — 그러면 서버는
+// 여전히 안전하지만 **정상 가입이 통째로 막힌다.** 두 라우트를 이어서 부르는 그물이 있어야
+// 그 고장이 드러난다.
+describe("#343 OTP 검증 라우트 → 가입: 서버가 순서를 잇는다", () => {
+  const OTP = "A1b2C3";
+  const OTP_IDENTIFIER = `email-verification-otp-${EMAIL}`;
+
+  /** 발송 라우트가 남기는 것과 같은 모양의 OTP 행 (`${sha256(otp)}:${시도횟수}`). */
+  function seedOtpRow() {
+    verificationRows.push({
+      id: "otp-row",
+      identifier: OTP_IDENTIFIER,
+      value: `${createHash("sha256").update(OTP).digest("base64url")}:0`,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+  }
+
+  async function callVerify(body: Record<string, unknown>): Promise<Response> {
+    const mod: any = await import("@/app/api/common/email/verify/route");
+    return mod.POST(
+      new NextRequest("http://localhost/api/common/email/verify", {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+  }
+
+  it("맞힌 OTP → 증거를 받고, 그 증거로 가입이 통과한다", async () => {
+    seedOtpRow();
+
+    const verified = await callVerify({ email: EMAIL, otp: OTP });
+    expect(verified.status).toBe(200);
+    const { result, verificationToken } = (await verified.json()) as {
+      result: boolean;
+      verificationToken?: string;
+    };
+    expect(result).toBe(true);
+    // 라우트가 증거를 안 내주면 여기서 멈춘다 — 정상 가입이 막히는 고장이다.
+    expect(typeof verificationToken).toBe("string");
+    expect(verificationToken).not.toBe("");
+
+    const res = await callSignup({ ...BASE, verificationToken });
+    expect(res.status).toBe(200);
+    expect(signUpEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("증거는 **해시로만** 저장된다 — DB 를 읽어도 원문을 집어가지 못한다", async () => {
+    seedOtpRow();
+    const { verificationToken } = (await (await callVerify({ email: EMAIL, otp: OTP })).json()) as {
+      verificationToken: string;
+    };
+
+    const grant = verificationRows.find((r) => r.identifier === emailVerifiedGrantIdentifier(EMAIL));
+    expect(grant).toBeDefined();
+    expect(grant!.value).not.toBe(verificationToken);
+    expect(grant!.value).toBe(createHash("sha256").update(verificationToken).digest("base64url"));
+  });
+
+  it("틀린 OTP → 증거가 없고, 가입도 막힌다", async () => {
+    seedOtpRow();
+
+    const verified = await callVerify({ email: EMAIL, otp: "WRONG1" });
+    expect(await verified.json()).toEqual({ result: false });
+    expect(verificationRows.some((r) => r.identifier === emailVerifiedGrantIdentifier(EMAIL))).toBe(false);
+
+    const res = await callSignup({ ...BASE, verificationToken: "anything" });
+    expect(res.status).toBe(403);
     expect(signUpEmail).not.toHaveBeenCalled();
   });
 });
