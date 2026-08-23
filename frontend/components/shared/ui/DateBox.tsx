@@ -174,7 +174,11 @@ export function DateBox<T = any>({
           }}
           aria-invalid={showsError || undefined}
           aria-describedby={showsError && shownError ? errorMessageId : undefined}
-          className={cn(FIELD_INPUT_CLASS, fieldBorderClass(showsError), showPickerButton ? "pr-9" : "")}
+          className={cn(
+            FIELD_INPUT_CLASS,
+            fieldBorderClass(showsError),
+            showPickerButton ? "pr-[calc(var(--touch-icon-target)+12px)]" : "",
+          )}
         />
         {showPickerButton && (
           <>

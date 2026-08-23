@@ -254,7 +254,9 @@ export function SelectMenu({
               // 그릇이 안 쓰는 유일한 표면 토큰), 못 고치는 상태는 `--bg-raised`.
               readOnly ? "cursor-default bg-bg-raised" : "cursor-pointer bg-bg-base",
               isInvalid ? "border-danger" : "border-line",
-              clearVisible ? "pr-12" : "",
+              // 지우기 상자(`right-5`=20px 에 표적 폭)가 `▾` 와 글자 위로 넘어오지 않게 비워 두는
+              // 자리. 20 + 표적 + 4 여유 — **표적과 같은 토큰에서 파생한다**(hitArea.ts 「겹쳐 놓는 자리」).
+              clearVisible ? "pr-[calc(var(--touch-icon-target)+24px)]" : "",
             )}
           >
             {renderTriggerContent()}
@@ -268,8 +270,8 @@ export function SelectMenu({
           <button
             type="button"
             aria-label="선택 지우기"
-            // right-5 는 24 폭 상자를 트리거가 비워 둔 자리(`pr-12`) 안에 넣으면서 × 의 가운데를
-            // 종전 자리에 유지한다 — 상자는 오른쪽 20~44px, ▾ 는 49~56px 이라 겹치지 않는다.
+            // right-5 는 × 의 가운데를 종전 자리에 유지한다. 상자는 오른쪽 20~(20+표적)px 을 차지하고,
+            // 트리거는 그만큼을 파생값으로 비워 둔다(위 `pr-[calc(…)]`) — 그래서 어느 갈래에서도 ▾ 를 안 덮는다.
             className={cn(ICON_HIT_AREA, "absolute right-5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink")}
             onClick={() => onChange(multiple ? [] : null)}
           >

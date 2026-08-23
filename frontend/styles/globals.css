@@ -200,9 +200,17 @@
 }
 
 /* 손가락으로 누르는 기기 — 표적을 권장치(Apple 44pt · Android 48dp)까지 키운다.
-   아이콘 크기는 그대로다: 커지는 것은 누를 수 있는 영역뿐이다. */
+   아이콘 크기는 그대로다: 커지는 것은 누를 수 있는 영역뿐이다.
+
+   **선택자 목록이 위 기본 블록과 같아야 한다.** 커스텀 프로퍼티는 상속되지만, 기본값을
+   `.auth-backdrop`·`[data-theme="dark"]` 에도 **직접** 선언해 두었으므로 그 부분 트리는
+   상속이 아니라 자기 선언을 쓴다 — 여기서 `:root` 만 덮으면 로그인·회원가입 화면(`.auth-backdrop`)
+   과 다크 섬 안에서는 손가락 갈래가 통째로 죽는다(실측: 로그인 화면의 표적이 coarse 에서도 24 였다).
+   두 목록이 갈라지지 않는지는 tests/styles/shellTokens.test.ts 가 대조한다. */
 @media (pointer: coarse) {
-  :root {
+  :root,
+  [data-theme="dark"],
+  .auth-backdrop {
     --touch-rail-target: 44px;
     --touch-min: 44px;
     --touch-icon-target: 44px;

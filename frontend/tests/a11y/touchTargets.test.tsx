@@ -22,18 +22,35 @@
 //   「조작 대상 아님」(sr-only·aria-hidden) 둘 다. 규칙이 느슨해져 진짜 조작부를 삼키면
 //   그 자리에서 빨간불이 난다.
 //
-// ## 두 축을 잰다 — 크기와 **닿음**
+// ## 네 축을 잰다 — 크기 · **닿음** · **덮음** · **보이지 않는데 눌림**
 //
 // 크기가 24 여도 그 좌표를 눌러서 안 열리면 「히트 영역을 고쳤다」는 반만 참이다 (#289 리드 결정
 // 2026-08-21 ①). 실제로 이 레포에서 조작부가 자기 조상의 클립 상자 밖으로 밀려나 **크기는 그대로
 // 인 채 못 눌리는** 결함이 있었다 — 그래서 크기와 함께 `document.elementFromPoint(중심)` 이 그
 // 조작부(또는 그 자손)를 내는지도 잰다.
 //
+// ## 덮음 — 이 표적이 **남의 글자 자리**를 먹는가
+//
+// 표적이 커지면 자기 상자 밖으로 자라 옆 조작부를 덮는다. 그때 커진 표적이 히트 테스트를 이기므로
+// **크기도 닿음도 초록인 채로** 사용자는 엉뚱한 것을 누른다 — 입력 글자 끝을 눌렀는데 값이 지워지고,
+// 목록을 여는 `▾` 를 눌렀는데 선택이 지워진다 (#289 리뷰 2026-08-22, 세 자리에서 실측).
+// 그래서 아이콘 표적의 상자가 **다른 조작부의 content box**(글자가 사는 상자)와 겹치는지 잰다.
+//
+// ## 보이지 않는데 눌림 — 호버가 없는 기기
+//
+// `opacity: 0` 은 포인터 이벤트를 안 막는다. 호버로만 드러나는 chrome 은 손가락 기기에서 영영
+// 안 보이는데 히트 테스트는 그대로 받는다 — 확인 없이 지우는 버튼이 거기 있으면 사고가 난다.
+// 아래 `revealHoverOnlyChrome` 은 그 상태를 **지우고** 재므로, 이 축만 **지우기 전 HTML** 로 따로
+// 잰다(호버가 없는 갈래에서만).
+//
 // ## 입력 장치 두 갈래를 각각 잰다
 //
 // 표적 하한이 마우스 24 · 손가락 44 로 갈린다(`--touch-icon-target`). 헤드리스 크롬은 기본이
-// `pointer: none` 이라 어느 쪽도 아니므로, `--blink-settings=primaryPointerType` 으로 갈래를
-// 명시해 두 번 잰다 (4=fine · 2=coarse — 실측으로 미디어 쿼리가 실제로 적용되는 것을 확인했다).
+// `pointer: none` · `hover: none` 이라 어느 쪽도 아니므로, `--blink-settings` 로 갈래를 명시해
+// 두 번 잰다 (`primaryPointerType` 4=fine · 2=coarse, `primaryHoverType` 2=hover · 1=none —
+// 실측으로 미디어 쿼리가 실제로 적용되는 것을 확인했다). **hover 도 같이 준다**: 기본 헤드리스는
+// `hover: none` 이라 「마우스」 회차가 사실은 마우스가 아니었고, 그러면 호버 갈래로 갈리는 규칙
+// (`[@media(hover:none)]:…`)이 두 회차에 똑같이 적용돼 그 축이 통째로 빈다.
 //
 // ## 이 그물이 증명하지 않는 것
 //
@@ -91,11 +108,12 @@ const WIDTHS = [390, 1440];
  *  모자라면 「화면 밖」으로 실패하므로 조용히 안 재지지 않는다. */
 const WINDOW_HEIGHT = 6000;
 
-/** 입력 장치 갈래. `primaryPointerType` 은 Blink 의 비트값(2=coarse · 4=fine)이다.
- *  `iconFloor` 는 `ICON_HIT_AREA` 자리의 하한 — `--touch-icon-target` 과 같은 숫자여야 한다. */
+/** 입력 장치 갈래. Blink 의 비트값이다 — 포인터 2=coarse · 4=fine, 호버 1=none · 2=hover.
+ *  `iconFloor` 는 `ICON_HIT_AREA` 자리의 하한 — `--touch-icon-target` 과 같은 숫자여야 한다.
+ *  `hoverless` 인 갈래에서만 「보이지 않는데 눌림」 축을 잰다. */
 const POINTERS = [
-  { name: "fine", blinkPointerType: 4, iconFloor: 24 },
-  { name: "coarse", blinkPointerType: 2, iconFloor: 44 },
+  { name: "fine", blinkPointerType: 4, blinkHoverType: 2, hoverless: false, iconFloor: 24 },
+  { name: "coarse", blinkPointerType: 2, blinkHoverType: 1, hoverless: true, iconFloor: 44 },
 ] as const;
 
 /** 모든 조작부가 어느 갈래에서도 지켜야 하는 하한 (WCAG 2.5.8 AA). */
@@ -109,6 +127,13 @@ const MIN_MEASURED_PER_RUN = 32;
 
 /** 한 회차의 `ICON_HIT_AREA` 자리가 이보다 적으면 표식이 바뀐 것이다 — 44 검사가 통째로 비는 것을 막는다. */
 const MIN_ICON_HIT_AREA_PER_RUN = 15;
+
+/** 아이콘 표적 × 다른 조작부 짝이 한 회차에 이보다 적으면 짝짓기가 죽은 것이다 — 「덮음 0건」과 구분한다. */
+const MIN_COVER_PAIRS_PER_RUN = 30;
+
+/** 호버가 없는 갈래에서 「안 보이는데 눌리는」 조작부는 하나도 없어야 한다. 예외를 두려면 여기 적고
+ *  왜 안전한지(파괴적이지 않다·다른 경로가 있다)를 함께 남긴다 — 목록이 곧 리뷰 대상이다. */
+const EXPECTED_INVISIBLE_HITTABLE: string[] = [];
 
 /** 2.5.8 "Inline" 예외로 빠져도 되는 것 — 문장 속 링크뿐이다(잰 회차마다 한 번씩). */
 const EXPECTED_EXEMPT_PER_RUN = ["ROADMAP.md"];
@@ -134,12 +159,19 @@ interface Measured {
   reachable: boolean;
   /** 못 닿았을 때 그 자리에서 실제로 잡힌 것 — 무엇이 가로챘는지 사람이 바로 읽게. */
   blockedBy: string;
+  /** 이 표적이 **글자 자리**를 먹은 다른 조작부들 — 비어 있어야 한다. */
+  covers: string[];
+  /** 짝지어 본 다른 조작부 수 — 0 이면 덮음 축이 아무것도 안 본 것이다. */
+  coverPairs: number;
+  /** 조상까지 곱한 실효 불투명도. 0 이면 화면에 없다. */
+  opacity: number;
 }
 
 afterEach(cleanup);
 
-/** 각 픽스처를 jsdom 에 렌더해 실제 HTML 을 뽑는다(포털로 나간 것까지 포함해 body 를 통째로). */
-function renderFixtures(): Array<{ name: string; html: string }> {
+/** 각 픽스처를 jsdom 에 렌더해 실제 HTML 을 뽑는다(포털로 나간 것까지 포함해 body 를 통째로).
+ *  `raw` 는 호버 전용 chrome 을 **안 세운** 스냅샷이다 — 「보이지 않는데 눌림」 축이 그것을 쓴다. */
+function renderFixtures(): Array<{ name: string; html: string; raw: string }> {
   const fixtures: Array<{ name: string; node: React.ReactElement }> = [
     {
       name: "SelectMenu(지우기)",
@@ -304,15 +336,15 @@ function renderFixtures(): Array<{ name: string; html: string }> {
     render(node);
     // PanelMenu 의 항목은 열어야 그려진다.
     const trigger = document.querySelector('[aria-label="패널 메뉴"]');
-    if (trigger) {
-      fireEvent.click(trigger);
-      revealHoverOnlyChrome(trigger);
-    }
+    if (trigger) fireEvent.click(trigger);
     if (name === "FileUploader(선택 해제)") pickFile();
     if (name === "DateBox(달력 열기)") requireControl("달력에서 고르기");
+    // 순서가 중요하다 — `raw` 를 먼저 뜨고 그다음에 호버 상태를 세운다.
+    const raw = document.body.innerHTML;
+    if (trigger) revealHoverOnlyChrome(trigger);
     const html = document.body.innerHTML;
     cleanup();
-    return { name, html };
+    return { name, html, raw };
   });
 }
 
@@ -394,13 +426,13 @@ function findChrome(): string {
 }
 
 /** 헤드리스 크롬에 픽스처를 얹고 조작부 상자를 잰다. */
-function measureInChrome(page: string, width: number, blinkPointerType: number): Measured[] {
+function measureInChrome(page: string, width: number, blinkPointerType: number, blinkHoverType: number): Measured[] {
   const dir = mkdtempSync(path.join(tmpdir(), "touch-targets-"));
   const file = path.join(dir, "harness.html");
   writeFileSync(file, page, "utf8");
   let dom: string;
   try {
-    dom = runChrome(file, width, blinkPointerType);
+    dom = runChrome(file, width, blinkPointerType, blinkHoverType);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -414,7 +446,7 @@ function measureInChrome(page: string, width: number, blinkPointerType: number):
   return JSON.parse(decoded) as Measured[];
 }
 
-function runChrome(file: string, width: number, blinkPointerType: number): string {
+function runChrome(file: string, width: number, blinkPointerType: number, blinkHoverType: number): string {
   return execFileSync(
     findChrome(),
     [
@@ -423,8 +455,8 @@ function runChrome(file: string, width: number, blinkPointerType: number): strin
       "--no-sandbox",
       "--hide-scrollbars",
       `--window-size=${width},${WINDOW_HEIGHT}`,
-      // 기본 헤드리스는 `pointer: none` 이라 두 갈래 어느 쪽도 아니다 — 갈래를 명시한다.
-      `--blink-settings=primaryPointerType=${blinkPointerType}`,
+      // 기본 헤드리스는 `pointer: none` · `hover: none` 이라 두 갈래 어느 쪽도 아니다 — 둘 다 명시한다.
+      `--blink-settings=primaryPointerType=${blinkPointerType},primaryHoverType=${blinkHoverType}`,
       "--virtual-time-budget=2000",
       "--dump-dom",
       `file://${file}`,
@@ -434,6 +466,11 @@ function runChrome(file: string, width: number, blinkPointerType: number): strin
 }
 
 const MEASURE_SCRIPT = `
+  // 애니메이션은 **끝난 상태**로 잰다. 토스트는 200ms 페이드인이라 첫 프레임의 opacity 가 0 이고,
+  // 그 프레임을 재면 「안 보이는데 눌린다」로 잘못 잡힌다 — 진짜 문제는 가라앉은 뒤에도 0 인 자리다.
+  if (document.getAnimations) {
+    for (const animation of document.getAnimations()) { try { animation.finish(); } catch (e) {} }
+  }
   const ICON_HIT_AREA_MARKER = ${JSON.stringify(ICON_HIT_AREA_MARKER)};
   const SELECTOR = 'button, [role="button"], [role="menuitem"], [role="tab"], a[href], summary,' +
     ' input:not([type=hidden]), select, textarea';
@@ -465,8 +502,31 @@ const MEASURE_SCRIPT = `
     const cls = String(el.className || '').split(' ').slice(0, 4).join('.');
     return el.tagName + (label ? '«' + label + '»' : cls ? '.' + cls : '');
   }
+  // 글자가 사는 상자 — 테두리·패딩을 뺀 안쪽. 표적이 여기를 먹으면 사람이 노린 글자를 덮은 것이다.
+  function contentBox(el) {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    const n = function (v) { return parseFloat(v) || 0; };
+    return {
+      l: r.left + n(s.borderLeftWidth) + n(s.paddingLeft),
+      r: r.right - n(s.borderRightWidth) - n(s.paddingRight),
+      t: r.top + n(s.borderTopWidth) + n(s.paddingTop),
+      b: r.bottom - n(s.borderBottomWidth) - n(s.paddingBottom),
+    };
+  }
+  // 조상까지 곱한 실효 불투명도 — opacity 0 은 히트 테스트를 안 막으므로 크기·닿음으로는 안 보인다.
+  function effectiveOpacity(el) {
+    let value = 1;
+    for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+      const own = parseFloat(getComputedStyle(e).opacity);
+      if (!isNaN(own)) value *= own;
+      if (value === 0) return 0;
+    }
+    return value;
+  }
   const out = [];
   for (const section of document.querySelectorAll('[data-fixture]')) {
+    const entries = [];
     for (const el of section.querySelectorAll(SELECTOR)) {
       const style = getComputedStyle(el);
       if (style.display === 'none' || style.visibility === 'hidden') continue;
@@ -481,20 +541,48 @@ const MEASURE_SCRIPT = `
       // 그 자손)여야 한다. 조상이 먼저 나오면 조작부가 조상의 클립 상자 밖으로 밀려난 것이다.
       const stack = inViewport ? document.elementsFromPoint(cx, cy) : [];
       const hit = stack.find(function (e) { return section.contains(e); }) || null;
-      out.push({
-        fixture: section.getAttribute('data-fixture'),
-        tag: el.tagName,
-        label: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30),
-        w: Math.round(rect.width * 10) / 10,
-        h: Math.round(rect.height * 10) / 10,
-        exempt: isInlineException(el),
-        notOperable: isNotOperable(el),
-        iconHitArea: el.classList.contains(ICON_HIT_AREA_MARKER),
-        inViewport: inViewport,
-        reachable: !!hit && el.contains(hit),
-        blockedBy: describeHit(hit),
+      entries.push({
+        el: el,
+        rect: rect,
+        info: {
+          fixture: section.getAttribute('data-fixture'),
+          tag: el.tagName,
+          label: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30),
+          w: Math.round(rect.width * 10) / 10,
+          h: Math.round(rect.height * 10) / 10,
+          exempt: isInlineException(el),
+          notOperable: isNotOperable(el),
+          iconHitArea: el.classList.contains(ICON_HIT_AREA_MARKER),
+          inViewport: inViewport,
+          reachable: !!hit && el.contains(hit),
+          blockedBy: describeHit(hit),
+          covers: [],
+          coverPairs: 0,
+          opacity: Math.round(effectiveOpacity(el) * 1000) / 1000,
+        },
       });
     }
+    // 덮음 — 아이콘 표적이 **같은 픽스처의 다른 조작부**의 글자 상자를 먹는가.
+    // 조상/자손 관계는 뺀다: 탭 안의 닫기처럼 담긴 자리는 겹치는 것이 정상이다.
+    for (const a of entries) {
+      if (!a.info.iconHitArea) continue;
+      for (const b of entries) {
+        if (a === b || b.info.exempt || b.info.notOperable) continue;
+        if (a.el.contains(b.el) || b.el.contains(a.el)) continue;
+        a.info.coverPairs += 1;
+        const box = contentBox(b.el);
+        const overlapX = Math.min(a.rect.right, box.r) - Math.max(a.rect.left, box.l);
+        const overlapY = Math.min(a.rect.bottom, box.b) - Math.max(a.rect.top, box.t);
+        if (overlapX > 0.5 && overlapY > 0.5) {
+          const name = b.el.getAttribute('aria-label') || (b.el.value || b.el.textContent || '').trim().slice(0, 20)
+            || b.el.tagName;
+          a.info.covers.push(
+            '«' + name + '» 의 글자 자리를 ' + Math.round(overlapX) + 'x' + Math.round(overlapY) + 'px'
+          );
+        }
+      }
+    }
+    for (const entry of entries) out.push(entry.info);
   }
   const pre = document.createElement('pre');
   pre.id = 'measured';
@@ -504,24 +592,44 @@ const MEASURE_SCRIPT = `
 
 it("아이콘 조작부의 표적이 두 입력 장치에서 각각 하한을 넘고, 그 좌표가 실제로 닿는다 (WCAG 2.5.8 · #289)", async () => {
   const fixtures = renderFixtures();
-  const body = fixtures
-    .map(({ name, html }) => `<section data-fixture="${name}" style="margin:8px">${html}</section>`)
-    .join("\n");
-  const css = await buildCss(body);
-  const page = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${css}</style></head>
-<body>${body}<script>${MEASURE_SCRIPT}</script></body></html>`;
+  const wrap = (parts: Array<{ name: string; markup: string }>) =>
+    parts
+      .map(({ name, markup }) => `<section data-fixture="${name}" style="margin:8px">${markup}</section>`)
+      .join("\n");
+  const body = wrap(fixtures.map(({ name, html }) => ({ name, markup: html })));
+  const rawBody = wrap(fixtures.map(({ name, raw }) => ({ name, markup: raw })));
+  // CSS 는 두 HTML 을 다 훑어 만든다 — 한쪽에만 있는 클래스가 빠지면 그쪽 회차가 거짓말을 한다.
+  const css = await buildCss(`${body}\n${rawBody}`);
+  const shell = (
+    inner: string,
+  ) => `<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>${css}</style></head>
+<body>${inner}<script>${MEASURE_SCRIPT}</script></body></html>`;
+  const page = shell(body);
+  const rawPage = shell(rawBody);
 
   // 폭 둘 × 입력 장치 둘. 폭은 손가락으로 누르는 폭(390)과, 거기서는 `display:none` 이라 아예
   // 없는 조작부(ProductPanel 의 620 토글은 xl 이상에만 있다)가 사는 폭(1440).
   const runs = WIDTHS.flatMap((width) => POINTERS.map((pointer) => ({ width, pointer })));
   const measured = runs.flatMap(({ width, pointer }) =>
-    measureInChrome(page, width, pointer.blinkPointerType).map((m) => ({
+    measureInChrome(page, width, pointer.blinkPointerType, pointer.blinkHoverType).map((m) => ({
       ...m,
       pointer,
       fixture: `${m.fixture} @${width}/${pointer.name}`,
     })),
   );
   const operable = measured.filter((m) => !m.exempt && !m.notOperable);
+  // 호버 전용 chrome 이 픽스처에 실제로 남아 있어야 「보이지 않는데 눌림」 축이 의미가 있다 —
+  // 두 스냅샷이 같으면 `revealHoverOnlyChrome` 이 아무것도 안 세운 것이고, raw 회차는 사본이 된다.
+  const revealedFixtures = fixtures.filter((f) => f.raw !== f.html).map((f) => f.name);
+
+  // 「보이지 않는데 눌림」은 **호버를 세우기 전** HTML 로, 호버가 없는 갈래에서만 잰다.
+  const hoverlessRuns = runs.filter(({ pointer }) => pointer.hoverless);
+  const rawMeasured = hoverlessRuns.flatMap(({ width, pointer }) =>
+    measureInChrome(rawPage, width, pointer.blinkPointerType, pointer.blinkHoverType).map((m) => ({
+      ...m,
+      fixture: `${m.fixture} @${width}/${pointer.name}`,
+    })),
+  );
 
   // 통과가 "위반 없음"인지 "아무것도 안 봤음"인지 읽는 사람이 구분할 수 있게 남긴다.
   console.log(
@@ -531,7 +639,12 @@ it("아이콘 조작부의 표적이 두 입력 장치에서 각각 하한을 �
       `(그중 ICON_HIT_AREA ${measured.filter((m) => m.iconHitArea).length}개 · 인라인 예외 ${
         measured.filter((m) => m.exempt).length
       }개 · 조작 대상 아님 ${measured.filter((m) => m.notOperable).length}개). ` +
-      `닿음 검사 ${operable.length}건 중 못 닿은 것 ${operable.filter((m) => !m.reachable).length}건. 가장 작은 다섯:\n` +
+      `닿음 검사 ${operable.length}건 중 못 닿은 것 ${operable.filter((m) => !m.reachable).length}건. ` +
+      `덮음 검사 ${measured.reduce((sum, m) => sum + m.coverPairs, 0)}짝 중 덮은 것 ${
+        measured.filter((m) => m.covers.length > 0).length
+      }건. 호버 없는 갈래에서 「안 보이는데 눌리는」 조작부 ${
+        rawMeasured.filter((m) => !m.exempt && !m.notOperable && m.opacity === 0 && m.reachable).length
+      }건(잰 것 ${rawMeasured.length}개, 호버 전용 chrome 픽스처 ${revealedFixtures.length}개). 가장 작은 다섯:\n` +
       [...operable]
         .sort((a, b) => Math.min(a.w, a.h) - Math.min(b.w, b.h))
         .slice(0, 5)
@@ -551,6 +664,14 @@ it("아이콘 조작부의 표적이 두 입력 장치에서 각각 하한을 �
       ).toBe(true);
     }
   }
+
+  expect(
+    revealedFixtures.length,
+    "호버 전용 chrome 을 가진 픽스처가 0개다 — 「보이지 않는데 눌림」 축이 잴 것이 없다",
+  ).toBeGreaterThanOrEqual(1);
+  expect(rawMeasured.length, `호버 없는 회차에서 잰 조작부가 ${rawMeasured.length}개뿐이다`).toBeGreaterThanOrEqual(
+    MIN_MEASURED_PER_RUN * hoverlessRuns.length,
+  );
 
   // 표식이 바뀌면 44 검사가 통째로 비어 조용히 초록이 된다 — 건수로 막는다.
   const iconSites = measured.filter((m) => m.iconHitArea);
@@ -590,5 +711,26 @@ it("아이콘 조작부의 표적이 두 입력 장치에서 각각 하한을 �
         : `«${m.label}» ${m.tag} — ${m.fixture}: 중심이 화면 밖이다 (WINDOW_HEIGHT=${WINDOW_HEIGHT})`,
     );
   expect(unreachable, `중심 좌표로 못 닿는 조작부:\n${unreachable.join("\n")}`).toEqual([]);
+
+  // ③ 덮음 — 아이콘 표적이 남의 글자 자리를 먹으면 안 된다. 크기·닿음은 초록인 채로 사람이
+  //    엉뚱한 것을 누르게 되는 축이라, 짝을 실제로 몇 개 봤는지도 하한으로 잠근다.
+  const coverPairs = measured.reduce((sum, m) => sum + m.coverPairs, 0);
+  expect(
+    coverPairs,
+    `덮음 축이 짝지어 본 것이 ${coverPairs}건뿐이다 — 아이콘 표적이나 픽스처가 사라졌는지 보라`,
+  ).toBeGreaterThanOrEqual(MIN_COVER_PAIRS_PER_RUN * runs.length);
+  const covering = measured
+    .filter((m) => m.covers.length > 0)
+    .map((m) => `«${m.label}» ${m.w}x${m.h} — ${m.fixture}: ${m.covers.join(" · ")}`);
+  expect(covering, `남의 글자 자리를 덮는 아이콘 표적:\n${covering.join("\n")}`).toEqual([]);
+
+  // ④ 보이지 않는데 눌림 — 호버가 없는 갈래에서 실효 불투명도가 0 인 채 히트 테스트를 받는 조작부.
+  const invisibleButHittable = rawMeasured
+    .filter((m) => !m.exempt && !m.notOperable && m.opacity === 0 && m.reachable)
+    .map((m) => `«${m.label}» ${m.tag} — ${m.fixture}`);
+  expect(
+    invisibleButHittable,
+    `호버가 없는 기기에서 보이지 않는데 눌리는 조작부:\n${invisibleButHittable.join("\n")}`,
+  ).toEqual(EXPECTED_INVISIBLE_HITTABLE);
   // Tailwind 컴파일 + 크롬 네 번 기동이라 기본 5초 안에 안 끝난다(전체 스위트 병렬 실행에서 실측).
 }, 240_000);

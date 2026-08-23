@@ -48,7 +48,9 @@ export function SessionListPanel({ sessions, activeGid, onSelect, onNew, onDelet
                     type="button"
                     onClick={() => onSelect(session.gid)}
                     aria-current={isActive ? "true" : undefined}
-                    className={`w-full truncate rounded-md py-2 pl-3 pr-8 text-left text-sm transition-colors ${
+                    // 겹쳐 놓인 삭제 상자(`right-1`=4px + 표적 + 4 여유)만큼 제목이 비운다 — 값은
+                    // 표적 토큰에서 파생한다(hitArea.ts 「겹쳐 놓는 자리」).
+                    className={`w-full truncate rounded-md py-2 pl-3 pr-[calc(var(--touch-icon-target)+8px)] text-left text-sm transition-colors ${
                       isActive ? "bg-blue-100 font-medium text-blue-800" : "text-gray-700 hover:bg-gray-100"
                     }`}
                     title={session.title || "새 대화"}
@@ -60,7 +62,9 @@ export function SessionListPanel({ sessions, activeGid, onSelect, onNew, onDelet
                     onClick={() => onDelete(session.gid)}
                     aria-label={`대화 삭제: ${session.title || "새 대화"}`}
                     title="대화 삭제"
-                    className={`${ICON_HIT_AREA} absolute right-1 top-1/2 -translate-y-1/2 rounded text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-gray-600 focus:opacity-100 group-hover:opacity-100`}
+                    // 호버가 없는 기기에서는 **처음부터 보인다.** `opacity: 0` 은 히트 테스트를 막지 않아,
+                    // 그대로 두면 손가락 기기에서 「안 보이는데 눌리는 삭제 버튼」이 된다(확인 없이 지운다).
+                    className={`${ICON_HIT_AREA} absolute right-1 top-1/2 -translate-y-1/2 rounded text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-gray-600 focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100`}
                   >
                     <svg
                       className="h-3.5 w-3.5"

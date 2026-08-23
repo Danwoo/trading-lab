@@ -42,7 +42,9 @@ export function PanelFrame({ instance, definition, provenance, onToggleCollapse,
           <span className="flex h-4 min-w-0 overflow-hidden">
             <ProvenanceBadge provenance={provenance} />
           </span>
-          <div className="flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none">
+          {/* 호버가 없는 기기에서는 상시로 보인다 — `opacity: 0` 은 히트 테스트를 안 막으므로, 그대로
+              두면 손가락 기기에서 접기·닫기·⋮ 가 「안 보이는데 눌리는」 조작부가 된다. */}
+          <div className="flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100">
             <PanelMenu collapsed={instance.collapsed} onToggleCollapse={onToggleCollapse} onClose={onClose} />
           </div>
         </div>
