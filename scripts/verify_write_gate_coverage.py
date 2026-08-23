@@ -23,8 +23,9 @@
 "대상 없음 = 위반 없음" 으로 조용히 초록이 되지 않게, 축마다 검사한 건수를 출력에 남긴다.
 
 `EXEMPT` 는 **위임**만 담는다 — 쓰기 함수를 부르지만 조작부를 세우지 않아 설명할 자리가 없는
-파일이다. 위임처가 실제로 게이트를 지는지는 사람이 판단하고 여기 사유로 남긴다. 면제가 낡는
-것도 실패다: 목록에 있는데 더는 쓰기 함수를 import 하지 않으면 빨간불이 된다.
+파일이다. 위임처를 **경로로** 적어 그 파일이 게이트 표식을 지는지 함께 확인한다(말로만 적으면
+위임처에서 게이트가 빠져도 초록이다 — 실측으로 확인한 구멍이다). 면제가 낡는 것도 실패다:
+목록에 있는데 더는 쓰기 함수를 import 하지 않으면 빨간불이 된다.
 
 실행: `python3 scripts/verify_write_gate_coverage.py`
 """
@@ -47,16 +48,23 @@ SCREEN_DIRS = [FRONTEND / "components", FRONTEND / "hooks", FRONTEND / "app"]
 # 화면이 「막혔다」를 스스로 말하거나(훅), 그것을 지는 공용 패널에 위임하는 표식.
 GATE_MARKERS = ("useWriteAccess", "writeGated")
 
-# 쓰기 함수를 부르지만 조작부가 없어 설명할 자리가 없는 파일 → 게이트는 호출자가 진다.
-EXEMPT: dict[str, str] = {
+# 쓰기 함수를 부르지만 조작부가 없어 설명할 자리가 없는 파일 → 게이트는 **위임처**가 진다.
+#
+# 위임처를 말로만 적으면 그 자리에서 게이트가 빠져도 이 검사가 초록이다 — 실측으로 확인했다:
+# `Bench/GridRunForm.tsx` 의 `useWriteAccess` 를 지워도 통과했다. 그래서 위임처를 **경로로**
+# 적고, 그 파일이 실제로 게이트 표식을 지고 있는지 여기서 같이 확인한다.
+EXEMPT: dict[str, tuple[str, tuple[str, ...]]] = {
     "components/features/Bot/deleteBotWithConfirm.tsx": (
-        "확인창만 띄우는 헬퍼다. 조작부(BotList 의 행 「삭제」·BotWorkbench 의 「삭제」)가 게이트를 진다."
+        "확인창만 띄우는 헬퍼다 — 조작부는 봇 목록의 행 「삭제」와 작업대의 「삭제」다.",
+        ("components/features/Bot/BotList.tsx", "components/features/Bot/BotWorkbench.tsx"),
     ),
     "hooks/bench/useBacktestBoard.ts": (
-        "격자 실행의 상태 보관소다. 조작부(Bench/GridRunForm 의 「격자 실행」)가 게이트를 진다."
+        "격자 실행의 상태 보관소다 — 조작부는 격자 실행 폼의 「격자 실행」이다.",
+        ("components/features/Bench/GridRunForm.tsx",),
     ),
     "components/features/Scheduler/SchedulerDetailForm.tsx": (
-        "등록·수정 폼이라 DetailPanel(writeGated)이 권한 없는 계정에는 아예 세우지 않는다 — 구성원 추가·제거도 그 안에 있다."
+        "등록·수정 폼이라 막힌 계정에는 아예 서지 않는다 — 구성원 추가·제거도 그 안에 있다.",
+        ("components/features/Scheduler/SchedulerContainer.tsx",),
     ),
 }
 
@@ -240,14 +248,32 @@ def main() -> int:
             ungated.append(f"{rel} — {', '.join(sorted(names))}")
 
     stale = sorted(set(EXEMPT) - set(screens))
-    print(f"  화면 대조 — 쓰기를 부르는 파일 {len(screens)}개 (면제 {len(EXEMPT)}개)")
+
+    # 면제의 근거는 「위임처가 게이트를 진다」이므로, 그 위임처를 실제로 열어 확인한다.
+    delegates = sorted({d for _, targets in EXEMPT.values() for d in targets})
+    if not delegates:
+        fail("면제의 위임처가 0건이다 — 면제가 근거 없이 통과한다")
+    missing: list[str] = []
+    for rel in delegates:
+        path = FRONTEND / rel
+        if not path.is_file():
+            missing.append(f"{rel} — 파일이 없다(옮겨졌다)")
+            continue
+        if not any(marker in path.read_text(encoding="utf-8") for marker in GATE_MARKERS):
+            missing.append(f"{rel} — 게이트 표식이 없다")
+
+    print(f"  화면 대조 — 쓰기를 부르는 파일 {len(screens)}개 (면제 {len(EXEMPT)}개 · 위임처 {len(delegates)}개)")
 
     if stale:
         fail("면제 목록이 낡았다 — 더는 쓰기 함수를 부르지 않는다:\n  " + "\n  ".join(stale))
+    if missing:
+        fail("면제의 위임처가 게이트를 지지 않는다 — 면제가 근거를 잃었다:\n  " + "\n  ".join(missing))
     if ungated:
         fail("누르기 전에 막힘을 말하지 않는 화면이 있다 (useWriteAccess·writeGated 없음):\n  " + "\n  ".join(ungated))
 
-    print(f"OK — 게이트 엔드포인트 {endpoints}개 · 화면 {len(screens)}개 전부 사유를 미리 말한다")
+    print(
+        f"OK — 게이트 엔드포인트 {endpoints}개 · 화면 {len(screens)}개 · 위임처 {len(delegates)}개 전부 사유를 미리 말한다"
+    )
     return 0
 
 
