@@ -7,7 +7,7 @@ import jsonwebtoken from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import path from "path";
 import { env } from "@/env";
-import { SYS_ADMIN_AUTHOR_ID, AUTHOR_PRIORITY } from "@/constants/protected";
+import { resolveAccountContext } from "@/lib/auth/accountContext";
 import { v7 as uuidv7 } from "uuid";
 
 const JWT_SECRET = env.JWT_SECRET || "";
@@ -123,58 +123,16 @@ export const auth = betterAuth({
     session: {
       create: {
         before: async (session) => {
-          const user = await prisma.user.findUnique({
-            where: { id: session.userId },
-            select: {
-              use_at: true,
-              appr_at: true,
-              email: true,
-              workspace_id: true,
-              workspace: { select: { use_at: true } },
-              // 기본 멤버십은 사용자당 1행이어야 하지만 DB 가 강제하지 못한다 (Prisma 스키마로
-              // partial unique index 를 표현할 수 없어 `prisma db push` 경로에 심을 자리가 없다 — #253).
-              // 그래서 정렬을 못 박는다: 불변식이 깨져도 로그인마다 테넌트가 바뀌지는 않게 한다.
-              workspace_members: {
-                where: { is_default: true },
-                select: { workspace_id: true, workspace: { select: { use_at: true } } },
-                orderBy: { workspace_id: "asc" },
-                take: 1,
-              },
-            },
-          });
-          if (user?.appr_at === "R") throw new APIError("FORBIDDEN", { message: "RejectedUser" });
-          if (user?.appr_at !== "Y") throw new APIError("FORBIDDEN", { message: "PendingApproval" });
-          if (user?.use_at === "N") throw new APIError("FORBIDDEN", { message: "InactiveUser" });
-
-          const memberships = await prisma.authorMember.findMany({
-            where: { user_id: user.email },
-            select: { author_id: true },
-          });
-          const authorIds = memberships.map((m) => m.author_id);
-
-          // 대표 권한: 행동 권한 우선순위로 먼저 집고 없으면 자유 권한 fallback (숫자 정렬 비의존)
-          const authorId = AUTHOR_PRIORITY.find((a) => authorIds.includes(a)) ?? authorIds[0] ?? null;
-
-          // 세션이 담는 것은 "소속"이 아니라 "지금 선택된 워크스페이스" — 기본 멤버십이 결정하고,
-          // 아직 멤버십이 없는 계정은 사용자 행의 워크스페이스로 떨어진다.
-          const defaultMembership = user.workspace_members[0];
-          const selectedWorkspace = defaultMembership
-            ? { id: defaultMembership.workspace_id, use_at: defaultMembership.workspace.use_at }
-            : user.workspace
-              ? { id: user.workspace_id, use_at: user.workspace.use_at }
-              : null;
-
-          // 워크스페이스 비활성 시 사용자도 접근 불가 — 단 시스템관리자(admin)는 무관하게 통과
-          const isSysAdmin = authorId === SYS_ADMIN_AUTHOR_ID;
-          if (!isSysAdmin && selectedWorkspace && selectedWorkspace.use_at !== "Y") {
-            throw new APIError("FORBIDDEN", { message: "InactiveWorkspace" });
-          }
+          // 로그인 시점의 판정도 요청마다 도는 판정(`withAuth`)과 **같은 함수**를 쓴다 — 두 벌로
+          // 두면 갈린다 (#354). 여기서는 사유를 그대로 로그인 거절로 올린다.
+          const account = await resolveAccountContext(session.userId);
+          if (account.block) throw new APIError("FORBIDDEN", { message: account.block });
 
           return {
             data: {
               ...session,
-              authorId,
-              workspaceId: selectedWorkspace?.id ?? null,
+              authorId: account.authorId,
+              workspaceId: account.workspaceId,
             },
           };
         },

@@ -1,6 +1,8 @@
 // utils/common/locale/en/apierrors.ts
 // API 에러 클라이언트 폴백 메시지 (English). 로직은 errors/apierrors.ts, ko 는 ../ko/apierrors.ts.
 
+import type { EmailFailureCode } from "@/utils/common/errors/emailFailure";
+
 export const STATUS_MESSAGES: Record<number, string> = {
   400: "Bad request.",
   401: "Your session has ended. Please sign in again.",
@@ -25,6 +27,16 @@ export const FALLBACK = {
   processing: "An error occurred while processing the request.",
   network: "Please check your network connection",
   unknown: "An unknown error occurred",
+};
+
+// Mail delivery failure reasons — key = EmailFailureCode from errors/emailFailure.ts.
+// The server sends only the code; the raw SMTP text stays in the log (#342).
+export const EMAIL_FAILURE_MESSAGES: Record<EmailFailureCode, string> = {
+  "email.mailbox_unknown": "That email address does not exist.\nPlease check the address.",
+  "email.mailbox_rejected": "That email address refused the message.\nPlease try another address.",
+  "email.smtp_unreachable": "The mail server could not be reached.\nTry again shortly or contact an administrator.",
+  "email.smtp_auth_failed": "The mail server rejected our sign-in.\nPlease contact an administrator.",
+  "email.send_failed": "The email could not be sent.\nCheck the address or try again shortly.",
 };
 
 // Prisma error translations — key = type emitted by lib/prisma/error.ts (real code P#### / prisma_*)
