@@ -310,7 +310,7 @@ describe("ParamGrid", () => {
 
   it("사유가 가림에 전부 지워져도 그 칸은 척도 밖에 남는다 — 「말할 수 없다」가 「없다」로 뒤집히지 않는다", () => {
     // `redactReason` 은 다듬은 뒤 빈 문구가 되면 null 을 돌려준다(공백뿐인 사유가 그렇다).
-    // 판정이 그 결과에 묶여 있으면 그 칸이 척도로 되돌아온다 — 판정은 원본 사유의 유무로만.
+    // 판정이 그 결과 하나에 매달리면 그 칸이 척도로 되돌아온다 — 건수가 받쳐야 한다.
     const base = gridWithNoTradeCell();
     const redacted: GridOut = {
       ...base,
@@ -321,7 +321,7 @@ describe("ParamGrid", () => {
     };
     render(<ParamGrid grid={redacted} selectedRunId={null} onSelect={vi.fn()} />);
 
-    const cell = screen.getByRole("button", { name: /ma_period=20 · pullback_pct=3 — 사유를 낼 수 없습니다/ });
+    const cell = screen.getByRole("button", { name: /ma_period=20 · pullback_pct=3 — 거래 없음/ });
     expect(cell.style.backgroundColor).toBe("");
     expect(cell.textContent).toBe("거래 0건");
   });

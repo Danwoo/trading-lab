@@ -28,24 +28,32 @@ function shadeable(cell: GridCellOut) {
 }
 
 /**
- * 척도 밖인가 — **원본 사유의 유무로만 가른다.**
+ * 척도 밖인가 — **사유 문구 하나에 매달리지 않는다.**
  *
- * 판정을 가림(`redactReason`)에 묶으면 안 된다: 사유가 전부 가려져 빈 문구가 되는 순간
- * 그 칸이 척도로 되돌아온다 — 「말할 수 없다」가 「사유가 없다」로 뒤집히는 것이다.
- * 가림은 **화면에 적을 때**만 지난다 (#251).
+ * 사유는 `redactReason` 안에서만 읽는다 (#251 — 원문에 키가 실릴 수 있어 이 레포는 읽는
+ * 자리마다 가림을 강제한다). 그런데 가림은 다듬은 결과가 빈 문구면 `null` 을 돌려주므로,
+ * 판정이 그 결과 하나에 매달리면 사유가 지워지는 순간 그 칸이 척도로 되돌아온다 —
+ * 「말할 수 없다」가 「사유가 없다」로 뒤집히는 것이다.
+ *
+ * 그래서 **건수라는 사실**로 받친다: 한 번도 사지 않은 칸은 사유 문구가 어떻게 되든
+ * 성적을 낼 곡선이 없다. 백엔드도 같은 조건에서 사유를 싣는다.
  */
 function outOfScale(cell: GridCellOut): boolean {
-  return (cell.metrics?.absent_reason ?? null) !== null;
+  const metrics = cell.metrics;
+  if (!metrics) return false;
+  if (redactReason(metrics.absent_reason) !== null) return true;
+  return metrics.closed_trades === 0 && metrics.open_positions === 0;
 }
 
 /**
  * 화면에 적을 사유 — 가림을 지난 문구.
  *
- * 가림이 문구를 통째로 지웠으면 그 사실을 적는다. 빈 칸으로 두면 왜 척도 밖인지 화면
- * 어디에도 안 남는다.
+ * 가림이 문구를 통째로 지웠거나 백엔드가 사유를 안 실었으면 **건수가 말한 것**을 적는다.
+ * 이 자리는 척도 밖인 칸에서만 불리고, 문구가 없는 척도 밖은 건수가 0 인 칸뿐이다.
+ * 빈 칸으로 두면 왜 척도 밖인지 화면 어디에도 안 남는다.
  */
 function absentReasonText(cell: GridCellOut): string {
-  return redactReason(cell.metrics?.absent_reason) ?? "사유를 낼 수 없습니다 — 전부 가려졌습니다";
+  return redactReason(cell.metrics?.absent_reason) ?? "거래 없음 — 성적을 낼 곡선이 없습니다";
 }
 
 /** 「몇 건 사고팔았나」 — 「청산 안 함」과 「거래 없음」을 가른다 (#314). */
