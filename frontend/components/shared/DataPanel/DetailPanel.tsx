@@ -12,6 +12,16 @@ import { WRITE_DENIED_SHORT } from "@/constants/writeAccess";
 
 type ModeType = "view" | "edit" | "create";
 
+/**
+ * 삭제 확인 창의 내용 — 「정말 삭제하시겠습니까?」한 줄로는 무엇을 지우는지 안 보인다 (#356).
+ * `target` 은 화면이 이미 갖고 있는 이름이라 항상 준다. `cascadeLines` 는 이 삭제가 **DB 에서
+ * 실측한** 연쇄를 낼 때만 — 짐작으로 채우지 않는다.
+ */
+export interface DeleteConfirmInfo {
+  target: string;
+  cascadeLines?: string[];
+}
+
 interface Props<T, F> {
   title?: React.ReactNode;
   data: T | null;
@@ -42,6 +52,13 @@ interface Props<T, F> {
     update?: (data: any) => Promise<any>;
     delete?: (data: any) => Promise<any>;
   };
+  /**
+   * 삭제 확인 창에 실을 대상·연쇄 정보를 부르는 쪽이 계산해 준다 (#356). 생략하면 옛 문구
+   * 그대로 「정말 삭제하시겠습니까?」다 — `apiService.delete` 를 쓰는 화면은 반드시 준다.
+   * 연쇄 건수가 필요하면(코드 그룹·권한·메뉴·포트폴리오·스케줄러) 여기서 API 를 호출해 세고
+   * 온 뒤 확인 창을 띄운다 — 세는 동안은 `isLoading` 스피너가 선다.
+   */
+  deleteConfirm?: (data: T) => DeleteConfirmInfo | Promise<DeleteConfirmInfo>;
 }
 
 export function DetailPanel<T, F>({
@@ -57,6 +74,7 @@ export function DetailPanel<T, F>({
   onComplete,
   writeGated,
   apiService,
+  deleteConfirm,
 }: Props<T, F>) {
   const isWriteGated = writeGated !== undefined;
   // 막힌 계정에는 등록 폼을 아예 세우지 않는다 — 다 채운 뒤 「저장」에서 403 을 만나는 것이
@@ -155,7 +173,30 @@ export function DetailPanel<T, F>({
   const handleDelete = async (): Promise<void> => {
     if (!currentData || !apiService || !apiService.delete) return;
 
-    showMessage("삭제 확인", <div>정말 삭제하시겠습니까?</div>, {
+    let content: React.ReactNode = <div>정말 삭제하시겠습니까?</div>;
+    if (deleteConfirm) {
+      setIsLoading(true);
+      try {
+        const info = await deleteConfirm(currentData);
+        content = (
+          <div>
+            <div>삭제 대상: {info.target}</div>
+            {info.cascadeLines?.map((line, i) => (
+              <div key={i} className="mt-1 text-sm text-gray-600">
+                {line}
+              </div>
+            ))}
+          </div>
+        );
+      } catch (error) {
+        setIsLoading(false);
+        showToast(getApiErrorMessage(error), "error");
+        return;
+      }
+      setIsLoading(false);
+    }
+
+    showMessage("삭제 확인", content, {
       type: "confirm",
       confirmText: "삭제",
       cancelText: "취소",

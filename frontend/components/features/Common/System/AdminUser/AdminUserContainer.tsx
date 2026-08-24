@@ -4,6 +4,7 @@
 import type { LegacyGridColumn } from "@/types/grid";
 import { SplitPane } from "@/components/shared/Layout/SplitPane";
 import { MasterPanel, DetailPanel } from "@/components/shared/DataPanel";
+import type { DeleteConfirmInfo } from "@/components/shared/DataPanel/DetailPanel";
 import { MasterGrid } from "@/components/shared/DataGrid";
 import AdminUserDetailView from "./AdminUserDetailView";
 import AdminUserDetailForm from "./AdminUserDetailForm";
@@ -14,6 +15,7 @@ import {
   updateAdminUser,
   deleteAdminUser,
 } from "@/services/common/adminUserService";
+import type { AdminUserOut } from "@/schemas/common/adminUser";
 import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
 import { useExcelExport } from "@/hooks/shared/useExcelExport";
 import { useMasterGridActions } from "@/hooks/shared/useMasterGridActions";
@@ -108,6 +110,12 @@ export default function AdminUserContainer() {
     delete: deleteAdminUser,
   };
 
+  // 대상 이름만 말한다 — `deleteUserCascade`(authUtils.ts) 의 다건 연쇄(권한 배정·세션·
+  // 워크스페이스 소속·소유한 개인 워크스페이스까지)는 이 이슈의 완료 조건 밖이라 PR 「발견」에 남긴다.
+  const buildDeleteConfirm = (data: AdminUserOut): DeleteConfirmInfo => ({
+    target: data.name ? `${data.name} (${data.email})` : data.email,
+  });
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0 border-t">
@@ -133,6 +141,7 @@ export default function AdminUserContainer() {
               defaultFormData={{ appr_at: "Y", use_at: "Y" }}
               onComplete={handleCompleteWithRefresh}
               apiService={apiService}
+              deleteConfirm={buildDeleteConfirm}
             />,
           ]}
         </SplitPane>

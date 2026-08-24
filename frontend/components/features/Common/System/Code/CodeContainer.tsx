@@ -3,6 +3,7 @@
 import type { LegacyGridColumn } from "@/types/grid";
 import { SplitPane } from "@/components/shared/Layout/SplitPane";
 import { MasterPanel, DetailPanel } from "@/components/shared/DataPanel";
+import type { DeleteConfirmInfo } from "@/components/shared/DataPanel/DetailPanel";
 import { MasterGrid } from "@/components/shared/DataGrid";
 import CodeDetailView from "./CodeDetailView";
 import CodeDetailForm from "./CodeDetailForm";
@@ -13,6 +14,7 @@ import {
   updateCodeGroup,
   deleteCodeGroup,
 } from "@/services/common/codeService";
+import type { CodeGroupOut } from "@/schemas/common/code";
 import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
 import { useExcelExport } from "@/hooks/shared/useExcelExport";
 import { useMasterGridActions } from "@/hooks/shared/useMasterGridActions";
@@ -75,6 +77,15 @@ export default function CodeContainer() {
     delete: deleteCodeGroup,
   };
 
+  // `selectCodeGroup` 이 이미 하위 코드를 `codes` 로 받아 온다 — 별도 API 호출 없이 실측된 건수다.
+  const buildDeleteConfirm = (data: CodeGroupOut): DeleteConfirmInfo => {
+    const codeCount = data.codes?.length ?? 0;
+    return {
+      target: `${data.group_code} ${data.group_code_nm}`,
+      cascadeLines: codeCount > 0 ? [`하위 코드 ${codeCount}건이 함께 삭제됩니다.`] : undefined,
+    };
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0 border-t">
@@ -100,6 +111,7 @@ export default function CodeContainer() {
               defaultFormData={{ use_at: "Y" }}
               onComplete={handleCompleteWithRefresh}
               apiService={apiService}
+              deleteConfirm={buildDeleteConfirm}
             />,
           ]}
         </SplitPane>
