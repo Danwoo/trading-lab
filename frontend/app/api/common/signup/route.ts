@@ -12,6 +12,7 @@ import {
   resolveOemSharedWorkspace,
   syncDefaultWorkspaceMembership,
 } from "@/lib/auth/authUtils";
+import { consumeSignupVerificationGrant } from "@/lib/auth/signupVerificationGrant";
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: false, name: "body" }, { status: 400 });
   }
 
-  const { email: rawEmail, password, name, dept: rawDept } = body as Record<string, unknown>;
+  const { email: rawEmail, password, name, dept: rawDept, verificationToken } = body as Record<string, unknown>;
   // 이후 이메일은 저장·조회·감사컬럼 전부 이 정규화 값만 쓴다 — Better Auth 가 저장하는 값과
   // 같은 규칙이라야 방금 만든 사용자를 바로 다음 줄에서 찾을 수 있다 (#250).
   const email = normalizeEmail(typeof rawEmail === "string" ? rawEmail : "");
@@ -99,6 +100,14 @@ export async function POST(req: NextRequest) {
 
     if (data) {
       return NextResponse.json({ result: false, name: "email" });
+    }
+
+    // **이메일 소유 증명이 여기서 강제된다** (#343). 마법사 1단계는 리액트 상태일 뿐이라
+    // 가입 API 를 직접 부르면 인증을 한 번도 통과하지 않고 계정이 만들어졌다. 검사를 화면이
+    // 아니라 **계정을 만드는 자리**에 두어야, 마법사를 고쳐도 구멍이 다시 열리지 않는다.
+    // 증거는 한 번만 쓰이고 여기서 소비된다 — 아래가 실패해 보상 삭제로 접히면 인증부터 다시 한다.
+    if (!(await consumeSignupVerificationGrant(email, verificationToken))) {
+      return NextResponse.json({ result: false, name: "verification" }, { status: 403 });
     }
 
     const oem = isOEM();

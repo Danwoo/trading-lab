@@ -404,15 +404,38 @@ class BacktestService:
             if failed_reason is None and cell.result.equity:
                 from services.backtest.metrics import longest_underwater, max_drawdown
 
-                _eq = [p.equity for p in cell.result.equity]
-                _under, _still = longest_underwater(_eq)
-                _mdd, _, _ = max_drawdown(_eq)
-                cell_metrics = {
-                    "longest_underwater": float(_under),
-                    "still_underwater": _still,
-                    "mdd_pct": _mdd * 100,
-                    "total_return_pct": ((_eq[-1] - _eq[0]) / _eq[0] * 100 if _eq[0] else None),
-                }
+                # **「거래가 없었다」와 「낙폭이 0 이었다」는 다른 사실이다** (#349).
+                # 자리를 한 번도 잡지 않은 조합의 곡선은 시작 자금 그대로 평평하다 — 거기서
+                # 나오는 0 은 성적이 아니라 아무 일도 없었다는 뜻인데, 숫자로 실어 보내면
+                # 격자가 그 칸을 척도의 **가장 좋은 끝**으로 칠한다(실측: 25칸 중 16칸).
+                #
+                # 열린 자리가 하나라도 있으면 곡선은 실제로 움직였으므로 값은 진짜다 —
+                # 「청산 안 함」과 「거래 없음」을 가르는 #314 의 규약을 여기서도 따른다.
+                closed_trades = len(cell.result.trades)
+                open_positions = 1 if cell.result.open_position else 0
+                if closed_trades == 0 and open_positions == 0:
+                    cell_metrics = {
+                        "longest_underwater": None,
+                        "still_underwater": None,
+                        "mdd_pct": None,
+                        "total_return_pct": None,
+                        "closed_trades": 0,
+                        "open_positions": 0,
+                        "absent_reason": "거래 없음 — 이 조합은 한 번도 사지 않았습니다. 성적을 낼 곡선이 없습니다",
+                    }
+                else:
+                    _eq = [p.equity for p in cell.result.equity]
+                    _under, _still = longest_underwater(_eq)
+                    _mdd, _, _ = max_drawdown(_eq)
+                    cell_metrics = {
+                        "longest_underwater": float(_under),
+                        "still_underwater": _still,
+                        "mdd_pct": _mdd * 100,
+                        "total_return_pct": ((_eq[-1] - _eq[0]) / _eq[0] * 100 if _eq[0] else None),
+                        "closed_trades": closed_trades,
+                        "open_positions": open_positions,
+                        "absent_reason": None,
+                    }
 
             cells_out.append(
                 {

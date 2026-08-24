@@ -90,7 +90,14 @@ export function TerminalContainer() {
 
       <IngestConsole />
 
-      <div className="flex min-h-0 flex-1">
+      {/*
+          `min-h-0` 이 아니라 **높이 하한**을 준다. 위의 적재 콘솔이 좁은 폭에서 화면보다 높아지면
+          `min-h-0 flex-1` 인 이 줄은 0 으로 접히는데, 그러면 안쪽 `overflow-auto` 의 클립 상자가
+          비어 **패널 안의 모든 조작부가 히트 테스트에서 사라진다** — 크기는 24×24 그대로이고
+          `getBoundingClientRect()` 도 화면 안 좌표를 내는데 그 좌표를 찍으면 `MAIN` 이 잡힌다
+          (#289 실측, 폭 390). 하한을 두면 대신 바깥(`main`)이 스크롤한다.
+          값은 격자 한 줄(`auto-rows-[minmax(20rem,1fr)]`)과 같은 20rem 이다. */}
+      <div className="flex min-h-[20rem] flex-1">
         <SymbolSidebar />
 
         <div className="flex min-h-0 flex-1 flex-col">

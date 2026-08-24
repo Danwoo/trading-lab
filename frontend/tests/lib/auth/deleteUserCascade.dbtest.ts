@@ -30,6 +30,7 @@ import {
   deleteUserCascade,
   emailVerificationOtpIdentifier,
   EMAIL_VERIFICATION_OTP_PREFIX,
+  emailVerifiedGrantIdentifier,
   USER_SCOPED_IDENTIFIER_TABLES,
   USER_SCOPED_IDENTIFIER_TABLES_EXCLUDED,
   WORKSPACE_SCOPED_PUBLIC_TABLES,
@@ -592,6 +593,10 @@ describe("deleteUserCascade — 인증 토큰(ba_verification)도 사용자 축�
       emailVerificationOtpIdentifier(neighborEmail),
       hashedIdentifier(`reset-password:${resetToken}`),
       hashedIdentifier(`reset-password:${otherResetToken}`),
+      // OTP 통과 증거(#343) — OTP 와 접두어가 다른 세 번째 평문 키다.
+      emailVerifiedGrantIdentifier(email),
+      emailVerifiedGrantIdentifier(otherEmail),
+      emailVerifiedGrantIdentifier(neighborEmail),
     ];
 
     try {
@@ -631,11 +636,17 @@ describe("deleteUserCascade — 인증 토큰(ba_verification)도 사용자 축�
           { id: randomUUID(), identifier: identifiers[4], value: userId, expiresAt: inOneHour },
           // 남의 재설정 토큰 — 살아 있어야 한다.
           { id: randomUUID(), identifier: identifiers[5], value: otherId, expiresAt: inOneHour },
+          // 탈퇴자의 OTP 통과 증거 (#343).
+          { id: randomUUID(), identifier: identifiers[6], value: "grant-hash", expiresAt: inOneHour },
+          // 남의 증거 — 살아 있어야 한다.
+          { id: randomUUID(), identifier: identifiers[7], value: "grant-hash", expiresAt: inOneHour },
+          // 이웃 주소(접두어 확장)의 증거 — 살아 있어야 한다.
+          { id: randomUUID(), identifier: identifiers[8], value: "grant-hash", expiresAt: inOneHour },
         ],
       });
 
       // 심은 것이 실제로 들어갔는지 먼저 확인한다 — 0건이면 "삭제 후 0건" 은 아무것도 증명하지 못한다.
-      expect(await prisma.baVerification.count({ where: { identifier: { in: identifiers } } })).toBe(6);
+      expect(await prisma.baVerification.count({ where: { identifier: { in: identifiers } } })).toBe(9);
 
       await expect(deleteUserCascade(email)).resolves.toBeUndefined();
 
@@ -647,9 +658,11 @@ describe("deleteUserCascade — 인증 토큰(ba_verification)도 사용자 축�
       )
         .map((r) => r.identifier)
         .sort();
-      // 지워진 것: 탈퇴자의 평문 OTP 2건(대소문자 변형 포함) + 재설정 토큰 1건.
-      // 남은 것: 남의 OTP·이웃 주소 OTP·남의 재설정 토큰.
-      expect(remaining).toEqual([identifiers[2], identifiers[3], identifiers[5]].sort());
+      // 지워진 것: 탈퇴자의 평문 OTP 2건(대소문자 변형 포함) + 재설정 토큰 1건 + 인증 증거 1건.
+      // 남은 것: 남의 OTP·이웃 주소 OTP·남의 재설정 토큰·남의 증거·이웃 주소 증거.
+      expect(remaining).toEqual(
+        [identifiers[2], identifiers[3], identifiers[5], identifiers[7], identifiers[8]].sort(),
+      );
     } finally {
       await prisma.baVerification.deleteMany({ where: { identifier: { in: identifiers } } });
       await prisma.workspaceMember.deleteMany({ where: { user_id: { in: [userId, otherId] } } });
