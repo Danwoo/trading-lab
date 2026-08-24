@@ -11,12 +11,16 @@ import type { DataKeyStatus } from "@/services/dataKey/dataKeyService";
 
 afterEach(() => cleanup());
 
+// 실제 설정 이름을 적지 않는다 — 그 이름이 나와도 되는 자리는 정의처·로더·예시뿐이고
+// `backend-service/scripts/verify_data_key_env_boundary.py` 가 그 밖의 코드를 잡는다. 백엔드
+// 테스트는 로더의 표에서 이름을 꺼내 쓰지만 그 표는 파이썬에만 있고, 이 컴포넌트는 이름의
+// 내용을 보지 않으므로 여기서는 지어낸 한 쌍으로 충분하다.
 const ROW: DataKeyStatus = {
-  source: "alpaca",
-  setting: "MARKET_DATA_ALPACA_KEY",
+  source: "fixture-source",
+  setting: "FIXTURE_SETTING_NOT_A_REAL_KEY",
   filled: false,
   secret: true,
-  guidance: "Alpaca 계정(paper) → API Keys",
+  guidance: "발급처에서 받은 값을 넣습니다",
 };
 
 describe("DataKeyRow — 넣는 자리는 시스템관리자만 (#344)", () => {

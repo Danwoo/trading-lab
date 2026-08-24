@@ -19,7 +19,7 @@ import { useSessionContext } from "@/hooks/shared/useSessionContext";
 export function DataKeyList() {
   const [rows, setRows] = useState<DataKeyStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { isSysAdmin, isLoaded } = useSessionContext();
+  const { isSysAdmin, isLoaded: sessionLoaded, isPending: sessionPending } = useSessionContext();
 
   const load = useCallback(() => {
     setError(null);
@@ -36,17 +36,27 @@ export function DataKeyList() {
     // 「못 읽었다」와 「없다」를 가른다 — 둘 다 회색이면 같아 보인다.
     return <p className="break-keep text-sm text-danger">키 상태를 읽지 못했습니다 — {error}</p>;
   }
-  if (rows === null || !isLoaded) {
+  if (rows === null || sessionPending) {
     // 세션이 오기 전에 그리면 시스템관리자에게도 「할 수 없습니다」가 한 번 스쳤다가 뒤집힌다.
+    // 기다리는 것은 「읽는 중」일 때뿐이다 — 세션이 끝내 안 오면 아래서 그 사실을 말한다.
     return <p className="break-keep text-sm text-ink-muted">불러오는 중입니다…</p>;
   }
   if (rows.length === 0) {
     return <p className="break-keep text-sm text-ink-muted">키로 여는 소스가 없습니다.</p>;
   }
 
+  // 세션을 못 읽었으면 누가 넣을 수 있는지 **모르는** 것이다 — 「권한 없음」이라 말하지 않는다.
+  const canWrite = sessionLoaded && isSysAdmin;
+
   return (
     <>
-      {!isSysAdmin && (
+      {!sessionLoaded && (
+        <p className="mb-2 break-keep text-2xs text-danger">
+          로그인 정보를 읽지 못해 값을 넣을 수 있는지 판단하지 못했습니다 — 아래는 상태만 보입니다. 다시 열어도 같다면
+          로그인부터 다시 하세요.
+        </p>
+      )}
+      {sessionLoaded && !isSysAdmin && (
         <p className="mb-2 break-keep text-2xs text-ink-muted">
           값을 넣는 것은 <strong className="font-normal text-ink">시스템관리자</strong>만 할 수 있습니다 — 이 설치를
           쓰는 모두에게 적용되는 값이라서입니다. 아래는 상태만 보입니다.
@@ -54,7 +64,7 @@ export function DataKeyList() {
       )}
       <ul className="flex min-w-0 flex-col">
         {rows.map((row) => (
-          <DataKeyRow key={`${row.source}:${row.setting}`} row={row} canWrite={isSysAdmin} onSaved={load} />
+          <DataKeyRow key={`${row.source}:${row.setting}`} row={row} canWrite={canWrite} onSaved={load} />
         ))}
       </ul>
     </>

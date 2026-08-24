@@ -6,11 +6,15 @@
 
 이 그물이 잠그는 것:
 
-  ① **`.env` 쓰기를 여는 서비스를 코드에서 찾는다** — 손으로 적은 목록이 아니다.
-     레포의 모든 서비스(`*/app/services/**`)에서 `set_env_value` 를 부르는 모듈을 훑어
-     0건이면 실패한다. backend-service 밖에서 나오면 **모르는 채로 통과시키지 않고** 실패한다
-     — 그 서비스의 라우터 관문은 이 그물이 아직 못 보기 때문이다.
-  ② 그 서비스를 노출하는 라우터의 **쓰기 라우트(POST/PUT/PATCH/DELETE)** 를 전부 센다 — 0건이면 실패.
+  ① **`.env` 쓰기를 여는 모듈을 코드에서 찾는다** — 손으로 적은 목록이 아니다.
+     레포의 모든 backend(`*/app/**/*.py` — 서비스 층만이 아니다)를 AST 로 읽어 `set_env_value`
+     를 **부르거나 import 하는** 모듈을 모은다. 정의처(`def set_env_value`)는 뺀다. 정의처가
+     0건이어도, 호출자가 0건이어도 실패한다. backend-service 밖에서 나오면 **모르는 채로
+     통과시키지 않고** 실패한다 — 그 서비스의 라우터 관문은 이 그물이 아직 못 보기 때문이다.
+  ② 호출자를 노출하는 라우터를 층으로 찾는다 — `services/<도메인>/` 이면 `routers/<도메인>/`
+     의 라우터, `routers/<도메인>/` 이면 그 자신. 그 밖의 층(utils·core·managers…)에서 부르면
+     어느 라우트가 이 쓰기를 여는지 이 그물이 모르므로 실패한다 — 여기에 가르쳐야 초록이 된다.
+     그 라우터의 **쓰기 라우트(POST/PUT/PATCH/DELETE)** 를 전부 센다 — 0건이면 실패.
   ③ 각 쓰기 라우트의 관문을 **실제로 실행해** 판정한다. 데코레이터 문자열을 grep 하지 않는다:
      `user`·`operator`·서비스 토큰·워크스페이스 없음은 막히고, `admin` 만 통과한다.
   ④ 읽기 라우트는 `user` 가 그대로 통과한다 — 과하게 조여 화면을 죽이지 않았음을 같이 잡는다.
@@ -21,10 +25,10 @@ standalone 실행 겸용:
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import importlib
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -82,25 +86,59 @@ def check(name: str, actual, expected) -> None:
         FAILURES.append(f"{name}: 기대 {expected!r} · 실제 {actual!r}")
 
 
-def env_writing_services() -> list[Path]:
-    """`.env` 쓰기를 여는 서비스 모듈 — **레포 전체에서 코드로 찾는다**, 목록을 적지 않는다.
+def _references(tree: ast.Module, name: str) -> bool:
+    """모듈이 `name` 을 부르거나 import 하는가 — 문자열·주석·docstring 은 세지 않는다."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id == name:
+            return True
+        if isinstance(node, ast.Attribute) and node.attr == name:
+            return True
+        if isinstance(node, ast.ImportFrom) and any(alias.name == name for alias in node.names):
+            return True
+    return False
 
-    이 레포의 backend 는 여러 개일 수 있다(`app/main.py` 가 있는 모든 폴더). 그래서 한 서비스만
-    훑으면 다른 서비스가 `.env` 를 쓰기 시작해도 이 그물이 초록인 채로 못 본다.
-    """
-    pattern = re.compile(rf"\b{ENV_WRITER}\b")
-    return sorted(
-        path
-        for path in _REPO_ROOT.glob("*/app/services/**/*_service.py")
-        if pattern.search(path.read_text(encoding="utf-8"))
+
+def _defines(tree: ast.Module, name: str) -> bool:
+    return any(
+        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name for node in ast.walk(tree)
     )
 
 
-def router_module_for(service_path: Path) -> tuple[str, Path]:
-    """서비스를 노출하는 라우터. 규약이 깨지면 **모르는 채로 통과시키지 않고 실패한다.**"""
-    rel = service_path.relative_to(_APP_DIR).as_posix()  # backend-service 안이라는 것은 호출부가 이미 확인했다
-    router_rel = rel.replace("services/", "routers/", 1).replace("_service.py", "_router.py")
-    return router_rel[: -len(".py")].replace("/", "."), _APP_DIR / router_rel
+def env_writing_modules() -> tuple[list[Path], list[Path], int]:
+    """(`.env` 쓰기를 부르는 모듈, 정의처, 훑은 모듈 수) — **레포 전체에서 코드로 찾는다**, 목록을 적지 않는다.
+
+    이 레포의 backend 는 여러 개일 수 있다(`app/main.py` 가 있는 모든 폴더). 그래서 한 서비스만
+    훑으면 다른 서비스가 `.env` 를 쓰기 시작해도 이 그물이 초록인 채로 못 본다. 서비스 층만
+    훑어도 같다 — 라우터·유틸이 직접 부르기 시작하면 data_key 만 계속 잡혀 조용히 초록이 된다.
+    """
+    callers: list[Path] = []
+    definitions: list[Path] = []
+    scanned = 0
+    for path in sorted(_REPO_ROOT.glob("*/app/**/*.py")):
+        scanned += 1
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        if _defines(tree, ENV_WRITER):
+            definitions.append(path)
+        elif _references(tree, ENV_WRITER):
+            callers.append(path)
+    return callers, definitions, scanned
+
+
+def routers_for(caller: Path) -> list[Path]:
+    """호출자를 노출하는 라우터 파일들. 층 규약이 깨지면 **모르는 채로 통과시키지 않고** 빈 목록을 낸다."""
+    parts = caller.relative_to(_APP_DIR).parts  # backend-service 안이라는 것은 호출부가 이미 확인했다
+    if len(parts) < 3:
+        return []
+    layer, domain = parts[0], parts[1]
+    if layer == "routers":
+        return [caller]
+    if layer == "services":
+        return sorted((_APP_DIR / "routers" / domain).glob("*_router.py"))
+    return []
+
+
+def module_name_of(router_path: Path) -> str:
+    return router_path.relative_to(_APP_DIR).with_suffix("").as_posix().replace("/", ".")
 
 
 def run_gate(gate, identity: dict) -> type[Exception] | None:
@@ -128,20 +166,31 @@ def gates_of(route) -> list:
 
 
 def main() -> int:
-    writers = env_writing_services()
+    callers, definitions, scanned = env_writing_modules()
     print(
-        f"`.env` 쓰기를 여는 서비스 {len(writers)}개: "
-        f"{[p.relative_to(_REPO_ROOT).as_posix() for p in writers] or '없음'}"
+        f"훑은 모듈 {scanned}개 · 정의처 {len(definitions)}개 · "
+        f"`.env` 쓰기를 부르는 모듈 {len(callers)}개: "
+        f"{[p.relative_to(_REPO_ROOT).as_posix() for p in callers] or '없음'}"
     )
-    if not writers:
+    if scanned == 0:
+        print("::error::*/app/**/*.py 를 0건 훑었다 — 그물이 아무것도 안 보고 있다", file=sys.stderr)
+        return 1
+    if not definitions:
         print(
-            f"::error::레포의 어느 */app/services/ 에서도 {ENV_WRITER} 를 부르는 모듈을 못 찾았다 — "
+            f"::error::레포의 어느 */app/ 에도 `def {ENV_WRITER}` 가 없다 — "
             "그물이 아무것도 안 보고 있다 (함수 이름이 바뀌었는가?)",
             file=sys.stderr,
         )
         return 1
+    if not callers:
+        print(
+            f"::error::레포의 어느 */app/ 에서도 {ENV_WRITER} 를 부르는 모듈을 못 찾았다 — "
+            "그물이 아무것도 안 보고 있다 (호출부가 이름을 바꿨는가?)",
+            file=sys.stderr,
+        )
+        return 1
 
-    outside = [p for p in writers if not p.is_relative_to(_APP_DIR)]
+    outside = [p for p in callers if not p.is_relative_to(_APP_DIR)]
     if outside:
         for path in outside:
             print(
@@ -152,21 +201,26 @@ def main() -> int:
             )
         return 1
 
-    write_routes = 0
-    read_routes = 0
-
-    for service_path in writers:
-        module_name, router_path = router_module_for(service_path)
-        if not router_path.exists():
+    routers: dict[Path, Path] = {}
+    for caller in callers:
+        found = routers_for(caller)
+        if not found:
             print(
-                f"::error::{service_path.relative_to(_APP_DIR)} 가 {ENV_WRITER} 를 부르는데 "
-                f"짝이 되는 라우터({router_path.relative_to(_APP_DIR)})가 없다 — "
-                "어느 라우트가 이 쓰기를 여는지 이 그물이 모른다. 여기에 가르쳐라",
+                f"::error::{caller.relative_to(_REPO_ROOT).as_posix()} 가 {ENV_WRITER} 를 부르는데 "
+                "어느 라우트가 이 쓰기를 여는지 이 그물이 모른다 (services/<도메인>/ 나 routers/<도메인>/ 이 "
+                "아니거나 짝이 되는 라우터가 없다). 여기에 가르쳐라",
                 file=sys.stderr,
             )
             return 1
+        for router_path in found:
+            routers.setdefault(router_path, caller)
+    print(f"관문을 실행할 라우터 {len(routers)}개: {[p.relative_to(_APP_DIR).as_posix() for p in routers]}")
 
-        router = importlib.import_module(module_name).router
+    write_routes = 0
+    read_routes = 0
+
+    for router_path in routers:
+        router = importlib.import_module(module_name_of(router_path)).router
         for route in router.routes:
             gates = gates_of(route)
             for method in sorted(route.methods):
