@@ -10,6 +10,7 @@ import { useMarketCapabilities } from "@/hooks/terminal/useMarketCapabilities";
 import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
 import { insertIngestRun } from "@/services/terminal/ingestService";
 import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
+import { observeIngestRuns } from "@/stores/terminal/ingestSignalStore";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import type { DataKind, IngestRunOut } from "@/schemas/terminal/ingest";
 import type { MarketCapability } from "@/services/terminal/marketService";
@@ -378,6 +379,18 @@ export function IngestConsole() {
     const timer = setInterval(() => setReloadToken((n) => n + 1), POLL_MS);
     return () => clearInterval(timer);
   }, [runningNow]);
+
+  /**
+   * **적재가 끝난 시점을 아는 유일한 자리가 여기다** — 그래서 여기서 알린다(#350).
+   *
+   * 이 이력 목록이 「받음 · 242행」으로 갱신되는 동안 차트는 「아직 적재되지 않았습니다」로
+   * 남아 있었다. 화면이 한 자리에서 두 말을 한 것이다. 판을 스토어에 넘기면 적재본을 읽는
+   * 훅들이 자기 종목의 세대가 올랐을 때만 다시 받는다.
+   */
+  useEffect(() => {
+    if (runs.data === null) return;
+    observeIngestRuns(runs.data);
+  }, [runs.data]);
 
   /**
    * 종목 목록(마스터) 받기 — **종목 선택에 매이지 않는 유일한 경로**다.

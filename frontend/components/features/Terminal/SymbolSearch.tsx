@@ -5,6 +5,7 @@ import { createWatchlist } from "@/services/watchlist/watchlistService";
 import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 import { selectInstrumentList } from "@/services/terminal/instrumentService";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
+import { INSTRUMENT_MASTER_SIGNAL_KEY, useIngestRevision } from "@/stores/terminal/ingestSignalStore";
 import type { InstrumentOut } from "@/schemas/terminal/instrument";
 import type { SymbolRef } from "@/types/terminal/context";
 
@@ -42,6 +43,9 @@ export function SymbolSearch({ onAdded, onClose }: SymbolSearchProps) {
   const [addingTicker, setAddingTicker] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const requestToken = useRef(0);
+  // 「종목 목록 받기」가 마스터를 채우면 다시 훑는다 — 안 그러면 방금 받은 4,303행을 두고
+  // 「아직 안 받았습니다」가 그대로 남는다(#350 과 같은 계통).
+  const masterRevision = useIngestRevision(INSTRUMENT_MASTER_SIGNAL_KEY);
 
   useEffect(() => {
     const token = ++requestToken.current;
@@ -65,7 +69,7 @@ export function SymbolSearch({ onAdded, onClose }: SymbolSearchProps) {
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, masterRevision]);
 
   const writeAccess = useWriteAccess();
 

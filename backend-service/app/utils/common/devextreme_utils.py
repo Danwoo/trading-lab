@@ -65,6 +65,26 @@ def parse_filter_sort(
         raise BadRequestError(_JSON_DEPTH_MESSAGE) from e
 
 
+# 값이 비어 있는 행의 자리 — 방향과 무관하게 항상 끝이다.
+#
+# PostgreSQL 의 기본은 `ASC` 면 NULLS LAST, `DESC` 면 NULLS FIRST 다. 즉 NULL 이 "가장 큰 값"으로
+# 취급돼, 목표가를 내림차순으로 정렬하면 **목표가가 없는 행**이 1등으로 온다 — "가장 높은 목표가"를
+# 찾으려고 열 머리를 누른 사람이 맨 위에서 보는 것은 빈 칸이다(#352). 격자에서 열을 정렬하는 것은
+# "값이 큰 것부터 보여 달라"는 뜻이므로, 값이 없는 행은 어느 방향에서든 뒤로 보낸다.
+#
+# ASC 에서는 PostgreSQL 기본과 결과가 같지만 그래도 명시한다 — 방향마다 규칙이 갈리면 다음 사람이
+# 다시 이 함정을 판단해야 하고, 이 유틸은 이미 방언 중립이 아니다(ILIKE). 규칙을 SQL 에 적어 두면
+# 읽는 사람이 방언 기본값을 몰라도 정렬 결과를 안다. `ASC NULLS LAST` 는 btree 인덱스의 정렬과 같아
+# 실행계획도 그대로다(실측).
+#
+# 값은 치른다 — `DESC NULLS LAST` 는 인덱스 정렬과 어긋나 정렬 없는 역방향 스캔을 못 쓴다
+# (실측 PostgreSQL 16.2: `Index Scan Backward` → `Sort` + `Seq Scan`). 사용자가 고른 열이라
+# nullable 인지 미리 알 수 없고, 빈 칸이 1등으로 오는 것보다는 정렬 비용이 낫다. 반대로 호출부의
+# **기본** 정렬 절은 작성자가 컬럼을 고르므로 여기 규율을 강제하지 않는다 —
+# tests/test_sort_null_ordering.py 가 그 경계와 근거를 적고 있다.
+_NULLS_POSITION = "NULLS LAST"
+
+
 def parse_sort(sort_obj) -> str | None:
     """DevExtreme sort 배열을 SQL ORDER BY 문자열로 변환"""
     if isinstance(sort_obj, str):
@@ -87,7 +107,8 @@ def parse_sort(sort_obj) -> str | None:
             desc = s.get("desc", False)
             if selector:
                 _validate_identifier(selector)
-                sort_clauses.append(f"{selector} {'DESC' if desc else 'ASC'}")
+                direction = "DESC" if desc else "ASC"
+                sort_clauses.append(f"{selector} {direction} {_NULLS_POSITION}")
         return ", ".join(sort_clauses)
 
     return None
