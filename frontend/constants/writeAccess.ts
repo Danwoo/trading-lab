@@ -36,6 +36,10 @@ export const ROLE_GATED_WRITE_PREFIXES: readonly string[] = [
  * `WRITE_AUTHOR_IDS` 로 판단하면 운영자에게 「쓸 수 있다」고 그려 놓고 누를 때만 403 이 온다.
  * 이 갈래는 워크스페이스에 속하지 않는 전역 변경이라 운영자도 막힌다 — `.env` 를 고쳐 쓰는
  * 데이터 소스 키가 그렇다 (#344). 화면은 세션의 시스템관리자 여부로 그린다.
+ *
+ * 위 목록과 마찬가지로 소비자가 TypeScript 밖이라 `@public` 을 단다.
+ *
+ * @public
  */
 export const ADMIN_ONLY_WRITE_PREFIXES: readonly string[] = ["/data-key"];
 
