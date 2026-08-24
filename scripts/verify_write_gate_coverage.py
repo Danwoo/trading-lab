@@ -13,13 +13,22 @@
    frontend `constants/writeAccess.ts` 의 `WRITE_AUTHOR_IDS` 가 같은 집합인가.
 2. **가입 배정** — `constants/protected.ts` 의 `SIGNUP_AUTHOR_ID` 가 그 쓰기 역할 중 하나인가.
    (리드 결정 2026-08-23 — 가입자는 자기 워크스페이스의 운영자다. 게스트로 되돌리면 여기서 갈린다.)
-3. **경계 대조** — 게이트가 걸린 라우터의 prefix 집합 == `ROLE_GATED_WRITE_PREFIXES`.
+3. **경계 대조** — 게이트가 걸린 라우터의 prefix 집합이 프론트 선언과 같은가. **게이트는 한
+   갈래가 아니다**: 쓰기 역할(`WRITE_ROLES` = admin·operator)이 여는 것과 **시스템관리자만**
+   여는 것(`require_role(ROLE_ADMIN)`)은 화면이 그려야 할 경계가 다르다 — 전자를
+   `ROLE_GATED_WRITE_PREFIXES`, 후자를 `ADMIN_ONLY_WRITE_PREFIXES` 와 각각 대조한다. 둘을
+   한 목록에 담으면 operator 에게 「쓸 수 있다」고 그려 놓고 누를 때 403 이 온다(#344 의 `.env`).
    라우터 파일은 `routers/` 아래를 **깊이·이름 무관**하게 훑고(한 단계 글롭은 `sub/` 에 심은
    라우터를 못 봤다 — #330 이 잡은 `**` 함정과 같은 부류), 한 파일에 `APIRouter` 가 여럿이면
    `require_role` 이 걸린 엔드포인트를 **그 데코레이터의 라우터 변수**로 귀속시킨다(첫 prefix 만
    읽으면 두 번째 게이트 prefix 가 조용히 초록이고, 게이트 없는 첫 라우터를 지목해 오진한다).
-4. **설명 대조** — 그 prefix 로 쓰기를 내는 서비스 함수를 import 하는 화면 파일이, 권한 판정
-   (`useWriteAccess`) 이나 그것을 대신 지는 공용 패널 플래그(`writeGated`) 를 실제로 참조하는가.
+   게이트를 **모듈 수준 이름으로 한 번만 적은 라우터**(`require_key_writer = require_role(...)`
+   → `Depends(require_key_writer)`)도 읽는다 — 그 별칭을 못 따라가면 게이트가 실재하는데
+   「어디에도 안 걸렸다」로 읽혀 검사가 통째로 멈춘다(실측: #344 머지 뒤 main 이 그렇게 빨간불).
+4. **설명 대조** — 그 prefix 로 쓰기를 내는 서비스 함수를 import 하는 화면 파일이, 그 갈래에
+   맞는 권한 표식을 실제로 참조하는가. 쓰기 역할 갈래는 `useWriteAccess`(또는 그것을 대신 지는
+   공용 패널 플래그 `writeGated`), 시스템관리자 전용 갈래는 `isSysAdmin`(또는 그 판정 결과를
+   받아 그리는 `canWrite`).
 
 ## fail-closed
 
@@ -51,6 +60,10 @@ SCREEN_DIRS = [FRONTEND / "components", FRONTEND / "hooks", FRONTEND / "app"]
 
 # 화면이 「막혔다」를 스스로 말하거나(훅), 그것을 지는 공용 패널에 위임하는 표식.
 GATE_MARKERS = ("useWriteAccess", "writeGated")
+
+# 시스템관리자 전용 쓰기의 표식. 판정은 세션에서 하고(`isSysAdmin`), 조작부가 그 결과를
+# 프로퍼티로 받아 그리는 자리(`canWrite`)도 같은 경계를 지는 것으로 본다.
+ADMIN_GATE_MARKERS = ("isSysAdmin", "canWrite")
 
 # 쓰기 함수를 부르지만 조작부가 없어 설명할 자리가 없는 파일 → 게이트는 **위임처**가 진다.
 #
@@ -155,34 +168,73 @@ def _call_end(text: str, open_paren: int) -> int:
 
 ROUTER_DECL_RE = re.compile(r"^(\w+)\s*=\s*APIRouter\(", re.M)
 ROUTE_DECORATOR_RE = re.compile(r"^@(\w+)\.(?:get|post|put|patch|delete|api_route|websocket)\(", re.M)
+GATE_CALL_RE = re.compile(r"require_role\(([^)]*)\)")
+#: 게이트를 모듈 수준 이름 하나로 묶어 둔 자리 — `require_key_writer = require_role(ROLE_ADMIN)`.
+GATE_ALIAS_RE = re.compile(r"^(\w+)\s*=\s*require_role\(([^)]*)\)", re.M)
 
 
-def routers_in(text: str) -> dict[str, tuple[str | None, bool]]:
-    """라우터 변수 → (prefix, 라우터 자체에 require_role 이 걸렸는가)."""
-    routers: dict[str, tuple[str | None, bool]] = {}
+def _roles(args: str) -> frozenset[str]:
+    return frozenset(part.strip() for part in args.split(",") if part.strip())
+
+
+def gate_aliases(text: str) -> dict[str, frozenset[str]]:
+    """모듈 수준 게이트 별칭 → 그 게이트가 여는 역할 이름들."""
+    return {match.group(1): _roles(match.group(2)) for match in GATE_ALIAS_RE.finditer(text)}
+
+
+def gate_roles_in(call: str, aliases: dict[str, frozenset[str]]) -> frozenset[str] | None:
+    """이 호출(라우터 선언·라우트 데코레이터)에 걸린 게이트가 여는 역할. 없으면 None."""
+    found: set[str] = set()
+    gated = False
+    for match in GATE_CALL_RE.finditer(call):
+        gated = True
+        found |= _roles(match.group(1))
+    for name, roles in aliases.items():
+        if re.search(rf"\b{re.escape(name)}\b", call):
+            gated = True
+            found |= roles
+    return frozenset(found) if gated else None
+
+
+def routers_in(text: str) -> dict[str, tuple[str | None, frozenset[str] | None]]:
+    """라우터 변수 → (prefix, 라우터 자체에 걸린 게이트의 역할 — 없으면 None)."""
+    aliases = gate_aliases(text)
+    routers: dict[str, tuple[str | None, frozenset[str] | None]] = {}
     for match in ROUTER_DECL_RE.finditer(text):
         call = text[match.end() - 1 : _call_end(text, match.end() - 1)]
         prefix = re.search(r'prefix\s*=\s*"([^"]+)"', call)
-        routers[match.group(1)] = (prefix.group(1) if prefix else None, "require_role(" in call)
+        routers[match.group(1)] = (prefix.group(1) if prefix else None, gate_roles_in(call, aliases))
     return routers
 
 
-def gated_routes_in(text: str) -> dict[str, int]:
-    """라우터 변수 → require_role 이 걸린 엔드포인트 수. 라우터 자체가 게이트면 그 라우터의 전 엔드포인트."""
+def gated_routes_in(text: str) -> dict[str, tuple[int, frozenset[str]]]:
+    """라우터 변수 → (게이트 엔드포인트 수, 그 자리들이 여는 역할 합집합).
+
+    라우터 자체가 게이트면 그 라우터의 전 엔드포인트가 게이트다.
+    """
+    aliases = gate_aliases(text)
     routers = routers_in(text)
-    counts: dict[str, int] = {}
+    counts: dict[str, tuple[int, frozenset[str]]] = {}
     for match in ROUTE_DECORATOR_RE.finditer(text):
         var = match.group(1)
         call = text[match.end() - 1 : _call_end(text, match.end() - 1)]
-        router_gated = routers.get(var, (None, False))[1]
-        if router_gated or "require_role(" in call:
-            counts[var] = counts.get(var, 0) + 1
+        roles = routers.get(var, (None, None))[1] or gate_roles_in(call, aliases)
+        if roles is None:
+            continue
+        seen, before = counts.get(var, (0, frozenset()))
+        counts[var] = (seen + 1, before | roles)
     return counts
 
 
-def backend_gated_prefixes() -> tuple[set[str], int]:
-    """require_role 이 걸린 라우터의 prefix 와 그 엔드포인트 수."""
-    prefixes: set[str] = set()
+def backend_gated_prefixes() -> tuple[set[str], set[str], int]:
+    """게이트가 걸린 라우터의 prefix — (쓰기 역할 갈래, 시스템관리자 전용 갈래, 엔드포인트 수).
+
+    갈래를 가르는 것은 **그 게이트가 여는 역할**이다. `require_role(ROLE_ADMIN)` 하나뿐이면
+    operator 는 못 쓰므로 쓰기 역할 목록에 담으면 안 된다 — 담는 순간 화면이 operator 에게
+    「쓸 수 있다」고 그리고 누를 때만 403 이 온다.
+    """
+    write_prefixes: set[str] = set()
+    admin_prefixes: set[str] = set()
     endpoints = 0
     router_files = sorted(p for p in BACKEND_ROUTERS.rglob("*.py") if "APIRouter(" in p.read_text(encoding="utf-8"))
     if not router_files:
@@ -195,23 +247,27 @@ def backend_gated_prefixes() -> tuple[set[str], int]:
         gated = gated_routes_in(text)
         if not gated:
             fail(f"{path.relative_to(REPO)} 에 require_role 이 있는데 어느 엔드포인트에도 귀속되지 않는다")
-        for var, count in gated.items():
-            prefix = routers.get(var, (None, False))[0]
+        for var, (count, roles) in gated.items():
+            prefix = routers.get(var, (None, None))[0]
             if prefix is None:
                 fail(f"{path.relative_to(REPO)} 의 게이트 엔드포인트가 쓰는 라우터 `{var}` 의 prefix 를 못 읽었다")
-            prefixes.add(prefix)
+            (admin_prefixes if roles == frozenset({"ROLE_ADMIN"}) else write_prefixes).add(prefix)
             endpoints += count
-    print(f"  backend: 라우터 {len(router_files)}개를 읽어 게이트 엔드포인트 {endpoints}개 · prefix {len(prefixes)}개")
+    total = len(write_prefixes) + len(admin_prefixes)
+    print(
+        f"  backend: 라우터 {len(router_files)}개를 읽어 게이트 엔드포인트 {endpoints}개 · "
+        f"prefix {total}개 (쓰기 역할 {len(write_prefixes)} · 시스템관리자 전용 {len(admin_prefixes)})"
+    )
     if endpoints == 0:
         fail("require_role 이 걸린 엔드포인트가 0건이다 — 게이트가 통째로 사라졌거나 이름이 바뀌었다")
-    return prefixes, endpoints
+    return write_prefixes, admin_prefixes, endpoints
 
 
-def declared_prefixes() -> set[str]:
+def declared_prefixes(name: str) -> set[str]:
     text = WRITE_ACCESS_TS.read_text(encoding="utf-8")
-    match = re.search(r"ROLE_GATED_WRITE_PREFIXES[^=]*=\s*\[(.*?)\]", text, re.S)
+    match = re.search(name + r"[^=]*=\s*\[(.*?)\]", text, re.S)
     if match is None:
-        fail(f"{WRITE_ACCESS_TS.relative_to(REPO)} 에서 ROLE_GATED_WRITE_PREFIXES 를 못 읽었다")
+        fail(f"{WRITE_ACCESS_TS.relative_to(REPO)} 에서 {name} 을 못 읽었다")
     return set(re.findall(r'"([^"]+)"', match.group(1)))
 
 
@@ -285,26 +341,40 @@ def main() -> int:
         )
     print(f"  가입 배정 통과 — SIGNUP_AUTHOR_ID={granted!r} 가 쓰기 역할에 든다")
 
-    backend, endpoints = backend_gated_prefixes()
-    declared = declared_prefixes()
-    if backend != declared:
-        fail(
-            "backend 의 게이트 prefix 와 constants/writeAccess.ts 가 어긋난다\n"
-            f"  backend 에만: {sorted(backend - declared)}\n"
-            f"  프론트에만:   {sorted(declared - backend)}"
-        )
-    print(f"  경계 대조 통과 — prefix {len(declared)}개 · 엔드포인트 {endpoints}개")
+    backend_write, backend_admin, endpoints = backend_gated_prefixes()
+    for label, backend_side, declared_name in (
+        ("쓰기 역할", backend_write, "ROLE_GATED_WRITE_PREFIXES"),
+        ("시스템관리자 전용", backend_admin, "ADMIN_ONLY_WRITE_PREFIXES"),
+    ):
+        declared = declared_prefixes(declared_name)
+        if backend_side != declared:
+            fail(
+                f"backend 의 {label} 게이트 prefix 와 constants/writeAccess.ts 의 {declared_name} 가 어긋난다\n"
+                f"  backend 에만: {sorted(backend_side - declared)}\n"
+                f"  프론트에만:   {sorted(declared - backend_side)}"
+            )
+    print(
+        f"  경계 대조 통과 — 쓰기 역할 prefix {len(backend_write)}개 · "
+        f"시스템관리자 전용 {len(backend_admin)}개 · 엔드포인트 {endpoints}개"
+    )
 
-    writers = gated_write_functions(backend)
-    screens = screens_calling(writers)
+    # 갈래마다 따로 모은다 — 어느 표식을 요구할지가 갈래에 달렸다.
+    write_screens = screens_calling(gated_write_functions(backend_write))
+    admin_screens = screens_calling(gated_write_functions(backend_admin))
+    screens = {
+        rel: write_screens.get(rel, set()) | admin_screens.get(rel, set()) for rel in write_screens | admin_screens
+    }
 
     ungated: list[str] = []
     for rel, names in sorted(screens.items()):
         if rel in EXEMPT:
             continue
         text = (FRONTEND / rel).read_text(encoding="utf-8")
-        if not any(marker in text for marker in GATE_MARKERS):
-            ungated.append(f"{rel} — {', '.join(sorted(names))}")
+        # 시스템관리자 전용 쓰기만 부르는 화면은 그 갈래의 표식을 진다 — `useWriteAccess` 는
+        # operator 까지 열어 주는 판정이라 여기서 요구하면 화면이 거짓말을 하게 된다.
+        markers = GATE_MARKERS if rel in write_screens else ADMIN_GATE_MARKERS
+        if not any(marker in text for marker in markers):
+            ungated.append(f"{rel} — {', '.join(sorted(names))} (필요한 표식: {'·'.join(markers)})")
 
     stale = sorted(set(EXEMPT) - set(screens))
 
@@ -328,7 +398,7 @@ def main() -> int:
     if missing:
         fail("면제의 위임처가 게이트를 지지 않는다 — 면제가 근거를 잃었다:\n  " + "\n  ".join(missing))
     if ungated:
-        fail("누르기 전에 막힘을 말하지 않는 화면이 있다 (useWriteAccess·writeGated 없음):\n  " + "\n  ".join(ungated))
+        fail("누르기 전에 막힘을 말하지 않는 화면이 있다:\n  " + "\n  ".join(ungated))
 
     print(
         f"OK — 게이트 엔드포인트 {endpoints}개 · 화면 {len(screens)}개 · 위임처 {len(delegates)}개 전부 사유를 미리 말한다"
