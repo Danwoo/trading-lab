@@ -74,9 +74,28 @@ NOT_CANONICAL_HINT = "시장마다 값을 주는 소스를 하나로 정해 둡�
 NOT_CANONICAL_CODE = "not_canonical"
 
 
+#: 종목 마스터의 **정본 소스** — 시장마다 하나(MD-AD-17). 정본이 아닌 소스는 여기를 읽어
+#: 「저기서 받아라」를 말하고, 정본인 소스는 여기를 읽어 자기가 낼 시장을 정한다. 양쪽이 각자
+#: 손으로 적으면 정본이 옮겨갈 때 한쪽만 따라간다 — SEC 가 AMEX 를 한 건도 식별하지 못해
+#: 정본이 토스로 옮겨졌을 때, alpaca 의 「정본은 SEC」 안내가 빈 자리를 가리켰다(#351).
+#: 없는 시장을 물으면 KeyError 로 시끄럽게 죽는다 — 시장을 늘리며 정본을 안 정한 것을
+#: 조용한 오안내로 넘기지 않는다.
+CANONICAL_MASTER_SOURCE: dict[str, str] = {
+    "KOSPI": "toss",
+    "KOSDAQ": "toss",
+    "NASDAQ": "sec",
+    "NYSE": "sec",
+    "AMEX": "toss",
+}
+
+#: 사유 문구에 쓰는 소스 표기. 표에 없으면 식별자를 그대로 쓴다.
+_SOURCE_LABEL = {"sec": "SEC", "toss": "토스증권", "alpaca": "Alpaca", "data_go_kr": "data.go.kr", "sample": "샘플"}
+
+
 def not_canonical_reason(what: str, canonical_source: str) -> str:
     """정본이 아닌 소스가 다는 표준 사유 — 문구를 어댑터마다 새로 쓰지 않게."""
-    return f"{what}의 정본 소스는 {canonical_source} 입니다 ({NOT_CANONICAL_HINT})"
+    label = _SOURCE_LABEL.get(canonical_source, canonical_source)
+    return f"{what}의 정본 소스는 {label} 입니다 ({NOT_CANONICAL_HINT})"
 
 
 class ProviderKeyMissing(ServiceUnavailableError):

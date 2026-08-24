@@ -12,12 +12,14 @@ from providers.models import NormalizedInstrument
 # SEC 의 `exchange` 표기 → 우리 `market` 표기. 우리 시장 집합(구현설계 §1.1)에 없는 표기는
 # 매핑하지 않는다 — `OTC`·`CBOE`·null 이 그것이다. 억지로 어디에 붙이면 시장 단위 판정(휴장·
 # 정규장 시간·패널 가용성)이 통째로 틀어지므로, 매핑 없음은 "버린 행"으로 셈한다.
+#
+# **키는 소스가 실제로 내보내는 표기만 적는다.** 소스에 없는 표기를 적으면 그 값(value)이
+# 「우리가 SEC 로 채울 수 있는 시장」인 척하게 되고, 어댑터가 그 시장을 `capabilities()` 에
+# 실어 화면까지 보낸다 — 눌러도 영영 0행인 시장이 그렇게 생겼다(#351). 소스 어휘 대조는
+# `scripts/verify_capability_market_reachability.py` 가 잡는다.
 MARKET_BY_SEC_EXCHANGE: dict[str, str] = {
     "nasdaq": "NASDAQ",
     "nyse": "NYSE",
-    "nyse american": "AMEX",
-    "nyse mkt": "AMEX",
-    "nyse arca": "AMEX",
 }
 
 _COUNTRY = "US"

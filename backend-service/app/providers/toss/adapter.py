@@ -10,7 +10,8 @@ isCommonShare·isinCode` 로 준다(market·currency 없음 — 요청 컨텍스
 
 **국내 마스터의 정본은 토스다** — 제품 정의 §7(리드 확정 2026-08-19) 이 "브로커·시세는 토스증권
 Open API 단일" 이라고 못박는다. data_go_kr 은 빈 구간을 채우는 쪽이다(MD-AD-17). 미국 마스터는
-SEC 가 정본이라 여기서 내지 않는다.
+NASDAQ·NYSE 를 SEC 가 가져가고 **AMEX 만 이 소스가 정본이다** — 어느 시장이 그런지는 여기가
+아니라 `providers/base.py` 의 `CANONICAL_MASTER_SOURCE` 가 정한다.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from core.logger import logger
 
 from providers import register_provider
 from providers.base import (
+    CANONICAL_MASTER_SOURCE,
     CREDENTIAL_MISSING_HINT,
     ProviderKeyMissing,
     ProviderResponseInvalid,
@@ -32,8 +34,19 @@ from providers.toss import SOURCE
 from providers.toss.client import PAGE_LIMIT, TossClient
 from providers.toss.mapper import SkippedRow, to_bar, to_instrument
 
-KR_MARKETS = ("KOSPI", "KOSDAQ", "KONEX")
+#: 소스가 **받아 주는** 시장. 실측 2026-08-23: `stocks/all` 이 그 밖의 값을 HTTP 400 으로
+#: 거절하며 허용 목록을 직접 말한다 — "유효하지 않은 market 입니다. KOSPI, KOSDAQ, NYSE,
+#: NASDAQ, AMEX 만 허용됩니다".
+KR_MARKETS = ("KOSPI", "KOSDAQ")
 US_MARKETS = ("NASDAQ", "NYSE", "AMEX")
+
+#: 소스가 다루지 않지만 **우리 시장 집합에는 있는** 시장 — 못 한다는 사실을 사유와 함께
+#: 표에 실어야 화면이 「없다」와 「이 소스는 안 준다」를 가른다(FR-021). 빼 버리면 KONEX 를
+#: 고른 사람은 토스가 왜 안 나오는지 물을 자리가 없다.
+UNSERVED_MARKETS = ("KONEX",)
+
+#: 이 어댑터가 `capabilities()` 에 싣는 시장 전부.
+MARKETS = KR_MARKETS + US_MARKETS + UNSERVED_MARKETS
 
 # 어댑터는 자격의 **모양**만 말한다 — 변수 이름은 로더(`services/data_key/`)가 안내한다.
 # 여기 이름을 적으면 그 값이 가림 등록을 안 거친 채 읽히는 길이 생긴다 (경계 스캐너가 잡는다).
@@ -50,6 +63,7 @@ MAX_PAGES = 2000
 # 상류 엔드포인트 이름(`/api/v1/prices`)과 구현 단위 이름은 위 모듈 주석에만 둔다.
 _NO_QUOTE_REASON = "토스증권이 주는 현재가에는 등락·등락률·거래량이 없어 시세를 채울 수 없습니다"
 _NO_ORDERBOOK_REASON = "토스증권 호가는 아직 받아오지 않습니다 — 소스에는 있지만 연결하지 않았습니다"
+_UNSERVED_REASON = "토스증권이 다루는 시장에 없습니다 — 소스가 KOSPI·KOSDAQ·NYSE·NASDAQ·AMEX 만 받습니다"
 
 
 def _market_tz(market: str) -> dt.tzinfo:
@@ -73,14 +87,22 @@ class TossProvider:
     def capabilities(self) -> list[Capability]:
         key_reason = self._key_reason()
         rows: list[Capability] = []
-        for market in KR_MARKETS + US_MARKETS:
-            is_kr = market in KR_MARKETS
-            if is_kr:
+        for market in MARKETS:
+            if market in UNSERVED_MARKETS:
+                for kind in ("instrument_master", "daily_bar", "minute_bar", "quote", "orderbook"):
+                    rows.append(Capability(market=market, data_kind=kind, available=False, reason=_UNSERVED_REASON))
+                continue
+            canonical = CANONICAL_MASTER_SOURCE[market]
+            if canonical == SOURCE:
                 # 국내는 토스가 정본이다 — 제품 정의 §7(리드 확정 2026-08-19): "브로커·시세는
                 # 토스증권 Open API 단일". data_go_kr 은 빈 구간을 채우는 쪽이다 (MD-AD-17).
+                # **AMEX 만 미국에서 예외다** — 정본이던 SEC 가 AMEX 를 식별하지 못한다(그 소스는
+                # `Nasdaq`·`NYSE`·`OTC`·`CBOE` 만 내보낸다). 정본이 못 주는 시장까지 양보하면
+                # 아무도 안 주는 시장이 「받을 수 있는 것」에 남는다(#351). 어느 시장이 그런지는
+                # 여기서 판단하지 않는다 — 정본 표가 정하고 이 줄은 그것을 읽는다.
                 master = (key_reason is None, key_reason)
             else:
-                master = (False, not_canonical_reason("미국 종목 마스터", "SEC"))
+                master = (False, not_canonical_reason(f"{market} 종목 마스터", canonical))
             for kind, (ok, reason) in {
                 "instrument_master": master,
                 "daily_bar": (key_reason is None, key_reason),
@@ -96,6 +118,12 @@ class TossProvider:
             raise ProviderKeyMissing(SOURCE, ENV_HINT)
 
     async def list_instruments(self, market: str) -> list[NormalizedInstrument]:
+        market = market.upper()
+        if market not in KR_MARKETS + US_MARKETS:
+            # 소스가 400 으로 거절할 값을 굳이 보내지 않는다 — capability 표가 답할 문제다
+            # (sec·data_go_kr 관례). 보내면 「소스가 요청을 거절했습니다」로 기록돼, 우리가
+            # 애초에 못 묻는 시장을 소스 장애처럼 읽게 만든다.
+            raise ProviderResponseInvalid(f"{SOURCE} 는 {market} 시장을 다루지 않습니다")
         self._require_key()
         rows = await self.client.stocks_all(market)
         out: list[NormalizedInstrument] = []

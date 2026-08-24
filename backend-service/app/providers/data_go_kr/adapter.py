@@ -22,7 +22,9 @@ from providers.data_go_kr.mapper import SkippedRow, to_bar, to_instrument
 from providers.merge import merge_duplicate_bars
 from providers.models import Capability, NormalizedBar, NormalizedInstrument, NormalizedQuote
 
-_MARKETS = ("KOSPI", "KOSDAQ", "KONEX")
+#: 이 어댑터가 `capabilities()` 에 싣는 시장 — `list_instruments` 가 받아 주는 집합과 **같아야**
+#: 한다. 어긋나면 화면이 못 받는 시장을 「받을 수 있다」로 광고한다(#351).
+MARKETS = ("KOSPI", "KOSDAQ", "KONEX")
 _ENV_HINT = "data.go.kr 일반 인증키(Encoding)"
 _NO_KEY_REASON = f"data.go.kr 인증키가 등록되지 않았습니다 — {CREDENTIAL_MISSING_HINT}"
 _NO_MINUTE_REASON = "금융위 주식시세정보는 일봉까지만 제공합니다 — 분봉은 증권사 API 축입니다"
@@ -36,7 +38,7 @@ class DataGoKrProvider:
 
     def capabilities(self) -> list[Capability]:
         caps: list[Capability] = []
-        for market in _MARKETS:
+        for market in MARKETS:
             for kind in ("instrument_master", "daily_bar"):
                 caps.append(
                     Capability(
@@ -73,7 +75,7 @@ class DataGoKrProvider:
         """최신 거래일 스냅샷 한 장에서 종목 마스터를 뽑는다 — 국내는 날짜별 전종목이라
         종목 수가 늘어도 호출 수가 늘지 않는다."""
         market = market.upper()
-        if market not in _MARKETS:
+        if market not in MARKETS:
             raise ProviderResponseInvalid(f"{SOURCE} 는 {market} 시장을 다루지 않습니다")
 
         items = await self._pages({"mrktCls": market}, cursor=f"instrument_master:{market}")
