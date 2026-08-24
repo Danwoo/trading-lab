@@ -5,6 +5,7 @@
 import { getAppLocale, type AppLocale } from "@/utils/common/locale/state";
 import * as ko from "@/utils/common/locale/ko/apierrors";
 import * as en from "@/utils/common/locale/en/apierrors";
+import { isEmailFailureCode } from "@/utils/common/errors/emailFailure";
 
 // 언어별 메시지 테이블 (locale/ko.ts, locale/en.ts) — 로직만 여기에.
 const LOCALES: Record<AppLocale, typeof ko> = { ko, en };
@@ -44,10 +45,28 @@ function serverTextIsNotShown(status: number): boolean {
 }
 
 /**
+ * 서버가 **사유 코드**를 실어 보냈으면 그것으로 우리 표에서 문구를 고른다 (#342).
+ *
+ * 아래 차단이 막는 것은 「서버가 쓴 **문장**」이지 「무슨 일이 났는지」가 아니다. 코드는 닫힌
+ * 집합(`EMAIL_FAILURE_CODES`)이라 서버 원문·내부 호스트·스택이 실릴 자리가 없고, 문구는
+ * 클라이언트가 자기 언어 표에서 고르므로 차단의 근거(내부 정보 유출)를 깨지 않는다.
+ *
+ * 이것이 없으면 손으로 쓴 사용자 안내가 5xx 봉투에 담겨 통째로 버려진다 — 메일 발송 실패
+ * 5갈래가 전부 「잠시 후 다시 시도」 하나로 뭉개졌다.
+ */
+function messageForReasonCode(error: any, L: typeof ko): string | null {
+  const code = error?.response?.data?.code;
+  return isEmailFailureCode(code) ? L.EMAIL_FAILURE_MESSAGES[code] : null;
+}
+
+/**
  * API 에러를 사용자 친화적인 메시지로 변환. 클라이언트 폴백은 현재 언어(getAppLocale)에 따름.
  */
 export function getApiErrorMessage(error: any): string {
   const L = LOCALES[getAppLocale()];
+
+  const byReasonCode = messageForReasonCode(error, L);
+  if (byReasonCode) return byReasonCode;
 
   const status = error?.response?.status;
   if (typeof status === "number" && serverTextIsNotShown(status)) {
