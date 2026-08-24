@@ -140,16 +140,19 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
   it("길을 둘 준다 — 「봇 만들기」와 「에이전트에게 맡기기」 (§21.4)", () => {
     render(<BenchPage />);
 
-    expect(screen.getByRole("button", { name: /봇 만들기/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /봇 만들기/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /에이전트에게 맡기기/ })).toBeTruthy();
   });
 
-  it("그 길은 죽은 링크가 아니다 — 누르면 해당 패널이 열린다", async () => {
-    const user = userEvent.setup();
+  it("「봇 만들기」는 주소 있는 자리로 보낸다 — 새로고침해도 돌아올 곳이 있다 (#347)", () => {
     render(<BenchPage />);
 
-    await user.click(screen.getByRole("button", { name: /봇 만들기/ }));
-    expect(useProductPanelStore.getState().openPanelId).toBe("bot");
+    expect(screen.getByRole("link", { name: /봇 만들기/ }).getAttribute("href")).toBe("/bench/bot/new");
+  });
+
+  it("아직 라우트가 없는 갈래는 죽은 링크가 아니다 — 누르면 해당 패널이 열린다", async () => {
+    const user = userEvent.setup();
+    render(<BenchPage />);
 
     await user.click(screen.getByRole("button", { name: /에이전트에게 맡기기/ }));
     expect(useProductPanelStore.getState().openPanelId).toBe("agent");
@@ -181,7 +184,9 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
 
     for (const railId of readyPaths) {
       const label = railId === "bot" ? /봇 만들기/ : /에이전트에게 맡기기/;
-      expect(screen.getByRole("button", { name: label }).textContent).not.toContain("준비 중");
+      // 봇은 주소 있는 자리로 가고(#347) 나머지는 패널을 연다 — 역할이 갈려 둘 다 받는다.
+      const card = screen.queryByRole("link", { name: label }) ?? screen.getByRole("button", { name: label });
+      expect(card.textContent).not.toContain("준비 중");
     }
   });
 });
