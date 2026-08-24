@@ -38,7 +38,8 @@ const PANEL_REGION_ID = "product-panel";
  * (리드 결정 2026-08-19 — 키 화면은 메뉴 게이트 뒤에 두지 않는다).
  *
  * 키 **값**은 이 화면에 오지 않으므로 읽기 권한을 넓게 두어도 새는 것이 없다. 값을 넣는
- * 경로가 생기면 그때는 권한을 따로 판정한다.
+ * 경로(`PUT /data-key`·`POST /data-key/probe`)는 백엔드가 `require_role(ROLE_ADMIN)` 으로
+ * 따로 판정한다(#344) — 화면이 메뉴 밖에 있는 것과 쓰기 권한은 별개의 축이다.
  */
 const SHELL_ENTRY_PATHS = [SETTINGS_PATH] as const;
 

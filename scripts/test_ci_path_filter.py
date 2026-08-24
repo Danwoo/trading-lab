@@ -13,10 +13,15 @@
   ④ 죽은 경로 — 패턴 하나하나가 **추적 중인 파일을 실제로 무는지**
   ⑤ 필수 트리거 — 선언한 (워크플로, 입력 파일) 짝에서 그 파일만 바뀐 PR 이 실제로 `run=true`
   ⑥ 필터 밖 그물 — 입력이 서비스 경계를 가로지르는 그물은 **경로 필터 없는 워크플로**에 산다
+  ⑦ backend 전수 — `app/main.py` 가 있는 폴더(= 이 레포의 backend 정의, 루트 CLAUDE.md)마다
+     그 폴더의 파일만 바뀐 PR 이 `ci.yml` 을 돌린다. 목록은 손으로 적지 않고 폴더를 훑는다
 
 ④ 가 이 그물의 핵심이다. 경로 문자열로 대상을 지정하는 필터는 그 경로가 사라져도
 "대상 없음 = 트리거 없음" 으로 조용히 초록이 된다 — 시끄럽게 실패하는 그물은 누구든 잡지만,
 초록으로 죽은 그물은 아무도 못 본다.
+
+⑦ 은 ⑤ 를 목록 없이 하는 것이다 — backend 는 폴더가 늘어나는 클래스라 짝을 손으로 적으면 새
+폴더가 또 빠진다. `single-agent-service` 가 실제로 그 상태였다(#344 리뷰에서 발견).
 
 ⑤⑥ 은 ④ 의 반대 방향이다 (#331). ④ 는 「목록의 패턴이 죽었는가」를 보지만, 이 레포가 두 번
 당한 것은 **목록에 애초에 없는 입력**이었다 — 그물은 멀쩡히 살아 있고 판정만 `run=false` 라
@@ -107,6 +112,9 @@ REQUIRED_TRIGGERS: list[tuple[str, str, str]] = [
 # `ci.yml` 의 backend 스위트에 있던 동안 이 둘은 **프론트만 바뀐 PR 에서 통째로 skipped** 였다:
 # 최근 머지 40건 중 8건이 그 경우였고 2건은 그물 글롭에 드는 파일을 고쳤다 (#331 실측).
 # 경로 필터 없이 도는 워크플로(repo-scans.yml)에 사는 것이 이 축의 계약이다.
+# ⑦ 의 하한 — 폴더 글롭이 헛돌아 0~1개만 찾고 초록이 되는 것을 막는다 (지금 11개).
+MIN_BACKEND_DIRS = 8
+
 UNFILTERED_NETS: list[tuple[str, str]] = [
     (
         "scripts/verify_capability_kind_lockstep.py",
@@ -302,6 +310,28 @@ def main() -> int:
                 "FILTER_PATTERNS 에 그 입력을 넣어라 (잡이 skipped 로 끝나고 GitHub 은 그것을 통과로 센다)"
             )
 
+    # ⑦ backend 전수 — `app/main.py` 가 있는 폴더마다 그 폴더만 바뀐 PR 에서 ci.yml 이 도는가
+    backend_dirs = sorted(p.parent.parent for p in REPO_ROOT.glob("*/app/main.py"))
+    checked += 1
+    if len(backend_dirs) < MIN_BACKEND_DIRS:
+        failures.append(
+            f"backend 전수: */app/main.py 로 찾은 폴더가 {len(backend_dirs)}개 — 하한 {MIN_BACKEND_DIRS} 미만이다. "
+            "backend 정의(app/main.py 가 있는 폴더)가 바뀌었으면 이 그물부터 고쳐라"
+        )
+    ci_patterns = _filter_patterns(
+        _job_blocks((WORKFLOW_DIR / "ci.yml").read_text(encoding="utf-8")).get(FILTER_JOB, "")
+    )
+    for backend_dir in backend_dirs:
+        checked += 1
+        probe = f"{backend_dir.name}/app/main.py"
+        run, _ = decide(ci_patterns, [probe]) if ci_patterns else (False, [])
+        if not run:
+            failures.append(
+                f"backend 전수: ci.yml 이 {probe!r} 만 바뀐 PR 에서 안 돈다 (run=false) — "
+                f"{backend_dir.name} 은 app/main.py 가 있는 backend 인데 FILTER_PATTERNS 에 없다. "
+                "그 서비스만 고친 PR 에서 계약 검증·standalone 테스트가 통째로 skipped 된다"
+            )
+
     # ⑥ 필터 밖 그물 — 경로 필터가 없는 워크플로가 실행해야 한다
     unfiltered_workflows = sorted(wf for wf in WORKFLOW_DIR.glob("*.yml") if wf.name not in FILTERED_WORKFLOWS)
     for script, reason in UNFILTERED_NETS:
@@ -319,7 +349,8 @@ def main() -> int:
 
     print(
         f"케이스 {checked}건 검사 · 워크플로 {len(FILTERED_WORKFLOWS)}개 · 패턴 {total_patterns}건 · "
-        f"필수 트리거 {len(REQUIRED_TRIGGERS)}건 · 필터 밖 그물 {len(UNFILTERED_NETS)}건"
+        f"필수 트리거 {len(REQUIRED_TRIGGERS)}건 · 필터 밖 그물 {len(UNFILTERED_NETS)}건 · "
+        f"backend 폴더 {len(backend_dirs)}개"
     )
     if checked == 0 or total_patterns == 0:
         _fail("검사 0건 — 통과가 아니라 실패다 (fail-closed)")
