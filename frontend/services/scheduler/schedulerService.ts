@@ -10,8 +10,8 @@ import { HolderInfo } from "@/schemas/devActivity/devActivity";
 import { apiCall } from "@/utils/common/api/client";
 import { handleZodValidationError, validateWithZod } from "@/lib/zod/validation";
 
-const BASE_URL = "/api/external/devactivity/scheduler";
-const HOLDERS_URL = "/api/external/devactivity/chat";
+const BASE_URL = "/api/external/backend/scheduler";
+const HOLDERS_URL = "/api/external/backend/chat";
 
 /**
  * 스케줄러 목록 조회

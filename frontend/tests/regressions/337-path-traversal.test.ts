@@ -139,7 +139,6 @@ describe("정적 net — app/api/external 전체에서 params 가 encodeURICompo
 vi.mock("@/env", () => ({
   env: {
     BACKEND_SERVICE_URL: "http://backend.test",
-    DEV_ACTIVITY_SERVICE_URL: "http://devactivity.test",
     NODE_ENV: "development",
   },
 }));
@@ -283,7 +282,7 @@ const CALL_SITES: CallSite[] = [
     buildUrl: (p: Record<string, string>) => `${DOC}/${p.research_doc_id}`,
   })),
   ...(["GET", "PUT", "DELETE"] as const).map((method) => ({
-    file: "@/app/api/external/devactivity/scheduler/[scheduler_id]/route",
+    file: "@/app/api/external/backend/scheduler/[scheduler_id]/route",
     label: `scheduler/[scheduler_id] ${method}`,
     method,
     opName: method,
@@ -292,7 +291,7 @@ const CALL_SITES: CallSite[] = [
     buildUrl: (p: Record<string, string>) => `${SCHED}/${p.scheduler_id}`,
   })),
   {
-    file: "@/app/api/external/devactivity/scheduler/[scheduler_id]/run/route",
+    file: "@/app/api/external/backend/scheduler/[scheduler_id]/run/route",
     label: "scheduler/[scheduler_id]/run POST",
     method: "POST",
     opName: "POST",
@@ -301,7 +300,7 @@ const CALL_SITES: CallSite[] = [
     buildUrl: (p: Record<string, string>) => `${SCHED}/${p.scheduler_id}/run`,
   },
   ...(["GET", "POST"] as const).map((method) => ({
-    file: "@/app/api/external/devactivity/scheduler/[scheduler_id]/member/route",
+    file: "@/app/api/external/backend/scheduler/[scheduler_id]/member/route",
     label: `scheduler/[scheduler_id]/member ${method}`,
     method,
     opName: method,
@@ -310,7 +309,7 @@ const CALL_SITES: CallSite[] = [
     buildUrl: (p: Record<string, string>) => `${SCHED}/${p.scheduler_id}/member`,
   })),
   {
-    file: "@/app/api/external/devactivity/scheduler/[scheduler_id]/member/[git_id]/route",
+    file: "@/app/api/external/backend/scheduler/[scheduler_id]/member/[git_id]/route",
     label: "scheduler/[scheduler_id]/member/[git_id] DELETE",
     method: "DELETE",
     opName: "DELETE",
