@@ -196,7 +196,7 @@ type CallSite = {
 const BACKEND = "http://backend.test/portfolio";
 const WATCHLIST = "http://backend.test/watchlist";
 const DOC = "http://backend.test/research-document";
-const SCHED = "http://devactivity.test/scheduler";
+const SCHED = "http://backend.test/scheduler";
 const BACKTEST_RUN = "http://backend.test/backtest-run";
 const BOT = "http://backend.test/bot";
 
