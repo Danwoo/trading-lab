@@ -10,7 +10,8 @@ isCommonShare·isinCode` 로 준다(market·currency 없음 — 요청 컨텍스
 
 **국내 마스터의 정본은 토스다** — 제품 정의 §7(리드 확정 2026-08-19) 이 "브로커·시세는 토스증권
 Open API 단일" 이라고 못박는다. data_go_kr 은 빈 구간을 채우는 쪽이다(MD-AD-17). 미국 마스터는
-SEC 가 정본이라 여기서 내지 않는다.
+NASDAQ·NYSE 를 SEC 가 가져가고 **AMEX 만 이 소스가 정본이다** — 어느 시장이 그런지는 여기가
+아니라 `providers/base.py` 의 `CANONICAL_MASTER_SOURCE` 가 정한다.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from core.logger import logger
 
 from providers import register_provider
 from providers.base import (
+    CANONICAL_MASTER_SOURCE,
     CREDENTIAL_MISSING_HINT,
     ProviderKeyMissing,
     ProviderResponseInvalid,
@@ -90,15 +92,17 @@ class TossProvider:
                 for kind in ("instrument_master", "daily_bar", "minute_bar", "quote", "orderbook"):
                     rows.append(Capability(market=market, data_kind=kind, available=False, reason=_UNSERVED_REASON))
                 continue
-            if market in KR_MARKETS or market == "AMEX":
+            canonical = CANONICAL_MASTER_SOURCE[market]
+            if canonical == SOURCE:
                 # 국내는 토스가 정본이다 — 제품 정의 §7(리드 확정 2026-08-19): "브로커·시세는
                 # 토스증권 Open API 단일". data_go_kr 은 빈 구간을 채우는 쪽이다 (MD-AD-17).
-                # **AMEX 만 미국에서 예외다** — 정본인 SEC 가 AMEX 를 식별하지 못한다(그 소스는
+                # **AMEX 만 미국에서 예외다** — 정본이던 SEC 가 AMEX 를 식별하지 못한다(그 소스는
                 # `Nasdaq`·`NYSE`·`OTC`·`CBOE` 만 내보낸다). 정본이 못 주는 시장까지 양보하면
-                # 아무도 안 주는 시장이 「받을 수 있는 것」에 남는다(#351).
+                # 아무도 안 주는 시장이 「받을 수 있는 것」에 남는다(#351). 어느 시장이 그런지는
+                # 여기서 판단하지 않는다 — 정본 표가 정하고 이 줄은 그것을 읽는다.
                 master = (key_reason is None, key_reason)
             else:
-                master = (False, not_canonical_reason("미국 종목 마스터", "SEC"))
+                master = (False, not_canonical_reason(f"{market} 종목 마스터", canonical))
             for kind, (ok, reason) in {
                 "instrument_master": master,
                 "daily_bar": (key_reason is None, key_reason),
