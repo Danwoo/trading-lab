@@ -83,7 +83,7 @@ export const AUTO_SYSTEM_MENUS_BY_AUTHOR: Record<string, string[]> = {
  * 그 계정의 사이드바에서 사라진다. 게스트도 포함하는 이유는 초대받은 사람이 **보기는**
  * 해야 하기 때문이다.
  * 두 곳이 어긋나면 사이드바가 다시 조용히 비므로
- * `tests/regressions/251-personal-workspace-menu.test.ts` 가 둘을 대조한다.
+ * `tests/regressions/251-personal-workspace-menu.test.tsx` 가 둘을 대조한다.
  */
 export const PERSONAL_WORKSPACE_DEFAULT_MENU_IDS = ["mbiz1009", "mbiz1008", "mbiz1001"];
 

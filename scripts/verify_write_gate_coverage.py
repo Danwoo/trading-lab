@@ -14,6 +14,10 @@
 2. **가입 배정** — `constants/protected.ts` 의 `SIGNUP_AUTHOR_ID` 가 그 쓰기 역할 중 하나인가.
    (리드 결정 2026-08-23 — 가입자는 자기 워크스페이스의 운영자다. 게스트로 되돌리면 여기서 갈린다.)
 3. **경계 대조** — 게이트가 걸린 라우터의 prefix 집합 == `ROLE_GATED_WRITE_PREFIXES`.
+   라우터 파일은 `routers/` 아래를 **깊이·이름 무관**하게 훑고(한 단계 글롭은 `sub/` 에 심은
+   라우터를 못 봤다 — #330 이 잡은 `**` 함정과 같은 부류), 한 파일에 `APIRouter` 가 여럿이면
+   `require_role` 이 걸린 엔드포인트를 **그 데코레이터의 라우터 변수**로 귀속시킨다(첫 prefix 만
+   읽으면 두 번째 게이트 prefix 가 조용히 초록이고, 게이트 없는 첫 라우터를 지목해 오진한다).
 4. **설명 대조** — 그 prefix 로 쓰기를 내는 서비스 함수를 import 하는 화면 파일이, 권한 판정
    (`useWriteAccess`) 이나 그것을 대신 지는 공용 패널 플래그(`writeGated`) 를 실제로 참조하는가.
 
@@ -125,23 +129,78 @@ def signup_role() -> str:
     return consts["SIGNUP_AUTHOR_ID"]
 
 
+def _call_end(text: str, open_paren: int) -> int:
+    """`text[open_paren] == "("` 인 호출의 닫는 괄호 다음 인덱스. 문자열 안의 괄호는 세지 않는다."""
+    depth = 0
+    quote: str | None = None
+    i = open_paren
+    while i < len(text):
+        ch = text[i]
+        if quote:
+            if ch == "\\":
+                i += 1
+            elif ch == quote:
+                quote = None
+        elif ch in "\"'":
+            quote = ch
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return len(text)
+
+
+ROUTER_DECL_RE = re.compile(r"^(\w+)\s*=\s*APIRouter\(", re.M)
+ROUTE_DECORATOR_RE = re.compile(r"^@(\w+)\.(?:get|post|put|patch|delete|api_route|websocket)\(", re.M)
+
+
+def routers_in(text: str) -> dict[str, tuple[str | None, bool]]:
+    """라우터 변수 → (prefix, 라우터 자체에 require_role 이 걸렸는가)."""
+    routers: dict[str, tuple[str | None, bool]] = {}
+    for match in ROUTER_DECL_RE.finditer(text):
+        call = text[match.end() - 1 : _call_end(text, match.end() - 1)]
+        prefix = re.search(r'prefix\s*=\s*"([^"]+)"', call)
+        routers[match.group(1)] = (prefix.group(1) if prefix else None, "require_role(" in call)
+    return routers
+
+
+def gated_routes_in(text: str) -> dict[str, int]:
+    """라우터 변수 → require_role 이 걸린 엔드포인트 수. 라우터 자체가 게이트면 그 라우터의 전 엔드포인트."""
+    routers = routers_in(text)
+    counts: dict[str, int] = {}
+    for match in ROUTE_DECORATOR_RE.finditer(text):
+        var = match.group(1)
+        call = text[match.end() - 1 : _call_end(text, match.end() - 1)]
+        router_gated = routers.get(var, (None, False))[1]
+        if router_gated or "require_role(" in call:
+            counts[var] = counts.get(var, 0) + 1
+    return counts
+
+
 def backend_gated_prefixes() -> tuple[set[str], int]:
     """require_role 이 걸린 라우터의 prefix 와 그 엔드포인트 수."""
     prefixes: set[str] = set()
     endpoints = 0
-    router_files = sorted(BACKEND_ROUTERS.glob("*/*_router.py"))
+    router_files = sorted(p for p in BACKEND_ROUTERS.rglob("*.py") if "APIRouter(" in p.read_text(encoding="utf-8"))
     if not router_files:
         fail(f"라우터 파일이 0건이다 — 경로가 옮겨졌다: {BACKEND_ROUTERS}")
     for path in router_files:
         text = path.read_text(encoding="utf-8")
-        hits = text.count("require_role(")
-        if hits == 0:
+        if "require_role(" not in text:
             continue
-        match = re.search(r'APIRouter\(\s*\n?\s*prefix="([^"]+)"', text)
-        if match is None:
-            fail(f"{path.relative_to(REPO)} 에 require_role 이 있는데 prefix 를 못 읽었다")
-        prefixes.add(match.group(1))
-        endpoints += hits
+        routers = routers_in(text)
+        gated = gated_routes_in(text)
+        if not gated:
+            fail(f"{path.relative_to(REPO)} 에 require_role 이 있는데 어느 엔드포인트에도 귀속되지 않는다")
+        for var, count in gated.items():
+            prefix = routers.get(var, (None, False))[0]
+            if prefix is None:
+                fail(f"{path.relative_to(REPO)} 의 게이트 엔드포인트가 쓰는 라우터 `{var}` 의 prefix 를 못 읽었다")
+            prefixes.add(prefix)
+            endpoints += count
     print(f"  backend: 라우터 {len(router_files)}개를 읽어 게이트 엔드포인트 {endpoints}개 · prefix {len(prefixes)}개")
     if endpoints == 0:
         fail("require_role 이 걸린 엔드포인트가 0건이다 — 게이트가 통째로 사라졌거나 이름이 바뀌었다")

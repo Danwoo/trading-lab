@@ -14,7 +14,7 @@ import { useFormState } from "@/hooks/shared/useFormState";
 import { getApiErrorMessage } from "@/utils/common/errors";
 import { showToast, showMessage } from "@/components/shared/Feedback";
 import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
-import { WRITE_DENIED_SHORT } from "@/constants/writeAccess";
+import { withWriteDeniedHint } from "@/constants/writeAccess";
 
 const BUILTIN_CRUD_ICONS = new Set(["plus", "edit", "trash"]);
 
@@ -255,7 +255,7 @@ const DetailGridPanelComponent = <T,>(
     // 새로고침은 읽기라 그대로 둔다 — 막힌 것만 막힌 것으로 보인다.
     .map((button) =>
       writeGated && BUILTIN_CRUD_ICONS.has(button.icon ?? "")
-        ? { ...button, disabled: true, hint: `${button.hint} — ${WRITE_DENIED_SHORT}` }
+        ? { ...button, disabled: true, hint: withWriteDeniedHint(button.hint) }
         : button,
     );
 

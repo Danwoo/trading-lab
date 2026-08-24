@@ -9,17 +9,28 @@ interface Props {
   data: PortfolioOut;
   onEdit?: () => void;
   onDelete?: () => void;
+  /** 역할이 쓰기를 막았을 때의 사유 — 주면 수정·삭제가 비활성으로 서고 title 이 이것을 말한다 (#341). */
+  writeDeniedHint?: string;
   codeList?: any;
 }
 
-export default function PortfolioDetailView({ data, onEdit, onDelete, codeList }: Props) {
+export default function PortfolioDetailView({ data, onEdit, onDelete, writeDeniedHint, codeList }: Props) {
   return (
     <div className="h-full flex flex-col">
       <div className="flex-shrink-0 mb-2">
         <div className="flex gap-2 justify-end">
-          {/* 조작부는 권한이 있을 때만 선다 — 판정은 `DataPanel/DetailPanel` 의 `writeGated` 가 한다 (#341). */}
-          {onEdit && <Button text="수정" onClick={onEdit} />}
-          {onDelete && <Button text="삭제" onClick={onDelete} stylingMode="outlined" type="danger" />}
+          {/* 막힌 계정에는 비활성으로 선다 — 판정은 `DataPanel/DetailPanel` 의 `writeGated` 가 한다 (#341). */}
+          {onEdit && <Button text="수정" onClick={onEdit} disabled={Boolean(writeDeniedHint)} hint={writeDeniedHint} />}
+          {onDelete && (
+            <Button
+              text="삭제"
+              onClick={onDelete}
+              stylingMode="outlined"
+              type="danger"
+              disabled={Boolean(writeDeniedHint)}
+              hint={writeDeniedHint}
+            />
+          )}
         </div>
       </div>
 

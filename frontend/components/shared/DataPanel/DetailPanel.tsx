@@ -8,6 +8,7 @@ import { showToast, showMessage } from "@/components/shared/Feedback";
 import { Loading } from "@/components/shared/Feedback/Loading";
 import { useUploadProgressStore } from "@/stores/shared/uploadProgressStore";
 import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
+import { WRITE_DENIED_SHORT } from "@/constants/writeAccess";
 
 type ModeType = "view" | "edit" | "create";
 
@@ -23,9 +24,12 @@ interface Props<T, F> {
   defaultFormData?: Partial<F>;
   onComplete?: (data: T | null, action?: "create" | "update" | "delete") => void;
   /**
-   * 역할이 이 자리의 쓰기를 막고 있다 (#341). 주면 등록·수정·삭제 조작부를 세우지 않고,
-   * **왜 막혔고 지금 무엇이 되는지**를 패널 머리에서 먼저 말한다. `halted` 는 이 화면에서
-   * 막히는 동작의 이름이다 — 화면마다 다르므로 부르는 쪽이 준다.
+   * 역할이 이 자리의 쓰기를 막고 있다 (#341). 주면 **왜 막혔고 지금 무엇이 되는지**를 패널
+   * 머리에서 먼저 말하고, 뷰의 수정·삭제는 `writeDeniedHint` 를 받아 **비활성**으로 선다
+   * (사라지지 않는다 — 있는 기능을 감추면 없는 것으로 읽힌다). 등록 폼만은 세우지 않는다:
+   * 채울 수는 있는데 저장이 안 되는 폼은 이 이슈의 증상(다 채운 뒤 403)을 모양만 바꾼 것이라,
+   * 그 자리에 배너가 대신 선다. `halted` 는 이 화면에서 막히는 동작의 이름이다 — 화면마다
+   * 다르므로 부르는 쪽이 준다.
    *
    * 판정은 여기서 하지 않는다: 이 패널은 역할 게이트가 **없는** 자원에도 쓰이므로
    * (`/admin` 의 코드·메뉴 관리는 Prisma 직접 경로라 `require_role` 이 없다) 게이트 여부는
@@ -192,8 +196,9 @@ export function DetailPanel<T, F>({
           <ViewComponent
             key={refreshKey}
             data={currentData}
-            onEdit={isWriteGated ? undefined : handleEdit}
-            onDelete={isWriteGated ? undefined : handleDelete}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            writeDeniedHint={isWriteGated ? WRITE_DENIED_SHORT : undefined}
             {...viewProps}
           />
         )}

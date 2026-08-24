@@ -37,6 +37,13 @@ export const canWriteWithAuthor = (authorId: string | null | undefined): boolean
 /** 조작부 `title`·`aria-description` 에 들어가는 짧은 사유. 좁은 자리에 서므로 한 줄이다. */
 export const WRITE_DENIED_SHORT = "저장·실행이 막혀 있습니다 — 이 계정은 읽기전용 게스트입니다";
 
+/**
+ * 조작부의 원래 hint(「등록」·「수정」) 뒤에 막힌 사유를 잇는다. hint 가 없는 버튼(아이콘만 있는
+ * customActions)은 사유만 낸다 — 템플릿에 그대로 넣으면 `"undefined — …"` 가 화면에 뜬다.
+ */
+export const withWriteDeniedHint = (hint?: string): string =>
+  hint ? `${hint} — ${WRITE_DENIED_SHORT}` : WRITE_DENIED_SHORT;
+
 /** 배너 머리. 「무엇이 안 되는가」를 먼저 말한다. */
 export const WRITE_DENIED_TITLE = "이 계정은 보기만 됩니다";
 

@@ -14,6 +14,8 @@ interface Props {
   data: SchedulerOut;
   onEdit?: () => void;
   onDelete?: () => void;
+  /** 역할이 쓰기를 막았을 때의 사유 — 주면 수정·삭제가 비활성으로 서고 title 이 이것을 말한다 (#341). */
+  writeDeniedHint?: string;
   dayOfWeekItems?: { code: string; code_nm: string }[];
   useAtItems?: { code: string; code_nm: string }[];
   periodItems?: { code: number; code_nm: string }[];
@@ -23,6 +25,7 @@ export default function SchedulerDetailView({
   data,
   onEdit,
   onDelete,
+  writeDeniedHint,
   dayOfWeekItems = [],
   useAtItems = [],
   periodItems = [],
@@ -60,8 +63,17 @@ export default function SchedulerDetailView({
             disabled={!writeAccess.canWrite}
             hint={writeAccess.deniedHint}
           />
-          {onEdit && <Button text="수정" onClick={onEdit} />}
-          {onDelete && <Button text="삭제" onClick={onDelete} stylingMode="outlined" type="danger" />}
+          {onEdit && <Button text="수정" onClick={onEdit} disabled={Boolean(writeDeniedHint)} hint={writeDeniedHint} />}
+          {onDelete && (
+            <Button
+              text="삭제"
+              onClick={onDelete}
+              stylingMode="outlined"
+              type="danger"
+              disabled={Boolean(writeDeniedHint)}
+              hint={writeDeniedHint}
+            />
+          )}
         </div>
       </div>
 

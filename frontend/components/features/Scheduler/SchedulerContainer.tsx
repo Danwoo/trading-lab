@@ -100,11 +100,12 @@ export default function SchedulerContainer() {
     fileName: "scheduler",
   });
 
-  // 등록은 `require_role` 이 걸린 쓰기다 — 막힌 계정에는 조작부를 세우지 않고, 패널이
-  // 사유를 대신 말한다 (#341).
+  // 등록은 `require_role` 이 걸린 쓰기다 — 막힌 계정에는 「등록」이 비활성으로 서고 title 이
+  // 사유를 말한다. 상세 패널의 배너가 왜 막혔고 어떻게 여는지를 잇는다 (#341).
   const writeAccess = useWriteAccess();
   const buttons = useMasterGridActions({
-    onCreate: writeAccess.canWrite ? handleCreate : undefined,
+    onCreate: handleCreate,
+    writeGated: writeAccess.isDenied,
     onRefresh: handleRefresh,
     onExcelDownload: handleExcelDownload,
     customActions: [],
