@@ -210,10 +210,10 @@ def test_value_validation_guards_declared_range() -> None:
     assert validate_param_values(spec, {"window": 10})["window"] == 10
 
     for values, expected in [
-        ({"window": 99}, "1~52"),
+        ({"window": 99}, "1주~52주"),
         ({"window": 1.5}, "정수"),
         ({"window": "4"}, "숫자"),
-        ({"mode": "z"}, "a, b"),
+        ({"mode": "z"}, "가, 나"),
         ({"strict": "yes"}, "true/false"),
         ({"unknown": 1}, "선언하지 않은"),
     ]:
@@ -223,6 +223,51 @@ def test_value_validation_guards_declared_range() -> None:
             assert expected in str(error), f"{values} → {error}"
         else:
             raise AssertionError(f"{values} 가 통과했다")
+
+
+def test_value_errors_speak_the_screen_label() -> None:
+    """값 오류는 화면 라벨로 말한다 — 내부 이름은 화면 어디에도 없다 (Danwoo/trading-lab#345).
+
+    레포 전략의 **모든 파라미터 × 5갈래**를 태운다. 오류가 난 칸은 라벨을 담고 내부 이름을
+    담지 않아야 한다. 검사한 칸이 0이면 실패다.
+    """
+    branches = [
+        ("범위 밖", lambda param: (param.max or 0) + 1000),
+        ("정수 아님", lambda param: 20.5),
+        ("숫자 아님", lambda param: "스물"),
+        ("bool 아님", lambda param: "네"),
+        ("choice 밖", lambda param: "아무거나"),
+    ]
+
+    result = load_strategies()
+    assert result.valid, "레포 전략이 0건이면 이 검사는 아무것도 안 본다"
+
+    checked = 0
+    for spec in result.valid:
+        for param in spec.params:
+            for branch, make_bad in branches:
+                try:
+                    validate_param_values(spec, {param.name: make_bad(param)})
+                except ValueError as error:
+                    checked += 1
+                    message = str(error)
+                    assert param.label in message, f"{spec.key}.{param.name} {branch} → {message}"
+                    assert param.name not in message, f"{spec.key}.{param.name} {branch} → {message}"
+                    for choice in param.choices or []:
+                        # 선택지도 값이 아니라 라벨로 부른다 — 화면의 드롭다운이 보여주는 그 문구다.
+                        assert choice.label in message, f"{spec.key}.{param.name} {branch} → {message}"
+    assert checked >= len(branches), f"오류가 난 칸이 {checked}건이다 — 그물이 죽어 있다"
+
+
+def test_duplicate_label_is_rejected() -> None:
+    """라벨이 겹치면 전략을 안 싣는다 — 오류가 어느 칸을 말하는지 못 짚게 된다 (Danwoo/trading-lab#345)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        directory = Path(tmp)
+        _write(directory, "twins.py", _NEW_STRATEGY.replace('"label": "엄격"', '"label": "관찰 기간"'))
+        result = load_strategies(directory)
+
+    assert result.valid == []
+    assert "라벨이 중복" in result.errors[0].message, result.errors
 
 
 def test_unknown_timeframe_is_rejected() -> None:
