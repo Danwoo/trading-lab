@@ -39,6 +39,9 @@ _NO_KEY_REASON = f"Alpaca API 키가 등록되지 않았습니다 — {CREDENTIA
 _MASTER_REASON_BY_MARKET = {
     market: not_canonical_reason(f"{market} 종목 마스터", CANONICAL_MASTER_SOURCE[market]) for market in MARKETS
 }
+#: 이 어댑터가 싣지 않는 시장을 물었을 때. 정본을 지목하지 않는다 — 모르는 시장의 정본은
+#: 지어낼 수 없다.
+_NOT_A_MARKET_REASON = f"Alpaca 가 다루는 시장에 없습니다 — 소스가 {'·'.join(MARKETS)} 만 받습니다"
 _NO_ORDERBOOK_REASON = "Alpaca 무료 플랜은 심층 호가를 제공하지 않습니다"
 _TIMEFRAME_BY_INTERVAL = {1: "1Min", 5: "5Min", 15: "15Min", 30: "30Min", 60: "1Hour"}
 
@@ -107,7 +110,7 @@ class AlpacaProvider:
         return merge_duplicate_bars(bars, source=SOURCE)
 
     async def list_instruments(self, market: str) -> list[NormalizedInstrument]:
-        raise ProviderResponseInvalid(_MASTER_REASON)
+        raise ProviderResponseInvalid(_MASTER_REASON_BY_MARKET.get(market, _NOT_A_MARKET_REASON))
 
     async def fetch_daily(self, symbol: str, market: str, date_from: dt.date, date_to: dt.date) -> list[NormalizedBar]:
         items = await self._bars(
