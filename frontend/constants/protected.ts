@@ -31,6 +31,10 @@ export const GUEST_AUTHOR_ID = "user";
  *
  * 별칭을 따로 두는 이유는 **두 뜻을 가르기 위해서**다 — "운영자라는 역할"을 가리키는 자리와
  * "가입이 주는 역할"을 가리키는 자리는 지금 같은 값이지만 같은 개념이 아니다.
+ *
+ * 이 값은 **개인 워크스페이스를 받은 가입**에만 간다. 이메일 도메인 매핑으로 남의 공용
+ * 워크스페이스에 들어간 가입은 「자기 공간의 주인」이 아니라 초대받은 손님이라 `GUEST_AUTHOR_ID`
+ * 다 (결정 보완 2026-08-24) — 갈래는 `app/api/common/signup/route.ts` 가 `sharedWorkspaceId` 로 가른다.
  */
 export const SIGNUP_AUTHOR_ID = GENERAL_ADMIN_AUTHOR_ID;
 
