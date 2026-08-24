@@ -25,7 +25,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import { assertAssignableWorkspace, deleteUserCascade } from "@/lib/auth/authUtils";
-import { DEFAULT_USER_AUTHOR_ID, GENERAL_ADMIN_AUTHOR_ID } from "@/constants/protected";
+import { GENERAL_ADMIN_AUTHOR_ID, GUEST_AUTHOR_ID } from "@/constants/protected";
 
 // withAuth 가 부르는 세션만 대역으로 세운다 — 검증 대상(authUtils·prisma)은 진짜를 쓴다.
 vi.mock("next/headers", () => ({ headers: vi.fn(async () => new Headers()) }));
@@ -71,12 +71,12 @@ async function createFixture(): Promise<Fixture> {
   const victimWorkspaceCode = `ws-362v-${victimId.slice(0, 22)}`;
   const sharedWorkspaceCode = `ws-362s-${targetId.slice(0, 22)}`;
 
-  // 워크스페이스를 옮기면 PUT 핸들러가 일반사용자 권한을 부여한다 — 그 권한 행이 없으면
+  // 워크스페이스를 옮기면 PUT 핸들러가 게스트 권한을 부여한다 — 그 권한 행이 없으면
   // 정상 경로가 FK 위반으로 죽어, 검증이 정상 배정까지 막았는지 아닌지 구분할 수 없게 된다.
   // (seed.sql 이 심는 행이지만 이 테스트 DB 는 tables.sql 만 적용된 빈 스키마다.)
   await prisma.author.upsert({
-    where: { author_id: DEFAULT_USER_AUTHOR_ID },
-    create: { author_id: DEFAULT_USER_AUTHOR_ID, author_nm: "일반사용자" },
+    where: { author_id: GUEST_AUTHOR_ID },
+    create: { author_id: GUEST_AUTHOR_ID, author_nm: "일반사용자" },
     update: {},
   });
 
@@ -307,8 +307,8 @@ describe("#413 F1 — 손상된 workspace_id 가 배정을 지우지 못한다",
         "일반관리자 권한이 삭제됐다",
       ).toBe(1);
       expect(
-        await prisma.authorMember.count({ where: { user_id: f.targetEmail, author_id: DEFAULT_USER_AUTHOR_ID } }),
-        "일반사용자 권한이 새로 부여됐다",
+        await prisma.authorMember.count({ where: { user_id: f.targetEmail, author_id: GUEST_AUTHOR_ID } }),
+        "게스트 권한이 새로 부여됐다",
       ).toBe(0);
     } finally {
       await cleanupFixture(f);

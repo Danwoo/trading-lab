@@ -32,6 +32,7 @@ export const API_REGRESSION_TESTS = [
   "tests/regressions/231-console-otp-dev-only.test.ts",
   "tests/regressions/342-email-failure-reason.test.ts",
   "tests/regressions/343-signup-requires-verification.test.ts",
+  "tests/regressions/341-signup-grants-operator.test.ts",
   "tests/regressions/354-stale-authorization.test.ts",
 ];
 

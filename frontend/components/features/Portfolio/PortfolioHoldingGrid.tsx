@@ -8,6 +8,7 @@ import { TextBox, SelectBox, NumberBox, TextArea } from "@/components/shared/ui"
 import { TableRow, TableCell, TableGroup } from "@/components/shared/Layout";
 import { selectHoldingList, createHolding, updateHolding, deleteHolding } from "@/services/portfolio/portfolioService";
 import { Holding, HoldingOut } from "@/schemas/portfolio/portfolio";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 
 interface Props {
   portfolioId: string;
@@ -24,6 +25,8 @@ const PortfolioHoldingGrid: React.FC<Props> = ({
   editable = false,
   codeList,
 }) => {
+  // 보유종목 등록·수정·삭제는 `require_role` 이 걸린 쓰기다 (`/portfolio/{id}/holding`) — #341.
+  const writeAccess = useWriteAccess();
   const GRID_COLUMNS: LegacyGridColumn[] = [
     { dataField: "rn", caption: "#", width: 50, dataType: "number", allowSorting: false, allowFiltering: false },
     { dataField: "ticker", caption: "종목코드", width: 100 },
@@ -75,6 +78,7 @@ const PortfolioHoldingGrid: React.FC<Props> = ({
       formProps={{ codeList }}
       defaultFormData={{ quantity: 0, avg_price: 0, use_at: "Y" }}
       editable={editable}
+      writeGated={writeAccess.isDenied ? { halted: ["보유종목 등록", "수정", "삭제"] } : undefined}
       onSelectionChanged={onSelectionChanged}
     />
   );

@@ -14,7 +14,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma/client";
 import { resolveAccountContext } from "@/lib/auth/accountContext";
-import { DEFAULT_USER_AUTHOR_ID, GENERAL_ADMIN_AUTHOR_ID, SYS_ADMIN_AUTHOR_ID } from "@/constants/protected";
+import { GENERAL_ADMIN_AUTHOR_ID, GUEST_AUTHOR_ID, SYS_ADMIN_AUTHOR_ID } from "@/constants/protected";
 
 const created: { userIds: string[]; workspaceIds: number[]; emails: string[] } = {
   userIds: [],
@@ -86,13 +86,13 @@ describe("resolveAccountContext — DB 가 정본이다 (#354)", () => {
   });
 
   it("여러 권한을 가지면 우선순위대로 대표 권한을 고른다", async () => {
-    const user = await makeUser({ authors: [DEFAULT_USER_AUTHOR_ID, SYS_ADMIN_AUTHOR_ID] });
+    const user = await makeUser({ authors: [GUEST_AUTHOR_ID, SYS_ADMIN_AUTHOR_ID] });
     expect((await resolveAccountContext(user.id)).authorId).toBe(SYS_ADMIN_AUTHOR_ID);
     scenarios++;
   });
 
   it("계정을 비활성으로 바꾸면 차단된다", async () => {
-    const user = await makeUser({ authors: [DEFAULT_USER_AUTHOR_ID] });
+    const user = await makeUser({ authors: [GUEST_AUTHOR_ID] });
     expect((await resolveAccountContext(user.id)).block).toBeNull();
 
     await prisma.user.update({ where: { id: user.id }, data: { use_at: "N" } });
@@ -101,7 +101,7 @@ describe("resolveAccountContext — DB 가 정본이다 (#354)", () => {
   });
 
   it("승인이 철회되면 차단된다", async () => {
-    const user = await makeUser({ authors: [DEFAULT_USER_AUTHOR_ID] });
+    const user = await makeUser({ authors: [GUEST_AUTHOR_ID] });
     await prisma.user.update({ where: { id: user.id }, data: { appr_at: "N" } });
     expect((await resolveAccountContext(user.id)).block).toBe("PendingApproval");
 
@@ -111,7 +111,7 @@ describe("resolveAccountContext — DB 가 정본이다 (#354)", () => {
   });
 
   it("워크스페이스를 비활성으로 바꾸면 일반 사용자는 차단되고 시스템관리자는 통과한다", async () => {
-    const user = await makeUser({ authors: [DEFAULT_USER_AUTHOR_ID] });
+    const user = await makeUser({ authors: [GUEST_AUTHOR_ID] });
     await prisma.workspace.update({ where: { id: user.workspaceId }, data: { use_at: "N" } });
     expect((await resolveAccountContext(user.id)).block).toBe("InactiveWorkspace");
 

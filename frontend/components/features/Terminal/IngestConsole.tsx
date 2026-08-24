@@ -9,6 +9,7 @@ import { useIngestRuns } from "@/hooks/terminal/useIngestRuns";
 import { useMarketCapabilities } from "@/hooks/terminal/useMarketCapabilities";
 import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
 import { insertIngestRun } from "@/services/terminal/ingestService";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 import { observeIngestRuns } from "@/stores/terminal/ingestSignalStore";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import type { DataKind, IngestRunOut } from "@/schemas/terminal/ingest";
@@ -328,6 +329,7 @@ export function IngestConsole() {
   const [message, setMessage] = useState<{ text: string; failed: boolean } | null>(null);
   const [masterMarket, setMasterMarket] = useState("");
   const [barKind, setBarKind] = useState<DataKind>("daily_bar");
+  const writeAccess = useWriteAccess();
 
   const capabilities = useMarketCapabilities(true);
   const runs = useIngestRuns(reloadToken, true);
@@ -349,6 +351,9 @@ export function IngestConsole() {
    */
   const buttonState = (() => {
     if (busy) return { label: "요청 중…", disabled: true };
+    // 역할 게이트가 소스보다 앞이다 — 소스가 다 갖춰져도 이 계정은 `POST /ingest-run` 에서
+    // 403 을 받는다. 그 사실을 소스 사유 뒤에 두면 사용자가 키부터 찾으러 간다 (#341).
+    if (writeAccess.isDenied) return { label: "적재 실행이 막혀 있습니다 — 읽기전용 게스트", disabled: true };
     if (symbol === null) return { label: "종목을 고르면 적재합니다", disabled: true };
     if (capabilities.data === null) {
       return capabilities.isLoading
@@ -480,6 +485,7 @@ export function IngestConsole() {
             type="button"
             onClick={() => start(barKind)}
             disabled={buttonState.disabled}
+            title={writeAccess.deniedHint}
             className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
           >
             {buttonState.label}
@@ -519,10 +525,15 @@ export function IngestConsole() {
             <button
               type="button"
               onClick={startMaster}
-              disabled={busy}
+              disabled={busy || writeAccess.isDenied}
+              title={writeAccess.deniedHint}
               className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
             >
-              {busy ? "요청 중…" : `${chosenMarket} 종목 목록 받기`}
+              {writeAccess.isDenied
+                ? "종목 목록 받기가 막혀 있습니다"
+                : busy
+                  ? "요청 중…"
+                  : `${chosenMarket} 종목 목록 받기`}
             </button>
             <span className="break-keep text-ink-muted">종목을 고르기 전에 이것부터 받습니다.</span>
           </>
