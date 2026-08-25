@@ -96,13 +96,25 @@ def service_cell_metric_dicts(tree: ast.Module) -> list[set[str]]:
     """
     out: list[set[str]] = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
+        # **주석 있는 대입(`cell_metrics: dict = {...}`)도 받는다.** `ast.Assign` 만 보면
+        # 한 갈래에 타입 주석을 붙이는 것만으로 그 갈래가 조용히 검사 밖으로 빠지고,
+        # 나머지 갈래가 남아 있어 「갈래 0개」 fail-closed 에도 안 걸린다.
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+        else:
             continue
-        if not any(isinstance(t, ast.Name) and t.id == "cell_metrics" for t in node.targets):
+        if not any(isinstance(t, ast.Name) and t.id == "cell_metrics" for t in targets):
             continue
         if isinstance(node.value, ast.Dict):
             out.append({k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)})
     return out
+
+
+#: 칸 지표를 만드는 갈래의 하한 — 「거래가 있던 칸」과 「거래 0건 칸」 둘이다 (#349).
+#: 이보다 적으면 갈래 하나가 사라졌거나 수집이 못 찾은 것이고, 어느 쪽이든 검사가 죽은 것이다.
+MIN_CELL_METRIC_BRANCHES = 2
 
 
 def main() -> int:
@@ -146,8 +158,11 @@ def main() -> int:
     # 칸 **지표**도 같은 규약이다 — 갈래마다 응답 모델의 필드를 전부 채워야 한다 (#349).
     metric_dicts = service_cell_metric_dicts(service_tree)
     metric_fields = back_model_fields("GridCellMetricsOut", schema_tree) or set()
-    if not metric_dicts:
-        failures.append("서비스의 `cell_metrics = {...}` 를 찾지 못했습니다 — 검사가 죽었습니다")
+    if len(metric_dicts) < MIN_CELL_METRIC_BRANCHES:
+        failures.append(
+            f"서비스의 `cell_metrics = {{...}}` 갈래가 {len(metric_dicts)}개뿐입니다 "
+            f"(하한 {MIN_CELL_METRIC_BRANCHES}) — 검사가 죽었거나 「거래 0건」 갈래가 사라졌습니다"
+        )
     elif not metric_fields:
         failures.append("백엔드에 `GridCellMetricsOut` 모델이 없습니다 — 짝이 사라졌습니다")
     else:

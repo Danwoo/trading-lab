@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTabStore, OpenedTab } from "@/stores/shared/tabStore";
+import { showMessage } from "@/components/shared/Feedback";
+import { UNSAVED_TAB_MESSAGE, type UnsavedTabMessage } from "@/hooks/shared/useUnsavedTabSignal";
 import { Icon } from "@/components/shared/ui/primitives/icons";
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { ICON_HIT_AREA } from "@/components/shared/ui/primitives/hitArea";
@@ -29,6 +31,25 @@ export function GlobalTabs() {
   const dragFromIndex = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  /**
+   * 저장 안 한 입력이 있는 탭의 경로. 탭 목록과 달리 **저장하지 않는다** — 새로고침하면
+   * iframe 이 다시 뜨면서 폼도 빈 상태로 돌아오므로, 그때 남아 있는 표시는 거짓말이 된다.
+   */
+  const [unsavedPaths, setUnsavedPaths] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as Partial<UnsavedTabMessage> | null;
+      if (!data || data.type !== UNSAVED_TAB_MESSAGE || typeof data.path !== "string") return;
+      const path = data.path;
+      const dirty = Boolean(data.dirty);
+      setUnsavedPaths((current) => (Boolean(current[path]) === dirty ? current : { ...current, [path]: dirty }));
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   // 드래그 재정렬 시 iframe이 reload되지 않도록 DOM 순서 고정
   const iframeTabs = useMemo(() => [...tabs].sort((a, b) => a.id.localeCompare(b.id)), [tabs]);
 
@@ -42,19 +63,28 @@ export function GlobalTabs() {
   );
 
   const handleCloseClick = useCallback(
-    (e: React.MouseEvent, tab: OpenedTab) => {
+    async (e: React.MouseEvent, tab: OpenedTab) => {
       e.stopPropagation();
       e.preventDefault();
+      if (unsavedPaths[tab.path]) {
+        const confirmed = await showMessage(
+          "저장하지 않은 입력",
+          <div>이 탭에 저장하지 않은 입력이 있습니다. 닫으면 입력한 내용이 사라집니다.</div>,
+          { type: "confirm", confirmText: "닫기", cancelText: "취소" },
+        );
+        if (!confirmed) return;
+      }
       const { tabs: currentTabs, activeId: currentActiveId, closeTab: doClose } = useTabStore.getState();
       const idx = currentTabs.findIndex((t) => t.id === tab.id);
       doClose(tab.id);
+      setUnsavedPaths((current) => ({ ...current, [tab.path]: false }));
       if (currentActiveId === tab.id) {
         const next = useTabStore.getState();
         const nextTab = next.tabs[Math.min(idx, next.tabs.length - 1)] ?? null;
         if (nextTab) router.replace(nextTab.path);
       }
     },
-    [router],
+    [router, unsavedPaths],
   );
 
   const handleKeyDown = useCallback(
@@ -78,13 +108,14 @@ export function GlobalTabs() {
         <div role="tablist" aria-label="열린 화면" className="flex flex-none overflow-x-auto border-t bg-gray-100">
           {tabs.map((tab, index) => {
             const isActive = tab.id === activeId;
+            const isUnsaved = Boolean(unsavedPaths[tab.path]);
             return (
               <div
                 key={tab.id}
                 role="tab"
                 aria-selected={isActive}
                 tabIndex={isActive ? 0 : -1}
-                title={tab.title}
+                title={isUnsaved ? `${tab.title} — 저장 안 함` : tab.title}
                 draggable
                 onDragStart={() => {
                   dragFromIndex.current = index;
@@ -116,10 +147,21 @@ export function GlobalTabs() {
                   dragOverIndex === index ? "border-l-2 border-l-gray-400" : "",
                 )}
               >
-                <span className="min-w-0 flex-1 truncate text-left">{tab.title}</span>
+                <span className="min-w-0 flex-1 truncate text-left">
+                  {tab.title}
+                  {isUnsaved && (
+                    <>
+                      {/* 점은 장식이고, 뜻은 옆의 숨은 글자가 나른다 — 색만으로 말하지 않는다. */}
+                      <span aria-hidden="true" className="ml-1 text-blue-600">
+                        ●
+                      </span>
+                      <span className="sr-only"> 저장 안 함</span>
+                    </>
+                  )}
+                </span>
                 <button
                   type="button"
-                  aria-label={`${tab.title} 닫기`}
+                  aria-label={isUnsaved ? `${tab.title} 닫기 (저장 안 한 입력 있음)` : `${tab.title} 닫기`}
                   // `-my-1` 은 표적이 탭 줄을 그만큼 덜 밀게 한다 — 마우스 갈래(24)에서는 줄이 안 늘고,
                   // 손가락 갈래(44)에서는 표적이 줄보다 커 줄이 함께 늘어난다(#289 리드 결정 2026-08-21 ②).
                   className={cn(ICON_HIT_AREA, "-my-1 ml-auto flex-shrink-0 rounded hover:bg-gray-300")}

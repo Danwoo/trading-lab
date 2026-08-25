@@ -1,11 +1,11 @@
-// app/api/external/devactivity/scheduler/[scheduler_id]/route.ts
+// app/api/external/backend/scheduler/[scheduler_id]/route.ts
 import { env } from "@/env";
 import { withAuth } from "@/lib/auth/withAuth";
 import { NextRequest } from "next/server";
 import { proxyApiRequest } from "@/utils/common/api/server";
 import { createSuccessResponse, createErrorResponse } from "@/utils/common/api/responses";
 
-const BACKEND_URL = env.DEV_ACTIVITY_SERVICE_URL + "/scheduler";
+const BACKEND_URL = env.BACKEND_SERVICE_URL + "/scheduler";
 
 // [GET] 단건 조회 핸들러
 const getHandler = async (req: NextRequest, session: any, params?: any) => {

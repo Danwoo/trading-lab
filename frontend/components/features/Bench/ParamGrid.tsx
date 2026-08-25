@@ -23,18 +23,37 @@ interface Props {
  * `absent_reason` 이 실린 칸은 여기서 걸러 색·최댓값 계산 어디에도 들어가지 않는다.
  */
 function shadeable(cell: GridCellOut) {
-  if (!cell.metrics || absentReasonOf(cell)) return null;
+  if (!cell.metrics || outOfScale(cell)) return null;
   return cell.metrics;
 }
 
 /**
- * 이 칸이 왜 성적을 못 내는가 — **가림을 지난 문구로만** 읽는다.
+ * 척도 밖인가 — **사유 문구 하나에 매달리지 않는다.**
  *
- * 사유는 화면으로 나가는 값이라 `redactReason` 이 마지막 관문이다(#251). 읽는 자리를
- * 여기 하나로 모아, 판정(척도에서 뺄까)과 표시(뭐라고 적을까)가 같은 문구를 본다.
+ * 사유는 `redactReason` 안에서만 읽는다 (#251 — 원문에 키가 실릴 수 있어 이 레포는 읽는
+ * 자리마다 가림을 강제한다). 그런데 가림은 다듬은 결과가 빈 문구면 `null` 을 돌려주므로,
+ * 판정이 그 결과 하나에 매달리면 사유가 지워지는 순간 그 칸이 척도로 되돌아온다 —
+ * 「말할 수 없다」가 「사유가 없다」로 뒤집히는 것이다.
+ *
+ * 그래서 **건수라는 사실**로 받친다: 한 번도 사지 않은 칸은 사유 문구가 어떻게 되든
+ * 성적을 낼 곡선이 없다. 백엔드도 같은 조건에서 사유를 싣는다.
  */
-function absentReasonOf(cell: GridCellOut): string | null {
-  return redactReason(cell.metrics?.absent_reason);
+function outOfScale(cell: GridCellOut): boolean {
+  const metrics = cell.metrics;
+  if (!metrics) return false;
+  if (redactReason(metrics.absent_reason) !== null) return true;
+  return metrics.closed_trades === 0 && metrics.open_positions === 0;
+}
+
+/**
+ * 화면에 적을 사유 — 가림을 지난 문구.
+ *
+ * 가림이 문구를 통째로 지웠거나 백엔드가 사유를 안 실었으면 **건수가 말한 것**을 적는다.
+ * 이 자리는 척도 밖인 칸에서만 불리고, 문구가 없는 척도 밖은 건수가 0 인 칸뿐이다.
+ * 빈 칸으로 두면 왜 척도 밖인지 화면 어디에도 안 남는다.
+ */
+function absentReasonText(cell: GridCellOut): string {
+  return redactReason(cell.metrics?.absent_reason) ?? "거래 없음 — 성적을 낼 곡선이 없습니다";
 }
 
 /** 「몇 건 사고팔았나」 — 「청산 안 함」과 「거래 없음」을 가른다 (#314). */
@@ -126,20 +145,20 @@ function Cell({
   // 거래 0건 칸은 척도의 어느 끝도 아니라 **척도 밖**이므로 배경색을 주지 않는다.
   if (cell.status === "failed" || value === null) {
     const failed = cell.status === "failed";
-    const absentReason = absentReasonOf(cell);
+    const absent = !failed && outOfScale(cell);
     const traded = cell.metrics ? cell.metrics.closed_trades + cell.metrics.open_positions : null;
-    const shown = failed ? "실패" : absentReason !== null && traded !== null ? `거래 ${traded}건` : "—";
+    const shown = failed ? "실패" : absent && traded !== null ? `거래 ${traded}건` : "—";
     const why = failed
       ? (redactReason(cell.failed_reason) ?? undefined)
-      : absentReason !== null
-        ? `${absentReason} — 성적 척도에서 뺐습니다`
+      : absent
+        ? `${absentReasonText(cell)} — 성적 척도에서 뺐습니다`
         : `${spec.label} 값이 없습니다 — 눌러서 이유를 보세요`;
     return (
       <button
         type="button"
         onClick={() => onSelect(cell.run_id, label)}
         title={why}
-        aria-label={`${label} — ${failed ? "실패" : absentReason !== null ? absentReason : `${spec.label} 없음`}`}
+        aria-label={`${label} — ${failed ? "실패" : absent ? absentReasonText(cell) : `${spec.label} 없음`}`}
         className={cn(
           "min-h-[26px] w-full min-w-0 break-keep rounded-badge px-1 py-0.5 text-2xs tabular-nums",
           failed ? "text-danger" : "text-ink-muted",
@@ -207,7 +226,7 @@ export function ParamGrid({ grid, selectedRunId, onSelect }: Props) {
   const maxAbsValue = values.length > 0 ? Math.max(...values.map(Math.abs)) : 0;
   // 척도 밖에 둔 칸을 **세어서 말한다** — 몇 칸이 빠졌는지 모르면 격자가 몇 칸으로 판단한
   // 그림인지 알 수 없다 (#349).
-  const outOfScale = grid.cells.filter((cell) => absentReasonOf(cell) !== null).length;
+  const outOfScaleCount = grid.cells.filter(outOfScale).length;
 
   const [rowAxis, colAxis] = grid.axes.length >= 2 ? [grid.axes[0], grid.axes[1]] : [null, grid.axes[0] ?? null];
 
@@ -253,7 +272,8 @@ export function ParamGrid({ grid, selectedRunId, onSelect }: Props) {
       <p className="break-keep text-2xs text-ink-muted">
         「{spec.label}」로 칠했습니다 — 진할수록 {spec.worseIsHigher ? "나쁩니다" : "많이 벌었습니다"}. 격자{" "}
         {grid.cells.length}칸 — 훑는 것도 시도라 시도 {grid.attempts_used}회를 썼습니다.
-        {outOfScale > 0 && ` 거래가 없던 ${outOfScale}칸은 성적이 아니라 「거래 0건」으로 두어 척도에서 뺐습니다.`}
+        {outOfScaleCount > 0 &&
+          ` 거래가 없던 ${outOfScaleCount}칸은 성적이 아니라 「거래 0건」으로 두어 척도에서 뺐습니다.`}
       </p>
 
       {/* 3축 이상은 표로 못 편다 — 자르지 않고 목록으로 전부 낸다 */}

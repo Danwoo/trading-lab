@@ -29,8 +29,16 @@ export const env = createEnv({
     DATABASE_URL: z.string(),
 
     // 프로젝트 특화
+    /**
+     * 통합 앱(`backend-service`)의 **서버→서버** 주소. `app/api/external/backend/**` 프록시가
+     * 이 하나만 쓴다 — 예전엔 흡수된 서비스 이름(`DEV_ACTIVITY_SERVICE_URL`)이 같은 앱을
+     * 따로 가리켜, 한쪽만 옮기면 관리자 화면 두 개가 「총 0건」으로 조용히 죽었다 (#361).
+     *
+     * 브라우저에서 그 앱을 부르는 자리는 이 값을 쓸 수 없다 — 서버 전용이라 번들에 안 실리고,
+     * 배포에서는 컨테이너 이름(`http://fullstack-backend:8000`)이라 브라우저가 못 푼다.
+     * 그쪽은 `NEXT_PUBLIC_FILE_SERVICE_URL` 이 따로 진다(아래 `client` 블록).
+     */
     BACKEND_SERVICE_URL: z.string(),
-    DEV_ACTIVITY_SERVICE_URL: z.string().default(""),
     MULTI_AGENT_SERVICE_URL: z.string().default("http://localhost:8003"),
     // 봇 만들기 대화 — 로컬 배포 모드 전용이라 없을 수도 있다(그때 화면이 이유를 보여준다).
     BOT_AGENT_SERVICE_URL: z.string().default("http://localhost:8011"),
@@ -47,7 +55,11 @@ export const env = createEnv({
     // 제품 에디션: SAAS(멀티테넌트·셀프가입) / OEM(단일워크스페이스·승인제). 미지정 시 OEM.
     NEXT_PUBLIC_APP_EDITION: z.enum(["SAAS", "OEM"]).default("OEM"),
 
-    // 공통 인프라
+    /**
+     * 통합 앱의 **브라우저→서버** 주소. `BACKEND_SERVICE_URL` 과 같은 앱을 가리키지만 **다른
+     * 축**이라 합치지 않는다 — 이 값은 번들에 실려 사용자의 브라우저가 직접 부르고, 비워 두면
+     * 같은 출처의 `/file-service` 로 떨어져 nginx 가 통합 앱으로 넘긴다.
+     */
     NEXT_PUBLIC_FILE_SERVICE_URL: z.string(),
   },
   experimental__runtimeEnv: {
