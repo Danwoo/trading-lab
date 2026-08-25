@@ -106,8 +106,12 @@ INVENTORY_AXES: list[tuple[str, str, int]] = [
 ]
 
 # 파일 하나로 환원되지 않는 검사. 워크플로 어딘가에 이 문자열이 있어야 한다.
+# `ruff check app/` 은 여기 없다 (2026-08-25). 서비스 잡의 그 스텝은 `test: repo` 의
+# `verify_python_format.py` 가 `git ls-files` 의 `*.py` **전수**에 같은 검사를 거는 것의
+# 진부분집합이었다 — ruff 는 파일마다 최근접 `pyproject.toml` 을 읽으므로 서비스 설정이
+# 그대로 적용된다. 유일하게 남던 차이(훅 rev 0.15.13 vs 서비스 잠금 0.16.x)는 훅 rev 를
+# 0.16.4 로 올려 없앴고, 레포 전체가 그 판에서 `All checks passed!` 다.
 NAMED_COMMANDS: dict[str, str] = {
-    "ruff check app/": "multi-agent-service 파이썬 린트",
     "alembic check": "모델 ↔ 마이그레이션 드리프트 (#185)",
     "npm test": "frontend vitest 단위 테스트",
     "npm run test:api-regressions": "frontend 실제 라우트 핸들러 회귀 (#337)",

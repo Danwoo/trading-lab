@@ -8,8 +8,8 @@
 
   ① 글롭 의미 — `*` 는 `/` 를 안 넘고 `**` 는 넘는다. 미구현 문법은 거부한다
   ② 판정 — 모르면 돌린다 · 무는 게 없으면 안 돌린다 · 패턴 0건은 예외
-  ③ 배선 — `ci.yml`·`frontend-ci.yml` 이 `on.paths` 를 다시 갖지 않았는지, 판정 잡이 있는지,
-     나머지 잡이 전부 그 출력을 `if:` 로 읽는지
+  ③ 배선 — `ci.yml` 이 `on.paths` 를 다시 갖지 않았는지, 필터가 걸린 잡마다 판정 **스텝**
+     (`id: paths`)이 있는지, 그 뒤 `run:` 스텝이 전부 그 출력을 `if:` 로 읽는지
   ④ 죽은 경로 — 패턴 하나하나가 **추적 중인 파일을 실제로 무는지**
   ⑤ 필수 트리거 — 선언한 (워크플로, 입력 파일) 짝에서 그 파일만 바뀐 PR 이 실제로 `run=true`
   ⑥ 필터 밖 그물 — 입력이 서비스 경계를 가로지르는 그물은 **경로 필터 없는 워크플로**에 산다
@@ -28,7 +28,15 @@
 잡이 `skipped` 로 끝나고 GitHub 은 그것을 통과로 센다. 처방이 둘이라 축도 둘이다: 입력을
 목록에 넣거나(⑤), 그물을 필터 없는 워크플로로 옮기거나(⑥).
 
-배선: `.github/workflows/repo-scans.yml` 의 `test: repo-scan` 잡 (경로 필터 없음).
+배선: `.github/workflows/ci.yml` 의 `test: repo` 잡 (경로 필터 없음).
+
+## 판정이 잡이 아니라 스텝이 된 이유 (2026-08-25 통합)
+
+종전엔 `changes` 잡이 판정을 한 번 내고 나머지 잡이 `needs:`+`if:` 로 읽었다. 잡을 셋으로
+합치면서 그 게이트 잡 자체가 「아끼려는 것보다 비싼」 자리가 됐다(잡 하나 = 1분 올림 청구).
+판정을 각 잡의 첫 스텝으로 인라인하면 게이트 잡이 사라지고, **잡은 항상 뜨므로**(체크런
+`success`) required 로 거는 데도 안전하다. 워크플로 레벨 `paths:` 가 금지인 이유는 그대로다 —
+그건 체크런 자체를 안 만든다 (2026-08-25 실측: 없는 이름을 required 로 걸면 `BLOCKED`).
 
 실행: `python3 scripts/test_ci_path_filter.py`
 """
@@ -52,10 +60,13 @@ from ci_path_filter import (  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 
-# 잡 레벨 필터로 옮긴 워크플로. 여기서 빠지면 그 파일은 이 그물 밖이다.
-FILTERED_WORKFLOWS = ["ci.yml", "frontend-ci.yml"]
-FILTER_JOB = "changes"
-FILTER_IF = "needs.changes.outputs.run == 'true'"
+# 경로 필터가 걸린 (워크플로, 잡 id). 여기서 빠지면 그 잡은 이 그물 밖이다.
+FILTERED_JOBS = [("ci.yml", "backend"), ("ci.yml", "frontend")]
+#: 판정 스텝의 id 와 뒤 스텝이 읽어야 하는 식
+FILTER_STEP_ID = "paths"
+FILTER_IF = "steps.paths.outputs.run == 'true'"
+#: 판정 스텝 자신과 셋업 스텝은 게이트 대상이 아니다 (`uses:` 스텝은 `run:` 이 없다).
+FILTER_EXEMPT_STEPS = {"Checkout", "경로 판정"}
 
 # (패턴, 경로, 무는가)
 GLOB_CASES: list[tuple[str, str, bool]] = [
@@ -92,26 +103,26 @@ REJECTED_PATTERNS = ["src/?.ts", "src/a+.ts", "src/[ab].ts", "!frontend/**", "a\
 # GitHub 은 skipped 를 통과로 센다 — 「검사가 있는데 안 돈다」의 가장 조용한 모양이다.
 REQUIRED_TRIGGERS: list[tuple[str, str, str]] = [
     (
-        "ci.yml",
+        "backend",
         "frontend/prisma/schema.prisma",
-        "backend-db 잡이 이 스키마에서 나온 tables.sql 로 scratch DB 를 세운다 (#331)",
+        "backend 잡의 DB 스텝이 이 스키마에서 나온 tables.sql 로 scratch DB 를 세운다 (#331)",
     ),
     (
-        "ci.yml",
+        "backend",
         "frontend/prisma/init/tables.sql",
-        "backend-db 잡이 커밋된 이 파일을 그대로 적용한다",
+        "backend 잡의 DB 스텝이 커밋된 이 파일을 그대로 적용한다",
     ),
     (
-        "frontend-ci.yml",
+        "frontend",
         "frontend/prisma/schema.prisma",
         "frontend 잡의 tables.sql 재현 대조가 이 파일을 읽는다 (#331)",
     ),
 ]
 
 # ⑥ 입력이 서비스 경계를 가로지르는 그물 — 어느 한쪽의 경로 목록으로도 온전히 못 덮는다.
-# `ci.yml` 의 backend 스위트에 있던 동안 이 둘은 **프론트만 바뀐 PR 에서 통째로 skipped** 였다:
+# backend 스위트에 있던 동안 이 둘은 **프론트만 바뀐 PR 에서 통째로 skipped** 였다:
 # 최근 머지 40건 중 8건이 그 경우였고 2건은 그물 글롭에 드는 파일을 고쳤다 (#331 실측).
-# 경로 필터 없이 도는 워크플로(repo-scans.yml)에 사는 것이 이 축의 계약이다.
+# 경로 필터 없이 도는 잡(`test: repo`)에 사는 것이 이 축의 계약이다.
 # ⑦ 의 하한 — 폴더 글롭이 헛돌아 0~1개만 찾고 초록이 되는 것을 막는다 (지금 11개).
 MIN_BACKEND_DIRS = 8
 
@@ -194,6 +205,39 @@ def _filter_patterns(job_body: str) -> list[str]:
     return []
 
 
+def _ungated_run_steps(job_body: str) -> list[str]:
+    """판정 스텝 뒤의 `run:` 스텝 중 판정 출력을 `if:` 로 안 읽는 것들의 이름."""
+    lines = job_body.splitlines()
+    out: list[str] = []
+    name = None
+    chunk: list[str] = []
+    started = False
+
+    def flush() -> None:
+        if name is None or not started:
+            return
+        if name in FILTER_EXEMPT_STEPS:
+            return
+        if not any(re.match(r"^        run:", ln) for ln in chunk):
+            return
+        if not any(FILTER_IF in ln for ln in chunk if ln.lstrip().startswith("if:")):
+            out.append(name)
+
+    for line in lines:
+        m = re.match(r"^      - name: (.*)$", line)
+        if m:
+            flush()
+            name = m.group(1).strip().strip("\"'")
+            chunk = []
+            continue
+        if name is not None:
+            chunk.append(line)
+            if re.match(r"^        id: " + FILTER_STEP_ID + r"\s*$", line):
+                started = True
+    flush()
+    return out
+
+
 def main() -> int:
     checked = 0
     failures: list[str] = []
@@ -240,7 +284,8 @@ def main() -> int:
         failures.append("추적 파일 0건 — git ls-files 가 헛돌았다")
 
     total_patterns = 0
-    for name in FILTERED_WORKFLOWS:
+    seen_workflows: set[str] = set()
+    for name, job_id in FILTERED_JOBS:
         wf = WORKFLOW_DIR / name
         checked += 1
         if not wf.is_file():
@@ -248,23 +293,34 @@ def main() -> int:
             continue
         text = wf.read_text(encoding="utf-8")
 
-        checked += 1
-        if re.search(r"^\s*paths(-ignore)?:", _on_block(text), re.MULTILINE):
-            failures.append(
-                f"배선: {name} 의 on: 에 경로 필터가 다시 생겼다 — 그 잡은 필터 밖 PR 에서 "
-                "체크런 자체가 안 생겨 required 로 걸 수 없다 (#23 Task 4)"
-            )
+        if name not in seen_workflows:
+            seen_workflows.add(name)
+            checked += 1
+            if re.search(r"^\s*paths(-ignore)?:", _on_block(text), re.MULTILINE):
+                failures.append(
+                    f"배선: {name} 의 on: 에 경로 필터가 다시 생겼다 — 필터 밖 PR 에서 "
+                    "체크런 자체가 안 생겨 required 로 걸 수 없다 (#23 Task 4 · 2026-08-25 재실측)"
+                )
 
         jobs = _job_blocks(text)
         checked += 1
-        if FILTER_JOB not in jobs:
-            failures.append(f"배선: {name} 에 판정 잡 `{FILTER_JOB}` 이 없다")
+        if job_id not in jobs:
+            failures.append(f"배선: {name} 에 잡 `{job_id}` 이 없다")
+            continue
+        body = jobs[job_id]
+
+        checked += 1
+        if f"id: {FILTER_STEP_ID}" not in body:
+            failures.append(
+                f"배선: {name} 의 잡 `{job_id}` 에 판정 스텝 `id: {FILTER_STEP_ID}` 이 없다 — "
+                "필터가 통째로 사라지면 이 잡은 늘 전부 돈다(비용) 또는 늘 건너뛴다(구멍)"
+            )
             continue
 
-        patterns = _filter_patterns(jobs[FILTER_JOB])
+        patterns = _filter_patterns(body)
         checked += 1
         if not patterns:
-            failures.append(f"배선: {name} 의 FILTER_PATTERNS 가 0건")
+            failures.append(f"배선: {name} 의 잡 `{job_id}` 에서 FILTER_PATTERNS 가 0건")
         total_patterns += len(patterns)
 
         for pattern in patterns:
@@ -272,33 +328,34 @@ def main() -> int:
             try:
                 matcher = re.compile(glob_to_regex(pattern))
             except PatternError as exc:
-                failures.append(f"죽은 경로: {name} — {exc}")
+                failures.append(f"죽은 경로: {name}/{job_id} — {exc}")
                 continue
             if not any(matcher.match(p) for p in tracked):
                 failures.append(
-                    f"죽은 경로: {name} 의 {pattern!r} 이 추적 파일을 하나도 물지 않는다 — "
-                    "경로가 사라졌으면 목록에서도 빼라 (조용히 안 도는 필터가 된다)"
+                    f"죽은 경로: {name} 의 잡 `{job_id}` 에서 {pattern!r} 이 추적 파일을 하나도 "
+                    "물지 않는다 — 경로가 사라졌으면 목록에서도 빼라 (조용히 안 도는 필터가 된다)"
                 )
 
-        for job_id, body in jobs.items():
-            if job_id == FILTER_JOB:
-                continue
-            checked += 1
-            if f"needs: {FILTER_JOB}" not in body or FILTER_IF not in body:
-                failures.append(
-                    f"배선: {name} 의 잡 `{job_id}` 이 판정을 안 읽는다 (`needs: {FILTER_JOB}` + `if: {FILTER_IF}`)"
-                )
-
-    # ⑤ 필수 트리거 — 선언한 입력만 바뀐 PR 에서 그 워크플로가 실제로 도는가
-    for name, changed_path, reason in REQUIRED_TRIGGERS:
+        # 판정 스텝 뒤의 `run:` 스텝은 전부 그 출력을 읽어야 한다. 하나라도 안 읽으면
+        # 그 검사는 **무관한 PR 에서도 매번 돈다** — 필터가 있다는 말이 거짓이 된다.
+        ungated = _ungated_run_steps(body)
         checked += 1
-        wf = WORKFLOW_DIR / name
-        if not wf.is_file():
-            failures.append(f"필수 트리거: {name} 이 없다")
-            continue
-        patterns = _filter_patterns(_job_blocks(wf.read_text(encoding="utf-8")).get(FILTER_JOB, ""))
+        if ungated:
+            failures.append(
+                f"배선: {name} 의 잡 `{job_id}` 에서 판정을 안 읽는 실행 스텝 {len(ungated)}건: "
+                f"{', '.join(repr(s) for s in ungated[:5])} (`if:` 에 `{FILTER_IF}` 가 있어야 한다)"
+            )
+
+    # ⑤ 필수 트리거 — 선언한 입력만 바뀐 PR 에서 그 잡이 실제로 도는가
+    job_patterns = {
+        job_id: _filter_patterns(_job_blocks((WORKFLOW_DIR / wf_name).read_text(encoding="utf-8")).get(job_id, ""))
+        for wf_name, job_id in FILTERED_JOBS
+    }
+    for job_id, changed_path, reason in REQUIRED_TRIGGERS:
+        checked += 1
+        patterns = job_patterns.get(job_id) or []
         if not patterns:
-            failures.append(f"필수 트리거: {name} 의 FILTER_PATTERNS 를 못 읽었다")
+            failures.append(f"필수 트리거: 잡 `{job_id}` 의 FILTER_PATTERNS 를 못 읽었다")
             continue
         if not (REPO_ROOT / changed_path).is_file():
             failures.append(f"필수 트리거: 선언한 입력 {changed_path!r} 이 실재하지 않는다 — 목록이 낡았다 ({reason})")
@@ -306,8 +363,8 @@ def main() -> int:
         run, _ = decide(patterns, [changed_path])
         if not run:
             failures.append(
-                f"필수 트리거: {name} 이 {changed_path!r} 만 바뀐 PR 에서 안 돈다 (run=false) — {reason}. "
-                "FILTER_PATTERNS 에 그 입력을 넣어라 (잡이 skipped 로 끝나고 GitHub 은 그것을 통과로 센다)"
+                f"필수 트리거: 잡 `{job_id}` 이 {changed_path!r} 만 바뀐 PR 에서 안 돈다 (run=false) — {reason}. "
+                "FILTER_PATTERNS 에 그 입력을 넣어라 (스텝이 전부 건너뛰고 잡은 초록으로 끝난다)"
             )
 
     # ⑦ backend 전수 — `app/main.py` 가 있는 폴더마다 그 폴더만 바뀐 PR 에서 ci.yml 이 도는가
@@ -318,37 +375,42 @@ def main() -> int:
             f"backend 전수: */app/main.py 로 찾은 폴더가 {len(backend_dirs)}개 — 하한 {MIN_BACKEND_DIRS} 미만이다. "
             "backend 정의(app/main.py 가 있는 폴더)가 바뀌었으면 이 그물부터 고쳐라"
         )
-    ci_patterns = _filter_patterns(
-        _job_blocks((WORKFLOW_DIR / "ci.yml").read_text(encoding="utf-8")).get(FILTER_JOB, "")
-    )
+    ci_patterns = job_patterns.get("backend") or []
     for backend_dir in backend_dirs:
         checked += 1
         probe = f"{backend_dir.name}/app/main.py"
         run, _ = decide(ci_patterns, [probe]) if ci_patterns else (False, [])
         if not run:
             failures.append(
-                f"backend 전수: ci.yml 이 {probe!r} 만 바뀐 PR 에서 안 돈다 (run=false) — "
+                f"backend 전수: `test: backend` 잡이 {probe!r} 만 바뀐 PR 에서 안 돈다 (run=false) — "
                 f"{backend_dir.name} 은 app/main.py 가 있는 backend 인데 FILTER_PATTERNS 에 없다. "
                 "그 서비스만 고친 PR 에서 계약 검증·standalone 테스트가 통째로 skipped 된다"
             )
 
-    # ⑥ 필터 밖 그물 — 경로 필터가 없는 워크플로가 실행해야 한다
-    unfiltered_workflows = sorted(wf for wf in WORKFLOW_DIR.glob("*.yml") if wf.name not in FILTERED_WORKFLOWS)
+    # ⑥ 필터 밖 그물 — 경로 필터가 **없는 잡**이 실행해야 한다
+    filtered_bodies = {
+        job_id: _job_blocks((WORKFLOW_DIR / wf_name).read_text(encoding="utf-8")).get(job_id, "")
+        for wf_name, job_id in FILTERED_JOBS
+    }
+    all_bodies: dict[str, str] = {}
+    for wf in sorted(WORKFLOW_DIR.glob("*.yml")):
+        for job_id, body in _job_blocks(wf.read_text(encoding="utf-8")).items():
+            all_bodies[f"{wf.name}:{job_id}"] = body
     for script, reason in UNFILTERED_NETS:
         checked += 1
         if not (REPO_ROOT / script).is_file():
             failures.append(f"필터 밖 그물: {script} 가 실재하지 않는다 — 목록이 낡았다 ({reason})")
             continue
-        hosts = [wf.name for wf in unfiltered_workflows if script in wf.read_text(encoding="utf-8")]
+        hosts = [key for key, body in all_bodies.items() if script in body and body not in filtered_bodies.values()]
         if not hosts:
             failures.append(
-                f"필터 밖 그물: {script} 를 경로 필터 없는 워크플로가 실행하지 않는다 — {reason}. "
-                f"필터가 있는 워크플로({', '.join(FILTERED_WORKFLOWS)})에 두면 그 그물이 지켜야 할 "
-                "바로 그 PR 클래스에서 skip 된다 (#331)"
+                f"필터 밖 그물: {script} 를 경로 필터 없는 잡이 실행하지 않는다 — {reason}. "
+                f"필터가 걸린 잡({', '.join(j for _, j in FILTERED_JOBS)})에 두면 그 그물이 지켜야 할 "
+                "바로 그 PR 클래스에서 스텝이 통째로 건너뛴다 (#331)"
             )
 
     print(
-        f"케이스 {checked}건 검사 · 워크플로 {len(FILTERED_WORKFLOWS)}개 · 패턴 {total_patterns}건 · "
+        f"케이스 {checked}건 검사 · 필터 잡 {len(FILTERED_JOBS)}개 · 패턴 {total_patterns}건 · "
         f"필수 트리거 {len(REQUIRED_TRIGGERS)}건 · 필터 밖 그물 {len(UNFILTERED_NETS)}건 · "
         f"backend 폴더 {len(backend_dirs)}개"
     )

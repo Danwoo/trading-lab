@@ -161,6 +161,21 @@ process-compose up        # staging+ 는 docker-compose (compose.staging.yaml + 
 
 ---
 
+## PR 은 draft 로 연다 (에이전트·사람 공통)
+
+**PR 을 열 때는 draft 로 열고, 스스로 확인한 뒤 ready 로 바꾼다.** CI 의 `pull_request` 트리거가
+`types: [ready_for_review, synchronize, reopened]` 라, **draft 인 동안의 push 는 CI 를 안 깨운다.**
+ready 로 바꾸는 순간 전량이 한 번 돌고, 그 뒤 리뷰 지적을 반영하는 push 는 `synchronize` 라
+종전대로 돈다.
+
+- 왜: 「일단 올리고 CI 로 고친다」가 잡 17개 × 커밋 수만큼 청구된다. draft 구간에서 로컬
+  게이트(`pre-commit run --all` · 관련 `verify_*.py`)로 먼저 거르면 그 반복이 사라진다.
+- **초안에서 CI 를 한 번 보고 싶으면** ready 로 바꿨다가 다시 draft 로 내리면 된다 —
+  `ready_for_review` 가 그때 한 번 뜬다.
+- 독립 리뷰(`cross-review`)도 draft 를 안 본다. 리뷰를 받을 준비가 됐다는 신호가 ready 다.
+
+---
+
 ## 병렬 작업 격리 규칙 (에이전트 — #351)
 
 - **워커는 `git worktree` 가 아니라 별도 `git clone` 에서 일한다.** 워크트리는 워킹트리만 나누고
