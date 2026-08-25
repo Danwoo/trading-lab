@@ -1143,7 +1143,10 @@ jobs:
   # 「리뷰 없음」을 잘못 붙이는 방향이 더 나쁘다).
   docs-notice:
     name: "chore: docs-notice (비게이트)"
-    if: ${{ github.event_name == 'pull_request' }}
+    # 초안에서는 안 돈다 — 테스트 잡과 같은 가드다. 초안 PR 은 아직 리뷰를 받을 상태가
+    # 아니므로 「독립 리뷰 없음」 고지도 이르다. 이 가드가 없으면 draft 구간의 push 마다
+    # (`synchronize` 는 draft 에도 뜬다) 이 잡이 깨어난다.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft }}
     # 테스트 잡과 같은 규칙 — 이 잡은 매 PR 마다 돌고 잡 하나 = 1분 올림 청구라, hosted 로
     # 남기면 통합 뒤 **남은 최대 과금**이 된다 (월 36 PR-push 기준 약 1,080분).
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
