@@ -61,7 +61,7 @@ export class SessionTimezoneError extends Error {
       `DB 세션 타임존이 ${SESSION_TIMEZONE} 이 아니다: ${actual}. ` +
         "앱과 DB 사이의 무언가가 커넥션 startup 옵션을 떼어냈다는 뜻이다 " +
         "(예: ignore_startup_parameters 가 걸린 PgBouncer, 트랜잭션 풀링). " +
-        "이 상태로 뜨면 감사 시각이 조용히 어긋나므로 기동을 멈춘다 (#359).",
+        "이 상태로 뜨면 감사 시각이 조용히 어긋나므로 기동을 멈춘다 (이슈 359).",
     );
     this.name = "SessionTimezoneError";
   }

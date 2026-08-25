@@ -49,10 +49,10 @@ naive 자릿수 자체에는 tz 표식이 없으므로, 그 자릿수를 **무�
 2. 덮어쓰기: env `ALEMBIC_NAIVE_SOURCE_TZ`. 서버 tz 를 DB 수명 중 바꾼 적이 있으면 코드가 알
    수 없으므로 사람이 준다. 둘 다 로그에 남기고, 값이 다르면 경고를 찍는다.
 
-`src_tz` 를 실제보다 **동쪽**으로 잘못 주면(KST DB 에 `UTC`) 감사 시각이 미래로 간다 — 아래
-사후 검사가 같은 트랜잭션에서 잡아 통째로 롤백한다. **서쪽** 오류(UTC DB 에 `Asia/Seoul`)는
-9시간 과거로 가 이 검사에 안 걸리므로 `scripts/timestamptz_migration_check.py` 의 snapshot/diff
-로 대조한다.
+`src_tz` 를 **실제보다 작은 오프셋**으로 잘못 주면(KST(+09) DB 에 `UTC`(+00)) 같은 자릿수가
+더 늦은 인스턴트로 읽혀 감사 시각이 **미래**로 간다 — 아래 사후 검사가 같은 트랜잭션에서 잡아
+통째로 롤백한다. 반대 방향(**실제보다 큰 오프셋**, 예: UTC DB 에 `Asia/Seoul`)은 과거로 갈 뿐이라
+이 검사에 안 걸리므로 `scripts/timestamptz_migration_check.py` 의 snapshot/diff 로 대조한다.
 
 ## 되돌리기
 
@@ -417,7 +417,8 @@ def _assert_no_future_audit_times(bind: sa.engine.Connection) -> None:
     print(f"[0019] 미래 시각 검사 — 감사·운영 컬럼 {checked}개 (만료 컬럼 {len(FUTURE_ALLOWED_COLUMNS)}종은 제외)")
     if offenders:
         raise TimestamptzMigrationError(
-            "전환 뒤 감사 시각이 미래다 — src_tz 를 실제 서버 tz 보다 동쪽으로 잡았을 때 나는 모양이다: "
+            "전환 뒤 감사 시각이 미래다 — src_tz 의 오프셋을 실제보다 작게 잡았을 때 나는 모양이다"
+            "(예: KST(+09) DB 에 UTC(+00)): "
             + ", ".join(offenders)
             + f". {SRC_TZ_ENV} 로 올바른 값을 주고 다시 실행하세요."
         )
