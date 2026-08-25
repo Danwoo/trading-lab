@@ -28,6 +28,13 @@ naive 자릿수 자체에는 tz 표식이 없으므로, 그 자릿수를 **무�
   서버 tz, 나머지는 UTC. 판정은 0007 과 같은 술어를 쓴다: `reg_id`/`mod_id` 가 `MGR`·`migration`
   이면 서버 tz, 그 밖(NULL 포함)이면 UTC. 컬럼 단위 판정이라 같은 행이라도 `reg_dt` 는 seed 값,
   `mod_dt` 는 앱 값일 수 있다.
+- `ba_account.createdAt`/`updatedAt` 도 섞여 있다 — `seed.sql:81-84` 가 데모 계정 2행을
+  `CURRENT_TIMESTAMP` 로 넣기 때문이다. 이 테이블엔 `reg_id`/`mod_id` 가 없으므로 기원 표식을
+  **소유자 사용자에서 빌려 온다**: `ba_account."userId"` → `frontend.tn_user.reg_id`.
+  남는 위험 — 시드가 만든 사용자의 계정 행을 Better Auth 가 나중에 갱신하면(비밀번호 변경 등)
+  그 `updatedAt` 은 UTC 자릿수인데 서버 tz 로 읽힌다. 개발 DB 실측에서는 시드 기원 2행이 모두
+  `createdAt = updatedAt` 이라 아직 그런 행이 없고, `scripts/timestamptz_migration_check.py` 의
+  diff 가 행 단위로 대조해 생기면 드러난다.
 
 `0007_kst_write_shift_correction` 의 docstring 은 「시드 = 참값」을 전제로 썼는데, 그 전제는
 **세션 tz 가 UTC 인 배포에서만** 참이었다. 서버 tz 가 KST 인 로컬 스택에서는 시드 행이 KST
@@ -81,6 +88,9 @@ NON_APP_ACTORS = ("MGR", "migration")
 SERVER_TZ = "server_tz"  # CURRENT_TIMESTAMP·now()·seed.sql·DDL DEFAULT now() → DB 서버 tz
 UTC = "utc"  # Prisma·Better Auth 의 new Date() → UTC 자릿수
 ACTOR = "actor"  # 한 컬럼에 둘이 섞였다 — reg_id/mod_id 로 가른다
+# ba_account 는 배우 컬럼이 없는데 seed.sql:81-84 가 CURRENT_TIMESTAMP 로 2행을 넣는다 —
+# 기원 표식을 소유자 사용자에서 빌려 온다(FK ba_account."userId" → tn_user.id → reg_id).
+ACTOR_VIA_USER = "actor_via_user"
 
 # 만료 시각은 미래가 정상이다 — 사후 검사(미래 시각 = 동쪽 tz 오류)에서 뺀다.
 FUTURE_ALLOWED_COLUMNS = frozenset({"expiresAt", "accessTokenExpiresAt", "refreshTokenExpiresAt"})
@@ -145,12 +155,26 @@ FRONTEND_COLUMNS: list[tuple[str, tuple[tuple[str, str], ...]]] = [
     ("th_email_log", (("reg_dt", UTC),)),
     # Better Auth — 라이브러리가 스스로 만들 때도 Postgres 에서는 timestamptz 다.
     ("ba_session", (("expiresAt", UTC), ("createdAt", UTC), ("updatedAt", UTC))),
+    # createdAt·updatedAt 은 seed.sql:81-84 기원(서버 tz)과 Better Auth 기원(UTC)이 한 컬럼에
+    # 섞인다 — 배우 컬럼이 없으므로 소유자 사용자의 reg_id 로 가른다. 만료 두 컬럼은 시드가 안
+    # 넣으므로 Better Auth 단독 기원이라 UTC 다.
     (
         "ba_account",
-        (("accessTokenExpiresAt", UTC), ("refreshTokenExpiresAt", UTC), ("createdAt", UTC), ("updatedAt", UTC)),
+        (
+            ("accessTokenExpiresAt", UTC),
+            ("refreshTokenExpiresAt", UTC),
+            ("createdAt", ACTOR_VIA_USER),
+            ("updatedAt", ACTOR_VIA_USER),
+        ),
     ),
     ("ba_verification", (("expiresAt", UTC), ("createdAt", UTC), ("updatedAt", UTC))),
 ]
+
+# ACTOR_VIA_USER 테이블 → tn_user.id 를 가리키는 FK 컬럼.
+ACTOR_SOURCE_COLUMNS: dict[str, str] = {"ba_account": "userId"}
+
+# ACTOR_VIA_USER 판정을 담는 임시 컬럼 — 이 리비전 안에서만 존재한다(추가 → UPDATE → ALTER → 삭제).
+ORIGIN_TZ_HELPER_COLUMN = "_origin_tz_0019"
 
 # IANA tz 이름 꼴 — SQL 문자열 리터럴에 넣기 전 1차 검증. 실존 여부는 pg_timezone_names 로 본다.
 _TZ_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_+/-]{0,63}$")
@@ -183,14 +207,40 @@ def origin_tz_expression(column: str, origin: str, src_tz: str) -> str:
         return f"{col} AT TIME ZONE 'UTC'"
     if origin == SERVER_TZ:
         return f"{col} AT TIME ZONE '{src_tz}'"
+    actors = ", ".join(f"'{actor}'" for actor in NON_APP_ACTORS)
+    if origin == ACTOR_VIA_USER:
+        # Postgres 는 `USING` 절에 서브쿼리를 금지한다("cannot use subquery in transform
+        # expression"). 그래서 소유자 사용자에서 빌려 온 판정을 ALTER 직전에 임시 컬럼으로
+        # 물질화하고(`_origin_tz_sql`) USING 은 그 컬럼만 읽는다 — `AT TIME ZONE` 의 오른쪽은
+        # text 표현식이면 되므로 컬럼을 그대로 쓸 수 있다.
+        return f"{col} AT TIME ZONE {_quote(ORIGIN_TZ_HELPER_COLUMN)}"
     if origin == ACTOR:
-        actors = ", ".join(f"'{actor}'" for actor in NON_APP_ACTORS)
         actor_col = _actor_column(column)
         # NULL 배우는 IN 이 NULL 을 내므로 ELSE 로 떨어진다 — 0007 의 `IS NULL OR NOT IN` 과 같은 편.
         return (
             f"CASE WHEN {actor_col} IN ({actors}) THEN {col} AT TIME ZONE '{src_tz}' ELSE {col} AT TIME ZONE 'UTC' END"
         )
     raise TimestamptzMigrationError(f"모르는 기원: {origin!r}")
+
+
+def origin_tz_helper_sql(schema: str, table: str, actor_source: str, src_tz: str) -> list[str]:
+    """`USING` 이 읽을 판정을 임시 컬럼에 적어 둔다 — 서브쿼리 금지를 우회하는 유일한 자리."""
+    helper = _quote(ORIGIN_TZ_HELPER_COLUMN)
+    full = f"{_quote(schema)}.{_quote(table)}"
+    actors = ", ".join(f"'{actor}'" for actor in NON_APP_ACTORS)
+    # 소유자 사용자를 못 찾으면 서브쿼리가 NULL → ELSE(UTC). 계획의 기본값과 같다.
+    return [
+        f"ALTER TABLE {full} ADD COLUMN {helper} text",
+        (
+            f"UPDATE {full} SET {helper} = CASE WHEN "
+            f"(SELECT u.reg_id FROM {_quote(schema)}.{_quote('tn_user')} u WHERE u.id = {_quote(actor_source)}) "
+            f"IN ({actors}) THEN '{src_tz}' ELSE 'UTC' END"
+        ),
+    ]
+
+
+def origin_tz_helper_drop_sql(schema: str, table: str) -> str:
+    return f"ALTER TABLE {_quote(schema)}.{_quote(table)} DROP COLUMN {_quote(ORIGIN_TZ_HELPER_COLUMN)}"
 
 
 def to_timestamptz_sql(schema: str, table: str, column: str, origin: str, src_tz: str, precision: int | None) -> str:
@@ -296,6 +346,9 @@ def _apply(bind: sa.engine.Connection, *, to_tz: bool, src_tz: str) -> int:
     for schema, table, columns, precision in plan:
         rows = _row_count(bind, schema, table)
         table_moved = 0
+        # 소유자 사용자에서 기원을 빌리는 컬럼이 있으면 판정을 임시 컬럼에 먼저 적는다.
+        needs_helper = any(origin == ACTOR_VIA_USER for _column, origin in columns)
+        helper_created = False
         for column, origin in columns:
             current = _column_type(bind, schema, table, column)
             if current is None:
@@ -313,8 +366,14 @@ def _apply(bind: sa.engine.Connection, *, to_tz: bool, src_tz: str) -> int:
                 )
             if current != already_type:
                 raise TimestamptzMigrationError(f"{schema}.{table}.{column} 의 타입이 예상 밖이다: {current}")
+            if needs_helper and not helper_created:
+                for statement in origin_tz_helper_sql(schema, table, ACTOR_SOURCE_COLUMNS[table], src_tz):
+                    op.execute(statement)
+                helper_created = True
             op.execute(render(schema, table, column, origin, src_tz, precision))
             table_moved += 1
+        if helper_created:
+            op.execute(origin_tz_helper_drop_sql(schema, table))
         if table_moved:
             moved += table_moved
             print(f"[0019] {schema}.{table} — {table_moved}컬럼 · {rows}행")
