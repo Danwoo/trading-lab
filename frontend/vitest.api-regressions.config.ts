@@ -12,7 +12,7 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
  * → `@/prisma/generated/client` 로 이어지는 체인을 갖고 있어, 이 파일을 import 하는 테스트는
  * 생성된 클라이언트가 있어야 한다 — `vitest.db.config.ts`(dbtest)와 달리 실제 DB 접속은
  * 필요 없고 `prisma generate` 만 있으면 된다(#337 CI 결함 — CI 는 `test:api-regressions` 를
- * 도는 잡에서만 `npx prisma generate` 를 돌린다, `.github/workflows/frontend-ci.yml` 참고).
+ * 도는 잡에서만 `npx prisma generate` 를 돌린다, `.github/workflows/ci.yml` 참고).
  *
  * `npm run test:api-regressions` 로 돈다. 기본 `npm test` 의 exclude 에 이 include 대상이 이미
  * 빠져 있으므로 같은 테스트가 두 번 돌거나 빠지는 일이 없다.

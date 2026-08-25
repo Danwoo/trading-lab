@@ -198,6 +198,27 @@ CASES: list[tuple[str, dict, str, bool | None]] = [
 ]
 
 
+# ── 수집부의 fail-closed — 「조회 실패」와 「진짜 0건」이 갈리는가 ────────────────
+# 이 자리가 실제로 뚫려 있었다 (2026-08-25 리뷰 차단급): `_gh` 가 종료코드를 버려서
+# `gh api` 실패의 빈 stdout 이 `[]` 로 파싱됐고, 멀쩡한 PR 이 「마커 없음 → rerun」이 됐다.
+# (라벨, rc, stdout, 기대값 또는 sentinel)
+_SENTINEL = object()
+COLLECT_CASES = [
+    ("종료코드 0 + 페이지 하나 → 그 목록", 0, '[{"body":"x"}]', [{"body": "x"}]),
+    (
+        "종료코드 0 + 페이지 둘 → 이어 붙인다 (--paginate)",
+        0,
+        '[{"body":"a"}]\n[{"body":"b"}]',
+        [{"body": "a"}, {"body": "b"}],
+    ),
+    ("종료코드 0 + 빈 출력 → 진짜 0건", 0, "", []),
+    ("**종료코드 비0 + 빈 출력 → None** (조회 실패)", 1, "", None),
+    ("종료코드 비0 + 그럴듯한 출력이어도 None", 1, '[{"body":"x"}]', None),
+    ("종료코드 0 + 깨진 JSON → None", 0, "{not json", None),
+    ("종료코드 0 + 배열이 아닌 JSON → None", 0, '{"body":"x"}', None),
+]
+
+
 def main() -> int:
     if len(CASES) < MIN_CASES:
         print(f"::error::케이스를 {len(CASES)}건만 모았습니다 (하한 {MIN_CASES}) — fail-closed")
@@ -209,6 +230,18 @@ def main() -> int:
             failures.append(f"{label}: kind 기대 {want_kind!r} ≠ 실제 {got['kind']!r} ({got.get('reason')})")
         if want_frozen is not None and got.get("frozen") != want_frozen:
             failures.append(f"{label}: frozen 기대 {want_frozen} ≠ 실제 {got.get('frozen')}")
+
+    for label, rc, raw, want in COLLECT_CASES:
+        got = sweep.parse_comments(rc, raw)
+        if got != want:
+            failures.append(f"[수집] {label}: 기대 {want!r} ≠ 실제 {got!r}")
+
+    # 수집부 실패가 판정부의 fail-closed 계약과 실제로 맞물리는가 — 두 층을 이어서 본다
+    broken = sweep.decide_pr(pr(comments=sweep.parse_comments(1, "")))
+    if broken["kind"] != "none":
+        failures.append(f"[수집→판정] 조회 실패가 무행동으로 안 접힌다: {broken}")
+    if sweep.parse_json_list(1, "") is not None:
+        failures.append("[수집] parse_json_list 가 실패를 빈 목록으로 삼킨다")
 
     # 묶음 판정 — 빈 입력은 처분이 아니라 오류다
     empty = sweep.decide_sweep({})
@@ -224,7 +257,10 @@ def main() -> int:
         if f'"{label}"' not in workflow:
             failures.append(f"라벨 표 불일치: {verdict} → {label!r} 이 cross-review.yml 에 없다")
 
-    print(f"쓸어담기 케이스 {len(CASES)}건 + 묶음 2건 + 라벨 표 {len(sweep.VERDICT_LABEL)}건 검사")
+    print(
+        f"쓸어담기 케이스 {len(CASES)}건 + 수집 {len(COLLECT_CASES)}건 + 이음 2건 "
+        f"+ 묶음 2건 + 라벨 표 {len(sweep.VERDICT_LABEL)}건 검사"
+    )
     for line in failures:
         print(f"::error::{line}")
     if failures:

@@ -40,7 +40,7 @@ updates:
     # mcp 는 major 만 막는다 — 1.x 의 minor·patch 는 계속 받는다(보안 패치가 거기서 온다).
     #   mcp 2.0.0 은 `mcp.shared.context.RequestContext` 를 없앤 파괴적 major 라
     #   backend-service·multi-agent-service 의 검증 스크립트가 ImportError 로 죽는다
-    #   (PR #117·#124 의 test: backend / test: multi-agent 로그).
+    #   (PR #117·#124 의 test: backend / test: backend 로그).
     #   이 레포는 MCP 서버 6 + 소비자 2 라 8개 서비스가 함께 걸리는 마이그레이션이고,
     #   2026-08-13 리드 결정으로 지금은 그 축을 하지 않는다.
     # 경고: ignore 는 보안 업데이트 PR 까지 막는다 — 다만 여기서 막는 것은 major 뿐이라
@@ -133,7 +133,7 @@ updates:
       # typescript 7 은 `npm ci` 자체가 ERESOLVE 로 죽는다 — @typescript-eslint/eslint-plugin
       #   8.60.0 의 peer 가 `typescript@">=4.8.4 <6.1.0"` 이라 7.x 를 못 받는다. 그 플러그인은
       #   eslint-plugin-unused-imports 의 peerOptional 이기도 해서 함께 끌려온다. 설치가
-      #   실패하니 test: frontend·test: frontend-db·notices: autofix 가 전부 죽는다
+      #   실패하니 test: frontend·notices: autofix 가 전부 죽는다
       #   (PR #112 Install dependencies 단계 로그).
       # 해제 조건: @typescript-eslint 가 typescript 7 을 peer 범위에 넣은 릴리스를 내면 지운다
       #   (frontend/package.json 의 @typescript-eslint 상승과 같은 PR 로 간다).

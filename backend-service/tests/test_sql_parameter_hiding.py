@@ -9,7 +9,7 @@ hide_parameters=True — 그래서 검증 지점은 핸들러가 아니라 엔�
     uv run python tests/test_sql_parameter_hiding.py
 pytest 가 도입되면 test_* 함수가 그대로 수집된다.
 
-CI 배선: .github/workflows/repo-scans.yml 의 `test: repo-scan-app` 잡(경로 필터 없는 전수
+CI 배선: .github/workflows/ci.yml 의 `test: repo` 잡(경로 필터 없는 전수
 스캔) + ci.yml 의 `test: backend` 스위트(tests/ 글롭). 테스트만 있고 잡이 없으면
 그물은 초록으로 죽는다 — 이 파일을 옮기거나 이름을 바꾸면 그 잡도 같이 고쳐야 한다.
 

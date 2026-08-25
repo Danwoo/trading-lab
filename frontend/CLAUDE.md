@@ -92,7 +92,7 @@ Backend exception_handler → {detail: "한글 메시지", status: 4xx/5xx}
   `tests/lib/grid/filters.test.ts` ↔ `lib/grid/filters.ts`
   수집 자체는 `**/*.{test,spec}.*` 기본값이라 다른 곳에 둬도 돌긴 한다 — 안 도는 테스트를 만들지 않으려는 의도적 선택이고, 배치는 위 규약을 따른다.
 - **수집된 테스트가 0건이면 실패한다** (`passWithNoTests: false`). `--passWithNoTests` 를 붙이면 이 방어가 사라지므로 붙이지 않는다 — 검사 대상이 0건인데 초록인 상태는 이 레포에서 실제로 사고를 냈다.
-- 게이트: CI `test: frontend` (`.github/workflows/frontend-ci.yml`, `on.paths` 에 `frontend/**`) + pre-commit `vitest` 훅. pre-commit 훅은 `frontend/node_modules` 가 없으면 SKIP 하므로(eslint·tsc 훅과 같은 동작) **권위 있는 게이트는 CI 쪽**이다.
+- 게이트: CI `test: frontend` (`.github/workflows/ci.yml`, `on.paths` 에 `frontend/**`) + pre-commit `vitest` 훅. pre-commit 훅은 `frontend/node_modules` 가 없으면 SKIP 하므로(eslint·tsc 훅과 같은 동작) **권위 있는 게이트는 CI 쪽**이다.
 
 ## 죽은 코드 상한 (knip)
 

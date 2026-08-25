@@ -32,9 +32,14 @@ permissions: {}
 jobs:
   analyze:
     name: "CodeQL: ${{ matrix.language }}"
-    # 분석은 GitHub-hosted 로 남긴다 — self-hosted 로 옮겨도 되지만, 주 1회 + main push 라
-    # 분이 작고(아래) 러너가 얼면 보안 스캔이 조용히 멎는다.
-    runs-on: ubuntu-latest
+    # **주기별로 러너가 갈린다.**
+    #   · `schedule`(주 1회) → 언제나 GitHub-hosted. 이 레포의 self-hosted 러너는 WSL 위라
+    #     호스트가 자면 얼어 있는데, 보안 스캔이 그렇게 조용히 멎으면 안 된다. 주 1회 × 3잡이라
+    #     hosted 비용은 월 15분 안쪽이다 — 이 한 줄이 보증이다.
+    #   · 그 밖(`push: main`·수동) → `CI_RUNNER`. main push 는 실측 하루 14회라(2026-08-13~25
+    #     100커밋/7일) hosted 로 두면 3잡 × 1분 올림 = 월 1,200분대가 되어 무료 한도의 60% 를
+    #     먹는다. 잦은 쪽을 self-hosted 로 보내고, 얼어서 놓친 것은 주 1회 hosted 가 줍는다.
+    runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 60
     permissions:
       security-events: write   # 경보 업로드

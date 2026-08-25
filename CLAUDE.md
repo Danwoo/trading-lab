@@ -29,7 +29,7 @@
 서비스별 상세 (레이어/훅/컴포넌트/유틸 + anti-pattern 체크리스트):
 
 - Frontend: [`frontend/CLAUDE.md`](frontend/CLAUDE.md) (모든 서비스 동일)
-- Backend: 각 backend 폴더 (`app/main.py` 가 있는 모든 폴더) 의 `CLAUDE.md`. 마커(`<!-- 여기부터 끝까지는 … -->`) 아래 **공통부는 전 서비스 byte-identical** — 정본은 [`backend-service/CLAUDE.md`](backend-service/CLAUDE.md), CI 잡 `test: repo-contracts` ([`scripts/verify_backend_claude_md.py`](scripts/verify_backend_claude_md.py)) 가 대조한다. 규율을 바꾸면 전 서비스에 같은 내용을 반영해야 하고, 서비스 고유 맥락은 마커 위 `> **이 서비스**:` 블록에만 둔다
+- Backend: 각 backend 폴더 (`app/main.py` 가 있는 모든 폴더) 의 `CLAUDE.md`. 마커(`<!-- 여기부터 끝까지는 … -->`) 아래 **공통부는 전 서비스 byte-identical** — 정본은 [`backend-service/CLAUDE.md`](backend-service/CLAUDE.md), CI 잡 `test: backend` ([`scripts/verify_backend_claude_md.py`](scripts/verify_backend_claude_md.py)) 가 대조한다. 규율을 바꾸면 전 서비스에 같은 내용을 반영해야 하고, 서비스 고유 맥락은 마커 위 `> **이 서비스**:` 블록에만 둔다
 
 작업 중 코드 패턴 / 위반 회피 상세는 [`.claude/docs/`](.claude/docs/):
 

@@ -9,8 +9,8 @@
  * 「생성기 출력 == 커밋본」 대조를 붙여 왔는데 여기만 없었다.
  *
  * 없으면 무슨 일이 나나: 두 CI 잡이 **서로 다른 스키마를 검증한다.**
- *   · `test: frontend-db` 는 `prisma generate` 뒤에 `tables.sql` 을 적용한다 → 방금 다시 만든 것
- *   · `test: backend-db` 는 generate 를 안 돌린다 → **커밋된 것**
+ *   · `test: frontend` 는 `prisma generate` 뒤에 `tables.sql` 을 적용한다 → 방금 다시 만든 것
+ *   · `test: backend` 는 generate 를 안 돌린다 → **커밋된 것**
  * `schema.prisma` 만 고치고 재생성을 잊으면 그 둘이 갈리고 아무도 말하지 않는다 (#331).
  *
  * ## 대조 기준은 커밋본(HEAD)이다

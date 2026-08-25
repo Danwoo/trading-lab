@@ -217,60 +217,126 @@ def decide_sweep(payload) -> dict:
 # ── 수집 배관 (gh 필요) ──────────────────────────────────────────────────────
 
 
-def _gh(args: list[str]) -> str:
-    return subprocess.run(["gh", *args], capture_output=True, text=True, check=False).stdout
+def _gh(args: list[str]) -> tuple[int, str]:
+    """`gh` 를 부르고 **(종료코드, stdout)** 을 준다.
+
+    종료코드를 버리면 안 된다 — `gh api` 가 rate limit·네트워크·인증 만료로 죽으면 stdout 은
+    보통 **빈 문자열**이고, 그것을 그대로 파싱하면 「조회 실패」와 「진짜 0건」이 같은 값으로
+    수렴한다. 이 스크립트의 존재 이유가 「조용히 죽은 것을 잡는 것」인데 자기가 그 클래스를
+    저지르는 자리였다 (2026-08-25 리뷰 차단급 지적).
+    """
+    proc = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
+    return proc.returncode, proc.stdout
+
+
+def parse_comments(rc: int, raw: str):
+    """`gh api --paginate --jq` 의 코멘트 출력을 목록으로 — **실패는 `None`** (fail-closed).
+
+    `--paginate` 는 페이지마다 한 줄씩 JSON 배열을 낸다. 판정부는 `comments is None` 을
+    「조회 실패 → 무행동」으로 읽으므로, 빈 목록과 실패를 여기서 반드시 갈라야 한다.
+    """
+    if rc != 0:
+        return None
+    pages = [line for line in raw.splitlines() if line.strip()]
+    if not pages:
+        # 종료코드가 0인데 출력이 비었다 = 코멘트가 진짜 0건이다.
+        return []
+    out = []
+    for page in pages:
+        try:
+            parsed = json.loads(page)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(parsed, list):
+            return None
+        out.extend(parsed)
+    return out
+
+
+def parse_json_list(rc: int, raw: str):
+    """단발 조회의 JSON 배열 — 실패·형식 위반은 `None` (fail-closed)."""
+    if rc != 0:
+        return None
+    try:
+        parsed = json.loads(raw or "[]")
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, list) else None
 
 
 def collect(repo: str) -> dict:
-    prs = []
-    listing = _gh(
-        ["pr", "list", "--repo", repo, "--state", "open", "--json", "number,headRefOid,isDraft,labels,autoMergeRequest"]
+    """열린 PR 과 그 부속을 모은다 — **조회 실패는 `None` 으로 남긴다** (fail-closed).
+
+    빈 목록으로 흡수하면 「진짜 0건」과 구분이 안 되고, 판정부가 그것을 「마커 없음」으로 읽어
+    멀쩡한 PR 을 `rerun` 으로 분류한다 (2026-08-25 리뷰 차단급 지적).
+    """
+    rc, listing = _gh(
+        [
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--state",
+            "open",
+            "--json",
+            "number,headRefOid,isDraft,labels,autoMergeRequest",
+        ]
     )
-    for item in json.loads(listing or "[]"):
+    items = parse_json_list(rc, listing)
+    if items is None:
+        # PR 목록 자체를 못 읽었으면 처분을 내지 않는다 — `decide_sweep` 이 오류로 접는다.
+        return {}
+
+    prs = []
+    for item in items:
         number, head = item["number"], item["headRefOid"]
-        comments_raw = _gh(
-            [
-                "api",
-                f"repos/{repo}/issues/{number}/comments",
-                "--paginate",
-                "--jq",
-                "[.[] | {body, author_association, html_url, user_login: .user.login, user_type: .user.type}]",
-            ]
-        )
-        try:
-            comments = [c for page in comments_raw.splitlines() if page for c in json.loads(page)]
-        except json.JSONDecodeError:
-            comments = None
-        runs_raw = _gh(
-            [
-                "api",
-                f"repos/{repo}/actions/workflows/cross-review.yml/runs?head_sha={head}&per_page=20",
-                "--jq",
-                "[.workflow_runs[] | {id, status, conclusion, run_attempt}]",
-            ]
-        )
-        runs = json.loads(runs_raw or "[]")
-        for run in runs:
-            jobs_raw = _gh(
+        comments = parse_comments(
+            *_gh(
                 [
                     "api",
-                    f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100",
+                    f"repos/{repo}/issues/{number}/comments",
+                    "--paginate",
                     "--jq",
-                    "[.jobs[] | {id, name, conclusion}]",
+                    "[.[] | {body, author_association, html_url, user_login: .user.login, user_type: .user.type}]",
                 ]
             )
-            jobs = json.loads(jobs_raw or "[]")
-            for job in jobs:
-                ann_raw = _gh(
+        )
+        # run 조회 실패도 `None` 으로 남긴다 — `_runs_finished(None)` 이 False 라 `wait` 로 접힌다.
+        runs = parse_json_list(
+            *_gh(
+                [
+                    "api",
+                    f"repos/{repo}/actions/workflows/cross-review.yml/runs?head_sha={head}&per_page=20",
+                    "--jq",
+                    "[.workflow_runs[] | {id, status, conclusion, run_attempt}]",
+                ]
+            )
+        )
+        for run in runs or []:
+            jobs = parse_json_list(
+                *_gh(
                     [
                         "api",
-                        f"repos/{repo}/check-runs/{job['id']}/annotations",
+                        f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100",
                         "--jq",
-                        "[.[] | {annotation_level, message}]",
+                        "[.jobs[] | {id, name, conclusion}]",
                     ]
                 )
-                job["annotations"] = json.loads(ann_raw or "[]")
-            run["jobs"] = jobs
+            )
+            for job in jobs or []:
+                # annotation 조회 실패는 `None` — `_failure_annotations` 가 빈 목록으로 읽어
+                # 「동결 아님」이 된다. 안전한 방향이다 (동결로 오인해 재실행하지 않는다).
+                job["annotations"] = parse_json_list(
+                    *_gh(
+                        [
+                            "api",
+                            f"repos/{repo}/check-runs/{job['id']}/annotations",
+                            "--jq",
+                            "[.[] | {annotation_level, message}]",
+                        ]
+                    )
+                )
+            run["jobs"] = jobs or []
         prs.append(
             {
                 "number": number,

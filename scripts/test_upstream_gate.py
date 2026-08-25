@@ -102,7 +102,7 @@ JUDGE_CASES: list[tuple[str, list[dict], bool, str]] = [
         False,
         "fail",
     ),
-    # 개시 직후가 실제로 가장 흔한 상태다 — repo-scans.yml 과 ci.yml·frontend-ci.yml 은 같은
+    # 개시 직후가 실제로 가장 흔한 상태다 — cross-review 와 ci 는 같은
     # pull_request 이벤트로 동시에 시작하므로, 게이트가 처음 조회할 때 상류는 대개 아직 돈다.
     # 이 상태를 통과로 접으면 게이트는 아무것도 안 보고 초록이 된다.
     (
@@ -223,7 +223,7 @@ STRUCTURE_CASES: list[tuple[str, dict[str, str], bool, str]] = [
     ("테스트 잡이 하한 미만", _names(gate.MIN_TEST_CHECKS - 1), True, "하한"),
     (
         "없앤 대표자 잡이 되살아남",
-        {**ENOUGH, RETIRED: "repo-scans.yml"},
+        {**ENOUGH, RETIRED: "ci.yml"},
         True,
         "되살아났습니다",
     ),
@@ -235,7 +235,7 @@ STRUCTURE_CASES: list[tuple[str, dict[str, str], bool, str]] = [
     ),
     (
         "대표자 부활 + 하한 미만 — 둘 다 사유로 남는다",
-        {**_names(gate.MIN_TEST_CHECKS - 2), RETIRED: "repo-scans.yml"},
+        {**_names(gate.MIN_TEST_CHECKS - 2), RETIRED: "ci.yml"},
         True,
         "하한",
     ),

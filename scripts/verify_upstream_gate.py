@@ -35,8 +35,8 @@
 
 ## 왜 `needs:` 가 아니라 체크런 조회인가
 
-`needs:` 는 **같은 워크플로 안**만 묶는다. 그러면 게이트는 `repo-scans.yml` 의 3종만 대표하고
-`ci.yml` 7종·`frontend-ci.yml` 3종은 대표하지 못한다. 종전엔 그 열을 구 `merge-router.yml`
+`needs:` 는 **같은 워크플로 안**만 묶는다. 종전에 검사가 세 워크플로에 흩어져 있을 때는
+게이트가 자기 워크플로의 잡만 묶어 나머지를 대표하지 못했다. 종전엔 그 열을 구 `merge-router.yml`
 의 전수 초록 게이트가 봤는데 그 파일은 #23 Task 8 이 지웠다 — 대비 없이 지우면 자동 머지가
 backend·frontend 테스트를 안 보고 머지하게 되므로, 판정 근거를 그 게이트와 같은 것
 (head SHA 의 `test: ` 접두 체크런 전수)으로 맞춰 이 게이트가 그 자리를 승계했다.
@@ -71,7 +71,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
-# 대기 루프가 사는 곳 — 자동 머지 arm 스텝. 종전에는 `repo-scans.yml` 의 게이트 잡이었다.
+# 대기 루프가 사는 곳 — 자동 머지 arm 스텝. 종전에는 `repo-scans.yml`(지금은 없다)의
+# 게이트 잡이었다.
 WAIT_LOOP_WORKFLOW = WORKFLOW_DIR / "cross-review.yml"
 WAIT_LOOP_STEP_FRAGMENT = "자동 머지 arm"
 
@@ -306,8 +307,7 @@ def wait_loop_block(text: str, *, fragment: str = WAIT_LOOP_STEP_FRAGMENT) -> st
 def check_wait_loop(block: str) -> list[str]:
     """arm 스텝이 상류를 **기다리는** 계약이 서 있는지 본다.
 
-    `cross-review.yml` 과 `ci.yml`·`frontend-ci.yml`·`repo-scans.yml` 은 같은 `pull_request`
-    이벤트로 **동시에** 시작한다. arm 스텝이 한 번만 조회하면 상류가 `in_progress` 로 잡혀
+    `cross-review.yml` 과 `ci.yml` 은 같은 `pull_request` 이벤트로 **동시에** 시작한다. arm 스텝이 한 번만 조회하면 상류가 `in_progress` 로 잡혀
     「게이트 비초록」으로 접히고, 그러면 테스트가 다 초록인 PR 이 영영 arm 되지 않는다.
     기다리게 하는 것은 판정부가 아니라 워크플로의 루프라, 여기서 그 배선을 못박는다.
     """

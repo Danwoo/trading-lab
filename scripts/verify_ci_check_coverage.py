@@ -133,7 +133,7 @@ PRECOMMIT_PARITY: dict[str, tuple[str, str]] = {
     ),
     "gitleaks": (
         "detect --no-git --redact --source .",
-        "repo-scans.yml `test: repo-lint` 이 훅과 같은 버전으로 트리 전수를 스캔한다.",
+        "ci.yml `test: repo` 이 훅과 같은 버전으로 트리 전수를 스캔한다.",
     ),
     "ruff-check": (
         "scripts/verify_python_format.py",
@@ -143,16 +143,16 @@ PRECOMMIT_PARITY: dict[str, tuple[str, str]] = {
         "scripts/verify_python_format.py",
         "CI 에 `ruff format` 이 아예 없던 자리 — 이 스크립트가 레포 전수로 본다.",
     ),
-    "eslint": ("npx eslint .", "frontend-ci.yml `test: frontend` (--fix 없이, #265)."),
-    "tsc": ("npx tsc --noEmit", "frontend-ci.yml `test: frontend` (#265)."),
+    "eslint": ("npx eslint .", "ci.yml `test: frontend` (--fix 없이, #265)."),
+    "tsc": ("npx tsc --noEmit", "ci.yml `test: frontend` (#265)."),
     "backend-claude-md": (
         "scripts/verify_backend_claude_md.py",
-        "ci.yml `test: repo-contracts`.",
+        "ci.yml `test: backend`.",
     ),
-    "vitest": ("npm test", "frontend-ci.yml `test: frontend`."),
+    "vitest": ("npm test", "ci.yml `test: frontend`."),
     "mcp-lockstep": (
         "multi-agent-service/scripts/verify_mcp_lockstep.py",
-        "ci.yml `test: multi-agent` 의 run_verify_scripts.py 스위트에 포함된다.",
+        "ci.yml `test: backend` 의 run_verify_scripts.py 스위트에 포함된다.",
     ),
 }
 
