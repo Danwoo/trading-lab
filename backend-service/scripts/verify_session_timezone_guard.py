@@ -55,7 +55,13 @@ CHECKS_EXPECTED = 2
 def _engine(url: str, timezone: str):
     import sqlalchemy as sa
 
-    return sa.create_engine(url, connect_args={"options": f"-c timezone={timezone}"}, poolclass=sa.pool.NullPool)
+    # hide_parameters=True — 예외 문자열에 바인딩 값이 실리는 것을 막는다 (#234, 전 엔진 공통 규약).
+    return sa.create_engine(
+        url,
+        connect_args={"options": f"-c timezone={timezone}"},
+        poolclass=sa.pool.NullPool,
+        hide_parameters=True,
+    )
 
 
 def main() -> int:

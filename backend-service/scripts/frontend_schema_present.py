@@ -44,7 +44,8 @@ def main() -> int:
         user=settings.BACKEND_SQL_DB_USER,
         password=settings.BACKEND_SQL_DB_PASSWORD,
     )
-    engine = sa.create_engine(url)
+    # hide_parameters=True — 예외 문자열에 바인딩 값이 실리는 것을 막는다 (#234, 전 엔진 공통 규약).
+    engine = sa.create_engine(url, hide_parameters=True)
     try:
         with engine.connect() as connection:
             present = connection.execute(sa.text("SELECT to_regclass('frontend.tn_user') IS NOT NULL")).scalar()
