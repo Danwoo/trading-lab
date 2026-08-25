@@ -96,9 +96,9 @@ describe("#353 — 관리자 폼 입력칸이 이름을 갖는다", () => {
     it(
       `${adminForm.path}: 이름 없는 입력칸이 0개다`,
       async () => {
-        const module = await adminForm.load();
-        const Form = (module.default ??
-          Object.values(module).find((value) => typeof value === "function")) as React.ComponentType<any>;
+        const formModule = await adminForm.load();
+        const Form = (formModule.default ??
+          Object.values(formModule).find((value) => typeof value === "function")) as React.ComponentType<any>;
         render(
           <Form isNew initialData={{}} onSubmit={async () => true} onCancel={() => {}} codeList={EMPTY_CODE_LIST} />,
         );
