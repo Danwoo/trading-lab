@@ -34,7 +34,8 @@ export const GUEST_AUTHOR_ID = "user";
  *
  * 이 값은 **개인 워크스페이스를 받은 가입**에만 간다. 이메일 도메인 매핑으로 남의 공용
  * 워크스페이스에 들어간 가입은 「자기 공간의 주인」이 아니라 초대받은 손님이라 `GUEST_AUTHOR_ID`
- * 다 (결정 보완 2026-08-24) — 갈래는 `app/api/common/signup/route.ts` 가 `sharedWorkspaceId` 로 가른다.
+ * 다 (결정 보완 2026-08-24) — 갈래는 `lib/auth/defaultAuthor.ts` 의 `defaultAuthorIdFor` 가 가른다.
+ * 계정을 만드는 세 경로(가입·관리자 생성·관리자 수정의 승인/배정)가 전부 그 함수를 쓴다 (#355).
  */
 export const SIGNUP_AUTHOR_ID = GENERAL_ADMIN_AUTHOR_ID;
 

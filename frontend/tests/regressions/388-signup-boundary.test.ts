@@ -45,7 +45,11 @@ vi.mock("@/lib/prisma/client", () => ({
     $transaction: vi.fn(async (fn: any) =>
       fn({
         user: { update: vi.fn(() => record("tx.user.update", {})) },
-        authorMember: { create: vi.fn(() => record("tx.authorMember.create", {})) },
+        authorMember: {
+          // 새 계정이라 기존 권한 행이 없다 — `grantDefaultAuthor` 가 「이미 있나」를 먼저 센다 (#355).
+          count: vi.fn(async () => 0),
+          create: vi.fn(() => record("tx.authorMember.create", {})),
+        },
       }),
     ),
   },

@@ -169,7 +169,12 @@ export default function AdminUserDetailForm({ initialData, isNew, onSubmit, onCa
               <TableGroup title="소속 권한">
                 <TableRow>
                   <TableCell colSpan={4}>
-                    <AdminUserAuthorGrid email={formData.email!} editable={true} height="500px" />
+                    <AdminUserAuthorGrid
+                      email={formData.email!}
+                      apprAt={formData.appr_at}
+                      editable={true}
+                      height="500px"
+                    />
                   </TableCell>
                 </TableRow>
               </TableGroup>

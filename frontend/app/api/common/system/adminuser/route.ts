@@ -14,6 +14,7 @@ import {
   syncDefaultWorkspaceMembership,
   workspaceScopedUserWhere,
 } from "@/lib/auth/authUtils";
+import { grantDefaultAuthor, resolveWorkspaceKind } from "@/lib/auth/defaultAuthor";
 
 /**
  * [GET] /api/system/adminuser
@@ -150,6 +151,16 @@ const postHandler = async (req: NextRequest, session: any) => {
         });
 
         await syncDefaultWorkspaceMembership(userId, workspace_id, session.user.email, "member", tx);
+
+        // 기본 권한 — 규칙은 `lib/auth/defaultAuthor.ts` 하나다 (가입·수정 경로와 같은 함수).
+        // 예전엔 이 경로만 아무것도 안 줘서, 만든 계정이 로그인은 되는데 메뉴가 하나도 안 열렸다 (#355).
+        // 여기서 배정되는 워크스페이스는 공용뿐이라(`assertAssignableWorkspace`) 결과는 게스트이고,
+        // 「대기」로 만든 계정은 승인하는 수정 경로가 붙인다.
+        await grantDefaultAuthor(tx, {
+          email,
+          placement: { workspace: await resolveWorkspaceKind(tx, workspace_id), approved: appr_at === "Y" },
+          actorEmail: session.user.email,
+        });
       });
     } catch (error) {
       await deleteHalfCreatedUser(userId).catch((rollbackError) =>

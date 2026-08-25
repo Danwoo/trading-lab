@@ -82,6 +82,8 @@ vi.mock("@/lib/prisma/client", () => ({
           }),
         },
         authorMember: {
+          // 새 계정이라 기존 권한 행이 없다 — `grantDefaultAuthor` 가 「이미 있나」를 먼저 센다 (#355).
+          count: vi.fn(async () => 0),
           create: vi.fn(async (args: any) => {
             grantedRoles.push(args?.data?.author_id);
             return {};
