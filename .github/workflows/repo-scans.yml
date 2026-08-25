@@ -503,6 +503,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_reason_redaction.py
 
+      # 프록시 라우트가 자기 폴더의 서비스만 가리키는가 (#361) — 같은 앱을 두 이름으로 가리키면
+      # 그 둘이 어긋나는 날 화면이 「총 0건」으로 조용히 죽는다. 위 가림 검사와 같은 이유로
+      # 경로 필터가 없는 이 잡에 둔다 — 프론트만 바꾼 PR 에서도 돌아야 한다.
+      - name: 프록시 라우트 env 이름 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_external_proxy_env_names.py
+
       # 바탕을 안 칠한 자리 (#281) — **대비 검사가 원리적으로 못 잡는** 구멍이다. 흰 바탕에
       # 다크 잉크는 대비가 높아서 통과한다. 결함은 대비가 아니라 「바탕이 틀린 것」이다.
       - name: 서피스 바탕 칠 검사
