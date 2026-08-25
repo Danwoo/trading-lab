@@ -555,7 +555,9 @@ class BacktestService:
                 **row,
                 "period_from": str(row["period_from"]),
                 "period_to": str(row["period_to"]),
-                "finished_dt": str(row["finished_dt"]) if row["finished_dt"] else None,
+                # timestamptz 는 psycopg 가 aware datetime 으로 준다 — str() 은 `+00:00` 을 붙이지만
+                # 공백 구분자라 계열이 갈린다. 저장소의 to_char(DT_ISO_TZ) 와 같은 ISO 꼴로 맞춘다.
+                "finished_dt": row["finished_dt"].isoformat() if row["finished_dt"] else None,
             }
             for row in rows
         ]

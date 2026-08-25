@@ -43,9 +43,11 @@ class Board(Base):
     rdcnt: Mapped[int | None] = mapped_column(Integer, default=0)
     use_at: Mapped[str | None] = mapped_column(String(5), default="Y", server_default="Y")
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -62,9 +64,11 @@ class MessageQueue(Base):
     retry_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -85,9 +89,11 @@ class Watchlist(Base):
     memo: Mapped[str | None] = mapped_column(String(1300), nullable=True)
     atch_file_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -111,9 +117,11 @@ class ResearchDocument(Base):
     chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_msg: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -128,9 +136,11 @@ class Portfolio(Base):
     use_at: Mapped[str] = mapped_column(String(1), default="Y", server_default="Y")
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -150,9 +160,11 @@ class Holding(Base):
     use_at: Mapped[str] = mapped_column(String(1), default="Y", server_default="Y")
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -179,15 +191,18 @@ class Nav(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     workspace_id: Mapped[int] = mapped_column(Integer, nullable=False)
     source_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # naive 로 남는다 — 시장 현지 벽시계 (2026-07-30 결정, #359 ㉠(a)). 감사 컬럼만 timestamptz.
     nav_dt: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
     nav: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     benchmark: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     daily_return: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     drawdown: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -202,9 +217,13 @@ class File(Base):
     atch_file_id: Mapped[str] = mapped_column(String(20), primary_key=True, comment="첨부파일 ID")
 
     # Audit
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now(), comment="생성일시")
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), default=func.now(), comment="생성일시"
+    )
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="생성자 ID")
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), comment="수정일시")
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), comment="수정일시"
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="수정자 ID")
 
     # Relationships
@@ -230,9 +249,13 @@ class FileDetail(Base):
     file_ty: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="파일 타입")
 
     # Audit
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now(), comment="생성일시")
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), default=func.now(), comment="생성일시"
+    )
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="생성자 ID")
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), comment="수정일시")
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), comment="수정일시"
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="수정자 ID")
 
     # Relationships
@@ -259,9 +282,11 @@ class Scheduler(Base):
     use_at: Mapped[str] = mapped_column(String(5), default="N", server_default="N")
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -277,9 +302,11 @@ class SchedulerMember(Base):
     email: Mapped[str] = mapped_column(String(200), nullable=False)
     name: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -307,9 +334,11 @@ class Instrument(Base):
     delisted_dt: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[str] = mapped_column(String(1), default="Y", server_default="Y")
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -341,9 +370,11 @@ class SymbolAlias(Base):
     alias_value: Mapped[str] = mapped_column(String(50), nullable=False)
     valid_to: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -372,12 +403,14 @@ class IngestRun(Base):
     skipped_rows: Mapped[int | None] = mapped_column(Integer, default=0, server_default="0")
     failed_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     workspace_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    started_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
-    finished_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    started_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, default=func.now())
+    reg_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -411,7 +444,7 @@ class DailyBar(Base):
     #: 그래서 **무엇인지 모르면 모른다고 적는다** (FR-021 — 없는 값을 0 으로 뭉개지 않는다).
     session_scope: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown", server_default="unknown")
     ingest_run_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("tn_ingest_run.run_id"), nullable=True)
-    ingested_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=func.now())
+    ingested_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=func.now())
 
 
 class MinuteBar(Base):
@@ -427,6 +460,7 @@ class MinuteBar(Base):
     )
 
     instrument_id: Mapped[int] = mapped_column(Integer, ForeignKey("tn_instrument.instrument_id"), primary_key=True)
+    # naive 로 남는다 — 시장 현지 벽시계 (core/calendar.market_local_naive, #359).
     ts: Mapped[datetime.datetime] = mapped_column(DateTime, primary_key=True)
     interval_min: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1, server_default="1")
     open: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
@@ -437,7 +471,7 @@ class MinuteBar(Base):
     source: Mapped[str] = mapped_column(String(30), nullable=False)
     adj_policy: Mapped[str] = mapped_column(String(20), nullable=False)
     ingest_run_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("tn_ingest_run.run_id"), nullable=True)
-    ingested_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=func.now())
+    ingested_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=func.now())
 
 
 # 12. Backtest (#200 M3 덩어리 1 — 스펙 §6 「엔진이 남겨야 할 것」)
@@ -477,12 +511,16 @@ class BacktestRun(Base):
     initial_cash: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="queued")
     failed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    started_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
-    finished_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
+    started_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    reg_dt: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    reg_dt: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     reg_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    mod_dt: Mapped[datetime.datetime | None] = mapped_column(DateTime, onupdate=func.now(), nullable=True)
+    mod_dt: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
     mod_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
@@ -509,6 +547,7 @@ class BacktestTrade(Base):
     )
     instrument_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     side: Mapped[str] = mapped_column(String(10), nullable=False)
+    # naive 로 남는다 — 엔진이 내는 시장 현지 시각 (#359). tz 를 붙이면 날짜가 밀린다.
     entry_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
     exit_ts: Mapped[datetime.datetime | None] = mapped_column(DateTime, nullable=True)
     qty: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)

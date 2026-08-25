@@ -1,3 +1,4 @@
+from repositories.common.sql_format import DT_ISO_TZ
 from sqlalchemy import text
 from utils.common.devextreme_utils import build_filter_params, parse_sort
 
@@ -8,7 +9,7 @@ class PortfolioRepository:
 
     # ── Portfolio (master) ─────────────────────────────────────────────
     def query_select_portfolio(self) -> str:
-        return """
+        return f"""
             SELECT *
               FROM (
                 SELECT portfolio_id
@@ -16,9 +17,9 @@ class PortfolioRepository:
                      , sort_ordr
                      , use_at
                      , description
-                     , to_char(reg_dt, 'YYYY-MM-DD HH24:MI:SS') AS reg_dt
+                     , to_char(reg_dt, '{DT_ISO_TZ}') AS reg_dt
                      , reg_id
-                     , to_char(mod_dt, 'YYYY-MM-DD HH24:MI:SS') AS mod_dt
+                     , to_char(mod_dt, '{DT_ISO_TZ}') AS mod_dt
                      , mod_id
                 FROM tn_portfolio
                 WHERE workspace_id = :workspace_id
@@ -131,7 +132,7 @@ class PortfolioRepository:
 
     # ── Holding (detail) ───────────────────────────────────────────────
     def query_select_holding(self) -> str:
-        return """
+        return f"""
             SELECT *
               FROM (
                 SELECT h.portfolio_id
@@ -143,9 +144,9 @@ class PortfolioRepository:
                      , h.use_at
                      , h.description
                      , p.portfolio_nm
-                     , to_char(h.reg_dt, 'YYYY-MM-DD HH24:MI:SS') AS reg_dt
+                     , to_char(h.reg_dt, '{DT_ISO_TZ}') AS reg_dt
                      , h.reg_id
-                     , to_char(h.mod_dt, 'YYYY-MM-DD HH24:MI:SS') AS mod_dt
+                     , to_char(h.mod_dt, '{DT_ISO_TZ}') AS mod_dt
                      , h.mod_id
                 FROM tn_holding h
                 INNER JOIN tn_portfolio p

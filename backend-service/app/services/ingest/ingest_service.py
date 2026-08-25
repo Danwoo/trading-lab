@@ -110,7 +110,9 @@ class IngestService:
         """
         await run_in_threadpool(
             self.ingest_repository.update_ingest_run_status,
-            {"run_id": run_id, "status": status, "finished_dt": dt.datetime.now(), **fields},
+            # aware 로 준다 (#359) — naive 파라미터는 서버가 **세션 tz** 로 읽는데 값은 **OS 시계**라,
+            # 앱 컨테이너가 KST(compose 의 TZ)이고 세션이 UTC 인 조합에서 9시간 어긋난다.
+            {"run_id": run_id, "status": status, "finished_dt": dt.datetime.now(dt.UTC), **fields},
         )
 
     async def _run_instrument_master(self, run: dict, provider) -> tuple[int, int]:

@@ -1,3 +1,4 @@
+from repositories.common.sql_format import DT_ISO_TZ
 from sqlalchemy import text
 from utils.common.devextreme_utils import build_filter_params, parse_sort
 
@@ -7,7 +8,7 @@ class WatchlistRepository:
         self.sql_client = sql_client
 
     def query_select_watchlist(self) -> str:
-        return """
+        return f"""
             SELECT *
               FROM (
                 SELECT ticker
@@ -21,9 +22,9 @@ class WatchlistRepository:
                      , use_at
                      , memo
                      , atch_file_id
-                     , to_char(reg_dt, 'YYYY-MM-DD HH24:MI:SS') AS reg_dt
+                     , to_char(reg_dt, '{DT_ISO_TZ}') AS reg_dt
                      , reg_id
-                     , to_char(mod_dt, 'YYYY-MM-DD HH24:MI:SS') AS mod_dt
+                     , to_char(mod_dt, '{DT_ISO_TZ}') AS mod_dt
                      , mod_id
                 FROM tn_watchlist
                 WHERE workspace_id = :workspace_id
