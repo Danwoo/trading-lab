@@ -36,6 +36,11 @@ function AgreeCheck({ id, checked, onChange }: { id: string; checked: boolean; o
   );
 }
 
+// 회색 행(`bg-gray-300`) 위의 약관 링크. 라이트 카드 안이라 라이트 잉크가 잡히는데, 그 바탕에서는
+// `--ink-muted` 가 4.05:1 로 AA 에 못 미쳐 한 단 진한 `--ink`(9.57:1)를 쓴다. `!` 는 `Button` 의
+// 기본 `text-blue-600`(3.51:1)을 덮기 위한 것이다(PolicyPopup.tsx 의 같은 주석).
+const AGREE_LINK_COLOR = "!text-ink hover:!text-ink-strong";
+
 export const Agreettac: FC<Props> = () => {
   const [isChecked, setIsChecked] = useState(false);
   const [isChecked2, setIsChecked2] = useState(false);
@@ -85,7 +90,7 @@ export const Agreettac: FC<Props> = () => {
                   <div className="flex justify-start w-full">
                     <Button
                       stylingMode="text"
-                      className="text-sm sm:text-base w-full"
+                      className={`text-sm sm:text-base w-full ${AGREE_LINK_COLOR}`}
                       render={() => (
                         <div className="text-left w-full">
                           <span className="whitespace-nowrap">
@@ -106,7 +111,7 @@ export const Agreettac: FC<Props> = () => {
                   <div className="flex justify-start w-full">
                     <Button
                       stylingMode="text"
-                      className="text-sm sm:text-base w-full"
+                      className={`text-sm sm:text-base w-full ${AGREE_LINK_COLOR}`}
                       render={() => (
                         <div className="text-left w-full">
                           <span className="whitespace-nowrap">

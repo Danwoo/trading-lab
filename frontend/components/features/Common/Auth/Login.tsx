@@ -159,7 +159,7 @@ export const Login = () => {
         </span>
         <span className="hidden text-2xs text-ink-muted sm:inline">실제 주문이 나가지 않습니다</span>
         <div className="ml-auto">
-          <PolicyPopup buttonClassName="!text-2xs" additionalClassName="!text-ink-muted hover:!text-ink" />
+          <PolicyPopup buttonClassName="!text-2xs" />
         </div>
       </header>
 
