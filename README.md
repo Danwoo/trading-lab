@@ -169,8 +169,10 @@ account turns it into a GitHub review so branch protection can act on it. Everyt
 in three jobs — `test: backend`, `test: frontend`, `test: repo` — and where they run is one repo
 variable: `CI_RUNNER`. Unset (the default) means GitHub-hosted `ubuntu-latest`; set it to a runner
 label and the same three jobs move to self-hosted runners, with no other change to the workflow
-files. The review job is separate: it always runs on a self-hosted runner, and it is skipped for
-pull requests from forks — a fork still gets the full build, test, and scan set on hosted runners.
+files. **A pull request from a fork always runs on GitHub-hosted runners regardless of that
+variable** — self-hosted runners are not exposed to code from forks. The review job is separate:
+it always runs on a self-hosted runner, and it is skipped for fork pull requests, so a fork gets
+the full build, test, and scan set but not the automated review.
 
 Contributions ship under the MIT license below.
 

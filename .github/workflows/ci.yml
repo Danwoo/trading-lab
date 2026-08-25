@@ -33,11 +33,18 @@ name: CI
 # ready 이후의 리뷰 지적 반영 push 는 `synchronize` 라 종전대로 돈다.
 #
 # ── 러너는 변수 하나로 갈린다 ───────────────────────────────────────────
-# `runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}` — 레포 변수 `CI_RUNNER` 를 지우면
-# GitHub-hosted 로 돌아온다. **기계 이름을 YAML 에 적지 않는다**: 라벨은 역할 이름이고,
-# public 으로 되돌렸을 때 사설 기계의 존재가 파일에 남지 않는다. 포크 PR 은 변수가 뭐든
-# GitHub-hosted 에서 돈다 (self-hosted 러너는 포크 PR 에 노출하지 않는 것이 GitHub 권고다) —
-# 그 분리는 레포 Actions 설정의 「포크 PR 워크플로 승인 요구」가 맡는다.
+# 레포 변수 `CI_RUNNER` 를 지우면 GitHub-hosted 로 돌아온다 — **YAML 은 안 바뀐다.**
+# **기계 이름을 YAML 에 적지 않는다**: 라벨은 역할 이름이고, public 으로 되돌렸을 때 사설
+# 기계의 존재가 파일에 남지 않는다.
+#
+# **포크 PR 은 변수가 뭐든 GitHub-hosted 에서 돈다.** 식의 앞 절이 그것이다 —
+#   (pull_request 이고 head 레포가 이 레포가 아니면) → 'ubuntu-latest'
+#   그 밖 → vars.CI_RUNNER, 없으면 'ubuntu-latest'
+# 근거 둘: ㉠ GitHub 은 *"self-hosted runners should almost never be used for public
+# repositories"* 라고 못박는다 — 포크 PR 이 우리 기계에서 코드를 돌리는 경로다.
+# ㉡ 변수를 켠 상태에서 포크 PR 을 self-hosted 큐에 올리면 러너가 받을 때까지 안 돌아
+# 「외부 기여자 PR 이 바로 돈다」가 거짓이 된다. 이 한 줄이 둘 다 닫는다.
+# 레포 Actions 설정의 「포크 PR 워크플로 승인 요구」는 그 위에 겹치는 방어층이다.
 #
 # pull_request 에 branches(base) 제한을 안 두는 이유는 스택 PR (#281).
 on:
@@ -66,7 +73,7 @@ jobs:
   backend:
     name: "test: backend"
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -78,16 +85,17 @@ jobs:
           POSTGRES_PASSWORD: ci
           POSTGRES_DB: ci
         ports:
-          - 5432:5432
+          # **호스트 포트를 고정하지 않는다.** GitHub-hosted 는 잡마다 VM 이라 5432 를 고정해도
+          # 안 부딪히지만, self-hosted 는 한 기계에서 여러 잡이 돌아 두 번째가
+          # `Bind for 0.0.0.0:5432 failed: port is already allocated` 로 죽는다 (2026-08-25 실측).
+          # 컨테이너 포트만 적으면 GitHub 이 빈 호스트 포트를 골라 주고,
+          # `job.services.postgres.ports['5432']` 로 그 값을 읽는다.
+          - 5432
         options: >-
           --health-cmd "pg_isready -U ci -d ci"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    env:
-      WORKSPACE_MEMBER_TEST_DB_URL: postgresql://ci:ci@localhost:5432/ci
-      ORPHAN_WORKSPACE_TEST_DB_URL: postgresql://ci:ci@localhost:5432/ci
-      FRONTEND_FK_TEST_DB_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -146,6 +154,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      # 서비스 컨테이너의 **실제** 호스트 포트를 env 로 편다. 잡 레벨 `env:` 는 `job` 컨텍스트를
+      # 못 읽어서(스텝만 읽는다) 여기서 한 번에 깐다.
+      - name: DB 접속 주소 확정 (서비스 컨테이너의 실제 호스트 포트)
+        if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
+        run: |
+          CI_DB="postgresql://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci"
+          {
+            echo "WORKSPACE_MEMBER_TEST_DB_URL=$CI_DB"
+            echo "ORPHAN_WORKSPACE_TEST_DB_URL=$CI_DB"
+            echo "FRONTEND_FK_TEST_DB_URL=$CI_DB"
+          } >> "$GITHUB_ENV"
+          echo "서비스 컨테이너 postgres → localhost:${{ job.services.postgres.ports['5432'] }}"
+
       - name: multi-agent — 계약 검증 스크립트 (scripts/verify_*.py, fail-closed)
         working-directory: multi-agent-service
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
@@ -202,7 +223,7 @@ jobs:
         working-directory: backend-service
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         env:
-          MINUTE_PARTITION_TEST_DB_URL: postgresql://ci:ci@localhost:5432/ci
+          MINUTE_PARTITION_TEST_DB_URL: postgresql://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci
         run: |
           out=$(uv run python scripts/verify_minute_partition_query.py)
           echo "$out"
@@ -219,7 +240,7 @@ jobs:
         working-directory: backend-service
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         env:
-          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci
         run: |
           out=$(uv run python scripts/verify_backtest_schema.py)
           echo "$out"
@@ -239,7 +260,7 @@ jobs:
         working-directory: backend-service
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         env:
-          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci
         run: |
           out=$(uv run python scripts/verify_sample_roundtrip.py)
           echo "$out"
@@ -252,7 +273,7 @@ jobs:
         working-directory: backend-service
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         env:
-          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci
         run: |
           out=$(uv run python scripts/verify_backtest_run_persists.py)
           echo "$out"
@@ -273,7 +294,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         env:
           APP_ENV: development
-          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci
         run: |
           cp app/.env.example app/.env.development
           out=$(uv run python scripts/verify_not_loaded_vs_missing.py)
@@ -290,7 +311,7 @@ jobs:
         working-directory: backend-service
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         env:
-          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+          BACKTEST_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci
         run: |
           out=$(uv run python scripts/verify_instrument_search.py)
           echo "$out"
@@ -316,7 +337,7 @@ jobs:
           uv run python - <<'PY'
           import psycopg
 
-          with psycopg.connect("postgresql://ci:ci@localhost:5432/postgres", autocommit=True) as conn:
+          with psycopg.connect("postgresql://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/postgres", autocommit=True) as conn:
               conn.execute("DROP DATABASE IF EXISTS alembic_verify_scratch")
               conn.execute("CREATE DATABASE alembic_verify_scratch")
           print("alembic_verify_scratch 생성")
@@ -327,7 +348,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' && steps.alembic_db.outcome == 'success' }}
         working-directory: backend-service/alembic
         env:
-          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/alembic_verify_scratch
+          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/alembic_verify_scratch
           ALEMBIC_ALLOW_MISSING_FRONTEND_SCHEMA: "1"
         run: uv run python -m alembic upgrade head
 
@@ -339,7 +360,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' && steps.alembic_upgrade.outcome == 'success' }}
         working-directory: backend-service/alembic
         env:
-          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/alembic_verify_scratch
+          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/alembic_verify_scratch
           ALEMBIC_ALLOW_MISSING_FRONTEND_SCHEMA: "1"
         run: |
           uv run python -m alembic check || {
@@ -355,7 +376,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' && steps.alembic_upgrade.outcome == 'success' }}
         working-directory: backend-service
         env:
-          BOT_ROUND_TRIP_DB_URL: postgresql://ci:ci@localhost:5432/alembic_verify_scratch
+          BOT_ROUND_TRIP_DB_URL: postgresql://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/alembic_verify_scratch
         run: uv run python scripts/verify_bot_round_trip.py --i-know-this-drops-tables
 
       # 스키마 판 가드(#311) — 여기가 유일하게 "한 판 되돌린 실제 DB" 를 만들 수 있는 자리다.
@@ -365,7 +386,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' && steps.alembic_upgrade.outcome == 'success' }}
         working-directory: backend-service
         env:
-          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/alembic_verify_scratch
+          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/alembic_verify_scratch
           ALEMBIC_ALLOW_MISSING_FRONTEND_SCHEMA: "1"
         run: uv run python scripts/verify_schema_guard_on_downgraded_db.py --i-know-this-downgrades-schema
 
@@ -425,7 +446,7 @@ jobs:
   frontend:
     name: "test: frontend"
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -437,14 +458,18 @@ jobs:
           POSTGRES_PASSWORD: ci
           POSTGRES_DB: ci
         ports:
-          - 5432:5432
+          # **호스트 포트를 고정하지 않는다.** GitHub-hosted 는 잡마다 VM 이라 5432 를 고정해도
+          # 안 부딪히지만, self-hosted 는 한 기계에서 여러 잡이 돌아 두 번째가
+          # `Bind for 0.0.0.0:5432 failed: port is already allocated` 로 죽는다 (2026-08-25 실측).
+          # 컨테이너 포트만 적으면 GitHub 이 빈 호스트 포트를 골라 주고,
+          # `job.services.postgres.ports['5432']` 로 그 값을 읽는다.
+          - 5432
         options: >-
           --health-cmd "pg_isready -U ci -d ci"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci?schema=frontend"
       NODE_ENV: "development"
       EMAIL_HOST: "smtp.example.com"
       EMAIL_PORT: "465"
@@ -650,6 +675,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      # 서비스 컨테이너의 **실제** 호스트 포트를 env 로 편다 — 잡 레벨 `env:` 는 `job` 컨텍스트를
+      # 못 읽는다(스텝만 읽는다). 아래 `npm run test:db` 가 이 값을 본다.
+      - name: DB 접속 주소 확정 (서비스 컨테이너의 실제 호스트 포트)
+        if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
+        run: |
+          echo "DATABASE_URL=postgresql://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci?schema=frontend" >> "$GITHUB_ENV"
+          echo "서비스 컨테이너 postgres → localhost:${{ job.services.postgres.ports['5432'] }}"
+
       - name: Apply frontend schema (tables.sql)
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         # **서비스 컨테이너 안의 psql 로 돌린다.** 호스트의 `psql` 을 쓰면 self-hosted 러너에
@@ -664,7 +697,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         working-directory: backend-service/alembic
         env:
-          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci
         run: uv run python -m alembic upgrade head
 
       - name: deleteUserCascade 통합 테스트
@@ -678,7 +711,7 @@ jobs:
   repo:
     name: "test: repo"
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -1107,7 +1140,9 @@ jobs:
   docs-notice:
     name: "chore: docs-notice (비게이트)"
     if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    # 테스트 잡과 같은 규칙 — 이 잡은 매 PR 마다 돌고 잡 하나 = 1분 올림 청구라, hosted 로
+    # 남기면 통합 뒤 **남은 최대 과금**이 된다 (월 36 PR-push 기준 약 1,080분).
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: read
