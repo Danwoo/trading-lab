@@ -1,11 +1,11 @@
-// app/api/external/devactivity/chat/holders/route.ts
+// app/api/external/backend/chat/holders/route.ts
 import { env } from "@/env";
 import { withAuth } from "@/lib/auth/withAuth";
 import { NextRequest } from "next/server";
 import { proxyApiRequest } from "@/utils/common/api/server";
 import { createSuccessResponse, createErrorResponse } from "@/utils/common/api/responses";
 
-const BACKEND_URL = env.DEV_ACTIVITY_SERVICE_URL + "/chat/holders";
+const BACKEND_URL = env.BACKEND_SERVICE_URL + "/chat/holders";
 
 // [GET] 계좌주 필터 드롭다운용 목록
 const getHandler = async (_req: NextRequest, session: any) => {

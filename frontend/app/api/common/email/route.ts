@@ -7,27 +7,14 @@ import dns from "dns/promises";
 import { prisma } from "@/lib/prisma/client";
 import { getClientIp, rateLimit } from "@/lib/rateLimit";
 import { emailVerificationOtpIdentifier, normalizeEmail } from "@/lib/auth/authUtils";
+import { classifyEmailFailure, describeSmtpError, EMAIL_FAILURE_STATUS } from "@/utils/common/errors/emailFailure";
+import { EMAIL_FAILURE_MESSAGES } from "@/utils/common/locale/ko/apierrors";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // SMTP 를 설정하지 않은 개발 환경에서는 메일 대신 서버 콘솔에 코드를 찍는다 — 메일 서버 없이 가입까지 도달하게.
 // 운영에서는 EMAIL_HOST 가 비어도 이 경로를 타지 않는다 (코드가 콘솔로 새는 것을 막는다).
 const isConsoleOtpMode = env.NODE_ENV !== "production" && !env.EMAIL_HOST;
-
-function toFriendlyEmailError(message: string): string {
-  if (
-    /user.*unavailable|account.*unavailable|no such user|user.*not.*exist|does not exist|unknown user|invalid.*mailbox/i.test(
-      message,
-    )
-  )
-    return `존재하지 않는 이메일 주소입니다.\n주소를 다시 확인해주세요.`;
-  if (/rejected|denied|not allowed/i.test(message)) return `수신 거부된 이메일 주소입니다.`;
-  if (/connect|timeout|ECONNREFUSED|ETIMEDOUT/i.test(message))
-    return `메일 서버에 연결할 수 없습니다.\n잠시 후 다시 시도해주세요.`;
-  if (/authentication|auth|credentials/i.test(message))
-    return `메일 서버 인증에 실패했습니다.\n관리자에게 문의해주세요.`;
-  return `이메일 발송에 실패했습니다.\n주소를 확인하거나 잠시 후 다시 시도해주세요.`;
-}
 
 // 가입 전(pre-auth) OTP 발송 엔드포인트라 withAuth 미적용 — 세션이 없는 회원가입 흐름에서 호출됨.
 // 남용 방어는 (1) 호출자 HTML 주입 제거(서버 템플릿만 렌더 → 피싱 릴레이 차단), (2) 수신자 검증, (3) IP·수신자 rate limit 로 대체.
@@ -151,10 +138,15 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ message: "Email sent successfully" });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // **진단은 로그로, 사용자에게는 사유 코드로** (#342). 원문에는 내부 메일 서버 이름이 그대로
+    // 실린다(실측: `getaddrinfo ENOTFOUND smtp.…`) — 봉투를 건너는 것은 닫힌 집합의 코드와
+    // 우리가 쓴 문구뿐이고, 상태도 사유에 맞춘다(주소 문제는 4xx, 메일 서버 사정은 5xx).
+    const diagnosis = describeSmtpError(error);
+    const code = classifyEmailFailure(diagnosis);
     await prisma.emailLog.create({
-      data: { to, subject, status: "FAIL", error_msg: errorMessage, reg_dt: new Date() },
+      data: { to, subject, status: "FAIL", error_msg: diagnosis, reg_dt: new Date() },
     });
-    return NextResponse.json({ message: toFriendlyEmailError(errorMessage) }, { status: 500 });
+    console.error(`[email] 발송 실패 (${code}):`, diagnosis);
+    return NextResponse.json({ code, message: EMAIL_FAILURE_MESSAGES[code] }, { status: EMAIL_FAILURE_STATUS[code] });
   }
 }

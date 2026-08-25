@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import { auth } from "@/lib/auth/auth";
-import { DEFAULT_USER_AUTHOR_ID } from "@/constants/protected";
+import { GUEST_AUTHOR_ID, SIGNUP_AUTHOR_ID } from "@/constants/protected";
 import { isOEM } from "@/utils/common/edition";
 import { getClientIp, rateLimit } from "@/lib/rateLimit";
 import { SIGNUP_EMAIL_PATTERN, signupRequestSchema } from "@/schemas/common/signup";
@@ -223,11 +223,19 @@ export async function POST(req: NextRequest) {
         // 기본 워크스페이스 멤버십 — 세션이 이 행에서 "지금 선택된 워크스페이스"를 읽는다.
         await syncDefaultWorkspaceMembership(userId, workspace_id, email, "member", tx);
 
-        // 즉시 활성인 가입자는 일반사용자 권한 자동 부여. OEM 은 승인 시 운영자가 부여.
+        // 즉시 활성인 가입자는 **자기** 워크스페이스의 운영자다 (리드 결정 2026-08-23, #341) —
+        // 게스트를 주면 실험대·시세·관심종목의 저장·실행이 전부 403 이다.
+        //
+        // 도메인 매핑으로 **남의 공용 워크스페이스**에 들어간 가입은 그 전제(주인)가 서지 않는다.
+        // 그 계정은 초대받은 손님이라 게스트를 주고, 쓰기를 열지는 그 워크스페이스 운영자가
+        // 권한관리에서 판단한다 (결정 보완 2026-08-24 — `adminuser/[email]/route.ts` 가 남의
+        // 워크스페이스에 사람을 넣을 때와 같은 원칙). 운영자를 주면 그 워크스페이스의 쓰기와
+        // 사용자관리(같은 워크스페이스 계정의 수정·삭제)가 초대 없이 열린다.
+        // OEM 은 승인 시 운영자가 부여.
         if (autoGrantRole) {
           await tx.authorMember.create({
             data: {
-              author_id: DEFAULT_USER_AUTHOR_ID,
+              author_id: sharedWorkspaceId === null ? SIGNUP_AUTHOR_ID : GUEST_AUTHOR_ID,
               user_id: email,
               reg_id: email,
               reg_dt: new Date(),

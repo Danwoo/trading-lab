@@ -20,6 +20,8 @@ interface Props {}
 export const Signup: FC<Props> = () => {
   const [email, setEmail] = useState<string>("");
   const [otp, setOtp] = useState<string>("");
+  // 모달은 「확인」을 누르면 사라진다 — 무엇을 해야 하는지는 폼 옆에 남아 있어야 한다 (#342).
+  const [sendError, setSendError] = useState<string>("");
   const [result, setResult] = useState<boolean>(false);
   const [emailToggle, setEmailToggle] = useState<string>("hidden");
   const [verifyToggle, setVerifyToggle] = useState<string>("hidden");
@@ -40,6 +42,7 @@ export const Signup: FC<Props> = () => {
     try {
       await sendEmail(email);
 
+      setSendError("");
       showMessage(
         "알림",
         <div>
@@ -51,6 +54,7 @@ export const Signup: FC<Props> = () => {
       setEmailToggle("");
     } catch (error: any) {
       const message = getApiErrorMessage(error);
+      setSendError(message);
       showMessage("오류", message);
     }
   };
@@ -85,6 +89,7 @@ export const Signup: FC<Props> = () => {
   const emailchk = async () => {
     if (!result) {
       if (email) {
+        setSendError("");
         emailchkApi(email);
       } else {
         showMessage("알림", <div>이메일 주소를 입력해주세요.</div>);
@@ -161,7 +166,10 @@ export const Signup: FC<Props> = () => {
                       width="100%"
                       height={48}
                       value={email}
-                      onValueChanged={(_field, v) => setEmail(String(v))}
+                      onValueChanged={(_field, v) => {
+                        setEmail(String(v));
+                        setSendError("");
+                      }}
                       className="rounded-2xl"
                       readOnly={emailToggle !== "hidden"}
                     />
@@ -182,6 +190,12 @@ export const Signup: FC<Props> = () => {
                     />
                   </div>
                 </div>
+
+                {sendError && (
+                  <p role="alert" className="max-w-sm mx-auto whitespace-pre-line text-sm font-medium text-danger">
+                    {sendError}
+                  </p>
+                )}
 
                 <div className={`items-center max-w-sm mx-auto ${emailToggle}`}>
                   <label htmlFor="otp" className="font-medium block text-sm text-gray-900">

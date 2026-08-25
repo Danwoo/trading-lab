@@ -1,6 +1,8 @@
 // utils/common/locale/ko/apierrors.ts
 // API 에러 클라이언트 폴백 메시지 (한국어). 로직은 errors/apierrors.ts, en 은 ../en/apierrors.ts.
 
+import type { EmailFailureCode } from "@/utils/common/errors/emailFailure";
+
 export const STATUS_MESSAGES: Record<number, string> = {
   400: "잘못된 요청입니다.",
   401: "로그인이 필요합니다. 다시 로그인해 주세요.",
@@ -26,6 +28,16 @@ export const FALLBACK = {
   processing: "처리 중 오류가 발생했습니다.",
   network: "네트워크 연결을 확인해주세요",
   unknown: "알 수 없는 오류가 발생했습니다",
+};
+
+// 메일 발송 실패 사유 — key = errors/emailFailure.ts 의 EmailFailureCode.
+// 서버는 이 코드만 실어 보내고 SMTP 원문은 로그에만 남긴다 (#342).
+export const EMAIL_FAILURE_MESSAGES: Record<EmailFailureCode, string> = {
+  "email.mailbox_unknown": "존재하지 않는 이메일 주소입니다.\n주소를 다시 확인해주세요.",
+  "email.mailbox_rejected": "수신 거부된 이메일 주소입니다.\n다른 주소로 다시 시도해주세요.",
+  "email.smtp_unreachable": "메일 서버에 연결할 수 없습니다.\n잠시 후 다시 시도하거나 관리자에게 문의해주세요.",
+  "email.smtp_auth_failed": "메일 서버 인증에 실패했습니다.\n관리자에게 문의해주세요.",
+  "email.send_failed": "이메일 발송에 실패했습니다.\n주소를 확인하거나 잠시 후 다시 시도해주세요.",
 };
 
 // Prisma 에러 번역 — key = lib/prisma/error.ts 가 emit 하는 type (실제 코드 P#### / prisma_*)

@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import { createSuccessResponse, createErrorResponse } from "@/utils/common/api/responses";
 import { isSysAdminAuthor, isProtectedAuthor } from "@/constants/protected";
+import { invalidateSessionsForUsers } from "@/lib/auth/authUtils";
 
 /**
  * [GET] /api/system/author/[author_id]
@@ -76,11 +77,19 @@ const deleteHandler = async (_req: NextRequest, _session: any, params: any) => {
       return createErrorResponse({ message: "시스템 권한은 삭제할 수 없습니다." }, operation);
     }
 
+    // 이 권한을 달고 있던 사람들 — 트랜잭션이 지우기 전에 집어 둔다.
+    const members = await prisma.authorMember.findMany({ where: { author_id }, select: { user_id: true } });
+
     await prisma.$transaction([
       prisma.authorMember.deleteMany({ where: { author_id } }),
       prisma.authorMenu.deleteMany({ where: { author_id } }),
       prisma.author.delete({ where: { author_id } }),
     ]);
+
+    // 권한을 통째로 지우는 것은 그 권한을 가진 **모든 사용자에게서 회수**하는 것과 같다.
+    // 사용자 단위 회수 경로(`author/[author_id]/user/[user_id]`)는 세션을 무효화하는데 여기만
+    // 안 했다 — 같은 클래스의 마지막 구멍이었다 (#354).
+    await invalidateSessionsForUsers(members.map((m) => m.user_id));
 
     return createSuccessResponse({ message: "권한이 삭제되었습니다." });
   } catch (error: any) {

@@ -11,7 +11,7 @@ import {
   deleteUserCascade,
   syncDefaultWorkspaceMembership,
 } from "@/lib/auth/authUtils";
-import { GENERAL_ADMIN_AUTHOR_ID, DEFAULT_USER_AUTHOR_ID } from "@/constants/protected";
+import { GENERAL_ADMIN_AUTHOR_ID, GUEST_AUTHOR_ID } from "@/constants/protected";
 import { AdminUserUpdateInSchema } from "@/schemas/common/adminUser";
 
 /**
@@ -182,16 +182,20 @@ const putHandler = async (req: NextRequest, session: any, params: any) => {
       });
     }
 
-    // 워크스페이스 배정(SaaS) 또는 승인 전환(OEM, appr_at N→Y) 시 일반사용자(003) 권한이 없으면 부여 → 즉시 사용 가능.
+    // 워크스페이스 배정(SaaS) 또는 승인 전환(OEM, appr_at N→Y) 시 게스트 권한이 없으면 부여 → 즉시 조회 가능.
+    //
+    // **가입(`SIGNUP_AUTHOR_ID`)과 다른 역할을 주는 것이 의도다** (#341): 여기는 남의 워크스페이스에
+    // 사람을 넣는 자리라 그 계정은 초대받은 손님이고, 쓰기를 열지는 운영자가 권한관리에서 판단한다.
+    // 리드 결정 2026-08-23 이 바꾼 것은 「회원가입」 경로 하나다.
     const approvedNow = existing && existing.appr_at !== "Y" && user.appr_at === "Y";
     if (workspaceChanged || approvedNow) {
       const hasDefault = await prisma.authorMember.count({
-        where: { user_id: email, author_id: DEFAULT_USER_AUTHOR_ID },
+        where: { user_id: email, author_id: GUEST_AUTHOR_ID },
       });
       if (!hasDefault) {
         await prisma.authorMember.create({
           data: {
-            author_id: DEFAULT_USER_AUTHOR_ID,
+            author_id: GUEST_AUTHOR_ID,
             user_id: email,
             reg_id: session.user.email,
             reg_dt: new Date(),

@@ -139,6 +139,23 @@ updates:
       #   (frontend/package.json 의 @typescript-eslint 상승과 같은 PR 로 간다).
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
+      # better-auth 는 1.7 로 가는 길만 막는다 — 1.6 안의 patch 는 계속 받는다.
+      #   better-auth 1.7 은 `account` 테이블에 `issuer` 를 **필수** 컬럼으로 더하고
+      #   `(issuer, accountId)` 유니크 인덱스를 붙이는데, 이 레포는 Prisma 를 스키마 SoT 로
+      #   써서 라이브러리 쪽 마이그레이션이 따라오지 않는다. `ba_account` 에 그 컬럼이 없는
+      #   채로 올리면 가입은 예외로 죽고 기존 계정 로그인은 전부 「비밀번호 틀림」으로 조용히
+      #   거절된다 (#379 에 재현). dependabot 은 1.6→1.7 을 「non-major」로 분류해 묶음 PR 에
+      #   실어 보낸다(PR #374) — DB 계약을 바꾸는 minor 라 그 분류가 이 레포 기준으로는 틀린다
+      #   (kysely·katex 와 같은 축이되, 이쪽은 0.x 가 아니라 정식 semver minor 다).
+      # patch 를 살려 둔 이유: 매니페스트가 이미 `^1.6.27`(= >=1.6.27 <2.0.0)이라 1.6 patch 는
+      #   설치 시점에 어차피 허용된다 — 여기서 막으면 락파일만 얼어 매니페스트와 어긋나고,
+      #   1.6 계열로 나오는 보안 릴리스까지 PR 이 끊긴다(ignore 는 보안 업데이트도 막는다).
+      # 경고: 1.7 이상으로 나오는 보안 릴리스는 이 항목이 막는다. Dependabot alerts 는 그대로
+      #   오므로 Security 탭으로 감시한다.
+      # 해제 조건: #379 가 `ba_account.issuer` 추가와 기존 행 백필을 마치면, frontend/package.json
+      #   의 better-auth 상승과 같은 PR 로 이 항목을 지운다.
+      - dependency-name: "better-auth"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       non-major:
         patterns: ["*"]

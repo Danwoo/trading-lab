@@ -31,6 +31,9 @@ export default defineConfig({
       "prisma/generated/**",
         ...API_REGRESSION_TESTS,
     ],
+    // better-auth 세션 아톰이 테스트 파일보다 오래 사는 타이머를 남겨, 환경이 걷힌 뒤
+    // `window` 를 만지다 Unhandled Error 를 낸다 — 이유와 대역 값은 그 파일의 주석에.
+    setupFiles: ["./tests/support/auth-client-mock.ts"],
     // 기본은 node(빠름) — 순수 유틸 대다수가 여기 해당. DOM 이 필요한 파일(컴포넌트 렌더
     // 테스트)만 파일 최상단 `// @vitest-environment jsdom` 주석으로 opt-in 한다.
     // 경로 글롭(environmentMatchGlobs/test.projects) 대신 파일 단위 주석을 고른 이유:

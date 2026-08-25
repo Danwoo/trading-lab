@@ -1,9 +1,27 @@
 // components/shared/Layout/TableCell.tsx
-import { ReactNode, isValidElement } from "react";
+import { ReactElement, ReactNode, cloneElement, isValidElement, useId } from "react";
 import { useTableGroupMode } from "./TableGroup";
 import { formatDate } from "@/utils/common/formatters/date";
 
 export type DataType = "string" | "number" | "date" | "boolean" | "datetime";
+
+/**
+ * 라벨과 입력칸을 잇는다 — `<label htmlFor>` 이 가리킬 `id` 를 자식 입력에 내려 준다.
+ *
+ * 라벨이 **옆 칸의 글자**로만 있으면 눌러도 포커스가 안 가고 스크린 리더는 「편집 텍스트」라고만
+ * 읽는다 (#353: 관리자 폼 37칸 중 31칸이 그랬다). 공용 입력 프리미티브는 진작부터 `id` 를 받아
+ * 실제 `<input>` 에 붙이고 있었고, 그 자리를 채우는 쪽이 없었을 뿐이다.
+ *
+ * 이미 `id` 를 들고 온 자식은 건드리지 않고 그 값을 그대로 가리킨다 — 호출부가 정한 것이 우선이다.
+ * 자식이 요소가 아니면(보기 전용 셀의 문자열) 이을 자리가 없으므로 `null` 을 돌려주고, 라벨은
+ * 종전처럼 글자로만 그린다.
+ */
+function withFieldId(node: ReactNode, fallbackId: string): { node: ReactNode; targetId: string | null } {
+  if (!isValidElement(node)) return { node, targetId: null };
+  const existing = (node.props as { id?: string }).id;
+  if (existing !== undefined) return { node, targetId: existing };
+  return { node: cloneElement(node as ReactElement<{ id?: string }>, { id: fallbackId }), targetId: fallbackId };
+}
 
 interface Props {
   label?: string;
@@ -62,6 +80,7 @@ export function TableCell({
   };
 
   const mode = useTableGroupMode();
+  const fallbackFieldId = useId();
   const displayValue = getDisplayValue();
   const contentStyle = {
     whiteSpace,
@@ -118,22 +137,30 @@ export function TableCell({
     }
   };
 
+  const cellField = withFieldId(displayValue, fallbackFieldId);
+  const flexField = withFieldId(children, fallbackFieldId);
   const content = (
     <div className="break-all" style={contentStyle}>
-      {formatValue(displayValue, dataType, format)}
+      {formatValue(cellField.node, dataType, format)}
     </div>
   );
   const hasContent = displayValue !== null && displayValue !== undefined && displayValue !== "";
+
+  const labelBody = (
+    <>
+      {label}
+      {required && <span className="text-red-500 ml-1">*</span>}
+    </>
+  );
+  const labelFor = (targetId: string | null) =>
+    targetId === null ? labelBody : <label htmlFor={targetId}>{labelBody}</label>;
 
   if (mode === "flex") {
     if (label !== undefined) {
       return (
         <>
-          <div className={labelClassName}>
-            {label}
-            {required && <span className="text-red-500 ml-1">*</span>}
-          </div>
-          <div className={`${contentClassName} ${className} flex-1 min-h-0`}>{children}</div>
+          <div className={labelClassName}>{labelFor(flexField.targetId)}</div>
+          <div className={`${contentClassName} ${className} flex-1 min-h-0`}>{flexField.node}</div>
         </>
       );
     }
@@ -144,8 +171,7 @@ export function TableCell({
     return (
       <>
         <td className={labelClassName} rowSpan={rowSpan}>
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {labelFor(cellField.targetId)}
         </td>
         <td className={`${contentClassName} ${className}`} colSpan={colSpan} rowSpan={rowSpan}>
           {content}

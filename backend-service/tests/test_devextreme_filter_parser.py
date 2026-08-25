@@ -504,8 +504,9 @@ def test_sort_selector_is_validated_like_filter_selector() -> str:
         else:
             raise AssertionError(f"sort={bad!r} 를 통과시켰다")
 
-    # 대조 — 정상 selector 는 그대로 통과한다.
-    assert parse_sort([{"selector": "reg_dt", "desc": True}]) == "reg_dt DESC"
+    # 대조 — 정상 selector 는 그대로 통과한다. NULL 위치는 #352 가 못박았다
+    # (값 없는 행이 내림차순 1등으로 오지 않게) — 규율 자체는 test_sort_null_ordering.py 가 지킨다.
+    assert parse_sort([{"selector": "reg_dt", "desc": True}]) == "reg_dt DESC NULLS LAST"
 
     print(f"     (sort selector 거절 {rejected}건 + 정상 통과 1건)")
     return "test_sort_selector_is_validated_like_filter_selector"

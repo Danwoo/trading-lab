@@ -32,6 +32,22 @@ function themeExtend(): NonNullable<NonNullable<typeof theme>["extend"]> {
   return extend;
 }
 
+/** 주석을 걷고 **그 토큰을 선언하는 규칙**들의 선택자 목록을 소스 순서대로 뽑는다. */
+function selectorsDeclaring(token: string): string[][] {
+  const css = GLOBALS_CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+  const found: string[][] = [];
+  for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!new RegExp(`${token}\\s*:`).test(body)) continue;
+    found.push(
+      selectors
+        .split(",")
+        .map((one) => one.trim())
+        .filter(Boolean),
+    );
+  }
+  return found;
+}
+
 function declaredShellTokens(): Record<string, string> {
   const found: Record<string, string> = {};
   for (const [, name, value] of GLOBALS_CSS.matchAll(/(--shell-[a-z-]+)\s*:\s*([^;]+);/g)) {
@@ -85,6 +101,8 @@ describe("터치 표적 — 손가락 축 (#230)", () => {
   it("기본값은 마우스 치수다 — 데스크톱 디자인이 안 바뀐다", () => {
     expect(GLOBALS_CSS).toMatch(/--touch-rail-target:\s*30px;/);
     expect(GLOBALS_CSS).toMatch(/--touch-min:\s*26px;/);
+    // 아이콘 조작부는 규격 하한(WCAG 2.5.8 AA)에 딱 맞춘다 — 마우스 화면에서 더 키우지 않는다.
+    expect(GLOBALS_CSS).toMatch(/--touch-icon-target:\s*24px;/);
   });
 
   it("손가락으로 누르는 기기에서 권장치까지 커진다", () => {
@@ -93,6 +111,28 @@ describe("터치 표적 — 손가락 축 (#230)", () => {
     expect(block, "`pointer: coarse` 블록이 없다").toBeTruthy();
     expect(block).toMatch(/--touch-rail-target:\s*44px;/);
     expect(block).toMatch(/--touch-min:\s*44px;/);
+    // #289 리드 결정 2026-08-21 ② — 갈래가 사라지면(=coarse 선언이 빠지면) 여기서 실패한다.
+    expect(block).toMatch(/--touch-icon-target:\s*44px;/);
+  });
+
+  // #289 리뷰 — 기본값을 `:root` 외의 선택자에도 **직접** 선언해 두면(`.auth-backdrop`·
+  // `[data-theme="dark"]`), 그 부분 트리는 상속이 아니라 자기 선언을 쓴다. coarse 블록이
+  // `:root` 만 덮으면 그 안에서는 손가락 갈래가 통째로 죽는데, 화면은 조용히 그려진다
+  // (실측: 로그인 화면의 아이콘 표적이 coarse 에서도 24px 이었다).
+  it("coarse 블록의 선택자 목록이 기본 블록과 같다 — 한쪽만 늘면 그 부분 트리에서 갈래가 죽는다", () => {
+    const tokens = ["--touch-rail-target", "--touch-min", "--touch-icon-target"] as const;
+
+    for (const token of tokens) {
+      const rules = selectorsDeclaring(token);
+
+      // 「선언이 하나도 없어서 비교할 것이 없다」로 초록이 되지 않게.
+      expect(rules.length, `${token} 를 선언하는 규칙이 ${rules.length}개다 — 기본 1 + coarse 1 이어야 한다`).toBe(2);
+      expect(
+        rules[1],
+        `${token} 의 coarse 선택자 «${rules[1].join(", ")}» 가 기본 «${rules[0].join(", ")}» 와 다르다`,
+      ).toEqual(rules[0]);
+      expect(rules[0]).toContain(":root");
+    }
   });
 
   it("레일 폭 자체는 그대로다 — 표적을 키우려고 셸 결정을 바꾸지 않는다", () => {
@@ -110,8 +150,8 @@ describe("터치 표적 — 손가락 축 (#230)", () => {
       px: Number(value),
     }));
 
-    // 선언이 사라져도 「위반 0건」으로 초록이 되지 않게 — 기본 2개 + coarse 2개.
-    expect(declared.length, `--touch-* 선언이 ${declared.length}건이다`).toBe(4);
+    // 선언이 사라져도 「위반 0건」으로 초록이 되지 않게 — 기본 3개 + coarse 3개.
+    expect(declared.length, `--touch-* 선언이 ${declared.length}건이다`).toBe(6);
     for (const { name, px } of declared) {
       expect(px, `${name} 가 ${px}px 이다 — WCAG 2.5.8 하한(24px) 아래다`).toBeGreaterThanOrEqual(24);
     }
@@ -124,5 +164,10 @@ describe("터치 표적 — 손가락 축 (#230)", () => {
 
     expect(spacing["touch-rail-target"]).toBe("var(--touch-rail-target)");
     expect(minHeight["touch-min"]).toBe("var(--touch-min)");
+    // `ICON_HIT_AREA` 는 `min-h-touch-icon min-w-touch-icon` 을 낸다 — 둘 다 없으면 클래스가
+    // 값 없이 죽어 상자가 글리프 크기로 되돌아간다 (#289).
+    const minWidth = extend.minWidth as Record<string, string>;
+    expect(minHeight["touch-icon"]).toBe("var(--touch-icon-target)");
+    expect(minWidth["touch-icon"]).toBe("var(--touch-icon-target)");
   });
 });

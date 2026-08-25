@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createWatchlist } from "@/services/watchlist/watchlistService";
+import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 import { selectInstrumentList } from "@/services/terminal/instrumentService";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
+import { INSTRUMENT_MASTER_SIGNAL_KEY, useIngestRevision } from "@/stores/terminal/ingestSignalStore";
 import type { InstrumentOut } from "@/schemas/terminal/instrument";
 import type { SymbolRef } from "@/types/terminal/context";
 
@@ -41,6 +43,9 @@ export function SymbolSearch({ onAdded, onClose }: SymbolSearchProps) {
   const [addingTicker, setAddingTicker] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
   const requestToken = useRef(0);
+  // 「종목 목록 받기」가 마스터를 채우면 다시 훑는다 — 안 그러면 방금 받은 4,303행을 두고
+  // 「아직 안 받았습니다」가 그대로 남는다(#350 과 같은 계통).
+  const masterRevision = useIngestRevision(INSTRUMENT_MASTER_SIGNAL_KEY);
 
   useEffect(() => {
     const token = ++requestToken.current;
@@ -64,7 +69,9 @@ export function SymbolSearch({ onAdded, onClose }: SymbolSearchProps) {
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, masterRevision]);
+
+  const writeAccess = useWriteAccess();
 
   const add = async (instrument: InstrumentOut) => {
     setAddingTicker(instrument.symbol);
@@ -124,7 +131,20 @@ export function SymbolSearch({ onAdded, onClose }: SymbolSearchProps) {
         </p>
       )}
 
-      <SearchBody state={state} addingTicker={addingTicker} onPick={add} />
+      {/* 담기는 `POST /watchlist` 다 — 역할이 막고 있으면 고르기 전에 말한다 (#341). */}
+      {writeAccess.isDenied && (
+        <p role="status" className="flex-shrink-0 border-b border-line px-2 py-1 text-2xs text-ink-muted">
+          {writeAccess.deniedHint}
+        </p>
+      )}
+
+      <SearchBody
+        state={state}
+        addingTicker={addingTicker}
+        canAdd={writeAccess.canWrite}
+        deniedHint={writeAccess.deniedHint}
+        onPick={add}
+      />
     </div>
   );
 }
@@ -132,10 +152,14 @@ export function SymbolSearch({ onAdded, onClose }: SymbolSearchProps) {
 function SearchBody({
   state,
   addingTicker,
+  canAdd,
+  deniedHint,
   onPick,
 }: {
   state: SearchState;
   addingTicker: string | null;
+  canAdd: boolean;
+  deniedHint: string | undefined;
   onPick: (instrument: InstrumentOut) => void;
 }) {
   if (state.kind === "loading") {
@@ -171,7 +195,8 @@ function SearchBody({
           <li key={`${instrument.market}:${instrument.symbol}`}>
             <button
               type="button"
-              disabled={addingTicker !== null}
+              disabled={addingTicker !== null || !canAdd}
+              title={deniedHint}
               onClick={() => onPick(instrument)}
               className="flex w-full items-center justify-between gap-2 border-l-2 border-transparent px-2 py-1.5 text-left hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
             >

@@ -139,7 +139,6 @@ describe("정적 net — app/api/external 전체에서 params 가 encodeURICompo
 vi.mock("@/env", () => ({
   env: {
     BACKEND_SERVICE_URL: "http://backend.test",
-    DEV_ACTIVITY_SERVICE_URL: "http://devactivity.test",
     NODE_ENV: "development",
   },
 }));
@@ -160,6 +159,13 @@ vi.mock("@/lib/auth/auth", () => ({
       })),
     },
   },
+}));
+
+// 인가 게이트는 세션 스냅샷이 아니라 **지금의 DB** 로 권한을 판정한다 (#354). 이 그물이
+// 보는 축은 그게 아니므로, 위 대역 세션과 같은 값을 내는 얇은 대역을 세워 게이트를 통과시킨다.
+// 게이트 자체는 `tests/regressions/354-stale-authorization.test.ts` 가 검사한다.
+vi.mock("@/lib/auth/accountContext", () => ({
+  resolveAccountContext: vi.fn(async () => ({ block: null, authorId: "operator", workspaceId: 1 })),
 }));
 
 // scopeEmailParam 을 쓰는 라우트는 이 20개 호출부에 없다(portfolio·watchlist·research-document·
@@ -190,7 +196,7 @@ type CallSite = {
 const BACKEND = "http://backend.test/portfolio";
 const WATCHLIST = "http://backend.test/watchlist";
 const DOC = "http://backend.test/research-document";
-const SCHED = "http://devactivity.test/scheduler";
+const SCHED = "http://backend.test/scheduler";
 const BACKTEST_RUN = "http://backend.test/backtest-run";
 const BOT = "http://backend.test/bot";
 
@@ -276,7 +282,7 @@ const CALL_SITES: CallSite[] = [
     buildUrl: (p: Record<string, string>) => `${DOC}/${p.research_doc_id}`,
   })),
   ...(["GET", "PUT", "DELETE"] as const).map((method) => ({
-    file: "@/app/api/external/devactivity/scheduler/[scheduler_id]/route",
+    file: "@/app/api/external/backend/scheduler/[scheduler_id]/route",
     label: `scheduler/[scheduler_id] ${method}`,
     method,
     opName: method,
@@ -285,7 +291,7 @@ const CALL_SITES: CallSite[] = [
     buildUrl: (p: Record<string, string>) => `${SCHED}/${p.scheduler_id}`,
   })),
   {
-    file: "@/app/api/external/devactivity/scheduler/[scheduler_id]/run/route",
+    file: "@/app/api/external/backend/scheduler/[scheduler_id]/run/route",
     label: "scheduler/[scheduler_id]/run POST",
     method: "POST",
     opName: "POST",
@@ -294,7 +300,7 @@ const CALL_SITES: CallSite[] = [
     buildUrl: (p: Record<string, string>) => `${SCHED}/${p.scheduler_id}/run`,
   },
   ...(["GET", "POST"] as const).map((method) => ({
-    file: "@/app/api/external/devactivity/scheduler/[scheduler_id]/member/route",
+    file: "@/app/api/external/backend/scheduler/[scheduler_id]/member/route",
     label: `scheduler/[scheduler_id]/member ${method}`,
     method,
     opName: method,
@@ -303,7 +309,7 @@ const CALL_SITES: CallSite[] = [
     buildUrl: (p: Record<string, string>) => `${SCHED}/${p.scheduler_id}/member`,
   })),
   {
-    file: "@/app/api/external/devactivity/scheduler/[scheduler_id]/member/[git_id]/route",
+    file: "@/app/api/external/backend/scheduler/[scheduler_id]/member/[git_id]/route",
     label: "scheduler/[scheduler_id]/member/[git_id] DELETE",
     method: "DELETE",
     opName: "DELETE",

@@ -53,8 +53,11 @@ const CEILINGS = {
   exports: 25,
   types: 10,
   enumMembers: 0,
-  // 스키마 배럴의 의도적 별칭(`XCreateInSchema = XSchema`)과 `export default` 재노출.
-  duplicates: 7,
+  // 스키마 배럴의 의도적 별칭(`XCreateInSchema = XSchema`)과 `export default` 재노출,
+  // 그리고 같은 값에 두 뜻을 붙인 상수 별칭 — `routes.ts` 의 `POST_LOGIN_PATH = BENCH_PATH`,
+  // `protected.ts` 의 `SIGNUP_AUTHOR_ID = GENERAL_ADMIN_AUTHOR_ID`(#341: 「운영자라는 역할」과
+  // 「가입이 주는 역할」은 지금 같은 값이지만 같은 개념이 아니다).
+  duplicates: 8,
 };
 
 // knip JSON 의 축 이름. 이 목록과 실제 출력이 어긋나면 실패한다 (버전 상승으로 축이 사라져도

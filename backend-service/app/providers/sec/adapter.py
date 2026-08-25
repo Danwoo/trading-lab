@@ -15,9 +15,12 @@ from providers.base import ProviderKeyMissing, ProviderResponseInvalid, RateLimi
 from providers.models import Capability, NormalizedBar, NormalizedInstrument, NormalizedQuote
 from providers.sec import SOURCE
 from providers.sec.client import SecClient, contact_is_usable
-from providers.sec.mapper import SkippedRow, to_instrument
+from providers.sec.mapper import MARKET_BY_SEC_EXCHANGE, SkippedRow, to_instrument
 
-_MARKETS = ("NASDAQ", "NYSE", "AMEX")
+#: 이 소스가 말하는 시장 — **매핑표에서 뽑는다.** 손으로 적으면 매핑이 못 만드는 시장이 표에
+#: 남고, 그 줄이 화면의 「지금 받을 수 있는 것」에 올라 눌러도 영영 0행이 된다(#351: AMEX 가
+#: 그랬다 — SEC 는 `NYSE American`·`NYSE MKT`·`NYSE Arca` 를 한 건도 내보내지 않는다).
+MARKETS = tuple(sorted(set(MARKET_BY_SEC_EXCHANGE.values())))
 _NO_PRICE_REASON = "SEC 는 공시·재무 공개기관으로 가격 데이터를 제공하지 않습니다"
 _NO_CONTACT_REASON = (
     "SEC 는 연락처(이메일)가 담긴 User-Agent 를 요구합니다 — MARKET_DATA_CONTACT 에 연락처가 필요합니다 "
@@ -36,7 +39,7 @@ class SecProvider:
     def capabilities(self) -> list[Capability]:
         usable = contact_is_usable(self.contact)
         caps: list[Capability] = []
-        for market in _MARKETS:
+        for market in MARKETS:
             caps.append(
                 Capability(
                     market=market,
@@ -57,7 +60,7 @@ class SecProvider:
         성질이다).
         """
         market = market.upper()
-        if market not in _MARKETS:
+        if market not in MARKETS:
             # 이 소스가 다루지 않는 시장 — 빈 목록이 아니라 capability 표가 답할 문제다.
             raise ProviderResponseInvalid(f"{SOURCE} 는 {market} 시장을 다루지 않습니다")
 

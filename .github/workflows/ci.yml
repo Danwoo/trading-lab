@@ -99,6 +99,7 @@ jobs:
             *-mcp-service/**
             backend-service/**
             bot-agent-service/**
+            single-agent-service/**
             */app/core/security.py
             */app/core/auth_context.py
             */app/core/config.py

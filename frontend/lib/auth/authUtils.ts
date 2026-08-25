@@ -33,14 +33,26 @@ export async function deleteHalfCreatedUser(userId: string): Promise<void> {
 }
 
 /**
- * 사용자의 모든 활성 세션을 무효화한다.
- * - 워크스페이스/권한 변경 시 호출하여 stale 한 BaSession.workspaceId/authorId 가 다음 요청까지 살아남는 것을 방지.
- * - 대상 사용자는 다음 요청 시 재로그인이 필요해진다.
+ * 사용자들의 모든 활성 세션을 무효화한다 — 다음 요청부터 재로그인이 필요해진다.
+ *
+ * **이것만으로는 부족하다.** 세션 행을 지워도 Better Auth 의 쿠키 캐시가 그 자리를 대신
+ * 채우면 인가가 그대로 통과한다 (#354, 실측 최대 5분). 캐시를 뚫는 자리는 인가 게이트
+ * (`withAuth` 의 `disableCookieCache`)이고, 이 함수는 그 위에서 "세션 목록을 진실하게
+ * 유지하는" 몫만 진다 — 관리자의 세션 화면과 재로그인 강제가 그것을 읽는다.
+ */
+export async function invalidateSessionsForUsers(emails: readonly string[]): Promise<number> {
+  if (emails.length === 0) return 0;
+  const users = await prisma.user.findMany({ where: { email: { in: [...emails] } }, select: { id: true } });
+  if (users.length === 0) return 0;
+  const { count } = await prisma.baSession.deleteMany({ where: { userId: { in: users.map((u) => u.id) } } });
+  return count;
+}
+
+/**
+ * 사용자 한 명의 모든 활성 세션을 무효화한다 (`invalidateSessionsForUsers` 의 단건 형태).
  */
 export async function invalidateUserSessions(email: string): Promise<void> {
-  const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-  if (!user) return;
-  await prisma.baSession.deleteMany({ where: { userId: user.id } });
+  await invalidateSessionsForUsers([email]);
 }
 
 /**

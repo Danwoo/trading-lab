@@ -47,6 +47,11 @@
     "node .",
   ],
 
+  // 개별 export 를 「TS 밖 소비자가 있다」로 선언하는 자리는 이 파일이 아니라 **그 export 의
+  // JSDoc `@public` 태그**다 (knip 이 읽는다). 지금 달린 곳: `constants/writeAccess.ts` 의
+  // `ROLE_GATED_WRITE_PREFIXES`·`ADMIN_ONLY_WRITE_PREFIXES` — scripts/verify_write_gate_coverage.py
+  // 가 소스 텍스트로 읽는다.
+
   "ignoreUnresolved": [
     // `npx prisma generate` 산출물(prisma/generated/**)이다 — .gitignore 대상이라 체크아웃
     // 직후에는 실재하지 않는다. 이걸 안 걸면 같은 커밋이 generate 전후로 다른 수를 내어
