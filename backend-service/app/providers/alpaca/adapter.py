@@ -4,9 +4,10 @@
 가격을 주지 않고, 가격을 주는 소스(Alpaca)는 키를 요구한다.** 그 사실을 화면이 읽을 수 있게
 capability 표로 내보내는 것이 이 어댑터의 현재 일이다.
 
-종목 마스터는 이 소스가 아니라 SEC 가 정본이다(MD-AD-17 — 시장마다 정본 소스 하나). 그래서
+종목 마스터는 이 소스가 아니라 시장별 정본이 낸다(MD-AD-17 — 시장마다 정본 소스 하나). 그래서
 `list_instruments` 는 `available=False` + 사유로 둔다 — 두 소스가 같은 표를 채우면 어느 쪽이
-정본인지가 데이터에서 사라진다.
+정본인지가 데이터에서 사라진다. **정본이 어디인지는 시장마다 다르다** — 미국이라고 전부 SEC 가
+아니라 AMEX 는 토스다(`CANONICAL_MASTER_SOURCE`).
 """
 
 import datetime as dt
@@ -19,6 +20,7 @@ from providers.alpaca import SOURCE
 from providers.alpaca.client import AlpacaClient
 from providers.alpaca.mapper import ADJUSTMENT_PARAM, SkippedRow, to_bar, to_quote
 from providers.base import (
+    CANONICAL_MASTER_SOURCE,
     CREDENTIAL_MISSING_HINT,
     ProviderKeyMissing,
     ProviderResponseInvalid,
@@ -28,10 +30,18 @@ from providers.base import (
 from providers.merge import merge_duplicate_bars
 from providers.models import Capability, NormalizedBar, NormalizedInstrument, NormalizedQuote
 
-_MARKETS = ("NASDAQ", "NYSE", "AMEX")
+#: 이 어댑터가 `capabilities()` 에 싣는 시장. 마스터는 시장별 정본이 따로 있어 여기서 내지 않는다.
+MARKETS = ("NASDAQ", "NYSE", "AMEX")
 _ENV_HINT = "Alpaca API Key ID 와 Secret 을 'KEYID:SECRET' 형식으로"
 _NO_KEY_REASON = f"Alpaca API 키가 등록되지 않았습니다 — {CREDENTIAL_MISSING_HINT}"
-_MASTER_REASON = not_canonical_reason("미국 종목 마스터", "SEC")
+#: 시장마다 정본이 다르므로 사유도 시장마다 만든다 — 「미국은 SEC」로 뭉뚱그리면 정본이
+#: 옮겨간 시장이 빈 자리를 가리킨다(#351).
+_MASTER_REASON_BY_MARKET = {
+    market: not_canonical_reason(f"{market} 종목 마스터", CANONICAL_MASTER_SOURCE[market]) for market in MARKETS
+}
+#: 이 어댑터가 싣지 않는 시장을 물었을 때. 정본을 지목하지 않는다 — 모르는 시장의 정본은
+#: 지어낼 수 없다.
+_NOT_A_MARKET_REASON = f"Alpaca 가 다루는 시장에 없습니다 — 소스가 {'·'.join(MARKETS)} 만 받습니다"
 _NO_ORDERBOOK_REASON = "Alpaca 무료 플랜은 심층 호가를 제공하지 않습니다"
 _TIMEFRAME_BY_INTERVAL = {1: "1Min", 5: "5Min", 15: "15Min", 30: "30Min", 60: "1Hour"}
 
@@ -44,9 +54,14 @@ class AlpacaProvider:
     def capabilities(self) -> list[Capability]:
         available = self.api_key is not None
         caps: list[Capability] = []
-        for market in _MARKETS:
+        for market in MARKETS:
             caps.append(
-                Capability(market=market, data_kind="instrument_master", available=False, reason=_MASTER_REASON)
+                Capability(
+                    market=market,
+                    data_kind="instrument_master",
+                    available=False,
+                    reason=_MASTER_REASON_BY_MARKET[market],
+                )
             )
             for kind in ("daily_bar", "minute_bar", "quote"):
                 caps.append(
@@ -95,7 +110,7 @@ class AlpacaProvider:
         return merge_duplicate_bars(bars, source=SOURCE)
 
     async def list_instruments(self, market: str) -> list[NormalizedInstrument]:
-        raise ProviderResponseInvalid(_MASTER_REASON)
+        raise ProviderResponseInvalid(_MASTER_REASON_BY_MARKET.get(market, _NOT_A_MARKET_REASON))
 
     async def fetch_daily(self, symbol: str, market: str, date_from: dt.date, date_to: dt.date) -> list[NormalizedBar]:
         items = await self._bars(
