@@ -24,9 +24,13 @@ name: CI
 # 나머지 스텝이 전부 건너뛴다. `test: repo` 는 레포 전역 규약이라 필터가 없다.
 #
 # ── 초안(draft)에서는 안 깨운다 ─────────────────────────────────────────
-# `types: [ready_for_review, synchronize, reopened]` — 워커는 PR 을 draft 로 열고 스스로
-# 확인한 뒤 ready 로 바꾼다. draft 중 push 는 CI 를 안 깨우고, ready 이후의 리뷰 지적 반영
-# push 는 `synchronize` 라 종전대로 돈다.
+# 워커는 PR 을 draft 로 열고 스스로 확인한 뒤 ready 로 바꾼다. **두 겹이 필요하다**:
+#   ① `types: [ready_for_review, synchronize, reopened]` — `opened` 를 빼서 PR 을 여는 것
+#      자체로는 안 깨어난다.
+#   ② 잡 레벨 `if:` — **draft 에도 `synchronize` 는 뜬다.** types 만으로는 draft 중 push 를
+#      못 막는다. 건너뛴 잡은 `skipped` 체크런을 남기고 GitHub 은 그것을 통과로 세는데
+#      (2026-08-25 실측), draft 는 애초에 머지가 안 되므로 문제가 아니다.
+# ready 이후의 리뷰 지적 반영 push 는 `synchronize` 라 종전대로 돈다.
 #
 # ── 러너는 변수 하나로 갈린다 ───────────────────────────────────────────
 # `runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}` — 레포 변수 `CI_RUNNER` 를 지우면
@@ -61,6 +65,7 @@ jobs:
   #     컨테이너 안에 **별도 데이터베이스 `ci_alembic`** 을 만들어 거기서만 돈다.
   backend:
     name: "test: backend"
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:
@@ -417,6 +422,7 @@ jobs:
   # 앞에 있어야 한다.** 그 스위트는 클라이언트가 없는 상태를 검증 대상으로 삼는다.
   frontend:
     name: "test: frontend"
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:
@@ -661,6 +667,7 @@ jobs:
   # 각 스크립트는 스스로 fail-closed 다 — 검사 건수를 출력하고 0건이면 실패한다.
   repo:
     name: "test: repo"
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
