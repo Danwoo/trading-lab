@@ -161,6 +161,27 @@ process-compose up        # staging+ 는 docker-compose (compose.staging.yaml + 
 
 ---
 
+## 쓸어담기 — 조용히 죽은 리뷰·머지를 줍는다 (에이전트)
+
+리뷰·판정 게시·라벨·승인·자동 머지 arm 이 **한 self-hosted 잡**의 스텝이라, 그 잡이 통째로
+죽으면(러너 동결·취소·큐 사망) 아무것도 안 남는다. 종전에 그 자리를 받던 두 장치
+(GitHub-hosted `review: publish` 폴백 · `runner-freeze-rerun.yml`)는 없앴다 — private 에서
+과금의 몸통이 되기 때문이다. **대신 에이전트가 주기적으로 훑는다.**
+
+```bash
+python3 scripts/review_sweep.py collect | python3 scripts/review_sweep.py plan
+```
+
+- **처분을 내놓을 뿐 실행하지 않는다.** `rerun` 이면 `gh run rerun <run_id> --failed`,
+  `relabel`·`rearm` 은 그 PR 에서 손으로(또는 에이전트가) 한다.
+- **주기는 10~15분**이면 충분하다 — 리뷰 중앙 실행시간이 약 9분이다.
+- **동결 판정은 잡 단위 annotation 으로 한다.** run conclusion 으로 하면 놓친다 —
+  옛 워크플로가 그렇게 죽어 있었다(12일간 365번 깨어나 재실행 0건, 진짜 동결 4건 전부 놓침).
+- 판정부를 부를 때는 **`git show origin/main:scripts/review_sweep.py`** 로 꺼내 쓴다.
+  PR 워크트리의 판본을 쓰면 PR 이 자기 처분을 고칠 수 있다.
+
+---
+
 ## PR 은 draft 로 연다 (에이전트·사람 공통)
 
 **PR 을 열 때는 draft 로 열고, 스스로 확인한 뒤 ready 로 바꾼다.** CI 의 `pull_request` 트리거가

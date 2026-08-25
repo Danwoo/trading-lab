@@ -929,6 +929,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_review_record.py
 
+      # 쓸어담기 판정 — 「조용히 죽은 리뷰·머지」를 결과로 줍는다. 종전 runner-freeze-rerun.yml
+      # 의 자리를 물려받았는데 **그 워크플로가 정확히 조용히 죽어 있었다**(365번 깨어나 재실행
+      # 0건 · 진짜 동결 4건 전부 놓침 — 원인은 판정 근거를 run conclusion 에 둔 것). 그래서
+      # 「동결은 잡 annotation 으로 본다」를 케이스로 못박는다. 0건 모으면 실패한다.
+      - name: 쓸어담기 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_review_sweep.py
+
       # 문서 전용 판정 (#23 Task 8) — docs-notice 잡이 부르는 순수 판정. cross-review 의
       # paths-ignore 와 어긋나면 리뷰가 돈 PR 에 「리뷰 없음」이 붙거나 그 반대가 된다.
 
