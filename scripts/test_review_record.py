@@ -1121,89 +1121,88 @@ DELEGATE_CASES = [
     ),
 ]
 
+
+def _checks(count, *, start=1, status="completed", conclusion="success"):
+    """`test: ` 체크런 count 개 — 게이트 전수 판정의 입력."""
+    return [
+        {
+            "id": start + i,
+            "name": f"test: job{start + i}",
+            "status": status,
+            "conclusion": conclusion,
+        }
+        for i in range(count)
+    ]
+
+
+FLOOR = rr.gate_lib.MIN_TEST_CHECKS
+FULL = _checks(FLOOR)
+
+# 대표자 잡(`test: gate`)을 없앤 뒤의 전수 판정 (2026-08-25). 종전 케이스는 그 잡 하나의
+# 색만 봤다 — 그대로 두면 잡이 사라진 지금 「없음 = 미완 → --final 에 실패」로 자동 머지가
+# 통째로 멎는 것을 그물이 못 잡는다.
 GATE_CASES = [
     # (설명, records, final, 기대 상태)
+    ("test: 체크 전수 초록 → pass", FULL, False, "pass"),
     (
-        "게이트 완료 success → pass",
-        [
-            {
-                "id": 2,
-                "name": "test: gate",
-                "status": "completed",
-                "conclusion": "success",
-            }
-        ],
-        False,
-        "pass",
-    ),
-    (
-        "게이트 in_progress → wait",
-        [{"id": 2, "name": "test: gate", "status": "in_progress", "conclusion": None}],
+        "하나가 in_progress → wait",
+        FULL[:-1] + _checks(1, start=99, status="in_progress", conclusion=None),
         False,
         "wait",
     ),
     (
-        "게이트 in_progress + final → fail (상한 초과 fail-closed)",
-        [{"id": 2, "name": "test: gate", "status": "in_progress", "conclusion": None}],
+        "하나가 in_progress + final → fail (상한 초과 fail-closed)",
+        FULL[:-1] + _checks(1, start=99, status="in_progress", conclusion=None),
         True,
         "fail",
     ),
     (
-        "게이트 failure → fail",
-        [
-            {
-                "id": 2,
-                "name": "test: gate",
-                "status": "completed",
-                "conclusion": "failure",
-            }
-        ],
+        "하나가 failure → fail (미완이 남아 있어도 즉시 접는다)",
+        FULL[:-2]
+        + _checks(1, start=98, conclusion="failure")
+        + _checks(1, start=99, status="in_progress", conclusion=None),
         False,
         "fail",
     ),
+    ("skipped 는 통과로 센다", _checks(FLOOR, conclusion="skipped"), False, "pass"),
+    ("체크런 0건 → wait (아직 스케줄 전)", [], False, "wait"),
+    ("체크런 0건 + final → fail (조회 실패도 여기로 접힌다)", [], True, "fail"),
     (
-        "체크런 0건 → wait (아직 스케줄 전)",
-        [],
+        "하한 미만(전부 초록이어도) → wait — 잡이 사라졌거나 조회가 샜다",
+        _checks(FLOOR - 1),
         False,
         "wait",
     ),
-    (
-        "체크런 0건 + final → fail (조회 실패도 여기로 접힌다)",
-        [],
-        True,
-        "fail",
-    ),
+    ("하한 미만 + final → fail (fail-closed)", _checks(FLOOR - 1), True, "fail"),
     (
         "재실행으로 같은 이름 복수 → id 최대만 (옛 failure 무시)",
-        [
-            {
-                "id": 9,
-                "name": "test: gate",
-                "status": "completed",
-                "conclusion": "failure",
-            },
-            {
-                "id": 12,
-                "name": "test: gate",
-                "status": "completed",
-                "conclusion": "success",
-            },
-        ],
+        # **순서가 판정을 결정하면 안 된다** — 새 것(id 901, 초록)을 먼저 두고 옛 것(id 900,
+        # 빨강)을 뒤에 둔다. 「나중에 온 것이 이긴다」로 짜면 여기서 빨개진다.
+        FULL
+        + [{"id": 901, "name": "test: rerun", "status": "completed", "conclusion": "success"}]
+        + [{"id": 900, "name": "test: rerun", "status": "completed", "conclusion": "failure"}],
         False,
         "pass",
     ),
     (
-        "다른 test: 체크만 있고 게이트 없음 → wait",
-        [
+        "없앤 대표자 `test: gate` 하나만 초록 → wait (그 잡에 기대던 판정은 사라졌다)",
+        [{"id": 2, "name": "test: gate", "status": "completed", "conclusion": "success"}],
+        False,
+        "wait",
+    ),
+    (
+        "`test: ` 접두가 아닌 체크는 안 센다 (리뷰·CodeQL 이 게이트를 흔들지 않는다)",
+        FULL
+        + [
             {
-                "id": 3,
-                "name": "test: repo-scan",
+                "id": 950,
+                "name": "review: cross (비게이트)",
                 "status": "completed",
-                "conclusion": "success",
+                "conclusion": "failure",
             }
         ],
         False,
-        "wait",
+        "pass",
     ),
 ]
 

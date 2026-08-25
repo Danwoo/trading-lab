@@ -748,30 +748,18 @@ def decide_delegate(payload) -> dict:
 
 
 def judge_gate(records, *, final: bool = False):
-    """required 게이트(`test: gate`) 체크런의 상태를 판정한다 — (상태, 사람이 읽을 줄).
+    """머지 게이트를 판정한다 — (상태, 사람이 읽을 줄).
 
-    같은 이름이 여럿이면(재실행) id 가 가장 큰 것만 본다. 체크런이 아예 없으면 미완이다 —
-    아직 스케줄 전일 수 있다. 상한을 관장하는 것은 호출자 루프이고 `final` 이 미완을
-    실패로 접는다 (fail-closed).
+    **대표자 잡(`test: gate`)이 없어진 뒤로 전수 판정이다** (2026-08-25). 종전에는 그 잡
+    하나의 색만 봤는데, 그 잡이 사라지면 「없음 = 미완」으로 영영 대기하다 `--final` 에
+    실패로 접혔다 — 즉 자동 머지가 통째로 멎었을 것이다. 지금은 `verify_upstream_gate.judge`
+    가 head SHA 의 `test: ` 체크런 전수를 판다: 하나라도 비-초록이면 실패, 미완이 남으면
+    대기, 하한 미만이면 실패(조회 실패가 0건으로 떨어지는 자리 — fail-closed).
+
+    상한을 관장하는 것은 호출자 루프이고 `final` 이 미완을 실패로 접는다.
     """
-    latest = None
-    for record in records:
-        if record.get("name") != gate_lib.SELF_CHECK_NAME:
-            continue
-        if latest is None or gate_lib._run_id(record) >= gate_lib._run_id(latest):
-            latest = record
-
-    if latest is None:
-        line = f"게이트 체크런 `{gate_lib.SELF_CHECK_NAME}` 없음 — 아직 스케줄 전이거나 조회 실패"
-        return ("fail" if final else "wait"), [line]
-
-    status, conclusion = latest.get("status"), latest.get("conclusion")
-    line = f"게이트 체크런 `{gate_lib.SELF_CHECK_NAME}`: {status}/{conclusion or '-'}"
-    if status != "completed":
-        return ("fail" if final else "wait"), [line]
-    if conclusion in gate_lib.PASSING_CONCLUSIONS:
-        return "pass", [line]
-    return "fail", [line]
+    state, lines, problems = gate_lib.judge(records, final=final)
+    return state, lines + problems
 
 
 def _gate_main(argv) -> int:

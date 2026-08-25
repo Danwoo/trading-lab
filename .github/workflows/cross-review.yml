@@ -2143,10 +2143,6 @@ jobs:
           APP_TOKEN: ${{ steps.app_token.outputs.token }}
           AUTO_MERGE: ${{ vars.AUTO_MERGE }}
           AUTO_MERGE_METHOD: ${{ vars.AUTO_MERGE_METHOD }}
-          # 게이트 대기 상한 — 옛 기록기는 1200초였다. 여기서는 self-hosted 러너를 그만큼
-          # 붙들면 뒤따르는 테스트 잡이 러너를 못 얻는 교착 표면이 생겨 절반으로 줄인다.
-          # 상한을 넘겨도 PR 이 굳지는 않는다 — arm 을 안 할 뿐이고 쓸어담기가 다시 집는다.
-          GATE_WAIT_SECONDS: "600"
         run: |
           # gh 실패를 직접 분류하므로 -e 를 끈다 (Actions 기본 셸은 `bash -e {0}`)
           set -uo pipefail
@@ -2222,7 +2218,12 @@ jobs:
 
           # ① required 게이트 초록까지 재조회 — 판정 코멘트는 게이트보다 먼저 올 수 있다.
           #   상한을 넘기면 --final 로 미완을 실패로 접는다 (fail-closed).
-          DEADLINE=$(( $(date +%s) + GATE_WAIT_SECONDS ))
+          # 게이트 대기 상한 600초 — 옛 기록기는 1200초였다. 여기서는 self-hosted 러너를 그만큼
+          # 붙들면 뒤따르는 테스트 잡이 러너를 못 얻는 교착 표면이 생겨 절반으로 줄인다.
+          # 상한을 넘겨도 PR 이 굳지는 않는다 — arm 을 안 할 뿐이고 쓸어담기가 다시 집는다.
+          # **리터럴로 둔다** — scripts/verify_upstream_gate.py 의 대기 루프 계약 검사가
+          # 이 숫자를 잡 타임아웃과 대조한다 (변수로 빼면 그 그물이 못 읽는다).
+          DEADLINE=$(( $(date +%s) + 600 ))
           while :; do
             CHECKS=$(gh api "repos/$REPO/commits/$HEAD/check-runs?per_page=100" --paginate \
                      --jq '.check_runs[] | {id, name, status, conclusion}') || CHECKS=""
