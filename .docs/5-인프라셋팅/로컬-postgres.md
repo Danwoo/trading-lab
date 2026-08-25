@@ -272,6 +272,41 @@ S0 가 인프라와 스키마 적재 경로를 놓고, S1~S4 가 서비스별 �
   (Prisma 는 이제 `frontend` 만 본다). 로컬 데이터를 버려도 되면 볼륨을 지우고 처음부터 적재한다:
   `docker volume rm fintech-pg-data`.
 
+## 세션 타임존은 UTC 다 — 서버 설정이 아니라 코드가 정한다 (#359)
+
+감사·운영 시각 컬럼은 `timestamptz` 이고(alembic `0019`), 그 컬럼에 **오프셋 없는 자릿수**를
+보내는 경로가 둘 있다 — psycopg 로 넘어가는 naive `datetime` 파라미터와, Prisma 어댑터가
+만드는 `YYYY-MM-DD HH:MM:SS.mmm` 문자열이다. Postgres 는 그 자릿수를 **세션 타임존**으로
+읽으므로, 세션 tz 가 무엇이냐에 따라 **저장되는 인스턴트가 달라진다.**
+
+그래서 세션 tz 를 환경에 맡기지 않는다:
+
+| 자리 | 무엇이 박나 |
+|---|---|
+| 통합 앱·multi-agent | `utils/common/database_utils.create_sql_engine_from_settings` 의 `connect_args={"options": "-c timezone=UTC"}` |
+| frontend (Prisma) | `lib/prisma/client.ts` → `poolConfigWithUtcTimezone(url)` (pg `PoolConfig.options`) |
+| alembic | **안 박는다** — 마이그레이션은 `pg_settings` 의 서버 기본값을 읽어야 하고, DDL 은 `USING` 으로 세션 tz 와 무관하다 |
+
+**`DATABASE_URL` 에 `options=` 를 직접 넣지 마세요.** pg 는 URL 과 코드 양쪽에 `options` 가
+있으면 **URL 쪽을 씁니다**(실측). 그래서 `poolConfigWithUtcTimezone` 은 URL 의 `options` 를
+떼어내 timezone 만 UTC 로 갈아끼운 뒤 코드 쪽으로 넘깁니다 — `search_path` 같은 다른 옵션은
+그대로 보존됩니다.
+
+**서버 설정(`postgresql.conf` 의 `timezone`)은 바꾸지 않습니다.** 로컬 pgserver 는 `initdb` 가
+OS tz 를 받아 적어 `Asia/Seoul` 이고, 도커·CI 는 `UTC` 입니다 — 셋 다 그대로 두어도 세션
+옵션이 이깁니다. 서버 기본값은 **마이그레이션이 기존 naive 값의 뜻을 정할 때** 쓰이므로
+(`0019` 의 `src_tz`), 함부로 바꾸면 그 판정의 근거가 사라집니다.
+
+기동 때 세 서비스가 각자 `SHOW timezone` 을 확인하고 UTC 가 아니면 **멈춥니다** — 우회 env 는
+없습니다. 빨간불은 「앱과 DB 사이의 무언가가 커넥션 startup 옵션을 떼어냈다」는 뜻입니다
+(예: `ignore_startup_parameters` 가 걸린 PgBouncer, 트랜잭션 풀링).
+
+**예외는 시장 시각 컬럼입니다** — `tn_minute_bar.ts`·`tn_backtest_trade.entry_ts`/`exit_ts`·
+`tn_nav.nav_dt` 는 「시장 현지 벽시계」라는 뜻이 2026-07-30 결정으로 붙어 있어 naive 로
+남습니다. 그 컬럼에 `CURRENT_TIMESTAMP` 를 쓰거나 비교할 때는 `AT TIME ZONE 'Asia/Seoul'` 을
+**명시**합니다(`nav_repository.py`). 안 적으면 세션이 UTC 인 지금 새 행만 UTC 벽시계가 되어
+옛 행과 갈립니다.
+
 ## 공유 DB 에서 alembic 을 쓰는 규칙
 
 `public` 스키마의 파이썬 소유자는 통합 앱(`backend-service`) 하나이고, 마이그레이션 이력
