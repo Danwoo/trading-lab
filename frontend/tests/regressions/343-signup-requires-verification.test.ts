@@ -60,7 +60,11 @@ vi.mock("@/lib/prisma/client", () => ({
     workspaceDomain: { findFirst: vi.fn(async () => null) },
     authorMember: { create: vi.fn(async () => ({})) },
     $transaction: vi.fn(async (fn: any) =>
-      fn({ user: { update: vi.fn(async () => ({})) }, authorMember: { create: vi.fn(async () => ({})) } }),
+      // `authorMember.count` — 새 계정이라 기존 권한 행이 없다; `grantDefaultAuthor` 가 먼저 센다 (#355).
+      fn({
+        user: { update: vi.fn(async () => ({})) },
+        authorMember: { count: vi.fn(async () => 0), create: vi.fn(async () => ({})) },
+      }),
     ),
   },
 }));

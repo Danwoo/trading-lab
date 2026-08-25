@@ -18,6 +18,7 @@ import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
 import { useExcelExport } from "@/hooks/shared/useExcelExport";
 import { useMasterGridActions } from "@/hooks/shared/useMasterGridActions";
 import { useSessionContext } from "@/hooks/shared/useSessionContext";
+import { renderAuthorCell } from "./authorCell";
 
 export default function AdminUserContainer() {
   const { isSysAdmin } = useSessionContext();
@@ -40,7 +41,15 @@ export default function AdminUserContainer() {
     { dataField: "email", caption: "이메일", minWidth: 200 },
     { dataField: "name", caption: "이름", width: 150 },
     { dataField: "dept", caption: "부서", width: 150 },
-    { dataField: "author_nm", caption: "권한", width: 180, allowFiltering: false, allowSorting: false },
+    {
+      dataField: "author_nm",
+      caption: "권한",
+      width: 180,
+      allowFiltering: false,
+      allowSorting: false,
+      // 빈 칸은 상태를 말하지 않는다 (#355) — 권한 0건이면 「권한 없음」을 그린다.
+      cellRender: renderAuthorCell,
+    },
     {
       dataField: "appr_at",
       caption: "승인",

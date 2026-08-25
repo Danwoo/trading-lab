@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import { auth } from "@/lib/auth/auth";
-import { GUEST_AUTHOR_ID, SIGNUP_AUTHOR_ID } from "@/constants/protected";
 import { isOEM } from "@/utils/common/edition";
 import { getClientIp, rateLimit } from "@/lib/rateLimit";
 import { SIGNUP_EMAIL_PATTERN, signupRequestSchema } from "@/schemas/common/signup";
@@ -13,6 +12,7 @@ import {
   syncDefaultWorkspaceMembership,
 } from "@/lib/auth/authUtils";
 import { consumeSignupVerificationGrant } from "@/lib/auth/signupVerificationGrant";
+import { grantDefaultAuthor } from "@/lib/auth/defaultAuthor";
 
 export async function GET(req: NextRequest) {
   try {
@@ -114,7 +114,6 @@ export async function POST(req: NextRequest) {
     // 에디션·도메인이 배정하는 공용 워크스페이스. 개인 워크스페이스와 별개다.
     let sharedWorkspaceId: number | null;
     let appr_at: string;
-    let autoGrantRole: boolean;
 
     if (oem) {
       // OEM: 단일 워크스페이스 배포. 도메인 매핑 없이 DB 의 유일 활성 공용 워크스페이스로 배정, 항상 승인 대기.
@@ -123,8 +122,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ message: shared.error }, { status: 500 });
       }
       sharedWorkspaceId = shared.id;
-      appr_at = "N"; // 운영자 승인 대기
-      autoGrantRole = false; // 권한은 운영자가 승인 시 부여
+      appr_at = "N"; // 운영자 승인 대기 — 권한은 승인 시 붙는다(`defaultAuthorIdFor`)
     } else {
       // SaaS: 이메일 도메인 → 공용 워크스페이스 자동 매핑 (워크스페이스 use_at='Y' 만 매칭).
       // 매핑 여부와 무관하게 개인 워크스페이스를 갖고 즉시 활성이므로, 배정 대기 경로는 없다.
@@ -139,7 +137,6 @@ export async function POST(req: NextRequest) {
 
       sharedWorkspaceId = workspaceDomain?.workspace_id ?? null;
       appr_at = "Y";
-      autoGrantRole = true;
     }
 
     // Better Auth로 사용자 생성 (TN_User + BA_Account). Better Auth 는 자기 어댑터로 쓰므로
@@ -223,27 +220,14 @@ export async function POST(req: NextRequest) {
         // 기본 워크스페이스 멤버십 — 세션이 이 행에서 "지금 선택된 워크스페이스"를 읽는다.
         await syncDefaultWorkspaceMembership(userId, workspace_id, email, "member", tx);
 
-        // 즉시 활성인 가입자는 **자기** 워크스페이스의 운영자다 (리드 결정 2026-08-23, #341) —
-        // 게스트를 주면 실험대·시세·관심종목의 저장·실행이 전부 403 이다.
-        //
-        // 도메인 매핑으로 **남의 공용 워크스페이스**에 들어간 가입은 그 전제(주인)가 서지 않는다.
-        // 그 계정은 초대받은 손님이라 게스트를 주고, 쓰기를 열지는 그 워크스페이스 운영자가
-        // 권한관리에서 판단한다 (결정 보완 2026-08-24 — `adminuser/[email]/route.ts` 가 남의
-        // 워크스페이스에 사람을 넣을 때와 같은 원칙). 운영자를 주면 그 워크스페이스의 쓰기와
-        // 사용자관리(같은 워크스페이스 계정의 수정·삭제)가 초대 없이 열린다.
-        // OEM 은 승인 시 운영자가 부여.
-        if (autoGrantRole) {
-          await tx.authorMember.create({
-            data: {
-              author_id: sharedWorkspaceId === null ? SIGNUP_AUTHOR_ID : GUEST_AUTHOR_ID,
-              user_id: email,
-              reg_id: email,
-              reg_dt: new Date(),
-              mod_id: email,
-              mod_dt: new Date(),
-            },
-          });
-        }
+        // 기본 권한 — 규칙은 `lib/auth/defaultAuthor.ts` 하나다 (관리자 생성·수정 경로와 같은 함수).
+        // 개인 워크스페이스를 받은 가입은 그 주인(운영자), 도메인 매핑으로 남의 공용 워크스페이스에
+        // 들어간 가입은 손님(게스트), OEM(승인 대기)은 승인 시 붙는다.
+        await grantDefaultAuthor(tx, {
+          email,
+          placement: { workspace: sharedWorkspaceId === null ? "personal" : "shared", approved: appr_at === "Y" },
+          actorEmail: email,
+        });
       });
     } catch (error) {
       await deleteHalfCreatedUser(userId).catch((rollbackError) =>

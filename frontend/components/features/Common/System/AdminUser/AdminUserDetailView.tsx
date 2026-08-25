@@ -65,7 +65,7 @@ export default function AdminUserDetailView({ data, onEdit, onDelete }: Props) {
         <TableGroup title="소속 권한">
           <TableRow>
             <TableCell colSpan={4}>
-              <AdminUserAuthorGrid email={data.email} editable={false} />
+              <AdminUserAuthorGrid email={data.email} apprAt={data.appr_at} editable={false} />
             </TableCell>
           </TableRow>
         </TableGroup>

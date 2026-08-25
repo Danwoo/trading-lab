@@ -11,7 +11,8 @@ import {
   deleteUserCascade,
   syncDefaultWorkspaceMembership,
 } from "@/lib/auth/authUtils";
-import { GENERAL_ADMIN_AUTHOR_ID, GUEST_AUTHOR_ID } from "@/constants/protected";
+import { grantDefaultAuthor, resolveWorkspaceKind } from "@/lib/auth/defaultAuthor";
+import { GENERAL_ADMIN_AUTHOR_ID } from "@/constants/protected";
 import { AdminUserUpdateInSchema } from "@/schemas/common/adminUser";
 
 /**
@@ -182,28 +183,17 @@ const putHandler = async (req: NextRequest, session: any, params: any) => {
       });
     }
 
-    // 워크스페이스 배정(SaaS) 또는 승인 전환(OEM, appr_at N→Y) 시 게스트 권한이 없으면 부여 → 즉시 조회 가능.
-    //
-    // **가입(`SIGNUP_AUTHOR_ID`)과 다른 역할을 주는 것이 의도다** (#341): 여기는 남의 워크스페이스에
-    // 사람을 넣는 자리라 그 계정은 초대받은 손님이고, 쓰기를 열지는 운영자가 권한관리에서 판단한다.
-    // 리드 결정 2026-08-23 이 바꾼 것은 「회원가입」 경로 하나다.
+    // 워크스페이스 배정(SaaS) 또는 승인 전환(OEM, appr_at N→Y) 시 기본 권한이 없으면 부여 → 즉시 조회 가능.
+    // 규칙은 `lib/auth/defaultAuthor.ts` 하나다 (가입·생성 경로와 같은 함수): 옮겨 간 곳은 공용
+    // 워크스페이스뿐이라(`assertAssignableWorkspace`) 손님(게스트)이고, 자기 개인 워크스페이스에서
+    // 승인만 뒤집힌 계정은 주인(운영자)이다. 승인 전(대기·거부)이면 아무것도 붙이지 않는다.
     const approvedNow = existing && existing.appr_at !== "Y" && user.appr_at === "Y";
     if (workspaceChanged || approvedNow) {
-      const hasDefault = await prisma.authorMember.count({
-        where: { user_id: email, author_id: GUEST_AUTHOR_ID },
+      await grantDefaultAuthor(prisma, {
+        email,
+        placement: { workspace: await resolveWorkspaceKind(prisma, user.workspace_id), approved: user.appr_at === "Y" },
+        actorEmail: session.user.email,
       });
-      if (!hasDefault) {
-        await prisma.authorMember.create({
-          data: {
-            author_id: GUEST_AUTHOR_ID,
-            user_id: email,
-            reg_id: session.user.email,
-            reg_dt: new Date(),
-            mod_id: session.user.email,
-            mod_dt: new Date(),
-          },
-        });
-      }
     }
 
     // 워크스페이스 변경 or 비활성 처리 시 기존 세션 무효화 (JWT/BaSession stale 방지)
