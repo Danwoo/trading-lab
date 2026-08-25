@@ -6,6 +6,7 @@ import {
   AdminUserCreateInSchema,
   UserSessionsOut,
   UserOptionsOut,
+  UserDeleteCascadeOut,
 } from "@/schemas/common/adminUser";
 import { AuthorOptionsOut } from "@/schemas/common/author";
 import { UpdateOut, DeleteOut } from "@/schemas/common/types";
@@ -53,6 +54,10 @@ export const deleteAdminUser = async (data: any): Promise<DeleteOut | null> => {
   const { email } = data;
   return apiCall<DeleteOut>(`${BASE_URL}/${encodeURIComponent(email)}`, { method: "DELETE" });
 };
+
+/** 삭제 직전에 함께 지워질 것을 센다 — 확인 창 문구의 원천 (#356) */
+export const selectUserDeleteCascade = async (email: string): Promise<UserDeleteCascadeOut | null> =>
+  apiCall<UserDeleteCascadeOut>(`${BASE_URL}/${encodeURIComponent(email)}/cascade`, { method: "GET" });
 
 export const selectUserAuthors = async (email: string) =>
   apiCall<AuthorOptionsOut>(`${BASE_URL}/${encodeURIComponent(email)}/author`, { method: "GET" });
