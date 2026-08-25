@@ -34,58 +34,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # ── required 게이트 — `test: ` 체크런 전부를 체크 하나로 대표한다 (#23 Task 5) ──
-  # 테스트를 개별로 required 로 걸면 pending 창이 잡 수만큼 생긴다. scripts/verify_upstream_gate.py
-  # 머리의 「Orca 판정 규칙」 실측대로 pending 이 하나만 있어도 머지 버튼이 잠기므로, 대표 잡 하나만
-  # 건다. required 로 **거는 것**은 레포 설정(ruleset) 소관이라 여기서는 걸 대상만 세운다.
-  #
-  # 판정 근거가 `needs:` 가 아니라 **head SHA 의 체크런 조회**인 이유: `needs:` 는 같은
-  # 워크플로 안만 묶어 ci.yml 7종·frontend-ci.yml 3종을 대표하지 못한다. 종전엔 그 열을
-  # 구 merge-router.yml 의 전수 초록 게이트가 봤고(#23 Task 8 이 삭제), 이 게이트가 같은
-  # 판정 근거(head SHA 의 `test: ` 접두 체크런 전수)로 그 자리를 승계했다 — 대비 없이
-  # 지우면 자동 머지가 backend·frontend 테스트를 안 보게 되기 때문이다. 판정부는
-  # scripts/verify_upstream_gate.py 의 순수 함수라 체크런 JSON 만 있으면 로컬에서 그대로 돈다.
-  #
-  # 게이트 자신도 `test: ` 접두 체크라 전수 조회에 자기가 잡힌다 — 판정부가 자기 이름을
-  # 빼지 않으면 스스로를 기다린다. 그 이름 대조도 판정부가 한다.
-  gate:
-    name: "test: gate"
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    permissions:
-      checks: read
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: 테스트 체크런 전수 판정
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -uo pipefail
-          set +e   # 판정부의 종료 코드를 직접 분류한다 (Actions 기본 셸은 `bash -e {0}`)
-          # 같은 SHA 의 다른 워크플로가 아직 도는 중일 수 있으므로 끝날 때까지 다시 조회한다.
-          # 한도를 넘기면 --final 로 미완을 실패로 접는다 (fail-closed).
-          DEADLINE=$(( $(date +%s) + 1200 ))
-          while :; do
-            CHECKS=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" --paginate \
-                     --jq '.check_runs[] | {id, name, status, conclusion}') || CHECKS=""
-            NOW=$(date +%s)
-            FINAL=""
-            [ "$NOW" -ge "$DEADLINE" ] && FINAL="--final"
-            OUT=$(printf '%s\n' "$CHECKS" | python3 scripts/verify_upstream_gate.py $FINAL)
-            RC=$?
-            if [ "$RC" -ne 2 ]; then
-              printf '%s\n' "$OUT"
-              exit "$RC"
-            fi
-            echo "대기 — $(printf '%s' "$OUT" | tail -1) (남은 한도 $(( DEADLINE - NOW ))초)"
-            sleep 15
-          done
-
   # ── CI 배선 대조 — 이 레포가 반복해서 데인 클래스를 닫는다 ────────────────
   # #241 · #252 · #269 · #290 · #302 · #335 는 전부 같은 부류였다: 검증은 실재하는데 CI 가
   # 안 돌린다. 종전 처방은 매번 "빠진 것을 찾아 잡을 하나 더" 였고 그래서 잡이 36개가 됐다.
@@ -404,13 +352,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_cross_review_chain_loop.py
 
-      # 러너 동결 재실행 판정 — runner-freeze-rerun.yml 이 부르는 순수 판정. 동결 서명
-      # 정확 일치 + 여파(verdict unable)만 재실행하고, 진짜 실패가 섞이면 재실행하지
-      # 않는지를 실제 API 픽스처(fixtures/runner_freeze_annotations.json)로 못박는다.
-      # 케이스를 0건 모으면 실패한다 (fail-closed).
-      - name: 러너 동결 재실행 판정 검사
-        if: ${{ !cancelled() }}
-        run: python3 scripts/test_runner_freeze_rerun.py
 
       # 경로 필터 판정 (#23 Task 4) — ci.yml·frontend-ci.yml 의 `changes` 잡이 부르는 순수
       # 판정 + **배선 구조 자체**. 글롭 의미만 보면 "판정은 맞는데 아무도 안 부르는" 상태가
@@ -420,12 +361,20 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_ci_path_filter.py
 
-      # required 게이트 판정 (#23 Task 5) — 통과 집합(success·skipped)과 상류 0건 실패,
-      # 그리고 게이트의 needs 가 이 워크플로의 나머지 잡을 전부 담는지. 게이트는 초록일 때
-      # 아무 일도 안 하는 검사라 죽어도 티가 안 난다. 케이스를 0건 모으면 실패한다.
-      - name: required 게이트 판정 검사
+      # 머지 게이트 판정 (#23 Task 5) — 통과 집합(success·skipped)과 상류 0건 실패.
+      # 게이트는 초록일 때 아무 일도 안 하는 검사라 죽어도 티가 안 난다.
+      # 케이스를 0건 모으면 실패한다.
+      - name: 머지 게이트 판정 검사
         if: ${{ !cancelled() }}
         run: python3 scripts/test_upstream_gate.py
+
+      # 게이트의 **구조** 판정 — 대표자 잡(`test: gate`)을 없앤 뒤 이 판정부를 실제로 돌리는
+      # 자리는 자동 머지 arm 스텝 하나뿐이고, 그건 리뷰가 끝난 뒤에야 돈다. 그래서 「테스트
+      # 잡이 하한 미만」·「대표자 잡 부활」·「대기 루프 계약 파손」을 PR 이 돌 때 여기서 본다.
+      # `--structure-only` 는 표준입력을 안 읽는다 (체크런 조회 없이 선언만 대조).
+      - name: 머지 게이트 구조 대조 (테스트 잡 하한 · 대기 루프 계약)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_upstream_gate.py --structure-only
 
       # pre-commit 훅 ↔ CI 대조 판정 (`test: ci-coverage` 가 부르는 순수 판정). 이 대조는
       # 초록일 때 아무 일도 안 하는 검사라 관대해져도 티가 안 난다 — 새 훅을 모른 척하거나
@@ -458,11 +407,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_review_notice.py
 
-      # 판정 → 체크 색 대응이 fail-closed 인지 (#23 Task 10) — merge_ok 정확 일치만 초록.
-      # 관대해지면 「빨개야 하는데 초록」으로, 어휘가 갈리면 「초록이어야 하는데 빨강」으로 죽는다.
-      - name: 리뷰 판정 가시화 검사
-        if: ${{ !cancelled() }}
-        run: python3 scripts/test_review_verdict.py
 
       # 고지 문서 생성기의 fail-closed 축 (앵커 파손·미분류 라이선스·§3 보존·--check).
       # frontend 잡의 `generate_notices.py --check` 는 **지금 트리가 맞는지**만 보인다 —

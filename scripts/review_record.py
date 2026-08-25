@@ -64,10 +64,18 @@ import review_route
 import verify_upstream_gate as gate_lib
 
 TRUSTED_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")
-BOT_REVIEWER_LOGIN = "github-actions"
+# 네이티브 리뷰(승인·수정요청)를 낼 수 있는 봇 신원. **둘이다**:
+#   · `github-actions` — Actions 의 GITHUB_TOKEN 이 게시하던 종전 경로. main 에 남아 있는
+#     낡은 리뷰가 이 신원이라, 지우면 그 PR 들의 승인이 없던 일이 된다.
+#   · `trading-lab-ci` — 승인 전용 GitHub App (2026-08-25). 승인을 CI 밖으로 못 옮기는 이유는
+#     GitHub 이 자기 PR 자기 승인을 금지해서다 — 리뷰 워커의 `gh` 는 PR 저자와 같은 계정이다.
+# **로그인 이름을 여기에 적는 것이 계약이다** — 목록 밖 신원의 승인은 arm 조건 ②를 못 채운다
+# (위조 방어: 승인을 required 로 걸지 않던 설계의 유일한 방어선이었고, required 1 로 올린
+# 뒤에도 「누구의 승인이 arm 을 여는가」는 여전히 이 목록이 정한다).
+BOT_REVIEWER_LOGINS = ("github-actions", "trading-lab-ci")
 # GITHUB_TOKEN 으로 올린 코멘트의 `author_association` 은 이 레포에서 `NONE` 이다
-# (2026-08-09 실측) — cross-review publish 폴백 게시분이 여기 걸려 영영 안 읽혔다.
-TRUSTED_BOT_LOGINS = (BOT_REVIEWER_LOGIN,)
+# (2026-08-09 실측) — cross-review 판정 게시 폴백분이 여기 걸려 영영 안 읽혔다.
+TRUSTED_BOT_LOGINS = BOT_REVIEWER_LOGINS
 REVIEWER_VENDORS = ("claude", "kimi", "codex")
 # `review_route` 가 티어를 모으는 벤더 — 지금은 claude 뿐이다. 티어 축은 **리뷰어 벤더의**
 # 티어를 알 때만 자기리뷰 차단을 푼다: 혼재 저자(claude+kimi)에서 claude 티어를 안다는
@@ -205,7 +213,7 @@ def _bot_reviews_for_head(reviews, head_sha):
     for review in reviews or []:
         if not isinstance(review, dict):
             continue
-        if _normalize_login(review.get("user_login")) != BOT_REVIEWER_LOGIN:
+        if _normalize_login(review.get("user_login")) not in BOT_REVIEWER_LOGINS:
             continue
         if review.get("commit_id") != head_sha:
             continue
@@ -239,7 +247,7 @@ def decide_record(payload) -> dict:
         return {
             **base,
             "reason": "현재 head 와 40자 동등한 유효 마커 없음 "
-            "(저자 필터 OWNER/MEMBER/COLLABORATOR + github-actions[bot] · "
+            "(저자 필터 OWNER/MEMBER/COLLABORATOR + 이 레포 봇 게시분 · "
             "낡은 sha·접두 sha 불인정)",
         }
 
@@ -740,30 +748,18 @@ def decide_delegate(payload) -> dict:
 
 
 def judge_gate(records, *, final: bool = False):
-    """required 게이트(`test: gate`) 체크런의 상태를 판정한다 — (상태, 사람이 읽을 줄).
+    """머지 게이트를 판정한다 — (상태, 사람이 읽을 줄).
 
-    같은 이름이 여럿이면(재실행) id 가 가장 큰 것만 본다. 체크런이 아예 없으면 미완이다 —
-    아직 스케줄 전일 수 있다. 상한을 관장하는 것은 호출자 루프이고 `final` 이 미완을
-    실패로 접는다 (fail-closed).
+    **대표자 잡(`test: gate`)이 없어진 뒤로 전수 판정이다** (2026-08-25). 종전에는 그 잡
+    하나의 색만 봤는데, 그 잡이 사라지면 「없음 = 미완」으로 영영 대기하다 `--final` 에
+    실패로 접혔다 — 즉 자동 머지가 통째로 멎었을 것이다. 지금은 `verify_upstream_gate.judge`
+    가 head SHA 의 `test: ` 체크런 전수를 판다: 하나라도 비-초록이면 실패, 미완이 남으면
+    대기, 하한 미만이면 실패(조회 실패가 0건으로 떨어지는 자리 — fail-closed).
+
+    상한을 관장하는 것은 호출자 루프이고 `final` 이 미완을 실패로 접는다.
     """
-    latest = None
-    for record in records:
-        if record.get("name") != gate_lib.SELF_CHECK_NAME:
-            continue
-        if latest is None or gate_lib._run_id(record) >= gate_lib._run_id(latest):
-            latest = record
-
-    if latest is None:
-        line = f"게이트 체크런 `{gate_lib.SELF_CHECK_NAME}` 없음 — 아직 스케줄 전이거나 조회 실패"
-        return ("fail" if final else "wait"), [line]
-
-    status, conclusion = latest.get("status"), latest.get("conclusion")
-    line = f"게이트 체크런 `{gate_lib.SELF_CHECK_NAME}`: {status}/{conclusion or '-'}"
-    if status != "completed":
-        return ("fail" if final else "wait"), [line]
-    if conclusion in gate_lib.PASSING_CONCLUSIONS:
-        return "pass", [line]
-    return "fail", [line]
+    state, lines, problems = gate_lib.judge(records, final=final)
+    return state, lines + problems
 
 
 def _gate_main(argv) -> int:
