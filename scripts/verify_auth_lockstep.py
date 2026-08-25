@@ -56,6 +56,12 @@ REPLICA_GROUPS: dict[str, dict[str, list[str]]] = {
     "app/utils/common/database_utils.py": {
         "members": ["backend-service", "multi-agent-service"],
     },
+    # 세션 타임존 기동 검사 (#359) — DB 를 쓰는 두 서비스가 같은 판정·같은 처방을 낸다.
+    # 부르는 자리는 서비스마다 다르지만(backend 는 스키마 판 검사 뒤, multi-agent 는 lifespan
+    # 첫 줄) 검사 자체는 한 벌이어야 한다.
+    "app/core/session_timezone.py": {
+        "members": ["backend-service", "multi-agent-service"],
+    },
     "app/utils/common/retry_utils.py": {
         "members": [
             "backend-service",

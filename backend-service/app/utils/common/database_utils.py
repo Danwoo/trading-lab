@@ -129,6 +129,10 @@ def create_sql_engine_from_settings(
             connect_args={"check_same_thread": False},
         )
     else:
+        # 세션 타임존을 UTC 로 못박는다 (#359). naive `timestamp` 컬럼을 쓰던 시절에는 세션 tz 가
+        # 저장값을 바꿨고, `timestamptz` 로 옮긴 뒤에는 **읽기 직렬화**와 naive 파라미터 해석을
+        # 바꾼다. 어느 쪽이든 "배포마다 뜻이 다른 시각"이 되므로 환경(.env·서버 conf)에 기대지
+        # 않고 코드가 정한다. startup 옵션이라 커넥션마다 붙는다.
         engine = create_engine(
             engine_url,
             pool_pre_ping=True,
@@ -138,6 +142,7 @@ def create_sql_engine_from_settings(
             pool_recycle=1800,
             echo=False,
             hide_parameters=True,
+            connect_args={"options": "-c timezone=UTC"},
         )
 
         # 연결 수립(신규·풀 재연결) 시 일시적 오류 유한 재시도 — pool_pre_ping 과 합쳐 끊김→재연결 복구 (무한 아님)
