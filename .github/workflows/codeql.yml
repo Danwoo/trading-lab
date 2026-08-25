@@ -20,7 +20,7 @@ on:
     # ⚠ `Danwoo/ci-execute` 는 **이 워크플로가 실제로 도는지 보려고 잠깐 넣은 것**이다.
     #   `workflow_dispatch` 는 기본 브랜치에서만 되고 `push: main` 은 머지 뒤에야 도므로,
     #   설정 오류를 머지 전에 잡을 길이 이것뿐이다. 초록을 확인하면 이 줄에서 뺀다.
-    branches: [main, Danwoo/ci-execute]
+    branches: [main, Danwoo/ci-execute-c]
   schedule:
     # 주 1회 전수 — default setup 의 `weekly` 를 그대로 옮긴 것이다.
     - cron: "23 19 * * 0"
