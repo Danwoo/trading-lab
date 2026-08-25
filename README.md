@@ -156,8 +156,8 @@ Issues and pull requests come here — there's no mirror or upstream. What you s
   redistributing their data. Mock data means you don't need a key to contribute. Never commit a
   file with a key in it. `.env*` is gitignored, and `pre-commit run --all` runs gitleaks over the
   tree — run `pre-commit install` so it runs on every commit. CI blocks credential patterns too
-  (`test: repo` runs the same gitleaks version the hook pins), and GitHub push protection is a
-  third net, but it only knows provider-format keys.
+  (`test: repo-lint` runs the same gitleaks version the hook pins), and GitHub push protection is
+  a third net, but it only knows provider-format keys.
 
 ### What CI does — and what it doesn't
 
@@ -165,10 +165,9 @@ CI answers one question: **is the code correct?** It builds, runs every test sui
 repo-wide static scans and security scans. It does **not** decide who reviews a PR, whether the
 review passed, or whether a PR may merge — an independent review agent posts its verdict as a PR
 comment, a `review: passed` / `review: needs-work` label makes that verdict visible, and a bot
-account turns it into a GitHub review so branch protection can act on it. Where those jobs run is
-one repo variable: `CI_RUNNER`. Unset (the default) means GitHub-hosted `ubuntu-latest`, so a
-fork's pull request runs the same workflow with no setup; set it to a runner label and the same
-jobs move to self-hosted runners. Nothing else in the workflow files changes either way.
+account turns it into a GitHub review so branch protection can act on it. The review job runs on
+a self-hosted runner and is skipped for pull requests from forks — a fork still gets the full
+build, test, and scan set on GitHub-hosted runners.
 
 Contributions ship under the MIT license below.
 
