@@ -114,6 +114,16 @@ class StrategySpec(BaseModel):
             raise ValueError(f"파라미터 이름이 중복됩니다: {', '.join(duplicated)}")
         return params
 
+    @field_validator("params")
+    @classmethod
+    def _unique_labels(cls, params: list[StrategyParam]) -> list[StrategyParam]:
+        """라벨도 겹치면 안 된다 — 폼에 같은 이름의 칸이 둘 생기고, 값 오류가 어느 칸인지 못 짚는다."""
+        labels = [param.label for param in params]
+        duplicated = sorted({label for label in labels if labels.count(label) > 1})
+        if duplicated:
+            raise ValueError(f"파라미터 라벨이 중복됩니다: {', '.join(duplicated)}")
+        return params
+
 
 class StrategyLoadError(BaseModel):
     """읽지 못한 전략 하나 — 목록에서 빠지되 이유는 남는다."""
@@ -221,7 +231,7 @@ def _to_field(param: StrategyParam) -> dict[str, Any]:
         field["min"] = _as_declared(param, param.min)
         field["max"] = _as_declared(param, param.max)
         field["step"] = _as_declared(param, param.step)
-        unit = param.unit or ("%" if param.type == "percent" else None)
+        unit = _display_unit(param)
         if unit:
             field["unit"] = unit
     elif param.type == "choice":
@@ -238,26 +248,39 @@ def _as_declared(param: StrategyParam, value: float | None) -> float | int | Non
     return int(value) if param.type == "int" else value
 
 
+def _display_unit(param: StrategyParam) -> str | None:
+    """폼과 오류가 같은 단위를 말하게 하는 한 자리 — 갈라지면 화면은 「일」인데 오류는 무단위가 된다."""
+    return param.unit or ("%" if param.type == "percent" else None)
+
+
 def _coerce(param: StrategyParam, value: Any) -> Any:
+    """사용자가 채운 값 하나를 선언에 맞춘다.
+
+    오류는 **화면이 쓰는 라벨**로 말한다 (`name` 은 화면 어디에도 없다). 선택지도 값이 아니라
+    라벨로 부른다 — 라벨의 정본은 전략 선언 하나뿐이라 여기서 사전을 따로 두지 않는다.
+    """
+    label = f"「{param.label}」"
     if param.type == "bool":
         if not isinstance(value, bool):
-            raise ValueError(f"'{param.name}': true/false 여야 합니다 (받은 값 {value!r})")
+            raise ValueError(f"{label}: true/false 여야 합니다 (받은 값 {value!r})")
         return value
     if param.type == "choice":
-        allowed = [choice.value for choice in param.choices or []]
-        if value not in allowed:
-            raise ValueError(f"'{param.name}': {', '.join(allowed)} 중 하나여야 합니다 (받은 값 {value!r})")
+        choices = param.choices or []
+        if value not in [choice.value for choice in choices]:
+            allowed = ", ".join(choice.label for choice in choices)
+            raise ValueError(f"{label}: {allowed} 중 하나여야 합니다 (받은 값 {value!r})")
         return value
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError(f"'{param.name}': 숫자여야 합니다 (받은 값 {value!r})")
+        raise ValueError(f"{label}: 숫자여야 합니다 (받은 값 {value!r})")
     if param.type == "int":
         if not float(value).is_integer():
-            raise ValueError(f"'{param.name}': 정수여야 합니다 (받은 값 {value!r})")
+            raise ValueError(f"{label}: 정수여야 합니다 (받은 값 {value!r})")
         value = int(value)
     if not param.min <= value <= param.max:
         low, high = _as_declared(param, param.min), _as_declared(param, param.max)
-        raise ValueError(f"'{param.name}': {low}~{high} 범위여야 합니다 (받은 값 {value!r})")
+        unit = _display_unit(param) or ""
+        raise ValueError(f"{label}: {low}{unit}~{high}{unit} 범위여야 합니다 (받은 값 {value!r}{unit})")
     return value
 
 
