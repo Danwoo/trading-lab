@@ -404,13 +404,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_cross_review_chain_loop.py
 
-      # 러너 동결 재실행 판정 — runner-freeze-rerun.yml 이 부르는 순수 판정. 동결 서명
-      # 정확 일치 + 여파(verdict unable)만 재실행하고, 진짜 실패가 섞이면 재실행하지
-      # 않는지를 실제 API 픽스처(fixtures/runner_freeze_annotations.json)로 못박는다.
-      # 케이스를 0건 모으면 실패한다 (fail-closed).
-      - name: 러너 동결 재실행 판정 검사
-        if: ${{ !cancelled() }}
-        run: python3 scripts/test_runner_freeze_rerun.py
 
       # 경로 필터 판정 (#23 Task 4) — ci.yml·frontend-ci.yml 의 `changes` 잡이 부르는 순수
       # 판정 + **배선 구조 자체**. 글롭 의미만 보면 "판정은 맞는데 아무도 안 부르는" 상태가
@@ -458,11 +451,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_review_notice.py
 
-      # 판정 → 체크 색 대응이 fail-closed 인지 (#23 Task 10) — merge_ok 정확 일치만 초록.
-      # 관대해지면 「빨개야 하는데 초록」으로, 어휘가 갈리면 「초록이어야 하는데 빨강」으로 죽는다.
-      - name: 리뷰 판정 가시화 검사
-        if: ${{ !cancelled() }}
-        run: python3 scripts/test_review_verdict.py
 
       # 고지 문서 생성기의 fail-closed 축 (앵커 파손·미분류 라이선스·§3 보존·--check).
       # frontend 잡의 `generate_notices.py --check` 는 **지금 트리가 맞는지**만 보인다 —

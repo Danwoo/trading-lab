@@ -116,6 +116,42 @@ RECORD_CASES = [
         {"post_review": False, "arm_candidate": False},
     ),
     (
+        "승인 App(trading-lab-ci[bot]) 게시분도 읽힌다 — 승인 신원이 둘이다 (2026-08-25)",
+        {
+            "head_sha": HEAD,
+            "comments": [bot_comment(marker(), login="trading-lab-ci[bot]")],
+            "existing_reviews": [],
+        },
+        {"post_review": True, "review_event": "APPROVE", "arm_candidate": True},
+    ),
+    (
+        "승인 App 사칭 — 로그인 유사(trading-lab-ci-bot[bot]) → 무행동  (공격 ⑦)",
+        {
+            "head_sha": HEAD,
+            "comments": [bot_comment(marker(), login="trading-lab-ci-bot[bot]")],
+            "existing_reviews": [],
+        },
+        {"post_review": False, "arm_candidate": False, "marker_sha": None},
+    ),
+    (
+        "승인 App 사칭 — 로그인은 맞는데 타입이 User → 무행동  (공격 ⑦)",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker(), association="NONE", login="trading-lab-ci", user_type="User")],
+            "existing_reviews": [],
+        },
+        {"post_review": False, "arm_candidate": False, "marker_sha": None},
+    ),
+    (
+        "App 승인이 이미 같은 head 에 있으면 중복 게시하지 않는다 (멱등)",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker())],
+            "existing_reviews": [approval(login="trading-lab-ci[bot]")],
+        },
+        {"post_review": False, "arm_candidate": True},
+    ),
+    (
         "비-멤버 사람 코멘트는 봇 축이 열려도 여전히 막힌다  (공격 ①)",
         {
             "head_sha": HEAD,
@@ -334,6 +370,16 @@ ARM_BASE = {
 ARM_CASES = [
     # (설명, payload 덮어쓰기, 기대 dict 부분집합)
     ("risk: low + 봇 승인 → arm", {}, {"arm": True, "risk": "low"}),
+    (
+        "App(trading-lab-ci) 승인도 조건 ②를 채운다 — 승인 신원이 둘이다 (2026-08-25)",
+        {"reviews": [approval(login="trading-lab-ci[bot]")]},
+        {"arm": True, "risk": "low"},
+    ),
+    (
+        "목록 밖 봇 승인(dependabot) → arm 금지 (조건 ② — 승인 신원 위조 차단)",
+        {"reviews": [approval(login="dependabot[bot]")]},
+        {"arm": False},
+    ),
     (
         "source=manual → arm 금지  (공격 ④)",
         {"manual": True},

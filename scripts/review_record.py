@@ -64,10 +64,18 @@ import review_route
 import verify_upstream_gate as gate_lib
 
 TRUSTED_ASSOCIATIONS = ("OWNER", "MEMBER", "COLLABORATOR")
-BOT_REVIEWER_LOGIN = "github-actions"
+# 네이티브 리뷰(승인·수정요청)를 낼 수 있는 봇 신원. **둘이다**:
+#   · `github-actions` — Actions 의 GITHUB_TOKEN 이 게시하던 종전 경로. main 에 남아 있는
+#     낡은 리뷰가 이 신원이라, 지우면 그 PR 들의 승인이 없던 일이 된다.
+#   · `trading-lab-ci` — 승인 전용 GitHub App (2026-08-25). 승인을 CI 밖으로 못 옮기는 이유는
+#     GitHub 이 자기 PR 자기 승인을 금지해서다 — 리뷰 워커의 `gh` 는 PR 저자와 같은 계정이다.
+# **로그인 이름을 여기에 적는 것이 계약이다** — 목록 밖 신원의 승인은 arm 조건 ②를 못 채운다
+# (위조 방어: 승인을 required 로 걸지 않던 설계의 유일한 방어선이었고, required 1 로 올린
+# 뒤에도 「누구의 승인이 arm 을 여는가」는 여전히 이 목록이 정한다).
+BOT_REVIEWER_LOGINS = ("github-actions", "trading-lab-ci")
 # GITHUB_TOKEN 으로 올린 코멘트의 `author_association` 은 이 레포에서 `NONE` 이다
-# (2026-08-09 실측) — cross-review publish 폴백 게시분이 여기 걸려 영영 안 읽혔다.
-TRUSTED_BOT_LOGINS = (BOT_REVIEWER_LOGIN,)
+# (2026-08-09 실측) — cross-review 판정 게시 폴백분이 여기 걸려 영영 안 읽혔다.
+TRUSTED_BOT_LOGINS = BOT_REVIEWER_LOGINS
 REVIEWER_VENDORS = ("claude", "kimi", "codex")
 # `review_route` 가 티어를 모으는 벤더 — 지금은 claude 뿐이다. 티어 축은 **리뷰어 벤더의**
 # 티어를 알 때만 자기리뷰 차단을 푼다: 혼재 저자(claude+kimi)에서 claude 티어를 안다는
@@ -205,7 +213,7 @@ def _bot_reviews_for_head(reviews, head_sha):
     for review in reviews or []:
         if not isinstance(review, dict):
             continue
-        if _normalize_login(review.get("user_login")) != BOT_REVIEWER_LOGIN:
+        if _normalize_login(review.get("user_login")) not in BOT_REVIEWER_LOGINS:
             continue
         if review.get("commit_id") != head_sha:
             continue
@@ -239,7 +247,7 @@ def decide_record(payload) -> dict:
         return {
             **base,
             "reason": "현재 head 와 40자 동등한 유효 마커 없음 "
-            "(저자 필터 OWNER/MEMBER/COLLABORATOR + github-actions[bot] · "
+            "(저자 필터 OWNER/MEMBER/COLLABORATOR + 이 레포 봇 게시분 · "
             "낡은 sha·접두 sha 불인정)",
         }
 
