@@ -58,7 +58,20 @@ const getHandler = async (_req: NextRequest, _session: any, params: any) => {
       workspace_nm: item.workspace?.workspace_nm ?? "",
     }));
 
-    return createSuccessResponse({ authorUsers, allUsers });
+    // 삭제 확인 창이 「이 권한만 가진 사용자」 영향을 말하려면(#356) 각 사용자의 **다른** 권한
+    // 배정까지 세어야 한다 — 이 권한 하나만 있던 사용자는 삭제 순간 권한 0건으로 떨어진다.
+    const userIds = authorMembers.map((m) => m.user_id);
+    const soleAuthorUserCount = userIds.length
+      ? (
+          await prisma.authorMember.groupBy({
+            by: ["user_id"],
+            where: { user_id: { in: userIds } },
+            _count: { author_id: true },
+          })
+        ).filter((row) => row._count.author_id === 1).length
+      : 0;
+
+    return createSuccessResponse({ authorUsers, allUsers, sole_author_user_count: soleAuthorUserCount });
   } catch (error: any) {
     console.error(`[${operation}] Error:`, error);
     return createErrorResponse(error, operation);

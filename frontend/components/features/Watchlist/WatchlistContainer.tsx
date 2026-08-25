@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState } from "react";
 import { SplitPane } from "@/components/shared/Layout/SplitPane";
 import { DataTable } from "@/components/shared/DataTable/DataTable";
 import { MasterPanel } from "@/components/shared/DataPanel/MasterPanel";
-import { DetailPanel } from "@/components/shared/DataPanel/DetailPanel";
+import { DetailPanel, type DeleteConfirmInfo } from "@/components/shared/DataPanel/DetailPanel";
 import WatchlistDetailView from "./WatchlistDetailView";
 import WatchlistDetailForm from "./WatchlistDetailForm";
 import {
@@ -150,6 +150,11 @@ export default function WatchlistContainer() {
     delete: deleteWatchlist,
   };
 
+  // 관심종목 삭제는 연쇄가 없다(단건 DELETE, 실측: watchlist_repository.delete_watchlist) — 대상 이름만 말한다.
+  const buildDeleteConfirm = (data: WatchlistOut): DeleteConfirmInfo => ({
+    target: data.issuer_nm ? `${data.ticker} ${data.issuer_nm}` : data.ticker,
+  });
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0 border-t">
@@ -172,6 +177,7 @@ export default function WatchlistContainer() {
               defaultFormData={{ use_at: "Y" }}
               onComplete={handleCompleteWithRefresh}
               apiService={apiService}
+              deleteConfirm={buildDeleteConfirm}
             />,
           ]}
         </SplitPane>

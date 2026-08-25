@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { LegacyGridColumn } from "@/types/grid";
 import { SplitPane } from "@/components/shared/Layout/SplitPane";
 import { MasterPanel, DetailPanel } from "@/components/shared/DataPanel";
+import type { DeleteConfirmInfo } from "@/components/shared/DataPanel/DetailPanel";
 import { MasterGrid } from "@/components/shared/DataGrid";
 import SchedulerDetailView from "./SchedulerDetailView";
 import SchedulerDetailForm from "./SchedulerDetailForm";
@@ -15,7 +16,9 @@ import {
   updateScheduler,
   deleteScheduler,
   selectHolders,
+  selectSchedulerMembers,
 } from "@/services/scheduler/schedulerService";
+import type { SchedulerOut } from "@/schemas/scheduler/scheduler";
 import { HolderInfo } from "@/schemas/devActivity/devActivity";
 import { useCodeStore } from "@/stores/shared/codeStore";
 import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
@@ -118,6 +121,17 @@ export default function SchedulerContainer() {
     delete: deleteScheduler,
   };
 
+  // 스케줄러 삭제는 구성원 배정까지 지운다(`delete_scheduler` 가 `tn_scheduler_member` 를 먼저
+  // 지우는 트랜잭션) — 이슈 #356 이 짚은 3종엔 없었지만 같은 클래스라 실측해 싣는다.
+  const buildDeleteConfirm = async (data: SchedulerOut): Promise<DeleteConfirmInfo> => {
+    const members = await selectSchedulerMembers(data.scheduler_id);
+    const count = members?.total_count ?? 0;
+    return {
+      target: data.scheduler_nm,
+      cascadeLines: count > 0 ? [`구성원 배정 ${count}건이 함께 삭제됩니다.`] : undefined,
+    };
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0 border-t">
@@ -154,6 +168,7 @@ export default function SchedulerContainer() {
               defaultFormData={{ day_of_week: "mon", hour: 9, minute: 0, period_weeks: 1, use_at: "Y" }}
               onComplete={handleCompleteWithRefresh}
               apiService={apiService}
+              deleteConfirm={buildDeleteConfirm}
             />,
           ]}
         </SplitPane>

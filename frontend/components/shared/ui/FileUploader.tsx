@@ -193,7 +193,7 @@ export const FileUploader = forwardRef<FileUploaderRef, Props>(
     );
 
     const handleDeleteFile = useCallback((file: FileDetail) => {
-      showMessage("삭제 확인", <div>파일을 삭제하시겠습니까?</div>, {
+      showMessage("삭제 확인", <div>삭제 대상: {file.orignl_file_nm}</div>, {
         type: "confirm",
         confirmText: "삭제",
         cancelText: "취소",

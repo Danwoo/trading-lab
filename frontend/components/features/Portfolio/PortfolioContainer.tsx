@@ -3,6 +3,7 @@
 import type { LegacyGridColumn } from "@/types/grid";
 import { SplitPane } from "@/components/shared/Layout/SplitPane";
 import { MasterPanel, DetailPanel } from "@/components/shared/DataPanel";
+import type { DeleteConfirmInfo } from "@/components/shared/DataPanel/DetailPanel";
 import { MasterGrid } from "@/components/shared/DataGrid";
 import PortfolioDetailView from "./PortfolioDetailView";
 import PortfolioDetailForm from "./PortfolioDetailForm";
@@ -12,7 +13,9 @@ import {
   createPortfolio,
   updatePortfolio,
   deletePortfolio,
+  selectHoldingList,
 } from "@/services/portfolio/portfolioService";
+import type { PortfolioOut } from "@/schemas/portfolio/portfolio";
 import { useCodeStore } from "@/stores/shared/codeStore";
 import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
 import { useExcelExport } from "@/hooks/shared/useExcelExport";
@@ -85,6 +88,17 @@ export default function PortfolioContainer() {
     delete: deletePortfolio,
   };
 
+  // 포트폴리오 삭제는 보유종목까지 지운다(`delete_portfolio` 가 `tn_holding` 을 먼저 지우는
+  // 트랜잭션) — 이슈 #356 이 짚은 3종엔 없었지만 같은 클래스라 실측해 싣는다.
+  const buildDeleteConfirm = async (data: PortfolioOut): Promise<DeleteConfirmInfo> => {
+    const holdings = await selectHoldingList({ portfolio_id: data.portfolio_id }, { throwOnFailure: true });
+    const count = holdings?.total_count ?? 0;
+    return {
+      target: data.portfolio_nm,
+      cascadeLines: count > 0 ? [`보유종목 ${count}건이 함께 삭제됩니다.`] : undefined,
+    };
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0 border-t">
@@ -114,6 +128,7 @@ export default function PortfolioContainer() {
               defaultFormData={{ use_at: "Y", sort_ordr: 1 }}
               onComplete={handleCompleteWithRefresh}
               apiService={apiService}
+              deleteConfirm={buildDeleteConfirm}
             />,
           ]}
         </SplitPane>

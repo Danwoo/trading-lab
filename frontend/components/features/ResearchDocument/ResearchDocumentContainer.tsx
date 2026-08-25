@@ -3,6 +3,7 @@
 import type { LegacyGridColumn } from "@/types/grid";
 import { SplitPane } from "@/components/shared/Layout/SplitPane";
 import { MasterPanel, DetailPanel } from "@/components/shared/DataPanel";
+import type { DeleteConfirmInfo } from "@/components/shared/DataPanel/DetailPanel";
 import { MasterGrid } from "@/components/shared/DataGrid";
 import ResearchDocumentDetailView from "./ResearchDocumentDetailView";
 import ResearchDocumentDetailForm from "./ResearchDocumentDetailForm";
@@ -12,7 +13,7 @@ import {
   createResearchDocument,
   deleteResearchDocument,
 } from "@/services/researchDocument/researchDocumentService";
-import { getResearchDocumentStatusLabel } from "@/schemas/researchDocument/researchDocument";
+import { getResearchDocumentStatusLabel, type ResearchDocumentOut } from "@/schemas/researchDocument/researchDocument";
 import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
 import { useExcelExport } from "@/hooks/shared/useExcelExport";
 import { useMasterGridActions } from "@/hooks/shared/useMasterGridActions";
@@ -67,6 +68,11 @@ export default function ResearchDocumentContainer() {
     delete: deleteResearchDocument,
   };
 
+  // 삭제는 연쇄가 없다(단건 DELETE, 실측: research_document_repository.delete_research_document) — 대상 이름만 말한다.
+  const buildDeleteConfirm = (data: ResearchDocumentOut): DeleteConfirmInfo => ({
+    target: data.doc_title,
+  });
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0 border-t">
@@ -90,6 +96,7 @@ export default function ResearchDocumentContainer() {
               FormComponent={ResearchDocumentDetailForm}
               onComplete={handleCompleteWithRefresh}
               apiService={apiService}
+              deleteConfirm={buildDeleteConfirm}
             />,
           ]}
         </SplitPane>

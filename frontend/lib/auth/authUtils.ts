@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma/client";
 import { Prisma } from "@/prisma/generated/client";
 import { PERSONAL_WORKSPACE_DEFAULT_MENU_IDS, SYS_ADMIN_AUTHOR_ID } from "@/constants/protected";
+import type { UserDeleteCascadeOut } from "@/schemas/common/adminUser";
 
 export { hashPassword } from "better-auth/crypto";
 
@@ -199,6 +200,82 @@ export const AUDIT_ANONYMIZED_TABLES = [
 export const deletedUserAuditId = (userId: string) => `deleted-user-${userId}`;
 
 /**
+ * 사용자가 **소유(owner)한 개인 워크스페이스** — 탈퇴·관리자 삭제가 통째로 지우는 단위다.
+ * 지우는 쪽(`deleteUserCascade`)과 세는 쪽(`countUserCascade`)이 같은 술어를 써야 확인 창이
+ * 말한 것과 실제로 지워지는 것이 갈리지 않는다.
+ */
+async function findOwnedPersonalWorkspaces(userId: string): Promise<{ id: number; workspace_nm: string }[]> {
+  const members = await prisma.workspaceMember.findMany({
+    where: { user_id: userId, role: "owner", workspace: { is_personal: true } },
+    select: { workspace: { select: { id: true, workspace_nm: true } } },
+  });
+  return members.map((m) => m.workspace);
+}
+
+/**
+ * `deleteUserCascade` 가 지울 것을 **지우기 전에 같은 술어로 센다** — 관리자의 삭제 확인 창이
+ * 「무엇이 몇 건 함께 지워지는가」를 짐작이 아니라 지금 DB 값으로 말하기 위해서다 (#356).
+ *
+ * DB 의 FK 는 `tn_user` 를 가리키는 4건(`ba_account`·`ba_session`·`tn_author_member`·
+ * `tn_workspace_member`)이 전부 `RESTRICT` 고 `public` 테이블은 `tn_workspace` 와 스키마가
+ * 달라 FK 자체가 없다 — 즉 DB 가 스스로 연쇄하는 것은 없고, 지워지는 범위는 위 삭제 함수가
+ * 명시적으로 지우는 것이 전부다. 그래서 세는 축도 그 함수의 술어를 그대로 따른다:
+ * 사용자 축(이메일·`tn_user.id`)과 워크스페이스 축(소유 개인 워크스페이스의
+ * `WORKSPACE_SCOPED_PUBLIC_TABLES`). 인증 계정·토큰·워크스페이스 메뉴/도메인은 계정·워크스페이스
+ * 자체의 일부라 따로 세지 않는다.
+ *
+ * 사용자가 없으면 `null` — 부르는 쪽이 「없음」과 「0건」을 가른다.
+ */
+export async function countUserCascade(email: string): Promise<UserDeleteCascadeOut | null> {
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (!user) return null;
+  const ownedWorkspaces = await findOwnedPersonalWorkspaces(user.id);
+  const ownedIds = ownedWorkspaces.map((w) => w.id);
+
+  const [
+    author_member_count,
+    workspace_member_count,
+    session_count,
+    chat_history_count,
+    email_log_count,
+    schedulerRows,
+  ] = await Promise.all([
+    prisma.authorMember.count({ where: { user_id: email } }),
+    prisma.workspaceMember.count({ where: { user_id: user.id } }),
+    prisma.baSession.count({ where: { userId: user.id } }),
+    prisma.aiChatHistory.count({ where: { email } }),
+    prisma.emailLog.count({ where: { to: { equals: email, mode: "insensitive" } } }),
+    // 소유한 개인 워크스페이스 안의 수신 등록은 아래 워크스페이스 축이 세므로 여기서 빼 두 줄이 같은 행을 두 번 말하지 않게 한다.
+    prisma.$queryRaw<
+      { count: number }[]
+    >`SELECT count(*)::int AS count FROM public.tn_scheduler_member WHERE account_id = ${user.id} ${ownedIds.length > 0 ? Prisma.sql`AND workspace_id NOT IN (${Prisma.join(ownedIds)})` : Prisma.empty}`,
+  ]);
+
+  const workspaceEntries =
+    ownedIds.length > 0
+      ? await Promise.all(
+          WORKSPACE_SCOPED_PUBLIC_TABLES.map(async (table) => {
+            const rows = await prisma.$queryRaw<
+              { count: number }[]
+            >`SELECT count(*)::int AS count FROM ${Prisma.raw(`public.${table}`)} WHERE workspace_id IN (${Prisma.join(ownedIds)})`;
+            return [table, rows[0]?.count ?? 0] as const;
+          }),
+        )
+      : [];
+
+  return {
+    author_member_count,
+    workspace_member_count,
+    session_count,
+    chat_history_count,
+    email_log_count,
+    scheduler_member_count: schedulerRows[0]?.count ?? 0,
+    owned_personal_workspaces: ownedWorkspaces,
+    owned_workspace_counts: Object.fromEntries(workspaceEntries),
+  };
+}
+
+/**
  * 사용자와 그에 매달린 행 전부를 지운다 (회원탈퇴·관리자 삭제 공통 경로).
  *
  * `tn_user` 를 참조하는 자식 테이블은 넷이고(`tn_workspace_member`·`ba_session`·`ba_account` 는
@@ -277,14 +354,7 @@ export const deletedUserAuditId = (userId: string) => `deleted-user-${userId}`;
  */
 export async function deleteUserCascade(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-  const ownedWorkspaceIds = user
-    ? (
-        await prisma.workspaceMember.findMany({
-          where: { user_id: user.id, role: "owner", workspace: { is_personal: true } },
-          select: { workspace_id: true },
-        })
-      ).map((m) => m.workspace_id)
-    : [];
+  const ownedWorkspaceIds = user ? (await findOwnedPersonalWorkspaces(user.id)).map((w) => w.id) : [];
 
   const results = await prisma.$transaction([
     prisma.authorMember.deleteMany({ where: { user_id: email } }),

@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import type { LegacyGridColumn } from "@/types/grid";
 import { SplitPane } from "@/components/shared/Layout/SplitPane";
 import { MasterPanel, DetailPanel } from "@/components/shared/DataPanel";
+import type { DeleteConfirmInfo } from "@/components/shared/DataPanel/DetailPanel";
 import { MasterGrid } from "@/components/shared/DataGrid";
 import MenuDetailView from "./MenuDetailView";
 import MenuDetailForm from "./MenuDetailForm";
@@ -15,7 +16,9 @@ import {
   updateMenu,
   deleteMenu,
   selectMenuParentOptions,
+  selectMenuAuthors,
 } from "@/services/common/menuService";
+import type { MenuOut } from "@/schemas/common/menu";
 import { useMasterGridData } from "@/hooks/shared/useMasterGridData";
 import { useExcelExport } from "@/hooks/shared/useExcelExport";
 import { useMasterGridActions } from "@/hooks/shared/useMasterGridActions";
@@ -90,6 +93,16 @@ export default function MenuContainer() {
     delete: deleteMenu,
   };
 
+  // 이 메뉴에 걸린 권한 매핑 건수 — 삭제가 `authorMenu.deleteMany` 로 지우는 것과 같은 조회다.
+  const buildDeleteConfirm = async (data: MenuOut): Promise<DeleteConfirmInfo> => {
+    const authorsResult = await selectMenuAuthors(data.menu_id);
+    const count = authorsResult?.total_count ?? 0;
+    return {
+      target: `${data.menu_nm} (${data.menu_id})`,
+      cascadeLines: count > 0 ? [`권한 매핑 ${count}건이 함께 삭제됩니다.`] : undefined,
+    };
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 min-h-0 border-t">
@@ -115,6 +128,7 @@ export default function MenuContainer() {
               defaultFormData={{ use_at: "Y", sort_ordr: 1 }}
               onComplete={handleCompleteWithRefresh}
               apiService={apiService}
+              deleteConfirm={buildDeleteConfirm}
             />,
           ]}
         </SplitPane>

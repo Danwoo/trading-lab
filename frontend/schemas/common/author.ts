@@ -33,6 +33,8 @@ export interface AuthorOptionsOut {
 export interface AuthorUsersOut {
   authorUsers: { author_id: string; user_id: string; user_nm: string; use_at: string; appr_at: string }[];
   allUsers: { user_id: string; user_nm: string; use_at: string; appr_at: string }[];
+  /** 이 권한만 갖고 있어(다른 권한 0건) 삭제 시 권한 0건으로 떨어지는 사용자 수 (#356). */
+  sole_author_user_count?: number;
 }
 
 export interface AuthorMenusOut {
