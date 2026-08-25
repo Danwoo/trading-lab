@@ -62,7 +62,7 @@ jobs:
   #   · alembic-drift — 유일하게 `alembic_version` 을 쓰고, **빈 DB** 와 **frontend 스키마
   #     부재**를 전제로 한다(`ALEMBIC_ALLOW_MISSING_FRONTEND_SCHEMA=1`). 같은 DB 를 쓰면
   #     서로 덮어써 #179 를 CI 가 그대로 재현하고, 그 선언도 거짓이 된다. 그래서 같은 서비스
-  #     컨테이너 안에 **별도 데이터베이스 `ci_alembic`** 을 만들어 거기서만 돈다.
+  #     컨테이너 안에 **별도 데이터베이스 `alembic_verify_scratch`** 을 만들어 거기서만 돈다.
   backend:
     name: "test: backend"
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
@@ -304,9 +304,11 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         run: uv run python scripts/verify_frontend_fk_referential_actions.py --i-know-this-drops-tables
 
-      # alembic 전용 데이터베이스 — 위 backend-db 스텝들이 `ci` 를 DROP·재생성하며 쓰므로
-      # 드리프트 검사는 **빈 DB** 를 따로 받아야 한다 (잡 머리 「격리 근거」).
-      - name: alembic 전용 빈 DB 생성 (ci_alembic)
+      # alembic 전용 데이터베이스 — 위 DB 스텝들이 `ci` 를 DROP·재생성하며 쓰므로 드리프트
+      # 검사는 **빈 DB** 를 따로 받아야 한다 (잡 머리 「격리 근거」).
+      # 이름이 `_verify_scratch` 로 끝나는 이유: 파괴적 스크립트들이 대상 DB 이름을 화이트리스트
+      # (`ci` 또는 `_verify_scratch` 접미사)로 막는다 — 개발·운영 DB 를 겨눈 실행을 막는 가드다.
+      - name: alembic 전용 빈 DB 생성 (alembic_verify_scratch)
         id: alembic_db
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         working-directory: backend-service
@@ -315,9 +317,9 @@ jobs:
           import psycopg
 
           with psycopg.connect("postgresql://ci:ci@localhost:5432/postgres", autocommit=True) as conn:
-              conn.execute("DROP DATABASE IF EXISTS ci_alembic")
-              conn.execute("CREATE DATABASE ci_alembic")
-          print("ci_alembic 생성")
+              conn.execute("DROP DATABASE IF EXISTS alembic_verify_scratch")
+              conn.execute("CREATE DATABASE alembic_verify_scratch")
+          print("alembic_verify_scratch 생성")
           PY
 
       - name: Apply migrations to empty DB
@@ -325,7 +327,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' && steps.alembic_db.outcome == 'success' }}
         working-directory: backend-service/alembic
         env:
-          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci_alembic
+          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/alembic_verify_scratch
           ALEMBIC_ALLOW_MISSING_FRONTEND_SCHEMA: "1"
         run: uv run python -m alembic upgrade head
 
@@ -337,7 +339,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' && steps.alembic_upgrade.outcome == 'success' }}
         working-directory: backend-service/alembic
         env:
-          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci_alembic
+          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/alembic_verify_scratch
           ALEMBIC_ALLOW_MISSING_FRONTEND_SCHEMA: "1"
         run: |
           uv run python -m alembic check || {
@@ -353,7 +355,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' && steps.alembic_upgrade.outcome == 'success' }}
         working-directory: backend-service
         env:
-          BOT_ROUND_TRIP_DB_URL: postgresql://ci:ci@localhost:5432/ci_alembic
+          BOT_ROUND_TRIP_DB_URL: postgresql://ci:ci@localhost:5432/alembic_verify_scratch
         run: uv run python scripts/verify_bot_round_trip.py --i-know-this-drops-tables
 
       # 스키마 판 가드(#311) — 여기가 유일하게 "한 판 되돌린 실제 DB" 를 만들 수 있는 자리다.
@@ -363,7 +365,7 @@ jobs:
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' && steps.alembic_upgrade.outcome == 'success' }}
         working-directory: backend-service
         env:
-          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci_alembic
+          ALEMBIC_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/alembic_verify_scratch
           ALEMBIC_ALLOW_MISSING_FRONTEND_SCHEMA: "1"
         run: uv run python scripts/verify_schema_guard_on_downgraded_db.py --i-know-this-downgrades-schema
 
@@ -466,6 +468,8 @@ jobs:
 
       - name: 경로 판정
         id: paths
+        # 이 잡의 `defaults` 는 `frontend` 다 — 판정부는 레포 루트의 스크립트라 루트에서 돈다.
+        working-directory: .
         env:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
