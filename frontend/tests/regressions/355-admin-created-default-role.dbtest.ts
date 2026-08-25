@@ -217,18 +217,16 @@ describe("#355 관리자가 만든 계정의 기본 권한 — 실제 라우트 
     scenarios++;
   });
 
-  it("같은 값으로 다시 저장해도 권한이 중복으로 붙지 않는다", async () => {
+  it("이미 권한이 있는 계정의 승인을 내렸다 올려도 권한이 중복으로 붙지 않는다", async () => {
     await ensureAuthors();
     const sharedId = await makeWorkspace(false);
     const email = await createViaAdmin(sharedId, "Y");
-    const [req, ctx] = putRequest(email, {
-      name: "355-probe",
-      dept: "조사",
-      workspace_id: sharedId,
-      use_at: "Y",
-      appr_at: "Y",
-    });
-    expect((await PUT(req, ctx)).status).toBe(200);
+    const body = { name: "355-probe", dept: "조사", workspace_id: sharedId, use_at: "Y" };
+
+    // 승인을 내렸다 다시 올리면 부여 블록에 두 번째로 들어간다 — 「이미 있나」를 안 세면 PK 위반으로 500 이다.
+    expect((await PUT(...putRequest(email, { ...body, appr_at: "N" }))).status).toBe(200);
+    const res = await PUT(...putRequest(email, { ...body, appr_at: "Y" }));
+    expect(res.status, `재승인 PUT 이 200 이 아니다: ${await res.clone().text()}`).toBe(200);
     expect(await rolesOf(email)).toEqual([GUEST_AUTHOR_ID]);
     scenarios++;
   });
