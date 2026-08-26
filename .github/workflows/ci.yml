@@ -276,7 +276,7 @@ jobs:
       - name: timestamptz USING 술어 검증 (기원별 해석·되돌리기)
         if: ${{ !cancelled() }}
         env:
-          TIMESTAMPTZ_USING_TEST_DB_URL: postgresql://ci:ci@localhost:5432/ci
+          TIMESTAMPTZ_USING_TEST_DB_URL: "postgresql://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci"
         run: |
           out=$(uv run python scripts/verify_timestamptz_using.py --i-know-this-drops-tables)
           echo "$out"
@@ -290,7 +290,7 @@ jobs:
       - name: 세션 타임존 기동 가드 검증
         if: ${{ !cancelled() }}
         env:
-          SESSION_TIMEZONE_TEST_DB_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+          SESSION_TIMEZONE_TEST_DB_URL: "postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci"
         run: |
           out=$(uv run python scripts/verify_session_timezone_guard.py)
           echo "$out"
