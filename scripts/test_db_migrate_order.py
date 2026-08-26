@@ -54,10 +54,35 @@ CASES: list[tuple[str, str, int, int, bool]] = [
 
 
 def db_migrate_command() -> str:
-    import yaml
+    """`processes: db-migrate: command: |` 블록을 그대로 꺼낸다.
 
-    data = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
-    command = data["processes"]["db-migrate"]["command"]
+    **stdlib 만 쓴다** — 이 레포의 루트 `scripts/*.py` 는 의존성 없이 어디서든 돌아야 한다
+    (러너의 맨 `python3` 에는 PyYAML 이 없다). 블록 스칼라 하나를 읽는 데 파서가 필요하지도
+    않고, 파일 모양이 바뀌면 아래 가드가 시끄럽게 실패한다.
+    """
+    lines = COMPOSE.read_text(encoding="utf-8").splitlines()
+    try:
+        head = next(i for i, ln in enumerate(lines) if ln.rstrip() == "  db-migrate:")
+    except StopIteration:
+        raise SystemExit("::error::process-compose.yaml 에서 `db-migrate:` 를 못 찾았다(fail-closed)") from None
+
+    body: list[str] | None = None
+    for i in range(head + 1, len(lines)):
+        line = lines[i]
+        if line.strip() and not line.startswith("    "):
+            break  # db-migrate 블록이 끝났다
+        if line.rstrip() == "    command: |":
+            block, indent = [], "      "
+            for raw in lines[i + 1 :]:
+                if raw.strip() and not raw.startswith(indent):
+                    break
+                block.append(raw[len(indent) :] if raw.startswith(indent) else "")
+            body = block
+            break
+    if body is None:
+        raise SystemExit("::error::db-migrate 의 `command: |` 블록을 못 찾았다(fail-closed)")
+
+    command = "\n".join(body).rstrip("\n") + "\n"
     if "frontend_schema_present.py" not in command:
         raise SystemExit(
             "::error::db-migrate 명령에서 스키마 판정 프로브를 못 찾았다 — "
