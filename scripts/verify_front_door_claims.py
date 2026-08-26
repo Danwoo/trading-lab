@@ -21,7 +21,7 @@ D. **코드가 거짓으로 만드는 문구** — 아래 `FALSIFIED` 의 각 �
    거짓」이라는 쌍이다. 증거는 매번 코드에서 계산한다(#329 ①②⑤⑦).
 E. **정문이 이름으로 부르는 CI 잡** — README 가 백틱으로 인용한 `` `test: …` `` 잡 이름은
    워크플로에 실재해야 한다. 잡을 통합·개명하면 정문이 조용히 낡는다 (실측 2026-08-25:
-   `test: repo-lint` 를 `test: repo` 라고 적은 문장이 리뷰에서 잡혔다 — 그때 이 축이 없었다).
+   `test: repo` 를 `test: repo` 라고 적은 문장이 리뷰에서 잡혔다 — 그때 이 축이 없었다).
 
 ## 무엇을 못 잡나 (정직하게)
 
@@ -63,7 +63,7 @@ PC_PORT_RE = re.compile(r"^\s+PORT:\s*(\d+)\s*$", re.M)
 #: "The last three aren't in `process-compose.yaml`"
 LAST_N_RE = re.compile(r"The last (one|two|three|four|five|six) (?:aren't|isn't) in `process-compose\.yaml`")
 WORD_TO_INT = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
-#: README 가 백틱으로 부르는 CI 잡 이름 — `` `test: repo-lint` `` 처럼.
+#: README 가 백틱으로 부르는 CI 잡 이름 — `` `test: repo` `` 처럼.
 README_TEST_JOB_RE = re.compile(r"`(test: [a-z0-9-]+)`")
 #: 워크플로 잡의 `name: "test: …"` (홑·겹따옴표·맨따옴표 전부)
 WORKFLOW_JOB_NAME_RE = re.compile(r'^\s{4}name:\s*["\']?(test: [^"\'\n]+?)["\']?\s*$', re.M)

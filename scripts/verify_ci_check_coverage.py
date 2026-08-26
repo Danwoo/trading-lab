@@ -94,7 +94,7 @@ INVENTORY_AXES: list[tuple[str, str, int]] = [
     # 있었지만 **인벤토리에는 없었다** — 배선을 지워도 이 검사가 초록이었다는 뜻이다. 서비스
     # 쪽 `*/tests` 축이 있는데 루트만 비어 있던 자리이고, 이 스크립트가 막으려는 바로 그
     # 클래스라 채운다 (#23 Task 2).
-    ("scripts", "test_*.py", 13),
+    ("scripts", "test_*.py", 14),
     ("*/tests", "test_*.py", 35),  # 서비스별 standalone 테스트 (#335)
     ("frontend/scripts", "check-*.js", 5),  # frontend 정적 스캔
     ("frontend/scripts", "generate-*.js", 1),  # 생성물 재현 대조 (--check 모드, #361)
@@ -106,8 +106,12 @@ INVENTORY_AXES: list[tuple[str, str, int]] = [
 ]
 
 # 파일 하나로 환원되지 않는 검사. 워크플로 어딘가에 이 문자열이 있어야 한다.
+# `ruff check app/` 은 여기 없다 (2026-08-25). 서비스 잡의 그 스텝은 `test: repo` 의
+# `verify_python_format.py` 가 `git ls-files` 의 `*.py` **전수**에 같은 검사를 거는 것의
+# 진부분집합이었다 — ruff 는 파일마다 최근접 `pyproject.toml` 을 읽으므로 서비스 설정이
+# 그대로 적용된다. 유일하게 남던 차이(훅 rev 0.15.13 vs 서비스 잠금 0.16.x)는 훅 rev 를
+# 0.16.4 로 올려 없앴고, 레포 전체가 그 판에서 `All checks passed!` 다.
 NAMED_COMMANDS: dict[str, str] = {
-    "ruff check app/": "multi-agent-service 파이썬 린트",
     "alembic check": "모델 ↔ 마이그레이션 드리프트 (#185)",
     "npm test": "frontend vitest 단위 테스트",
     "npm run test:api-regressions": "frontend 실제 라우트 핸들러 회귀 (#337)",
@@ -129,7 +133,7 @@ PRECOMMIT_PARITY: dict[str, tuple[str, str]] = {
     ),
     "gitleaks": (
         "detect --no-git --redact --source .",
-        "repo-scans.yml `test: repo-lint` 이 훅과 같은 버전으로 트리 전수를 스캔한다.",
+        "ci.yml `test: repo` 이 훅과 같은 버전으로 트리 전수를 스캔한다.",
     ),
     "ruff-check": (
         "scripts/verify_python_format.py",
@@ -139,16 +143,16 @@ PRECOMMIT_PARITY: dict[str, tuple[str, str]] = {
         "scripts/verify_python_format.py",
         "CI 에 `ruff format` 이 아예 없던 자리 — 이 스크립트가 레포 전수로 본다.",
     ),
-    "eslint": ("npx eslint .", "frontend-ci.yml `test: frontend` (--fix 없이, #265)."),
-    "tsc": ("npx tsc --noEmit", "frontend-ci.yml `test: frontend` (#265)."),
+    "eslint": ("npx eslint .", "ci.yml `test: frontend` (--fix 없이, #265)."),
+    "tsc": ("npx tsc --noEmit", "ci.yml `test: frontend` (#265)."),
     "backend-claude-md": (
         "scripts/verify_backend_claude_md.py",
-        "ci.yml `test: repo-contracts`.",
+        "ci.yml `test: backend`.",
     ),
-    "vitest": ("npm test", "frontend-ci.yml `test: frontend`."),
+    "vitest": ("npm test", "ci.yml `test: frontend`."),
     "mcp-lockstep": (
         "multi-agent-service/scripts/verify_mcp_lockstep.py",
-        "ci.yml `test: multi-agent` 의 run_verify_scripts.py 스위트에 포함된다.",
+        "ci.yml `test: backend` 의 run_verify_scripts.py 스위트에 포함된다.",
     ),
 }
 

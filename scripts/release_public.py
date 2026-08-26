@@ -95,7 +95,7 @@ tar 로 뱉는다 — `.git` 도, 히스토리도, gitignore 대상도, 워킹�
 ## CI 판단 (리드 결정 「전부 넣는다」를 따르되, 판단은 적는다)
 
 워크플로를 **제외하지 않는다** — 리드 결정이 「전부 넣는다」이고, 빌드·테스트 워크플로
-(`ci.yml`·`frontend-ci.yml`·`repo-scans.yml`)는 공개본에서도 그대로 값이 있다. 다만 하네스
+(`ci.yml`)는 공개본에서도 그대로 값이 있다. 다만 하네스
 자동화 워크플로(`cross-review`·`plan`·`review-record`·`merge-delegate`·
 `orphaned-branch-scan`)는 **시크릿·라벨·프로젝트 보드·self-hosted 러너를 새 레포에
 다시 붙이기 전까지** 실패하거나 아무 일도 하지 않는다 (붙이는 절차는 이사 런북 §5).

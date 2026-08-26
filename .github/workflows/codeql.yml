@@ -1,0 +1,70 @@
+name: CodeQL
+
+# CodeQL 을 **워크플로로** 돌린다 (2026-08-25 — default setup 을 껐다).
+#
+# ── 왜 옮겼나 ────────────────────────────────────────────────────────────
+# default setup 은 설정이 `weekly` 인데도 **PR·push 마다** 분석을 돌렸다 (12일 표본에서 run 의
+# 12.9%, GitHub-hosted 1,908분). 그 분석이 PR 을 막지도 않는다 — 경보는 Security 탭의
+# alerts 로 나가고 체크는 12일 내내 실패 0이었다. private 로 가면 그 분만 청구된다.
+# 워크플로로 옮기면 **언제 도는지를 우리가 정한다**: main 에 들어온 코드와 주 1회 전수.
+#
+# ── 언어 5종 → 3종 ──────────────────────────────────────────────────────
+# default setup 의 `javascript`·`typescript`·`javascript-typescript` 는 GitHub 이 하나로 접어
+# 실제로는 3잡이 돌았다. 표기만 정직하게 줄인다 — 분석 범위는 그대로다.
+#
+# ⚠ **PR 에서는 안 돈다.** 그 대가는 「main 에 들어간 뒤에야 경보가 뜬다」이고, 받아들이는
+# 근거는 위 실측이다(12일간 이 체크가 PR 을 막은 적이 없다). 되돌리려면 아래 `on:` 에
+# `pull_request:` 를 더하면 된다.
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 주 1회 전수 — default setup 의 `weekly` 를 그대로 옮긴 것이다.
+    - cron: "23 19 * * 0"
+  workflow_dispatch: {}
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  analyze:
+    name: "CodeQL: ${{ matrix.language }}"
+    # **주기별로 러너가 갈린다.**
+    #   · `schedule`(주 1회) → 언제나 GitHub-hosted. 이 레포의 self-hosted 러너는 WSL 위라
+    #     호스트가 자면 얼어 있는데, 보안 스캔이 그렇게 조용히 멎으면 안 된다. 주 1회 × 3잡이라
+    #     hosted 비용은 월 15분 안쪽이다 — 이 한 줄이 보증이다.
+    #   · 그 밖(`push: main`·수동) → `CI_RUNNER`. main push 는 실측 하루 14회라(2026-08-13~25
+    #     100커밋/7일) hosted 로 두면 3잡 × 1분 올림 = 월 1,200분대가 되어 무료 한도의 60% 를
+    #     먹는다. 잦은 쪽을 self-hosted 로 보내고, 얼어서 놓친 것은 주 1회 hosted 가 줍는다.
+    runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    permissions:
+      security-events: write   # 경보 업로드
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, javascript-typescript, python]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # default setup 과 같은 설정을 그대로 옮긴다 — `query_suite: default` 이므로
+          # `queries:` 를 안 준다(주면 default 가 아니라 그 묶음이 된다), `threat_model: remote`
+          # 는 config 로 옮긴다. 실측 원문:
+          #   {"state":"configured","query_suite":"default","threat_model":"remote","schedule":"weekly"}
+          config: |
+            threat-models: remote
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

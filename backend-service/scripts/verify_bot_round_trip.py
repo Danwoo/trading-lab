@@ -5,7 +5,7 @@
 `CAST(:params AS jsonb)` 처럼 **DB 에 닿기 전엔 아무도 틀렸다고 말해 주지 않는 자리**가 이
 모듈의 실질 위험이라, 레포지토리를 그대로 태워 왕복시킨다.
 
-전제: `alembic upgrade head` 로 `public` 스키마가 서 있는 DB. CI 의 `test: alembic-drift` 잡이
+전제: `alembic upgrade head` 로 `public` 스키마가 서 있는 DB. CI 의 `test: backend` 잡이
 바로 그 상태를 만든다 — 그래서 이 스크립트는 그 잡에 붙는다.
 
 실행: `uv run python scripts/verify_bot_round_trip.py --i-know-this-drops-tables` (cwd=backend-service).

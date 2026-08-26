@@ -189,6 +189,22 @@
 #     조용히 막힌다. 티어는 코멘트 첫 줄·라벨로만 드러낸다.
 #     고위험은 폴백 여부와 무관하게 종전대로 사람 머지 경로다.
 #
+# 승인 신원의 승계 (2026-08-25 실측 — 이 설계가 교착을 안 만드는 이유):
+#   GitHub 의 `reviewDecision` 은 **저자별 마지막 리뷰**로 계산된다. 그래서 같은 App 이
+#   `CHANGES_REQUESTED` 를 남긴 뒤 다음 head 에서 `APPROVE` 를 게시하면 그것이 덧써져
+#   「수정 필요 → 고침 → 승인」이 사람 개입 없이 돈다. 판정부가 그 성질을 지킨다 —
+#   `decide_record` 는 **같은 상태**의 봇 리뷰가 이미 있을 때만 생략하고, 상태가 다르면 낸다
+#   (`scripts/test_review_record.py` 의 「신원 승계」 케이스 4건이 못박는다).
+#   ⚠ **신원이 갈리면 승계가 안 된다.** 옛 `github-actions[bot]` 이 남긴 수정 요청은 App 이
+#   덧쓸 수 없다 — 저자가 다르면 GitHub 은 둘을 별개로 세기 때문이다. 이관 이행기에 실제로
+#   그 상태가 한 번 생겼고 사람이 그 리뷰를 해제했다. **머지 뒤에는 양쪽이 다 App 신원이라
+#   이 조치가 다시 필요하지 않다.**
+#   ⚠ **남는 교착 하나**: 판정이 `unable` 이면 리뷰를 아예 안 낸다(낼 판정이 없다). 앞 head 의
+#   `CHANGES_REQUESTED` 가 그대로 살아 머지를 막는데 새 판정이 안 오는 상태다. 출구는 둘 —
+#   리뷰를 다시 돌려 판정을 받거나, 사람이 그 리뷰를 해제한다. ruleset 의
+#   `dismiss_stale_reviews_on_push` 를 켜면 이 클래스가 통째로 닫히지만 그건 리드 결정이다
+#   (지금은 `false`).
+#
 # 재리뷰 규칙 (synchronize): push → concurrency 가 낡은 run 을 취소하고 새 head 로 재리뷰.
 #   판정 게시는 판정 SHA == 현재 head 일 때만 한다. reopened 도 재리뷰가 돌아 수렴한다.
 #   ⚠ **push 시 자동 머지 disarm 잡은 없앴다** (옛 review-record 의 `merge: disarm`).
@@ -2218,12 +2234,16 @@ jobs:
 
           # ① required 게이트 초록까지 재조회 — 판정 코멘트는 게이트보다 먼저 올 수 있다.
           #   상한을 넘기면 --final 로 미완을 실패로 접는다 (fail-closed).
-          # 게이트 대기 상한 600초 — 옛 기록기는 1200초였다. 여기서는 self-hosted 러너를 그만큼
-          # 붙들면 뒤따르는 테스트 잡이 러너를 못 얻는 교착 표면이 생겨 절반으로 줄인다.
+          # 게이트 대기 상한 300초 — 옛 기록기는 1200초였다. **이 잡은 self-hosted 러너를
+          # 붙들고 기다린다**: 테스트 잡도 같은 풀(`CI_RUNNER`)을 쓰므로, 오래 기다릴수록
+          # 그 잡들이 러너를 못 얻는다. 러너 2대 기준 실측 — PR 하나면 리뷰가 1대를 잡고
+          # 테스트 셋이 나머지 1대에서 직렬로 약 5.7분에 끝나므로(repo 39초 · backend 2분39초 ·
+          # frontend 2분23초) 리뷰가 arm 에 닿을 때는 이미 초록이다. PR 이 둘이면 리뷰 둘이
+          # 양쪽을 잡아 테스트가 못 뜨는데, 그때 짧게 포기하는 편이 빨리 풀린다.
           # 상한을 넘겨도 PR 이 굳지는 않는다 — arm 을 안 할 뿐이고 쓸어담기가 다시 집는다.
           # **리터럴로 둔다** — scripts/verify_upstream_gate.py 의 대기 루프 계약 검사가
           # 이 숫자를 잡 타임아웃과 대조한다 (변수로 빼면 그 그물이 못 읽는다).
-          DEADLINE=$(( $(date +%s) + 600 ))
+          DEADLINE=$(( $(date +%s) + 300 ))
           while :; do
             CHECKS=$(gh api "repos/$REPO/commits/$HEAD/check-runs?per_page=100" --paginate \
                      --jq '.check_runs[] | {id, name, status, conclusion}') || CHECKS=""

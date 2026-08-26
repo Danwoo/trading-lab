@@ -18,7 +18,7 @@
 
 **루트 `scripts/` 에 사는 이유**: 입력이 프론트와 백엔드에 걸쳐 있다. 경로 필터가 있는
 워크플로에 두면 이 그물이 지켜야 할 바로 그 PR 클래스(프론트만 바뀐 PR)에서 skip 된다 (#331).
-경로 필터 없이 도는 `repo-scans.yml` 의 `test: repo-scan` 잡이 실행한다.
+경로 필터 없이 도는 `ci.yml` 의 `test: repo` 잡이 실행한다.
 
 실행: `python3 scripts/verify_capability_kind_lockstep.py`
 """

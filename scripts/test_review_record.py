@@ -151,6 +151,47 @@ RECORD_CASES = [
         },
         {"post_review": False, "arm_candidate": True},
     ),
+    # ── 신원 승계 — 「수정 필요 → 고침 → 승인」이 교착 없이 도는가 (2026-08-25) ──────
+    # GitHub 의 `reviewDecision` 은 **저자별 마지막 리뷰**로 계산된다. 그래서 같은 App 이
+    # CHANGES_REQUESTED 를 남긴 뒤 APPROVE 를 덧쓰면 교착이 안 생긴다. 신원이 갈리면
+    # (옛 `github-actions[bot]` ↔ 새 App) 덧쓰기가 안 되고 사람이 해제해야 한다 —
+    # 실제로 이 PR 의 이행기에 한 번 그 조치가 필요했다.
+    (
+        "앞 head 에서 App 이 수정 요청했어도 새 head 의 merge_ok 는 APPROVE 를 덧쓴다",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker())],
+            "existing_reviews": [approval(sha=OTHER, state="CHANGES_REQUESTED", login="trading-lab-ci[bot]")],
+        },
+        {"post_review": True, "review_event": "APPROVE", "arm_candidate": True},
+    ),
+    (
+        "같은 head 에 App 수정 요청이 있어도 merge_ok 마커면 APPROVE 로 덧쓴다",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker())],
+            "existing_reviews": [approval(state="CHANGES_REQUESTED", login="trading-lab-ci[bot]")],
+        },
+        {"post_review": True, "review_event": "APPROVE", "arm_candidate": True},
+    ),
+    (
+        "신원이 다른 옛 봇의 수정 요청은 덧써지지 않는다 — 새 App 은 자기 리뷰만 낸다",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker())],
+            "existing_reviews": [approval(sha=OTHER, state="CHANGES_REQUESTED", login="github-actions[bot]")],
+        },
+        {"post_review": True, "review_event": "APPROVE", "arm_candidate": True},
+    ),
+    (
+        "판정 unable → 아무 리뷰도 안 낸다 — 앞 head 의 수정 요청이 그대로 남는다 (교착 출구는 사람)",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker(verdict="unable"))],
+            "existing_reviews": [approval(sha=OTHER, state="CHANGES_REQUESTED", login="trading-lab-ci[bot]")],
+        },
+        {"post_review": False, "review_event": None, "arm_candidate": False},
+    ),
     (
         "비-멤버 사람 코멘트는 봇 축이 열려도 여전히 막힌다  (공격 ①)",
         {
