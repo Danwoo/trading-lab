@@ -270,11 +270,11 @@ jobs:
             *) echo "::error::검사가 실제로 돌지 않았다 — 건너뜀은 통과가 아니다"; exit 1 ;;
           esac
 
-      # 0019 의 `USING` 술어 (#359). alembic-drift 는 **빈 DB** 에 올리므로 값 해석이 한 번도
+      # 0019 의 `USING` 술어 (#359). 아래 「Apply migrations to empty DB」 는 **빈 DB** 에 올리므로 값 해석이 한 번도
       # 실행되지 않는다 — 이 리비전의 위험은 DDL 구문이 아니라 기존 값의 뜻에 있다.
       # 리비전의 SQL 생성 함수를 그대로 import 해 쓰므로 두 벌이 갈리지 않는다.
       - name: timestamptz USING 술어 검증 (기원별 해석·되돌리기)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         env:
           TIMESTAMPTZ_USING_TEST_DB_URL: "postgresql://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci"
         run: |
@@ -288,7 +288,7 @@ jobs:
       # 세션 tz 기동 가드 (#359) — 대역을 끼우면 "옵션이 서버까지 가는가"가 빠지는데 그게 이
       # 가드가 지키는 바로 그것이다. 진짜 커넥션 둘에 태운다.
       - name: 세션 타임존 기동 가드 검증
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         env:
           SESSION_TIMEZONE_TEST_DB_URL: "postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci"
         run: |

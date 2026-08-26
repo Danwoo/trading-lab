@@ -34,7 +34,7 @@ EXEMPT: dict[str, str] = {
     "0019_timestamptz_audit_columns": (
         "전 DB 시각 컬럼 전환(#359) — public·frontend 를 명시 수식해 격리 스키마에서 돌 수 없고, "
         "backtest 테이블을 만들지도 않는다(감사 컬럼의 타입만 바꾼다). "
-        "이 리비전은 alembic-drift(전 체인 + alembic check)와 verify_timestamptz_using.py 가 본다"
+        "이 리비전은 빈 DB 전 체인 + alembic check 와 verify_timestamptz_using.py 가 본다"
     ),
 }
 
