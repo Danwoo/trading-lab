@@ -116,6 +116,83 @@ RECORD_CASES = [
         {"post_review": False, "arm_candidate": False},
     ),
     (
+        "승인 App(trading-lab-ci[bot]) 게시분도 읽힌다 — 승인 신원이 둘이다 (2026-08-25)",
+        {
+            "head_sha": HEAD,
+            "comments": [bot_comment(marker(), login="trading-lab-ci[bot]")],
+            "existing_reviews": [],
+        },
+        {"post_review": True, "review_event": "APPROVE", "arm_candidate": True},
+    ),
+    (
+        "승인 App 사칭 — 로그인 유사(trading-lab-ci-bot[bot]) → 무행동  (공격 ⑦)",
+        {
+            "head_sha": HEAD,
+            "comments": [bot_comment(marker(), login="trading-lab-ci-bot[bot]")],
+            "existing_reviews": [],
+        },
+        {"post_review": False, "arm_candidate": False, "marker_sha": None},
+    ),
+    (
+        "승인 App 사칭 — 로그인은 맞는데 타입이 User → 무행동  (공격 ⑦)",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker(), association="NONE", login="trading-lab-ci", user_type="User")],
+            "existing_reviews": [],
+        },
+        {"post_review": False, "arm_candidate": False, "marker_sha": None},
+    ),
+    (
+        "App 승인이 이미 같은 head 에 있으면 중복 게시하지 않는다 (멱등)",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker())],
+            "existing_reviews": [approval(login="trading-lab-ci[bot]")],
+        },
+        {"post_review": False, "arm_candidate": True},
+    ),
+    # ── 신원 승계 — 「수정 필요 → 고침 → 승인」이 교착 없이 도는가 (2026-08-25) ──────
+    # GitHub 의 `reviewDecision` 은 **저자별 마지막 리뷰**로 계산된다. 그래서 같은 App 이
+    # CHANGES_REQUESTED 를 남긴 뒤 APPROVE 를 덧쓰면 교착이 안 생긴다. 신원이 갈리면
+    # (옛 `github-actions[bot]` ↔ 새 App) 덧쓰기가 안 되고 사람이 해제해야 한다 —
+    # 실제로 이 PR 의 이행기에 한 번 그 조치가 필요했다.
+    (
+        "앞 head 에서 App 이 수정 요청했어도 새 head 의 merge_ok 는 APPROVE 를 덧쓴다",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker())],
+            "existing_reviews": [approval(sha=OTHER, state="CHANGES_REQUESTED", login="trading-lab-ci[bot]")],
+        },
+        {"post_review": True, "review_event": "APPROVE", "arm_candidate": True},
+    ),
+    (
+        "같은 head 에 App 수정 요청이 있어도 merge_ok 마커면 APPROVE 로 덧쓴다",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker())],
+            "existing_reviews": [approval(state="CHANGES_REQUESTED", login="trading-lab-ci[bot]")],
+        },
+        {"post_review": True, "review_event": "APPROVE", "arm_candidate": True},
+    ),
+    (
+        "신원이 다른 옛 봇의 수정 요청은 덧써지지 않는다 — 새 App 은 자기 리뷰만 낸다",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker())],
+            "existing_reviews": [approval(sha=OTHER, state="CHANGES_REQUESTED", login="github-actions[bot]")],
+        },
+        {"post_review": True, "review_event": "APPROVE", "arm_candidate": True},
+    ),
+    (
+        "판정 unable → 아무 리뷰도 안 낸다 — 앞 head 의 수정 요청이 그대로 남는다 (교착 출구는 사람)",
+        {
+            "head_sha": HEAD,
+            "comments": [comment(marker(verdict="unable"))],
+            "existing_reviews": [approval(sha=OTHER, state="CHANGES_REQUESTED", login="trading-lab-ci[bot]")],
+        },
+        {"post_review": False, "review_event": None, "arm_candidate": False},
+    ),
+    (
         "비-멤버 사람 코멘트는 봇 축이 열려도 여전히 막힌다  (공격 ①)",
         {
             "head_sha": HEAD,
@@ -334,6 +411,16 @@ ARM_BASE = {
 ARM_CASES = [
     # (설명, payload 덮어쓰기, 기대 dict 부분집합)
     ("risk: low + 봇 승인 → arm", {}, {"arm": True, "risk": "low"}),
+    (
+        "App(trading-lab-ci) 승인도 조건 ②를 채운다 — 승인 신원이 둘이다 (2026-08-25)",
+        {"reviews": [approval(login="trading-lab-ci[bot]")]},
+        {"arm": True, "risk": "low"},
+    ),
+    (
+        "목록 밖 봇 승인(dependabot) → arm 금지 (조건 ② — 승인 신원 위조 차단)",
+        {"reviews": [approval(login="dependabot[bot]")]},
+        {"arm": False},
+    ),
     (
         "source=manual → arm 금지  (공격 ④)",
         {"manual": True},
@@ -1075,89 +1162,88 @@ DELEGATE_CASES = [
     ),
 ]
 
+
+def _checks(count, *, start=1, status="completed", conclusion="success"):
+    """`test: ` 체크런 count 개 — 게이트 전수 판정의 입력."""
+    return [
+        {
+            "id": start + i,
+            "name": f"test: job{start + i}",
+            "status": status,
+            "conclusion": conclusion,
+        }
+        for i in range(count)
+    ]
+
+
+FLOOR = rr.gate_lib.MIN_TEST_CHECKS
+FULL = _checks(FLOOR)
+
+# 대표자 잡(`test: gate`)을 없앤 뒤의 전수 판정 (2026-08-25). 종전 케이스는 그 잡 하나의
+# 색만 봤다 — 그대로 두면 잡이 사라진 지금 「없음 = 미완 → --final 에 실패」로 자동 머지가
+# 통째로 멎는 것을 그물이 못 잡는다.
 GATE_CASES = [
     # (설명, records, final, 기대 상태)
+    ("test: 체크 전수 초록 → pass", FULL, False, "pass"),
     (
-        "게이트 완료 success → pass",
-        [
-            {
-                "id": 2,
-                "name": "test: gate",
-                "status": "completed",
-                "conclusion": "success",
-            }
-        ],
-        False,
-        "pass",
-    ),
-    (
-        "게이트 in_progress → wait",
-        [{"id": 2, "name": "test: gate", "status": "in_progress", "conclusion": None}],
+        "하나가 in_progress → wait",
+        FULL[:-1] + _checks(1, start=99, status="in_progress", conclusion=None),
         False,
         "wait",
     ),
     (
-        "게이트 in_progress + final → fail (상한 초과 fail-closed)",
-        [{"id": 2, "name": "test: gate", "status": "in_progress", "conclusion": None}],
+        "하나가 in_progress + final → fail (상한 초과 fail-closed)",
+        FULL[:-1] + _checks(1, start=99, status="in_progress", conclusion=None),
         True,
         "fail",
     ),
     (
-        "게이트 failure → fail",
-        [
-            {
-                "id": 2,
-                "name": "test: gate",
-                "status": "completed",
-                "conclusion": "failure",
-            }
-        ],
+        "하나가 failure → fail (미완이 남아 있어도 즉시 접는다)",
+        FULL[:-2]
+        + _checks(1, start=98, conclusion="failure")
+        + _checks(1, start=99, status="in_progress", conclusion=None),
         False,
         "fail",
     ),
+    ("skipped 는 통과로 센다", _checks(FLOOR, conclusion="skipped"), False, "pass"),
+    ("체크런 0건 → wait (아직 스케줄 전)", [], False, "wait"),
+    ("체크런 0건 + final → fail (조회 실패도 여기로 접힌다)", [], True, "fail"),
     (
-        "체크런 0건 → wait (아직 스케줄 전)",
-        [],
+        "하한 미만(전부 초록이어도) → wait — 잡이 사라졌거나 조회가 샜다",
+        _checks(FLOOR - 1),
         False,
         "wait",
     ),
-    (
-        "체크런 0건 + final → fail (조회 실패도 여기로 접힌다)",
-        [],
-        True,
-        "fail",
-    ),
+    ("하한 미만 + final → fail (fail-closed)", _checks(FLOOR - 1), True, "fail"),
     (
         "재실행으로 같은 이름 복수 → id 최대만 (옛 failure 무시)",
-        [
-            {
-                "id": 9,
-                "name": "test: gate",
-                "status": "completed",
-                "conclusion": "failure",
-            },
-            {
-                "id": 12,
-                "name": "test: gate",
-                "status": "completed",
-                "conclusion": "success",
-            },
-        ],
+        # **순서가 판정을 결정하면 안 된다** — 새 것(id 901, 초록)을 먼저 두고 옛 것(id 900,
+        # 빨강)을 뒤에 둔다. 「나중에 온 것이 이긴다」로 짜면 여기서 빨개진다.
+        FULL
+        + [{"id": 901, "name": "test: rerun", "status": "completed", "conclusion": "success"}]
+        + [{"id": 900, "name": "test: rerun", "status": "completed", "conclusion": "failure"}],
         False,
         "pass",
     ),
     (
-        "다른 test: 체크만 있고 게이트 없음 → wait",
-        [
+        "없앤 대표자 `test: gate` 하나만 초록 → wait (그 잡에 기대던 판정은 사라졌다)",
+        [{"id": 2, "name": "test: gate", "status": "completed", "conclusion": "success"}],
+        False,
+        "wait",
+    ),
+    (
+        "`test: ` 접두가 아닌 체크는 안 센다 (리뷰·CodeQL 이 게이트를 흔들지 않는다)",
+        FULL
+        + [
             {
-                "id": 3,
-                "name": "test: repo-scan",
+                "id": 950,
+                "name": "review: cross (비게이트)",
                 "status": "completed",
-                "conclusion": "success",
+                "conclusion": "failure",
             }
         ],
         False,
-        "wait",
+        "pass",
     ),
 ]
 

@@ -29,7 +29,7 @@
 서비스별 상세 (레이어/훅/컴포넌트/유틸 + anti-pattern 체크리스트):
 
 - Frontend: [`frontend/CLAUDE.md`](frontend/CLAUDE.md) (모든 서비스 동일)
-- Backend: 각 backend 폴더 (`app/main.py` 가 있는 모든 폴더) 의 `CLAUDE.md`. 마커(`<!-- 여기부터 끝까지는 … -->`) 아래 **공통부는 전 서비스 byte-identical** — 정본은 [`backend-service/CLAUDE.md`](backend-service/CLAUDE.md), CI 잡 `test: repo-contracts` ([`scripts/verify_backend_claude_md.py`](scripts/verify_backend_claude_md.py)) 가 대조한다. 규율을 바꾸면 전 서비스에 같은 내용을 반영해야 하고, 서비스 고유 맥락은 마커 위 `> **이 서비스**:` 블록에만 둔다
+- Backend: 각 backend 폴더 (`app/main.py` 가 있는 모든 폴더) 의 `CLAUDE.md`. 마커(`<!-- 여기부터 끝까지는 … -->`) 아래 **공통부는 전 서비스 byte-identical** — 정본은 [`backend-service/CLAUDE.md`](backend-service/CLAUDE.md), CI 잡 `test: backend` ([`scripts/verify_backend_claude_md.py`](scripts/verify_backend_claude_md.py)) 가 대조한다. 규율을 바꾸면 전 서비스에 같은 내용을 반영해야 하고, 서비스 고유 맥락은 마커 위 `> **이 서비스**:` 블록에만 둔다
 
 작업 중 코드 패턴 / 위반 회피 상세는 [`.claude/docs/`](.claude/docs/):
 
@@ -158,6 +158,42 @@ process-compose up        # staging+ 는 docker-compose (compose.staging.yaml + 
 - 사후 그물(이미 벌어진 고립을 잡는 것)은 `scripts/detect_orphaned_merged_branches.py` +
   `.github/workflows/orphaned-branch-scan.yml`(주기 스캔) 이 맡는다. **오탐이 있어 자동 차단은
   하지 않는다** — 후보만 뽑아 워크플로 요약 + 이슈 코멘트로 사람에게 낸다.
+
+---
+
+## 쓸어담기 — 조용히 죽은 리뷰·머지를 줍는다 (에이전트)
+
+리뷰·판정 게시·라벨·승인·자동 머지 arm 이 **한 self-hosted 잡**의 스텝이라, 그 잡이 통째로
+죽으면(러너 동결·취소·큐 사망) 아무것도 안 남는다. 종전에 그 자리를 받던 두 장치
+(GitHub-hosted `review: publish` 폴백 · `runner-freeze-rerun.yml`)는 없앴다 — private 에서
+과금의 몸통이 되기 때문이다. **대신 에이전트가 주기적으로 훑는다.**
+
+```bash
+python3 scripts/review_sweep.py collect | python3 scripts/review_sweep.py plan
+```
+
+- **처분을 내놓을 뿐 실행하지 않는다.** `rerun` 이면 `gh run rerun <run_id> --failed`,
+  `relabel`·`rearm` 은 그 PR 에서 손으로(또는 에이전트가) 한다.
+- **주기는 10~15분**이면 충분하다 — 리뷰 중앙 실행시간이 약 9분이다.
+- **동결 판정은 잡 단위 annotation 으로 한다.** run conclusion 으로 하면 놓친다 —
+  옛 워크플로가 그렇게 죽어 있었다(12일간 365번 깨어나 재실행 0건, 진짜 동결 4건 전부 놓침).
+- 판정부를 부를 때는 **`git show origin/main:scripts/review_sweep.py`** 로 꺼내 쓴다.
+  PR 워크트리의 판본을 쓰면 PR 이 자기 처분을 고칠 수 있다.
+
+---
+
+## PR 은 draft 로 연다 (에이전트·사람 공통)
+
+**PR 을 열 때는 draft 로 열고, 스스로 확인한 뒤 ready 로 바꾼다.** CI 의 `pull_request` 트리거가
+`types: [ready_for_review, synchronize, reopened]` 라, **draft 인 동안의 push 는 CI 를 안 깨운다.**
+ready 로 바꾸는 순간 전량이 한 번 돌고, 그 뒤 리뷰 지적을 반영하는 push 는 `synchronize` 라
+종전대로 돈다.
+
+- 왜: 「일단 올리고 CI 로 고친다」가 잡 17개 × 커밋 수만큼 청구된다. draft 구간에서 로컬
+  게이트(`pre-commit run --all` · 관련 `verify_*.py`)로 먼저 거르면 그 반복이 사라진다.
+- **초안에서 CI 를 한 번 보고 싶으면** ready 로 바꿨다가 다시 draft 로 내리면 된다 —
+  `ready_for_review` 가 그때 한 번 뜬다.
+- 독립 리뷰(`cross-review`)도 draft 를 안 본다. 리뷰를 받을 준비가 됐다는 신호가 ready 다.
 
 ---
 

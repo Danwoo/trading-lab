@@ -22,7 +22,7 @@ URL 이 없으면 건너뛴다(exit 0). 실제로 돌면 `REQUIRE=db 실행됨` 
 
 ## 스키마는 스스로 세운다
 
-`test: backend-db` 잡은 마이그레이션을 돌리지 않는다 — 각 스크립트가 필요한 것을 자기
+`test: backend` 잡은 마이그레이션을 돌리지 않는다 — 각 스크립트가 필요한 것을 자기
 스키마에 세우는 것이 이 잡의 관례다(`verify_minute_partition_query.py` 와 같다).
 
 **직접 CREATE TABLE 을 적지 않고 마이그레이션 모듈을 그대로 태운다.** 손으로 옮겨 적으면
@@ -108,7 +108,7 @@ def main() -> int:
     engine = create_engine(url, hide_parameters=True, connect_args={"options": "-csearch_path=bt_persist"})
     # 전용 스키마에 마이그레이션을 **그대로 태운다.** 손으로 CREATE TABLE 을 옮겨 적으면
     # 그 사본이 마이그레이션과 갈라져, 이 검사가 「지금 스키마」가 아니라 「내가 적어 둔
-    # 스키마」를 확인하게 된다. (`test: backend-db` 잡은 마이그레이션을 돌리지 않는다 —
+    # 스키마」를 확인하게 된다. (`test: backend` 잡은 마이그레이션을 돌리지 않는다 —
     # 각 스크립트가 필요한 것을 자기 스키마에 세우는 것이 이 잡의 관례다.)
     from alembic.migration import MigrationContext
     from alembic.operations import Operations

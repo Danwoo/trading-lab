@@ -45,7 +45,7 @@ sql-param-hiding(test_sql_parameter_hiding.py)이 "사본 동일성을 가정하
     uv run python tests/test_constraint_handler_no_exc_info.py
 pytest 가 도입되면 test_* 함수가 그대로 수집된다.
 
-CI 배선: .github/workflows/repo-scans.yml 의 `test: repo-scan` 잡 (경로 필터 없음) — 서비스
+CI 배선: .github/workflows/ci.yml 의 `test: repo` 잡 (경로 필터 없음) — 서비스
 이름을 가리지 않는 레포 전수 스캔이라 sql-param-hiding·date-literals 와 같은 파일에 둔다(#302 의
 "서비스 단위 on.paths 에 얹으면 새 서비스가 스캔에서 빠진다" 교훈과 동일 이유).
 

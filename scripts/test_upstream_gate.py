@@ -1,16 +1,19 @@
-"""required 게이트 판정 회귀 그물 (#23 Task 5) — fail-closed, stdlib 전용.
+"""머지 게이트 판정 회귀 그물 (#23 Task 5) — fail-closed, stdlib 전용.
 
 게이트는 **초록일 때 아무 일도 안 하는 검사**라 죽어도 티가 안 난다. 통과 집합에 한 줄만
 더하면(`failure` 를 통과로 세거나, 0건을 통과로 세거나) 그 뒤로는 영영 초록이다.
 그래서 판정의 축을 케이스로 못박는다:
 
-  · **자기 제외** — 게이트 자신도 `test: ` 접두 체크다. 안 빼면 자기 체크가 `in_progress`
-    로 잡혀 영영 초록이 안 된다. 자기 자신이 섞인 입력에서 판정이 나오는지 판다.
+  · **자기 제외** — `self_name` 을 준 호출자에서만 쓴다. 판정 자신이 `test: ` 체크로 뜨면
+    안 빼는 순간 스스로를 기다린다. 지금 호출자 둘은 체크런을 안 만들어 기본값이 `None` 이다.
   · **결과** — `success`·`skipped` 만 통과. 미완은 대기(재조회), `--final` 이면 실패.
   · **하한** — 0건·조회 실패·잡 삭제는 전부 실패. 이 자리가 「검사 0건 = 통과」를 막는다.
   · **재실행** — 같은 이름이 여러 번이면 id 가 가장 큰 것만 본다.
-  · **구조** — 게이트 잡 이름 ↔ 판정부가 빼는 이름, 선언된 `test: ` 잡 수 ↔ 하한.
-    실제 워크플로로도 한 번 돌린다 (합성 픽스처만 보면 배선이 끊겨도 초록이다).
+  · **구조** — 선언된 `test: ` 잡 수 ↔ 하한, 없앤 대표자 잡(`test: gate`)의 부활, 이름에
+    섞인 식(매트릭스). 실제 워크플로로도 한 번 돌린다 (합성 픽스처만 보면 배선이 끊겨도 초록이다).
+  · **대기 루프** — 자동 머지 arm 스텝이 상류를 기다리는 계약. 잡이 아니라 **스텝** 하나를
+    잘라 본다 — 그 잡에는 리뷰 폴링용 루프·DEADLINE 이 여럿이라 잡째로 보면 엉뚱한 루프를
+    보고 초록이 된다.
 
 **fail-closed**: 케이스를 하한보다 적게 모으면 실패한다.
 
@@ -31,9 +34,13 @@ import verify_upstream_gate as gate  # noqa: E402
 MIN_JUDGE_CASES = 20
 MIN_PARSE_CASES = 6
 MIN_STRUCTURE_CASES = 6
+MIN_LIVE_CASES = 3
 MIN_LOOP_CASES = 7
 
-SELF = gate.SELF_CHECK_NAME
+# 판정이 자기 자신을 빼야 하는 호출자를 흉내 내는 이름 (지금 호출자 둘은 체크런을 안 만든다).
+SELF = "test: self"
+# 없앤 대표자 잡 — 되살아나면 구조 검사가 막는다.
+RETIRED = gate.RETIRED_GATE_CHECK_NAME
 
 failures: list[str] = []
 
@@ -59,27 +66,9 @@ SHORT = _green(gate.MIN_TEST_CHECKS - 1)
 JUDGE_CASES: list[tuple[str, list[dict], bool, str]] = [
     ("하한만큼 전부 success", FULL, False, "pass"),
     (
-        "자기 자신이 in_progress 로 섞여 있어도 통과",
-        FULL + [_run(SELF, None, status="in_progress")],
-        False,
-        "pass",
-    ),
-    (
-        "자기 자신이 실패로 남아 있어도 통과",
+        "자기 제외를 안 주면 그 체크도 세어 실패한다 (기본값 None)",
         FULL + [_run(SELF, "failure")],
         False,
-        "pass",
-    ),
-    (
-        "자기 자신만 있고 나머지 0건",
-        [_run(SELF, None, status="in_progress")],
-        False,
-        "wait",
-    ),
-    (
-        "자기 자신만 있고 나머지 0건 (final)",
-        [_run(SELF, None, status="in_progress")],
-        True,
         "fail",
     ),
     (
@@ -113,7 +102,7 @@ JUDGE_CASES: list[tuple[str, list[dict], bool, str]] = [
         False,
         "fail",
     ),
-    # 개시 직후가 실제로 가장 흔한 상태다 — repo-scans.yml 과 ci.yml·frontend-ci.yml 은 같은
+    # 개시 직후가 실제로 가장 흔한 상태다 — cross-review 와 ci 는 같은
     # pull_request 이벤트로 동시에 시작하므로, 게이트가 처음 조회할 때 상류는 대개 아직 돈다.
     # 이 상태를 통과로 접으면 게이트는 아무것도 안 보고 초록이 된다.
     (
@@ -220,68 +209,41 @@ PARSE_CASES: list[tuple[str, str, int]] = [
     ("문자열 JSON", '"nope"', 0),
 ]
 
-_GATE_JOB = f'  gate:\n    name: "{SELF}"\n    runs-on: ubuntu-latest\n'
 
-
-def _workflow(job_block: str) -> str:
-    return "on:\n  pull_request: {}\n\njobs:\n" + job_block
-
-
-def _names(count: int, *, include_self: bool = True) -> dict[str, str]:
-    found = {f"test: job{i}": "ci.yml" for i in range(count)}
-    if include_self:
-        found[SELF] = "repo-scans.yml"
-    return found
+def _names(count: int) -> dict[str, str]:
+    return {f"test: job{i}": "ci.yml" for i in range(count)}
 
 
 ENOUGH = _names(gate.MIN_TEST_CHECKS)
 
-# (라벨, 게이트 워크플로 YAML, 선언된 test: 잡 목록, 문제가 있어야 하는가, 사유 조각)
-STRUCTURE_CASES: list[tuple[str, str, dict[str, str], bool, str]] = [
-    ("게이트 이름이 판정부와 일치", _workflow(_GATE_JOB), ENOUGH, False, ""),
+# (라벨, 선언된 test: 잡 목록, 문제가 있어야 하는가, 사유 조각)
+STRUCTURE_CASES: list[tuple[str, dict[str, str], bool, str]] = [
+    ("하한만큼 선언돼 있음", ENOUGH, False, ""),
+    ("`test: ` 잡을 0건 읽음", {}, True, "0건"),
+    ("테스트 잡이 하한 미만", _names(gate.MIN_TEST_CHECKS - 1), True, "하한"),
     (
-        "게이트 이름을 바꾸고 판정부를 안 고침",
-        _workflow('  gate:\n    name: "test: gatekeeper"\n    runs-on: ubuntu-latest\n'),
-        ENOUGH,
+        "없앤 대표자 잡이 되살아남",
+        {**ENOUGH, RETIRED: "ci.yml"},
         True,
-        "자기 자신을 기다립니다",
-    ),
-    (
-        "게이트 잡이 없음",
-        _workflow('  other:\n    name: "test: other"\n'),
-        ENOUGH,
-        True,
-        "게이트 잡",
-    ),
-    ("잡을 0건 읽음", "on:\n  pull_request: {}\n", ENOUGH, True, "0건"),
-    (
-        "테스트 잡이 하한 미만",
-        _workflow(_GATE_JOB),
-        _names(gate.MIN_TEST_CHECKS - 1),
-        True,
-        "하한",
-    ),
-    (
-        "게이트만 선언돼 있고 대표할 잡이 0건",
-        _workflow(_GATE_JOB),
-        {SELF: "repo-scans.yml"},
-        True,
-        "자기 자신 제외",
+        "되살아났습니다",
     ),
     (
         "매트릭스로 갈리는 이름",
-        _workflow(_GATE_JOB),
         {**ENOUGH, "test: mcp ${{ matrix.svc }}": "ci.yml"},
         True,
         "매트릭스",
     ),
+    (
+        "대표자 부활 + 하한 미만 — 둘 다 사유로 남는다",
+        {**_names(gate.MIN_TEST_CHECKS - 2), RETIRED: "ci.yml"},
+        True,
+        "하한",
+    ),
 ]
 
 
-_LOOP_OK = """    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: 테스트 체크런 전수 판정
+_LOOP_OK = """    timeout-minutes: 25
+      - name: 판정 → 네이티브 리뷰 + 자동 머지 arm
         run: |
           DEADLINE=$(( $(date +%s) + 1200 ))
           while :; do
@@ -370,8 +332,8 @@ def main() -> int:
             f"기대 {expected}건 · 실제 {len(got)}건",
         )
 
-    for label, text, names, should_fail, fragment in STRUCTURE_CASES:
-        problems = gate.check_structure(gate.parse_jobs(text), names)
+    for label, names, should_fail, fragment in STRUCTURE_CASES:
+        problems = gate.check_structure(names)
         joined = " / ".join(problems)
         _check(
             f"[구조] {label}",
@@ -401,22 +363,28 @@ def main() -> int:
             )
 
     # 합성 픽스처만 보면 실제 배선이 끊겨도 초록이다 — 살아 있는 워크플로로도 한 번 판다.
-    live_text = gate.GATE_WORKFLOW.read_text(encoding="utf-8")
-    live_jobs = gate.parse_jobs(live_text)
+    live_text = gate.WAIT_LOOP_WORKFLOW.read_text(encoding="utf-8")
     live_names = gate.collect_test_job_names(gate.WORKFLOW_DIR)
-    live_problems = gate.check_structure(live_jobs, live_names)
+    live_problems = gate.check_structure(live_names)
     _check("[실물] 게이트 구조", not live_problems, " / ".join(live_problems))
-    live_loop = gate.check_wait_loop(gate.gate_job_block(live_text))
-    _check("[실물] 게이트 대기 루프", not live_loop, " / ".join(live_loop))
+    live_loop = gate.check_wait_loop(gate.wait_loop_block(live_text))
+    _check("[실물] 대기 루프", not live_loop, " / ".join(live_loop))
+    # 스텝을 실제로 잘라냈는지 — 빈 블록이면 위 검사가 「본문 못 읽음」으로 빨개지지만,
+    # 잘라낸 블록이 잡 전체만큼 크면(스텝 좁힘 실패) 엉뚱한 루프를 보고 초록이 될 수 있다.
+    _check(
+        "[실물] 대기 루프 블록이 스텝 하나로 좁혀졌다",
+        0 < len(gate.wait_loop_block(live_text).splitlines()) < len(live_text.splitlines()) // 4,
+        f"블록 {len(gate.wait_loop_block(live_text).splitlines())}줄 / 파일 {len(live_text.splitlines())}줄",
+    )
 
-    total = len(JUDGE_CASES) + len(PARSE_CASES) + len(STRUCTURE_CASES) + len(LOOP_CASES) + 2
+    total = len(JUDGE_CASES) + len(PARSE_CASES) + len(STRUCTURE_CASES) + len(LOOP_CASES) + MIN_LIVE_CASES
     print(
         f"케이스 {total}건 (판정 {len(JUDGE_CASES)} · 파싱 {len(PARSE_CASES)} · "
-        f"구조 {len(STRUCTURE_CASES)} · 대기 {len(LOOP_CASES)} · 실물 2) · 실패 {len(failures)}건"
+        f"구조 {len(STRUCTURE_CASES)} · 대기 {len(LOOP_CASES)} · 실물 {MIN_LIVE_CASES}) · 실패 {len(failures)}건"
     )
     print(
-        f"실물: 선언된 `{gate.CHECK_NAME_PREFIX}` 잡 {len(live_names)}개 (게이트 포함) · "
-        f"하한 {gate.MIN_TEST_CHECKS}개 · 자기 제외 이름 {SELF!r}"
+        f"실물: 선언된 `{gate.CHECK_NAME_PREFIX}` 잡 {len(live_names)}개 · "
+        f"하한 {gate.MIN_TEST_CHECKS}개 · 대기 루프 {gate.WAIT_LOOP_WORKFLOW.name}"
     )
     for f in failures:
         print(f"::error::{f}")

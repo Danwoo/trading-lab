@@ -3252,7 +3252,7 @@ frontend/` 로 옛 파일명 참조가 남지 않았음을 확인했다.
 없는 주장**이었다 — 생성 SVG 도 래스터화 명령도 커밋되지 않았다. 지금은 소스
 `frontend/scripts/brand/logo.svg`·`favicon.svg` 와 생성 명령
 `node frontend/scripts/generate-brand-assets.js` 가 함께 커밋돼 있고, 같은 명령의 `--check`
-모드가 CI(`frontend-ci.yml`)에서 매 PR 마다 **소스 → 산출물 바이트 재현**을 대조한다.
+모드가 CI(`ci.yml` 의 `test: frontend`)에서 매 PR 마다 **소스 → 산출물 바이트 재현**을 대조한다.
 표의 `logo.png` 바이트 수가 15,106 → 14,368 로 바뀐 것은 이 재현 가능한 소스에서 다시 만든
 결과다(아래 워드마크 절 참조).
 

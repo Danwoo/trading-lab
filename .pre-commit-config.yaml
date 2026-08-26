@@ -9,8 +9,13 @@ repos:
     hooks:
       - id: gitleaks
 
+  # rev 는 서비스들이 잠근 ruff 와 같은 판으로 맞춘다 (2026-08-25 실측: multi-agent·backend
+  # 0.16.4 · bot-agent 0.16.3). 종전 0.15.13 은 **훅이 서비스보다 낡은** 상태였고 그 차이를
+  # 서비스 잡의 `ruff check app/` 가 메우고 있었다 — 그 중복 스텝을 없애면서 판을 맞춘다.
+  # ⚠ `rev:` 는 `- repo:` **바로 다음 줄**이어야 한다 — scripts/verify_python_format.py 가
+  #   그 앵커로 읽는다 (사이에 주석을 끼우면 「rev 를 못 읽었다」로 fail-closed 종료).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.13
+    rev: v0.16.4
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]

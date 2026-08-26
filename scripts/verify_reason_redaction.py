@@ -6,7 +6,7 @@
 이 그물이 지키는 것은 `frontend/` 다. `backend-service/scripts/` 에 두면 `ci.yml` 의 경로
 필터(`FILTER_PATTERNS`)에 `frontend/**` 가 없어 **프론트만 바꾼 PR 에서 조용히 skip** 된다 —
 지켜야 할 바로 그 PR 클래스에서 안 도는 그물이다. 이 레포가 같은 클래스를 이미 겪고
-`repo-scans.yml` 주석에 적어 두었다. 그래서 경로 필터가 없는 `repo-scan` 잡에서 돈다
+`ci.yml` 주석에 적어 두었다. 그래서 경로 필터가 없는 `repo-scan` 잡에서 돈다
 (`scripts/verify_color_token_usage.py` 가 같은 선례다).
 
 ## 왜 있나

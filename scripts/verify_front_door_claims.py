@@ -19,6 +19,9 @@ C. **루트 `CLAUDE.md` 의 backend 모듈 목록** ↔ `modules.py` 등록 라�
    14개 중 8개만 적혀 있었다).
 D. **코드가 거짓으로 만드는 문구** — 아래 `FALSIFIED` 의 각 항목은 「이 증거가 성립하면 이 문구는
    거짓」이라는 쌍이다. 증거는 매번 코드에서 계산한다(#329 ①②⑤⑦).
+E. **정문이 이름으로 부르는 CI 잡** — README 가 백틱으로 인용한 `` `test: …` `` 잡 이름은
+   워크플로에 실재해야 한다. 잡을 통합·개명하면 정문이 조용히 낡는다 (실측 2026-08-25:
+   `test: repo` 를 `test: repo` 라고 적은 문장이 리뷰에서 잡혔다 — 그때 이 축이 없었다).
 
 ## 무엇을 못 잡나 (정직하게)
 
@@ -60,6 +63,10 @@ PC_PORT_RE = re.compile(r"^\s+PORT:\s*(\d+)\s*$", re.M)
 #: "The last three aren't in `process-compose.yaml`"
 LAST_N_RE = re.compile(r"The last (one|two|three|four|five|six) (?:aren't|isn't) in `process-compose\.yaml`")
 WORD_TO_INT = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
+#: README 가 백틱으로 부르는 CI 잡 이름 — `` `test: repo` `` 처럼.
+README_TEST_JOB_RE = re.compile(r"`(test: [a-z0-9-]+)`")
+#: 워크플로 잡의 `name: "test: …"` (홑·겹따옴표·맨따옴표 전부)
+WORKFLOW_JOB_NAME_RE = re.compile(r'^\s{4}name:\s*["\']?(test: [^"\'\n]+?)["\']?\s*$', re.M)
 #: modules.py 의 `"routers.<도메인>.<모듈>"`
 ROUTER_RE = re.compile(r'"routers\.([a-z_]+)\.[a-z_]+"')
 #: 루트 CLAUDE.md 의 backend-service 불릿과 그 안의 "등록된 **14개가 전부**"
@@ -233,6 +240,21 @@ def main() -> int:
             if f"`{domain}`" not in bullet_text:
                 violations.append(f"backend-service 불릿에 모듈 `{domain}` 이 없습니다")
 
+    # ── E. 정문이 이름으로 부르는 CI 잡이 실재하는가 ────────────────────────
+    declared_jobs: set[str] = set()
+    for wf in sorted(WORKFLOWS.glob("*.yml")):
+        declared_jobs.update(WORKFLOW_JOB_NAME_RE.findall(wf.read_text(encoding="utf-8")))
+    if not declared_jobs:
+        print("::error::워크플로에서 `test: ` 잡 이름을 0건 찾았습니다 — fail-closed 종료", file=sys.stderr)
+        return 1
+    named_in_readme = sorted(set(README_TEST_JOB_RE.findall(readme)))
+    for name in named_in_readme:
+        if name not in declared_jobs:
+            violations.append(
+                f"README 가 부르는 CI 잡 `{name}` 이 워크플로에 없습니다 — "
+                f"실재하는 이름: {', '.join(sorted(declared_jobs))}"
+            )
+
     # ── D. 코드가 거짓으로 만드는 문구 ──────────────────────────────────────
     for path, phrase, why, evidence in FALSIFIED:
         if evidence() and phrase in path.read_text(encoding="utf-8"):
@@ -243,7 +265,8 @@ def main() -> int:
 
     print(
         f"서비스 표 {len(table)}행 · 실재 서비스 {len(actual)}개 · backend 모듈 {len(registered)}개 · "
-        f"문구 대조 {len(FALSIFIED) + len(REQUIRED)}건"
+        f"문구 대조 {len(FALSIFIED) + len(REQUIRED)}건 · "
+        f"정문이 부르는 CI 잡 {len(named_in_readme)}건 ↔ 선언된 잡 {len(declared_jobs)}개"
     )
     for line in violations:
         print(f"::error::{line}", file=sys.stderr)

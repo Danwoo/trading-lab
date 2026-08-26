@@ -8,8 +8,8 @@ doc-search 는 동기 database_utils 대신 자체 create_async_engine 을 쓰�
     uv run python tests/test_workspace_engine_hides_parameters.py
 pytest 가 도입되면 test_* 함수가 그대로 수집된다.
 
-CI 배선: .github/workflows/repo-scans.yml 의 `test: repo-scan-app` 잡(경로 필터 없는 전수
-스캔) + ci.yml 의 `test: mcp-services` 스위트(tests/ 글롭). 테스트만 있고 잡이 없으면
+CI 배선: .github/workflows/ci.yml 의 `test: repo` 잡(경로 필터 없는 전수
+스캔) + ci.yml 의 `test: backend` 스위트(tests/ 글롭). 테스트만 있고 잡이 없으면
 그물은 초록으로 죽는다 — 이 파일을 옮기거나 이름을 바꾸면 그 잡도 같이 고쳐야 한다.
 
 외부 DB 없이 돈다 — create_async_engine 은 lazy 라 접속하지 않는다.

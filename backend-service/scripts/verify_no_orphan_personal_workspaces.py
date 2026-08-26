@@ -14,7 +14,7 @@ SQL(`_ORPHAN_QUERY`) 자신의 정밀도·재현율**만 scratch DB 에 직접 �
 
 `deleteUserCascade` 실행 자체를 검증하는 그물은 별도로 있다 —
 `frontend/tests/lib/auth/deleteUserCascade.dbtest.ts`(`npm run test:db`, cwd=frontend,
-`frontend-ci.yml` 의 `delete-user-cascade` 잡). 이 스크립트는 그 그물과 상호 보완이지 대체가
+`ci.yml` 의 `delete-user-cascade` 잡). 이 스크립트는 그 그물과 상호 보완이지 대체가
 아니다: 이쪽은 "감사 SQL 자체가 옳은가", 저쪽은 "삭제 코드가 실제로 안전한가"를 본다.
 
 검사 3가지 (fail-closed — 셋 다 반드시 통과해야 한다, 하나라도 없으면 검사가 아무것도

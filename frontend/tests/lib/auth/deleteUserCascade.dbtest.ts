@@ -14,7 +14,7 @@
  * (파일명 규약: `*.dbtest.ts`, 기본 include 글롭 `*.{test,spec}.*` 와 겹치지 않는다).
  *
  * 실행: `DATABASE_URL` 을 **두 스키마가 다 준비된** Postgres 로 잡고 `npm run test:db`
- * (cwd=frontend). CI(`frontend-ci.yml` 의 `delete-user-cascade` 잡)는 backend-service 의
+ * (cwd=frontend). CI(`ci.yml` 의 `delete-user-cascade` 잡)는 backend-service 의
  * `verify_*.py` 와 같은 패턴으로 scratch DB(dbname=ci)에 `prisma/init/tables.sql`(frontend)과
  * `alembic upgrade head`(public)를 실제 배포와 같은 순서로 적용한 뒤 이 테스트를 돌린다 —
  * 탈퇴 연쇄가 `public` 스키마의 워크스페이스 데이터도 지우므로 frontend 만 있는 DB 로는

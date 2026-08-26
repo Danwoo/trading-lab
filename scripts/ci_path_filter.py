@@ -5,7 +5,7 @@ r"""경로 필터 판정 — 변경 파일 목록이 글롭 하나라도 무는�
 워크플로 레벨 `on.paths` 로 건너뛴 체크는 **체크런이 아예 생기지 않는다** — required 로 걸면
 영영 pending 이라 그 PR 이 머지 불가로 막힌다. 잡 레벨 `if:` 로 건너뛴 잡은 `skipped` 를
 보고하고 GitHub 은 `success`·`skipped`·`neutral` 을 통과로 센다. 그래서 `ci.yml`·
-`frontend-ci.yml` 은 `on.paths` 대신 **판정 잡 하나**가 이 스크립트로 boolean 을 내고
+`ci.yml` 은 `on.paths` 대신 **잡 안의 첫 스텝**이 이 스크립트로 boolean 을 내고
 나머지 잡이 `if: needs.changes.outputs.run == 'true'` 로 그것을 읽는다 (#23 Task 4).
 
 판정부를 워크플로 안 bash 가 아니라 이 파일에 두는 이유는 **로컬에서 돌려 볼 수 있어야**

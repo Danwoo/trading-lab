@@ -11,12 +11,12 @@
   // 상한이 잠근다. 선언으로 감추면 다시는 안 보이지만, 목록에 남으면 매번 보인다.
 
   "entry": [
-    // ── .github/workflows/frontend-ci.yml 이 `node scripts/<이름>` 으로 직접 실행한다 ──
-    "scripts/check-terminal-devextreme-transitive.js", // frontend-ci.yml "전이 devextreme 의존 검사"
-    "scripts/check-no-kst-time-in-routes.js", // frontend-ci.yml "app/api 라우트 getKSTTime() 재유입 검사"
-    "scripts/check-dead-code.js", // frontend-ci.yml "죽은 코드 상한" — 이 설정을 읽는 스크립트 자신
-    "scripts/check-tables-sql-reproducible.js", // frontend-ci.yml "tables.sql 재현 대조"
-    "scripts/generate-brand-assets.js", // frontend-ci.yml "브랜드 자산 재현 대조" + scripts/verify_public_release_tree.py
+    // ── .github/workflows/ci.yml 이 `node scripts/<이름>` 으로 직접 실행한다 ──
+    "scripts/check-terminal-devextreme-transitive.js", // ci.yml "전이 devextreme 의존 검사"
+    "scripts/check-no-kst-time-in-routes.js", // ci.yml "app/api 라우트 getKSTTime() 재유입 검사"
+    "scripts/check-dead-code.js", // ci.yml "죽은 코드 상한" — 이 설정을 읽는 스크립트 자신
+    "scripts/check-tables-sql-reproducible.js", // ci.yml "tables.sql 재현 대조"
+    "scripts/generate-brand-assets.js", // ci.yml "브랜드 자산 재현 대조" + scripts/verify_public_release_tree.py
     // package.json 의 pretest·predev 훅이 부른다 (npm 이 실행 — import 하는 TS 파일은 없다)
     "scripts/check-deps-sync.js",
     // THIRD-PARTY-NOTICES.md §3 이 Pretendard 재배포 출처를 다시 확인하는 명령으로 적어 둔 도구
