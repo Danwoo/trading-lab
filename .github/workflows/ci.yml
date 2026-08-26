@@ -955,6 +955,13 @@ jobs:
       # 초록이므로, on.paths 재유입·판정 잡 부재·`if:` 안 읽는 잡·추적 파일을 하나도 안 무는
       # 죽은 패턴을 같이 본다. 이 잡은 경로 필터가 없어 그 그물 자신은 항상 돈다.
 
+      # db-migrate 의 순서 판정 (#359) — 「모르는 상태」가 파괴적인 쪽(push 먼저)으로 흐르면
+      # frontend 35컬럼이 USING 없이 바뀌어 기존 값의 뜻이 사라진다. 명령을 process-compose.yaml
+      # 에서 뽑아 그대로 돌린다(사본을 검사하면 「내가 적어 둔 명령」을 확인하게 된다).
+      - name: db-migrate 순서 판정 fail-closed 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_db_migrate_order.py
+
       - name: 경로 필터 판정·배선 검사
         if: ${{ !cancelled() }}
         run: python3 scripts/test_ci_path_filter.py
