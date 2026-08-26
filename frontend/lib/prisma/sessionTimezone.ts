@@ -28,10 +28,12 @@ export function mergeUtcTimezoneOption(options: string): string {
   const kept: string[] = [];
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
-    if (token === "-c" && index + 1 < tokens.length) {
-      const value = tokens[index + 1];
+    if (token === "-c") {
+      // 값이 없는 꼬리 `-c` 는 뜻이 없다 — 남기면 뒤에 붙는 `-c timezone=UTC` 의 값을 삼켜
+      // 커넥션이 통째로 실패한다. 버린다.
+      const value: string | undefined = tokens[index + 1];
       index += 1;
-      if (!TIMEZONE_ASSIGNMENT.test(value)) kept.push(token, value);
+      if (value !== undefined && !TIMEZONE_ASSIGNMENT.test(value)) kept.push(token, value);
       continue;
     }
     if (GLUED_TIMEZONE_OPTION.test(token)) continue;

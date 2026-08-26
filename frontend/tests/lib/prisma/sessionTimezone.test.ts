@@ -26,6 +26,10 @@ describe("mergeUtcTimezoneOption", () => {
     expect(mergeUtcTimezoneOption("-ctimezone=Asia/Seoul")).toBe("-c timezone=UTC");
   });
 
+  it("값 없는 꼬리 -c 는 버린다 — 남기면 뒤 옵션의 값을 삼킨다", () => {
+    expect(mergeUtcTimezoneOption("-c search_path=frontend -c")).toBe("-c search_path=frontend -c timezone=UTC");
+  });
+
   it("timezone 이 아닌 옵션은 순서대로 보존한다", () => {
     expect(mergeUtcTimezoneOption("-c search_path=frontend -c timezone=Asia/Seoul")).toBe(
       "-c search_path=frontend -c timezone=UTC",
