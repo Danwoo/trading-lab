@@ -24,11 +24,11 @@ model User {
   emailVerified Boolean   @default(false)              /// 이메일 인증 여부
   image         String?   @db.VarChar(500)             /// 프로필 이미지
   reg_id        String?   @db.VarChar(100)             /// 생성자 ID
-  reg_dt        DateTime? @db.Timestamp(3)             /// 생성일시
+  reg_dt        DateTime? @db.Timestamptz(3)             /// 생성일시
   reg_ip        String?   @db.VarChar(45)              /// 생성 IP
   reg_pid       String?   @db.VarChar(30)              /// 생성 프로그램 ID
   mod_id        String?   @db.VarChar(100)             /// 수정자 ID
-  mod_dt        DateTime? @db.Timestamp(3)             /// 수정일시
+  mod_dt        DateTime? @db.Timestamptz(3)             /// 수정일시
   mod_ip        String?   @db.VarChar(45)              /// 수정 IP
   mod_pid       String?   @db.VarChar(30)              /// 수정 프로그램 ID
   @@map("tn_user")
@@ -47,9 +47,9 @@ model Workspace {
   workspace_nm   String    @db.VarChar(200)              /// 워크스페이스명
   use_at         String    @default("Y") @db.VarChar(5)  /// 사용여부
   is_personal    Boolean   @default(false)               /// 개인 워크스페이스 여부 (사용자 1명 소유 — 공용 워크스페이스 수를 세는 곳에서 제외된다)
-  reg_dt         DateTime? @db.Timestamp(3)              /// 생성일시
+  reg_dt         DateTime? @db.Timestamptz(3)              /// 생성일시
   reg_id         String?   @db.VarChar(100)              /// 생성자 ID
-  mod_dt         DateTime? @db.Timestamp(3)              /// 수정일시
+  mod_dt         DateTime? @db.Timestamptz(3)              /// 수정일시
   mod_id         String?   @db.VarChar(100)              /// 수정자 ID
 
   @@map("tn_workspace")
@@ -66,9 +66,9 @@ model WorkspaceMember {
   user_id      String    @db.VarChar(36)                      /// 사용자 ID
   role         String    @default("member") @db.VarChar(20)   /// 구성원 역할 (owner|member|viewer)
   is_default   Boolean   @default(false)                      /// 로그인 시 선택되는 기본 워크스페이스 여부
-  reg_dt       DateTime? @db.Timestamp(3)                     /// 생성일시
+  reg_dt       DateTime? @db.Timestamptz(3)                     /// 생성일시
   reg_id       String?   @db.VarChar(100)                     /// 생성자 ID
-  mod_dt       DateTime? @db.Timestamp(3)                     /// 수정일시
+  mod_dt       DateTime? @db.Timestamptz(3)                     /// 수정일시
   mod_id       String?   @db.VarChar(100)                     /// 수정자 ID
 
   @@id([workspace_id, user_id])
@@ -84,9 +84,9 @@ model WorkspaceMember {
 model WorkspaceMenu {
   workspace_id Int                        /// 워크스페이스 ID
   menu_id      String    @db.VarChar(20)  /// 메뉴 ID
-  reg_dt       DateTime? @db.Timestamp(3) /// 생성일시
+  reg_dt       DateTime? @db.Timestamptz(3) /// 생성일시
   reg_id       String?   @db.VarChar(100) /// 생성자 ID
-  mod_dt       DateTime? @db.Timestamp(3) /// 수정일시
+  mod_dt       DateTime? @db.Timestamptz(3) /// 수정일시
   mod_id       String?   @db.VarChar(100) /// 수정자 ID
 
   @@id([workspace_id, menu_id])
@@ -99,9 +99,9 @@ model WorkspaceMenu {
 model WorkspaceDomain {
   domain       String    @id @db.VarChar(100) /// 이메일 도메인
   workspace_id Int                            /// 워크스페이스 ID
-  reg_dt       DateTime? @db.Timestamp(3)     /// 생성일시
+  reg_dt       DateTime? @db.Timestamptz(3)     /// 생성일시
   reg_id       String?   @db.VarChar(100)     /// 생성자 ID
-  mod_dt       DateTime? @db.Timestamp(3)     /// 수정일시
+  mod_dt       DateTime? @db.Timestamptz(3)     /// 수정일시
   mod_id       String?   @db.VarChar(100)     /// 수정자 ID
 
   @@index([workspace_id])
@@ -113,10 +113,10 @@ model WorkspaceDomain {
 /// 인증 세션
 model BaSession {
   id          String   @id @db.VarChar(36)
-  expiresAt   DateTime @db.Timestamp(3)
+  expiresAt   DateTime @db.Timestamptz(3)
   token       String   @unique @db.VarChar(500)
-  createdAt   DateTime @db.Timestamp(3)
-  updatedAt   DateTime @db.Timestamp(3)
+  createdAt   DateTime @db.Timestamptz(3)
+  updatedAt   DateTime @db.Timestamptz(3)
   ipAddress   String?  @db.VarChar(45)
   userAgent   String?  @db.VarChar(500)
   userId      String   @db.VarChar(36)
@@ -139,12 +139,12 @@ model BaAccount {
   accessToken           String?   @db.VarChar(500)
   refreshToken          String?   @db.VarChar(500)
   idToken               String?   @db.Text
-  accessTokenExpiresAt  DateTime? @db.Timestamp(3)
-  refreshTokenExpiresAt DateTime? @db.Timestamp(3)
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(3)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(3)
   scope                 String?   @db.VarChar(500)
   password              String?   @db.VarChar(255)
-  createdAt             DateTime  @db.Timestamp(3)
-  updatedAt             DateTime  @db.Timestamp(3)
+  createdAt             DateTime  @db.Timestamptz(3)
+  updatedAt             DateTime  @db.Timestamptz(3)
 
   @@unique([providerId, accountId])
   @@index([userId])
@@ -158,9 +158,9 @@ model BaVerification {
   id         String    @id @db.VarChar(36)
   identifier String    @db.VarChar(200)
   value      String    @db.Text
-  expiresAt  DateTime  @db.Timestamp(3)
-  createdAt  DateTime? @db.Timestamp(3)
-  updatedAt  DateTime? @db.Timestamp(3)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  createdAt  DateTime? @db.Timestamptz(3)
+  updatedAt  DateTime? @db.Timestamptz(3)
 
   @@map("ba_verification")
 }
@@ -169,9 +169,9 @@ model BaVerification {
 model Author {
   author_id  String    @id @db.VarChar(20) /// 권한 ID
   author_nm  String    @db.VarChar(200)    /// 권한명
-  reg_dt     DateTime? @db.Timestamp(3)    /// 생성일시
+  reg_dt     DateTime? @db.Timestamptz(3)    /// 생성일시
   reg_id     String?   @db.VarChar(100)    /// 생성자 ID
-  mod_dt     DateTime? @db.Timestamp(3)    /// 수정일시
+  mod_dt     DateTime? @db.Timestamptz(3)    /// 수정일시
   mod_id     String?   @db.VarChar(100)    /// 수정자 ID
 
   @@map("tn_author")
@@ -184,9 +184,9 @@ model Author {
 model AuthorMember {
   author_id String    @db.VarChar(20)  /// 권한 ID
   user_id   String    @db.VarChar(100) /// 사용자 ID
-  reg_dt    DateTime? @db.Timestamp(3) /// 생성일시
+  reg_dt    DateTime? @db.Timestamptz(3) /// 생성일시
   reg_id    String?   @db.VarChar(100) /// 생성자 ID
-  mod_dt    DateTime? @db.Timestamp(3) /// 수정일시
+  mod_dt    DateTime? @db.Timestamptz(3) /// 수정일시
   mod_id    String?   @db.VarChar(100) /// 수정자 ID
 
   @@id([author_id, user_id])
@@ -206,9 +206,9 @@ model Menu {
   url           String?   @db.VarChar(400)             /// URL
   use_at        String?   @default("Y") @db.VarChar(5) /// 사용여부
   icon          String?   @db.VarChar(50)              /// 아이콘
-  reg_dt        DateTime? @db.Timestamp(3)             /// 생성일시
+  reg_dt        DateTime? @db.Timestamptz(3)             /// 생성일시
   reg_id        String?   @db.VarChar(100)             /// 생성자 ID
-  mod_dt        DateTime? @db.Timestamp(3)             /// 수정일시
+  mod_dt        DateTime? @db.Timestamptz(3)             /// 수정일시
   mod_id        String?   @db.VarChar(100)             /// 수정자 ID
 
   @@index([upper_menu_id, sort_ordr])
@@ -223,9 +223,9 @@ model Menu {
 model AuthorMenu {
   author_id String    @db.VarChar(20)  /// 권한 ID
   menu_id   String    @db.VarChar(20)  /// 메뉴 ID
-  reg_dt    DateTime? @db.Timestamp(3) /// 생성일시
+  reg_dt    DateTime? @db.Timestamptz(3) /// 생성일시
   reg_id    String?   @db.VarChar(100) /// 생성자 ID
-  mod_dt    DateTime? @db.Timestamp(3) /// 수정일시
+  mod_dt    DateTime? @db.Timestamptz(3) /// 수정일시
   mod_id    String?   @db.VarChar(100) /// 수정자 ID
 
   @@id([author_id, menu_id])
@@ -241,9 +241,9 @@ model GroupCode {
   group_code_nm String    @db.VarChar(200)   /// 그룹코드명
   group_code_dc String?   @db.VarChar(200)   /// 그룹코드 설명
   use_at        String    @default("Y") @db.VarChar(5) /// 사용여부
-  reg_dt        DateTime? @db.Timestamp(3)   /// 생성일시
+  reg_dt        DateTime? @db.Timestamptz(3)   /// 생성일시
   reg_id        String?   @db.VarChar(100)   /// 생성자 ID
-  mod_dt        DateTime? @db.Timestamp(3)   /// 수정일시
+  mod_dt        DateTime? @db.Timestamptz(3)   /// 수정일시
   mod_id        String?   @db.VarChar(100)   /// 수정자 ID
 
   @@map("tc_group_code")
@@ -260,9 +260,9 @@ model Code {
   code_dc     String?   @db.VarChar(200) /// 코드 설명
   sort_ordr   Int?      @default(1)      /// 정렬순서
   use_at      String    @default("Y") @db.VarChar(5) /// 사용여부
-  reg_dt      DateTime? @db.Timestamp(3) /// 생성일시
+  reg_dt      DateTime? @db.Timestamptz(3) /// 생성일시
   reg_id      String?   @db.VarChar(100) /// 생성자 ID
-  mod_dt      DateTime? @db.Timestamp(3) /// 수정일시
+  mod_dt      DateTime? @db.Timestamptz(3) /// 수정일시
   mod_id      String?   @db.VarChar(100) /// 수정자 ID
 
   @@id([group_code, code])
@@ -285,9 +285,9 @@ model AiChatHistory {
   question String    @db.Text                      /// 사용자 질문
   answer   String?   @db.Text                      /// AI 답변 (스트리밍 중·중단 시 비어 있을 수 있음)
   flag     Int       @default(1)                   /// 유효 플래그 (1=유효, 그 외=조회 제외)
-  reg_dt   DateTime? @db.Timestamp(3)              /// 생성일시
+  reg_dt   DateTime? @db.Timestamptz(3)              /// 생성일시
   reg_id   String?   @db.VarChar(100)              /// 생성자 ID
-  mod_dt   DateTime? @db.Timestamp(3)              /// 수정일시
+  mod_dt   DateTime? @db.Timestamptz(3)              /// 수정일시
   mod_id   String?   @db.VarChar(100)              /// 수정자 ID
 
   /// 조회 조건(email·gid·flag) + 정렬(sort) 그대로 — 히스토리 조회가 인덱스만으로 끝나게
@@ -302,7 +302,7 @@ model EmailLog {
   subject   String   @db.VarChar(200) /// 제목
   status    String   @db.VarChar(10)  /// 발송 상태
   error_msg String?  @db.VarChar(500) /// 에러 메시지
-  reg_dt    DateTime @db.Timestamp(3) /// 발송일시
+  reg_dt    DateTime @db.Timestamptz(3) /// 발송일시
 
   @@map("th_email_log")
 }

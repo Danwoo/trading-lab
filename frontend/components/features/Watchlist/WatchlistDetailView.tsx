@@ -78,11 +78,15 @@ export default function WatchlistDetailView({ data, onEdit, onDelete, writeDenie
             </TableCell>
           </TableRow>
           <TableRow>
-            <TableCell label="생성일시">{data.reg_dt}</TableCell>
+            <TableCell label="생성일시" dataType="datetime">
+              {data.reg_dt}
+            </TableCell>
             <TableCell label="생성자">{data.reg_id}</TableCell>
           </TableRow>
           <TableRow>
-            <TableCell label="수정일시">{data.mod_dt}</TableCell>
+            <TableCell label="수정일시" dataType="datetime">
+              {data.mod_dt}
+            </TableCell>
             <TableCell label="수정자">{data.mod_id}</TableCell>
           </TableRow>
         </TableGroup>

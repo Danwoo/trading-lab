@@ -14,6 +14,7 @@
     // ── .github/workflows/ci.yml 이 `node scripts/<이름>` 으로 직접 실행한다 ──
     "scripts/check-terminal-devextreme-transitive.js", // ci.yml "전이 devextreme 의존 검사"
     "scripts/check-no-kst-time-in-routes.js", // ci.yml "app/api 라우트 getKSTTime() 재유입 검사"
+    "scripts/check-datetime-cell-datatype.js", // ci.yml "시각 셀 dataType 누락 검사"
     "scripts/check-dead-code.js", // ci.yml "죽은 코드 상한" — 이 설정을 읽는 스크립트 자신
     "scripts/check-tables-sql-reproducible.js", // ci.yml "tables.sql 재현 대조"
     "scripts/generate-brand-assets.js", // ci.yml "브랜드 자산 재현 대조" + scripts/verify_public_release_tree.py

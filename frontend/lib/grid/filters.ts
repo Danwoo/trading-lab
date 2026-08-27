@@ -173,7 +173,14 @@ const _DATE_LIKE_RE = /^\d{4}[-/]\d{2}[-/]\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$/;
 function coerceValue(value: any): any {
   if (typeof value !== "string") return value;
   if (_DATE_LIKE_RE.test(value)) {
-    // 슬래시를 하이픈으로, 공백을 T로 변환 후 Z 추가 → UTC로 강제 해석
+    // 슬래시를 하이픈으로, 공백을 T 로 바꾸고 `Z` 를 붙인다.
+    //
+    // 이 함수의 본체는 **문자열을 Date 로 바꾸는 것**이다 — 그래야 Prisma 가 datetime 비교로
+    // 바인딩한다. `Z` 는 그 과정에서 "이 자릿수를 어느 인스턴트로 읽을까"를 정하는 부분이고,
+    // 감사 컬럼이 `timestamptz` 로 옮겨진 뒤에도 **그대로 둔다** (#359): 어댑터는 Date 를 UTC
+    // 자릿수 문자열로 보내고 세션 tz 는 UTC 로 고정돼 있으므로, `Z` 는 "UTC 로 강제"가 아니라
+    // 사실을 그대로 적은 표식이 됐다. 떼면 브라우저 로컬 tz 로 읽혀 필터 경계가 사용자마다
+    // 달라진다.
     const normalized = value.replace(/\//g, "-").replace(" ", "T") + "Z";
     const d = new Date(normalized);
     if (!isNaN(d.getTime())) return d;

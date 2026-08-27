@@ -191,7 +191,8 @@ jobs:
             --skip verify_no_orphan_personal_workspaces.py \
             --skip verify_frontend_fk_referential_actions.py \
             --skip verify_bot_round_trip.py \
-            --skip verify_schema_guard_on_downgraded_db.py
+            --skip verify_schema_guard_on_downgraded_db.py \
+            --skip verify_timestamptz_using.py
 
       - name: backend — standalone tests (tests/test_*.py, fail-closed)
         working-directory: backend-service
@@ -267,6 +268,37 @@ jobs:
           case "$out" in
             *"REQUIRE=db 실행됨"*) : ;;
             *) echo "::error::검사가 실제로 돌지 않았다 — 건너뜀은 통과가 아니다"; exit 1 ;;
+          esac
+
+      # 0019 의 `USING` 술어 (#359). 아래 「Apply migrations to empty DB」 는 **빈 DB** 에 올리므로 값 해석이 한 번도
+      # 실행되지 않는다 — 이 리비전의 위험은 DDL 구문이 아니라 기존 값의 뜻에 있다.
+      # 리비전의 SQL 생성 함수를 그대로 import 해 쓰므로 두 벌이 갈리지 않는다.
+      - name: timestamptz USING 술어 검증 (기원별 해석·되돌리기)
+        working-directory: backend-service
+        if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
+        env:
+          TIMESTAMPTZ_USING_TEST_DB_URL: "postgresql://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci"
+        run: |
+          out=$(uv run python scripts/verify_timestamptz_using.py --i-know-this-drops-tables)
+          echo "$out"
+          case "$out" in
+            *"REQUIRE=db 실행됨"*) : ;;
+            *) echo "::error::검사가 실제로 돌지 않았다 (DB URL 이 안 닿았다) — 건너뜀은 통과가 아니다"; exit 1 ;;
+          esac
+
+      # 세션 tz 기동 가드 (#359) — 대역을 끼우면 "옵션이 서버까지 가는가"가 빠지는데 그게 이
+      # 가드가 지키는 바로 그것이다. 진짜 커넥션 둘에 태운다.
+      - name: 세션 타임존 기동 가드 검증
+        working-directory: backend-service
+        if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
+        env:
+          SESSION_TIMEZONE_TEST_DB_URL: "postgresql+psycopg://ci:ci@localhost:${{ job.services.postgres.ports['5432'] }}/ci"
+        run: |
+          out=$(uv run python scripts/verify_session_timezone_guard.py)
+          echo "$out"
+          case "$out" in
+            *"REQUIRE=db 실행됨"*) : ;;
+            *) echo "::error::검사가 실제로 돌지 않았다 (DB URL 이 안 닿았다) — 건너뜀은 통과가 아니다"; exit 1 ;;
           esac
 
       - name: 백테스트 실행이 결과를 남기는지 검증
@@ -569,6 +601,13 @@ jobs:
       - name: app/api 라우트 getKSTTime() 재유입 검사
         if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
         run: node scripts/check-no-kst-time-in-routes.js
+
+      # 시각 셀의 dataType 누락 (#359) — 빠지면 TableCell 이 기본값 string 으로 떨어져 오프셋
+      # 문자열을 날것으로 그린다. 목록(그리드)은 formatDate 로 그리므로 같은 행이 화면 안에서
+      # 갈린다. 타입 검사는 통과하는 결함이라(선택 prop) 정적으로 센다.
+      - name: 시각 셀 dataType 누락 검사
+        if: ${{ !cancelled() && steps.paths.outputs.run == 'true' }}
+        run: node scripts/check-datetime-cell-datatype.js
 
       # --ignore-scripts: 루트 postinstall(prisma generate)과 엔진 다운로드를 건너뛴다.
       # install script 를 가진 devDependency 는 sharp 하나뿐이고(#361), 그 스크립트는
@@ -922,6 +961,13 @@ jobs:
       # 판정 + **배선 구조 자체**. 글롭 의미만 보면 "판정은 맞는데 아무도 안 부르는" 상태가
       # 초록이므로, on.paths 재유입·판정 잡 부재·`if:` 안 읽는 잡·추적 파일을 하나도 안 무는
       # 죽은 패턴을 같이 본다. 이 잡은 경로 필터가 없어 그 그물 자신은 항상 돈다.
+
+      # db-migrate 의 순서 판정 (#359) — 「모르는 상태」가 파괴적인 쪽(push 먼저)으로 흐르면
+      # frontend 35컬럼이 USING 없이 바뀌어 기존 값의 뜻이 사라진다. 명령을 process-compose.yaml
+      # 에서 뽑아 그대로 돌린다(사본을 검사하면 「내가 적어 둔 명령」을 확인하게 된다).
+      - name: db-migrate 순서 판정 fail-closed 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_db_migrate_order.py
 
       - name: 경로 필터 판정·배선 검사
         if: ${{ !cancelled() }}

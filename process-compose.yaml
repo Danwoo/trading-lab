@@ -54,10 +54,43 @@ processes:
   # 이 자리는 **이 파일로 띄운 backend 만** 덮는다 — 손으로 띄우는 경로(루트 CLAUDE.md 의
   # `cd <backend>/app && uvicorn …`)는 여기를 안 지난다. 그래서 판 대조는 앱 안에도 있다
   # (`backend-service/app/core/schema_version.py` — 어긋나면 기동 거부, #311).
+  # ── 순서가 두 번 나오는 이유 (#333 · #359) ────────────────────────────────
+  # 종전엔 `push → alembic` 한 벌이었다. 0005·0007 이 frontend 테이블을 필요로 해서다.
+  # 그런데 0019 는 **반대**를 요구한다: `frontend` 의 naive 값을 행 기원별 `USING` 으로 옮기는데,
+  # push 가 먼저 돌면 같은 컬럼을 `USING` 없이 `SET DATA TYPE TIMESTAMPTZ(3)` 로 바꿔 버려
+  # (SafeCast — 경고도 없다) 자릿수의 뜻을 push 커넥션의 세션 tz 하나로 뭉갠다. 한 컬럼에 두
+  # 기원이 섞인 테이블에서는 어느 세션 tz 로 돌려도 절반이 틀린다.
+  #
+  # 두 요구를 다 만족시키는 순서가 아래다:
+  #   1) **기존 DB 만** alembic 을 먼저 돌린다 — frontend 값이 아직 naive 인 동안 0019 가 옮긴다.
+  #      신규 DB 는 frontend 스키마가 없어 0005·0007 가드가 죽으므로 `to_regclass` 로 건너뛴다.
+  #   2) push — 기존 DB 에서는 타입이 이미 맞아 no-op(스크래치 실측: "already in sync"),
+  #      신규 DB 에서는 여기서 frontend 스키마가 처음 만들어진다.
+  #   3) alembic 한 번 더 — 신규 DB 가 1) 에서 건너뛴 리비전을 여기서 적용한다. 기존 DB 에서는
+  #      이미 head 라 no-op 이다.
   db-migrate:
     command: |
       bash -c 'set -e
       python3 scripts/verify_alembic_head_freshness.py --fetch
+      rc=0
+      present=$(cd backend-service/app && APP_ENV=development uv run python ../scripts/frontend_schema_present.py) || rc=$?
+      if [ "$rc" -ne 0 ]; then
+        echo "db-migrate: frontend 스키마 유무를 판정하지 못했다 (rc=$rc) — 순서를 정할 수 없으므로 멈춘다" >&2
+        exit 1
+      fi
+      case "$present" in
+        t)
+          echo "db-migrate: 기존 DB — prisma db push 앞에서 alembic 을 먼저 돌린다 (#359)"
+          (cd backend-service/alembic   && APP_ENV=development uv run python -m alembic upgrade head)
+          ;;
+        f)
+          echo "db-migrate: 신규 DB (frontend.tn_user 없음) — push 가 스키마를 먼저 만든다"
+          ;;
+        *)
+          echo "db-migrate: 스키마 판정값이 t/f 가 아니다: [$present] — 순서를 정할 수 없으므로 멈춘다" >&2
+          exit 1
+          ;;
+      esac
       (cd frontend                    && npm run dev:prisma:push)
       (cd backend-service/alembic     && APP_ENV=development uv run python -m alembic upgrade head)'
     depends_on:
