@@ -47,8 +47,26 @@ const A_BOT = {
         name: "이동평균 눌림목",
         timeframe: "1d",
         fields: [
-          { name: "ma_period", label: "평균선 기간", control: "number", default: 20, min: 5, max: 120, step: 1, unit: "일" },
-          { name: "dip_pct", label: "눌림 깊이", control: "number", default: 3, min: 0.5, max: 15, step: 0.5, unit: "%" },
+          {
+            name: "ma_period",
+            label: "평균선 기간",
+            control: "number",
+            default: 20,
+            min: 5,
+            max: 120,
+            step: 1,
+            unit: "일",
+          },
+          {
+            name: "dip_pct",
+            label: "눌림 깊이",
+            control: "number",
+            default: 3,
+            min: 0.5,
+            max: 15,
+            step: 0.5,
+            unit: "%",
+          },
         ],
       },
       missing_reason: null,
@@ -63,7 +81,14 @@ afterEach(() => {
 
 function Harness({ onRun }: { onRun: (input: BacktestGridIn) => void }) {
   const controller = useGridRunForm();
-  return <GridRunForm bots={[{ bot_id: 1, bot_nm: "봇" } as never]} controller={controller} isRunning={false} onRun={onRun} />;
+  return (
+    <GridRunForm
+      bots={[{ bot_id: 1, bot_nm: "봇" } as never]}
+      controller={controller}
+      isRunning={false}
+      onRun={onRun}
+    />
+  );
 }
 
 async function givenFormWithBot() {

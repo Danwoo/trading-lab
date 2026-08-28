@@ -92,8 +92,7 @@ const UNREADABLE_MESSAGE = "숫자로 읽을 수 없습니다 — 숫자와 쉼�
  */
 function outOfRangeMessage(value: number | null | undefined, min?: number, max?: number): string | undefined {
   if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
-  if (min !== undefined && max !== undefined && (value < min || value > max))
-    return `${min}~${max} 사이로 적으세요.`;
+  if (min !== undefined && max !== undefined && (value < min || value > max)) return `${min}~${max} 사이로 적으세요.`;
   if (min !== undefined && value < min) return `${min} 이상으로 적으세요.`;
   if (max !== undefined && value > max) return `${max} 이하로 적으세요.`;
   return undefined;
