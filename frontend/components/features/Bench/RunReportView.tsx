@@ -14,14 +14,27 @@ import type {
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { redactReason } from "@/utils/common/errors/redactReason";
 
-/** 등락 숫자 하나 — 부호를 항상 함께 그린다 (디자인 시스템 §2.3). */
-function SignedPct({ value, unit }: { value: number; unit: string }) {
-  const negative = value < 0;
+/**
+ * 원 단위 정수로 반올림 — 0.5 는 0 에서 먼 쪽으로(−4,123.5 → −4,124). `Math.round` 는 음수의
+ * 반을 0 쪽으로 올려 부호에 따라 규칙이 갈린다.
+ */
+function roundWon(value: number): number {
+  return Math.sign(value) * Math.round(Math.abs(value));
+}
+
+/**
+ * 부호 붙은 원화 — 부호를 항상 함께 그린다 (디자인 시스템 §2.3).
+ *
+ * 정수다. 체결은 1주 단위인데 비용이 비율이라 실현손익에 소수가 남고, 그대로 찍으면 한 표 안에서
+ * `+1,810,707.32` 와 `+281,622` 가 섞인다 — 평가액(`won`)과 같은 규칙으로 맞춘다.
+ */
+function SignedWon({ value }: { value: number }) {
+  const whole = roundWon(value);
+  const negative = whole < 0;
   return (
     <span className={cn("tabular-nums", negative ? "text-market-down" : "text-market-up")}>
       {negative ? "−" : "+"}
-      {Math.abs(value).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}
-      {unit}
+      {Math.abs(whole).toLocaleString("ko-KR")}
     </span>
   );
 }
@@ -68,7 +81,7 @@ function MetricsList({ metrics }: { metrics: MetricOut[] }) {
 
 /** 원 단위 정수 표기 — 소수점은 평가액에서 읽을 것이 없다. */
 function won(value: number): string {
-  return Math.round(value).toLocaleString("ko-KR");
+  return roundWon(value).toLocaleString("ko-KR");
 }
 
 /**
@@ -153,7 +166,7 @@ function TradeList({ trades, openPosition }: { trades: TradeOut[]; openPosition:
                 {trade.realized_pnl === null ? (
                   <span className="text-ink-muted">미청산</span>
                 ) : (
-                  <SignedPct value={trade.realized_pnl} unit="" />
+                  <SignedWon value={trade.realized_pnl} />
                 )}
               </td>
             </tr>

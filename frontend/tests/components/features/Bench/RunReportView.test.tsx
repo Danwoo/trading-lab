@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 
 import { RunReportView } from "@/components/features/Bench/RunReportView";
-import type { MetricOut, OpenPositionOut, RunReportOut } from "@/schemas/backtest/backtest";
+import type { MetricOut, OpenPositionOut, RunReportOut, TradeOut } from "@/schemas/backtest/backtest";
 
 // jsdom 에는 캔버스가 없다 — 차트 팩토리는 브라우저 실측이 정본이고, 여기서는 데이터·문구만 본다.
 vi.mock("@/lib/bench/equityChart", () => ({
@@ -90,6 +90,26 @@ function report(overrides: Partial<RunReportOut> = {}): RunReportOut {
   };
 }
 
+function trade(overrides: Partial<TradeOut> = {}): TradeOut {
+  return {
+    trade_id: 1,
+    instrument_id: 10,
+    side: "BUY",
+    entry_ts: "2026-01-02",
+    exit_ts: "2026-01-10",
+    qty: 3,
+    fill_price: 100,
+    exit_price: 110,
+    fee: 0.1,
+    slippage: 0.1,
+    tax: 0.2,
+    realized_pnl: 30,
+    mae: null,
+    mfe: null,
+    ...overrides,
+  };
+}
+
 describe("RunReportView", () => {
   it("지표 순서는 서버(D-Q2)의 것이다 — 최장 미회복 기간이 맨 위, 샤프가 맨 뒤", () => {
     render(<RunReportView report={report()} />);
@@ -148,6 +168,26 @@ describe("RunReportView", () => {
 
     const section = screen.getByRole("region", { name: "거래 목록" });
     expect(section.textContent).toContain("+30");
+  });
+
+  it("원화 실현손익은 정수로 찍는다 — 같은 표 안에서 소수 자릿수가 갈리지 않는다 (F7)", () => {
+    // 실측(리포트 → 거래 목록): 비용이 비율이라 원 단위 정수 체결에도 소수가 남아
+    // `+1,810,707.32` 와 `+281,622` 가 한 표 안에 섞였다. 원화는 `won()` 과 같은 규칙(반올림)이다.
+    const mixed = report({
+      trades: [
+        trade({ trade_id: 1, realized_pnl: 1810707.32 }),
+        trade({ trade_id: 2, realized_pnl: 281622 }),
+        trade({ trade_id: 3, realized_pnl: -4123.5 }),
+      ],
+    });
+    render(<RunReportView report={mixed} />);
+
+    const section = screen.getByRole("region", { name: "거래 목록" });
+    const pnl = within(section)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell").at(-1)?.textContent?.trim());
+    expect(pnl).toEqual(["+1,810,707", "+281,622", "−4,124"]);
   });
 
   it("비용 가정 3종을 그대로 읽어 준다 — 이 숫자들이 무엇 위에 서 있는지", () => {
