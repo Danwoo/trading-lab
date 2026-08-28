@@ -74,6 +74,12 @@ MERGED_BY = {
     "delegate": "지휘자",  # 지휘자가 위임 머지 워크플로를 돌렸다
 }
 UNKNOWN = "미상"
+# 「에이전트 신원이 하나도 없다」는 **사람이라는 뜻이 아니다** — 신원 설정을 빠뜨린 에이전트도
+# 같은 모양이고 리드와 같은 git 신원을 쓰므로 가를 수 없다. 종전엔 이 자리를 「사람」으로
+# 적었는데, 그것은 없는 사실을 기록하는 것이다 (CONTEXT 2026-08-09: 「모르는 것은 미상으로
+# 적는다」). 바로 앞 `UNKNOWN` 과 구분되게 사유를 함께 싣는다 — 그쪽은 커밋을 아예 못 읽었거나
+# 신원이 판독 불가인 경우다.
+NO_IDENTITY = "미상(신원 없음)"
 COAUTHOR_PREFIX = "Co-authored-by: "
 
 
@@ -207,14 +213,14 @@ def describe_author(commits, head_ref) -> str:
         # 어휘 밖 에이전트형 신원은 사람이 아니라 판독 불가다 (review_record 와 같은 규율)
         return UNKNOWN
     vendors = identity["vendors"]
-    human = any(e and not e.endswith("@noreply.local") for e in emails)
+    no_identity = any(e and not e.endswith("@noreply.local") for e in emails)
     if not vendors:
-        return "사람" if human else UNKNOWN
+        return NO_IDENTITY if no_identity else UNKNOWN
     tier = identity["author_tier"]
     label = ",".join(vendors)
     if vendors == ["claude"]:
         label = f"claude({tier or '티어 미상'})"
-    return f"{label} + 사람" if human else label
+    return f"{label} + {NO_IDENTITY}" if no_identity else label
 
 
 def describe_reviewer(model, tier) -> str:

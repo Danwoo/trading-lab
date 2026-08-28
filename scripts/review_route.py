@@ -4,6 +4,25 @@
 여기 하나다. 디스패치 쪽(§6.1 표·conductor·worker 스킬)이 이 형식에 맞춘다.
 신원 형식은 `<벤더>[-<티어>]-agent@noreply.local` 이고 **명시 목록만** 받는다 (와일드카드
 금지). 구형식 `<벤더>-agent@`(티어 미상)도 계속 유효하다.
+
+## 저자 판별의 세 갈래 — 「모르면 모른다」 (리드 결정 2026-08-28)
+
+브랜치 규약이 `feature/<이슈>-<설명>` 으로 바뀌며 이름에서 벤더 슬러그가 빠졌다. 그래서
+**커밋 신원이 유일한 저자 근거**다. 신호가 하나도 없을 때 무엇으로 떨어지느냐가 게이트를
+가른다:
+
+  commit-email  어휘 안 신원 1종 → `agent` · 2종 이상 → `mixed`
+  branch-name   커밋 신원이 없고 옛 이름 `fix-N-<벤더>` 이면 → `agent` (전환기 잔존, 아래 참조)
+  none          **아무 신호도 없으면 → `unknown`** — 사람일 수도, 신원 설정을 빠뜨린
+                에이전트일 수도 있고 **둘을 가를 방법이 없다** (리드와 에이전트가 같은
+                GitHub 계정·같은 git 신원을 쓴다). 종전에는 이 자리가 `human` 이었고,
+                그 관대함이 신원을 빠뜨린 에이전트 PR 을 사람으로 읽어 자기리뷰 arm 까지
+                흘려보냈다. 이제 `unknown` 이고 **`review_record.judge_author_identity`
+                가 arm 을 거부한다** (봇 PR 만 면제 — 봇 신원은 GitHub 이 보증한다).
+
+`unknown` 은 리뷰를 막지 않는다 — 리뷰어는 종전대로 배정되고(claude) 판정 코멘트도 남는다.
+막는 것은 **자동 머지 arm 하나**다. 사람이 쓴 PR 은 사람이 버튼을 누르면 된다.
+`label_allowed` 는 종전과 같은 식이라 `unknown` 에서 자동으로 거짓이다.
 """
 
 import json
@@ -31,6 +50,17 @@ VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS
 _IDENTITY = re.compile(r"^(?P<vendor>claude|kimi|codex)(?:-(?P<tier>[a-z0-9.\-]+))?-agent@noreply\.local\Z")
 # 미상 신원 관측은 접미만 본다 — 앞 공백은 통과하고 뒤 공백은 못 통과한다
 _AGENTISH = re.compile(r"-agent@noreply\.local\Z", re.I)
+# 옛 브랜치 규약 `fix-<이슈>-<벤더>` 의 벤더 슬러그 — **전환기 잔존물이다.**
+# 새 규약(`feature/<이슈>-<설명>` · `chore/<설명>` · `docs/<주제>`, 리드 결정 2026-08-27)에는
+# 벤더 신호가 없다. 그래서 이 폴백은 옛 이름으로 열린 PR 이 남아 있는 동안만 의미가 있고,
+# 그 뒤로는 아무것도 매칭하지 않는다 — **없앨 조건은 판정 가능하게 적어 둔다**:
+#
+#     gh pr list --state open --limit 200 --json headRefName \
+#       --jq '[.[] | select(.headRefName | test("^fix-[0-9]+-(claude|kimi|codex)$"))] | length'
+#
+# 이 값이 0 이고 원격에도 그런 이름의 브랜치가 없으면 `_BRANCH`·`branch-name` 경로를 통째로
+# 지운다. 지울 때 `identify_author` 의 세 갈래(commit-email · branch-name · none)가 둘로 줄고
+# `_identity_note` 의 branch-name 가지도 함께 없어진다.
 _BRANCH = re.compile(r"^fix-[0-9]+-(?P<vendor>claude|kimi|codex)\Z")
 
 
@@ -74,7 +104,11 @@ def _identity_note(
             "라우팅·표기 전용 — 판정 라벨 미부착)"
         )
     else:
-        parts.append("에이전트 신원 없음 — 사람 저자 취급, 판정 라벨 미부착(사람 경로)")
+        parts.append(
+            "저자 신원 미상 — 커밋에 에이전트 신원이 없고 브랜치도 벤더를 선언하지 않는다. "
+            "사람일 수도, `git config --worktree user.email` 을 빠뜨린 에이전트일 수도 있어 "
+            "**둘을 가를 방법이 없다** — 판정 라벨 미부착 · 자동 머지 arm 거부(사람이 머지한다)"
+        )
 
     if unknown_agentish:
         parts.append(f"목록 밖 에이전트형 이메일 관측: {','.join(unknown_agentish)}")
@@ -136,7 +170,10 @@ def identify_author(emails, head_ref):
             "branch-name",
         )
     else:
-        author_kind, author_vendor, identity_source = "human", None, "none"
+        # **「모르면 사람」이 아니라 「모르면 모른다」** — 이 자리가 `human` 이던 동안,
+        # 신원 설정을 빠뜨린 에이전트 PR 이 사람 저자로 읽혀 자기리뷰 차단을 통과했다.
+        # 값을 바꾸는 것만으로 닫히지는 않는다 — arm 을 거부하는 것은 `review_record` 다.
+        author_kind, author_vendor, identity_source = "unknown", None, "none"
 
     return {
         "author_kind": author_kind,
@@ -182,7 +219,9 @@ def decide(emails, head_ref, issue_risks, codex_on):
         reviewer = "codex" if (risk == "high" and codex_on) else "kimi"
     elif author_kind == "agent" and author_vendor == "codex":
         reviewer = "claude"
-    elif author_kind == "human":
+    elif author_kind == "unknown":
+        # 저자를 모른다고 리뷰까지 멈추지 않는다 — 리뷰어는 종전대로 claude 다.
+        # 「모른다」가 무는 것은 자동 머지 arm 하나이고 그 판정은 `review_record` 에 있다.
         reviewer = "claude"
     else:
         # 혼재 저자는 **자기 벤더가 아닌** 후보를 찾는다. 여기서는 codex_on 을 존중한다 —

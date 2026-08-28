@@ -639,14 +639,90 @@ ARM_CASES = [
         {"commit_author_emails": ["claude-agent@noreply.local"]},
         {"arm": True, "self_vendor": False},
     ),
+    # ── 저자 신원 미상 = arm 거부 (리드 결정 2026-08-28, 브랜치 규약 전환) ──────────
+    # 종전에는 이 입력이 `arm: True` 였다. 에이전트형이 아닌 이메일뿐이면 `review_route` 가
+    # `human` 을 내고, 자기리뷰 축(`self_vendor`)에 해당 없음으로 통과했기 때문이다.
+    # 브랜치명이 벤더를 싣던 동안에는 그 폴백이 남아 있었지만 새 규약에는 없다 —
+    # 즉 **신원 설정을 빠뜨린 에이전트 PR 이 사람으로 읽혀 자기리뷰 arm 까지 갔다.**
     (
-        "사람 저자(에이전트형이 아닌 이메일) → 자기리뷰 축 미해당, risk: low 면 arm",
+        "저자 신원 미상(에이전트형이 아닌 이메일 + 새 형식 브랜치) → arm 거부  (fail-closed)",
         {
             "marker_model": "claude",
             "commit_author_emails": ["dev@example.test"],
-            "head_ref": "feature/x",
+            "head_ref": "feature/359-timestamptz-audit-columns",
         },
-        {"arm": True, "self_vendor": False, "identity_source": "none"},
+        {
+            "arm": False,
+            "self_vendor": False,
+            "author_kind": "unknown",
+            "identity_source": "none",
+        },
+    ),
+    (
+        "저자 신원 미상 + risk: low 여도 arm 거부 — 위험도가 낮다고 신원이 생기지 않는다",
+        {
+            "marker_model": "kimi",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "chore/ci-npm-cache",
+            "issue_refs": [{"number": 23, "labels": ["risk: low"]}],
+        },
+        {"arm": False, "risk": "low", "author_kind": "unknown"},
+    ),
+    (
+        # 봇 면제가 없으면 dependabot 자동 머지가 통째로 멎는다 — 봇 신원은 GitHub 이 보증한다
+        # (`pr_authorship` 의 R1·R2 면제와 같은 근거). 위 두 케이스와 **같은 신원 모양**인데
+        # `pr_author_is_bot` 하나로 갈린다는 것이 이 케이스의 요점이다.
+        "봇 PR 은 신원 미상이어도 arm — 면제는 봇 플래그 하나로만 열린다",
+        {
+            "marker_model": "claude",
+            "pr_author_is_bot": True,
+            "pr_author_login": "dependabot[bot]",
+            "pr_title": "build(deps): bump pyjwt from 2.12.1 to 2.13.0 in /template-mcp-service",
+            "issue_refs": [],
+            "commit_author_emails": ["49699333+dependabot[bot]@users.noreply.github.com"],
+            "head_ref": "dependabot/uv/template-mcp-service/pyjwt-2.13.0",
+        },
+        {"arm": True, "author_kind": "unknown", "bot_bump": "non-major"},
+    ),
+    (
+        # 옛 형식은 전환기 동안 계속 읽힌다 — 브랜치명이 벤더를 실으면 미상이 아니다.
+        # 그리고 그 값은 **자기리뷰 차단으로 이어진다** (공격 ⑨ 케이스와 같은 계약).
+        "옛 형식 브랜치 + 신원 없음 → 미상이 아니라 branch-name 판별 (전환기)",
+        {
+            "marker_model": "kimi",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "fix-42-claude",
+        },
+        {"arm": True, "author_kind": "agent", "identity_source": "branch-name", "self_vendor": False},
+    ),
+    (
+        "새 형식 + claude 신원 + claude 리뷰 → 자기리뷰 차단은 그대로 선다  (티어 미상)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["claude-agent@noreply.local"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+        },
+        {"arm": False, "self_vendor": True, "author_kind": "agent", "author_tier": None},
+    ),
+    (
+        "새 형식 + claude/opus 저자 + claude/opus 리뷰 → 동일-티어 자기리뷰 차단",
+        {
+            "marker_model": "claude",
+            "marker_tier": "opus",
+            "commit_author_emails": ["claude-opus-agent@noreply.local"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+        },
+        {"arm": False, "self_vendor": True, "author_tier": "opus", "reviewer_tier": "opus"},
+    ),
+    (
+        "새 형식 + claude/opus 저자 + claude/sonnet 리뷰 → 티어가 갈리면 arm",
+        {
+            "marker_model": "claude",
+            "marker_tier": "sonnet",
+            "commit_author_emails": ["claude-opus-agent@noreply.local"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+        },
+        {"arm": True, "self_vendor": True, "author_tier": "opus", "reviewer_tier": "sonnet"},
     ),
     (
         "어휘 밖 티어 신원(claude-opus5-agent@) → 사람 저자로 접지 않고 arm 거부  (공격 ⑨)",

@@ -30,8 +30,15 @@ GitHub 이 자기 PR 자기 승인을 금지해 로컬 `gh`(리드 계정)로는
 
 조건 ③ 은 cross-review.yml 의 동일-벤더 폴백 차단을 arm 조건으로 승계한 것이다: 리뷰어
 벤더가 저자 벤더와 같으면 교차 축이 티어뿐이다. 저자 신원은 커밋 author 이메일(1순위)·
-브랜치명으로 읽고, 리뷰어 티어는 마커의 `tier=`(기동 배너 관측값)로 읽는다. **어느 쪽이든
-판독이 안 되면 arm 하지 않는다** (fail-closed). 신원 형식의 SoT 는 `review_route` 하나다.
+브랜치명(옛 규약 잔존)으로 읽고, 리뷰어 티어는 마커의 `tier=`(기동 배너 관측값)로 읽는다.
+**어느 쪽이든 판독이 안 되면 arm 하지 않는다** (fail-closed). 신원 형식의 SoT 는
+`review_route` 하나다.
+
+조건 ③ 은 **저자 신원이 아예 없는 경우도 막는다** (리드 결정 2026-08-28). 새 브랜치 규약
+(`feature/<이슈>-<설명>`)에는 벤더 슬러그가 없어 커밋 신원이 유일한 근거인데, 그 신원이
+없으면 사람인지 신원 설정을 빠뜨린 에이전트인지 가를 수 없다 — 「모르면 사람」이 아니라
+「모르면 모른다」다. 봇 PR 은 면제(GitHub 이 신원을 보증한다). 자세한 근거는
+`judge_author_identity` 의 docstring.
 
 위험도의 SoT 는 **이슈의 risk 라벨**이고 판정 시점마다 fresh 조회한다 (구 merge-router.yml 이
 못 박은 규칙 승계). 이슈 연결은 `closingIssuesReferences` 가 아니라 **PR 본문 파싱**으로 읽는다
@@ -484,6 +491,15 @@ def judge_author_identity(payload) -> dict:
     없으므로 arm 을 거부한다 (리뷰 자체와 코멘트·네이티브 리뷰 기록은 그대로 남는다).
     신원을 아예 못 읽어도 거부한다 — 못 읽으면 arm 하지 않는다.
 
+    **저자 신원이 아예 없으면 arm 하지 않는다** (리드 결정 2026-08-28). 브랜치 규약이
+    `feature/<이슈>-<설명>` 으로 바뀌며 이름의 벤더 슬러그가 사라져 **커밋 신원이 유일한
+    저자 근거**가 됐다. 그 신원이 없을 때 `review_route` 는 `author_kind="unknown"` 을 내는데,
+    그것은 「사람이다」가 아니라 「사람인지 신원 설정을 빠뜨린 에이전트인지 모른다」다 — 리드와
+    에이전트가 같은 GitHub 계정·같은 git 신원을 쓰므로 둘을 가를 방법이 없다. 모르는 채로
+    통과시키면 자기리뷰가 조용히 arm 되므로 여기서 막는다. **봇 PR 은 면제다** — 봇 신원은
+    GitHub 이 보증하고(`pr_authorship` 의 R1~R4 면제와 같은 근거), 막으면 dependabot 자동
+    머지가 통째로 멎는다. 막힌 PR 은 리뷰·코멘트·승인은 그대로 받고 **사람이 버튼을 누른다.**
+
     **어휘 밖 에이전트형 이메일은 「사람 저자」가 아니라 「판독 불가」다.** 어휘
     (`review_route` 의 티어·벤더 목록)는 새 모델이 붙을 때 사람이 갱신하므로, 디스패치가
     어휘보다 먼저 도는 창이 반드시 생긴다. 그 창에서 저자 벤더를 모른 채 통과시키면
@@ -511,6 +527,7 @@ def judge_author_identity(payload) -> dict:
         "author_models": None,
         "author_tier": None,
         "reviewer_tier": reviewer_tier,
+        "author_kind": None,
         "identity_source": None,
         "unknown_agentish": None,
         "block": None,
@@ -535,6 +552,7 @@ def judge_author_identity(payload) -> dict:
         "author_models": author_models or None,
         "author_tier": identity["author_tier"],
         "reviewer_tier": reviewer_tier,
+        "author_kind": identity["author_kind"],
         "identity_source": identity["identity_source"],
         "unknown_agentish": unknown_agentish or None,
         "block": None,
@@ -545,6 +563,15 @@ def judge_author_identity(payload) -> dict:
             "block": "어휘 밖 에이전트형 커밋 신원("
             + ", ".join(unknown_agentish)
             + ") — 저자 벤더를 판정할 수 없어 arm 하지 않는다 (fail-closed)",
+        }
+    # 저자 미상 — 「사람이다」가 아니라 「모른다」다 (위 docstring). `self_vendor` 는 저자
+    # 벤더 목록이 비어 늘 거짓이므로 아래 자기리뷰 축에 걸리지 않는다. 그래서 여기서 막는다.
+    if identity["author_kind"] == "unknown" and not payload.get("pr_author_is_bot"):
+        return {
+            **result,
+            "block": "저자 신원 미상(커밋에 에이전트 신원 없음 · 브랜치도 벤더 미선언) — "
+            "사람인지 `git config --worktree user.email` 을 빠뜨린 에이전트인지 가를 수 없어 "
+            "자기리뷰를 배제할 수 없다. arm 하지 않는다 (fail-closed — 사람이 머지한다)",
         }
     if not self_vendor:
         return result
@@ -598,6 +625,7 @@ def decide_arm(payload) -> dict:
         "author_models": identity["author_models"],
         "author_tier": identity["author_tier"],
         "reviewer_tier": identity["reviewer_tier"],
+        "author_kind": identity["author_kind"],
         "identity_source": identity["identity_source"],
         "unknown_agentish": identity["unknown_agentish"],
     }
