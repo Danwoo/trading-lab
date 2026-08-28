@@ -35,8 +35,10 @@ is closed at the code level and only a strategy that passed verification will ev
 
 ## Run it
 
-You need Python 3.12, Node 20+, [uv](https://docs.astral.sh/uv/),
-[process-compose](https://github.com/F1bonacc1/process-compose), and Docker.
+You need Python 3.12, Node 20+, and [uv](https://docs.astral.sh/uv/). The one-command path below
+also uses [process-compose](https://github.com/F1bonacc1/process-compose) and Docker — if you have
+neither, [Without Docker or process-compose](#without-docker-or-process-compose) runs the same
+stack without them.
 
 ```bash
 # 1. Create .env.development for every service (once).
@@ -77,6 +79,70 @@ the model, so `bootstrap_local_env.py` leaves `ROUTER_LLM_API_KEY` and `GENERATO
 defaults point at RFC 5737 documentation addresses that do not route. Set the base URL, model and
 key for both roles before asking a question; `GET /agent/llm` says what is configured and
 `POST /agent/llm/probe` says whether it actually answers.
+
+### Without Docker or process-compose
+
+Neither is required. Docker is the default only because `process-compose.yaml` starts the database
+with `docker run`; every other step is a plain command you can run yourself.
+
+**Without Docker.** Run PostgreSQL yourself on port 5442 and nothing else changes — no `.env` edits,
+and `process-compose up` still starts the rest. (Without Docker the `postgres` process says so and
+stops, rather than retrying forever.) The quickest way with no root and no daemon is
+[`pgserver`](https://pypi.org/project/pgserver/), a wheel that bundles PostgreSQL 16:
+
+```bash
+export PGDATA="$HOME/pgdata-trading-lab"
+PGBIN=$(uv run --with pgserver python -c \
+  "import pgserver, inspect, pathlib; print(pathlib.Path(inspect.getfile(pgserver)).parent / 'pginstall' / 'bin')")
+
+"$PGBIN/initdb" -D "$PGDATA" -U fintech --auth=trust -E UTF8
+"$PGBIN/pg_ctl" -D "$PGDATA" -l "$PGDATA/server.log" -o "-p 5442 -c listen_addresses=127.0.0.1" start
+"$PGBIN/psql" -h 127.0.0.1 -p 5442 -U fintech -d postgres \
+  -c "CREATE DATABASE fintech OWNER fintech" -c "ALTER ROLE fintech PASSWORD 'fintech'"
+```
+
+Any PostgreSQL 14+ works — a system package, Homebrew, Podman, a managed instance. The
+`pgvector/pgvector:pg16` image matters only for doc-search's real document index: doc-search creates
+the `vector` extension itself, and only once `USE_REAL_API=true`. Nothing else in the stack needs it.
+
+If your database is **not** on `localhost:5442`, four files name that port. Re-running
+`python3 scripts/bootstrap_local_env.py` is safe — it never overwrites — and it reports any file
+whose coordinates have drifted:
+
+| File | Key |
+| --- | --- |
+| `backend-service/app/.env.development` | `BACKEND_SQL_DB_HOST` · `BACKEND_SQL_DB_PORT` |
+| `multi-agent-service/app/.env.development` | `MULTI_AGENT_SQL_DB_HOST` · `MULTI_AGENT_SQL_DB_PORT` |
+| `doc-search-mcp-service/app/.env.development` | `DOC_VECTOR_DB_HOST` · `DOC_VECTOR_DB_PORT` |
+| `frontend/.env.development` | `DATABASE_URL` |
+
+**Without process-compose.** Run the steps it runs. On a fresh database:
+
+```bash
+# 1. Schema. The freshness check compares your checkout against origin/main; in a tree with no git
+#    remote (a release tarball, a ZIP download) it prints what it could not check and continues.
+python3 scripts/verify_alembic_head_freshness.py --fetch
+(cd frontend && npm run dev:prisma:push)
+(cd backend-service/alembic && APP_ENV=development uv run python -m alembic upgrade head)
+
+# 2. Seed, once. The first file is what step 4 above pipes through the container; the second adds
+#    backend demo rows (boards, watchlists, portfolios) and is optional.
+psql postgresql://fintech:fintech@localhost:5442/fintech -f frontend/prisma/init/seed.sql
+psql postgresql://fintech:fintech@localhost:5442/fintech -f backend-service/alembic/init/init.sql
+
+# 3. Services, one terminal each. The ports are not optional: `npm run dev` on its own listens on
+#    3000, and the frontend proxies the others where the service table below says they are.
+(cd backend-service/app && APP_ENV=development uv run python -m uvicorn main:app --reload --port 8000)
+(cd frontend && PORT=3010 npm run dev)
+```
+
+Start only what you use. The frontend and `backend-service` cover everything except the research
+chat, which also needs `multi-agent-service` and the MCP servers it calls — same command, with the
+`working_dir` and `--port` each one has in `process-compose.yaml`.
+
+If your database **already has** the `frontend` schema, run `alembic upgrade head` once *before*
+`prisma db push` as well. [`.docs/5-인프라셋팅/로컬-postgres.md`](.docs/5-인프라셋팅/로컬-postgres.md)
+has the long form of this section and explains why that order changes.
 
 For staging or production, use Docker Compose instead:
 
