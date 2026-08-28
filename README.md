@@ -239,7 +239,10 @@ label and the same three jobs move to self-hosted runners, with no other change 
 files. **A pull request from a fork always runs on GitHub-hosted runners regardless of that
 variable** — self-hosted runners are not exposed to code from forks. The review job is separate:
 it always runs on a self-hosted runner, and it is skipped for fork pull requests, so a fork gets
-the full build, test, and scan set but not the automated review.
+the full build, test, and scan set but not the automated review. A pull request that changes only
+documentation (`**.md`, `docs/**`) gets no automated review at all — the bot account approves it
+under the documentation exemption and enables auto-merge, and a comment on the PR says so, because
+"no review happened" must never look like "review passed".
 
 Contributions ship under the MIT license below.
 

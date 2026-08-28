@@ -1033,6 +1033,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_review_notice.py
 
+      # 문서 전용 정의의 lockstep (2026-08-28) — cross-review 의 paths-ignore 와 review_notice 의
+      # IGNORE_PATTERNS 가 같은 목록인가, docs-notice 의 승인 스텝이 그 판정부를 기본 브랜치
+      # 판본으로 쓰는가. 한쪽만 고치면 빈틈(리뷰도 승인도 없음)이나 겹침이 조용히 생긴다.
+      # 대조 0건이면 실패 (fail-closed).
+
+      - name: 문서 전용 lockstep 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_docs_only_lockstep.py
+
 
       # 고지 문서 생성기의 fail-closed 축 (앵커 파손·미분류 라이선스·§3 보존·--check).
       # frontend 잡의 `generate_notices.py --check` 는 **지금 트리가 맞는지**만 보인다 —
@@ -1187,6 +1196,25 @@ jobs:
   # 오류(API 실패)로 문서 PR 머지를 잠그면 안 된다. 실패는 ::error:: 로 남긴다.
   # 판정 자체는 fail-closed 다 — 파일 목록을 못 읽으면 고지하지 않는다 (리뷰가 돈 PR 에
   # 「리뷰 없음」을 잘못 붙이는 방향이 더 나쁘다).
+  #
+  # ── 문서 전용 PR → App 승인 + 자동 머지 arm (2026-08-28 리드 결정) ─────────────
+  # ruleset 이 승인 1 을 요구하는데 문서 전용 PR 은 cross-review 가 건너뛰어 승인자가 없다 —
+  # 영구 차단 (#408 실측). 면제 규약(루트 CLAUDE.md 「목표층 문서 변경 — 통행료를 걷지
+  # 않는다」: 문서만 바뀐 PR 은 독립 리뷰를 안 기다리고 바로 머지)을 App 승인으로 집행한다.
+  # 불변식: **cross-review 가 건너뛰는 PR 이 정확히 이 스텝이 승인하는 PR 이다** — 정의는
+  # scripts/review_notice.py `IGNORE_PATTERNS` 한 곳이고 scripts/verify_docs_only_lockstep.py 가
+  # cross-review 의 paths-ignore 와 정적으로 대조한다. 트리거 레벨 `paths` 로 판정하지 않는다
+  # (이 파일 머리 「경로 판정은 …」).
+  #   · 판정부는 **기본 브랜치 판본**을 내려받아 쓴다 — PR 트리의 판정부로 자기 승인을
+  #     판정하면 PR 이 그 판정을 고칠 수 있다 (cross-review 의 `judge/` 계약과 같다).
+  #   · 판정은 fail-closed — 파일 목록·판정부·PR 조회 중 하나라도 못 얻으면 승인하지 않는다.
+  #     `ci_path_filter.py` 의 「모르면 돌린다」와 극성이 반대다.
+  #   · fork 제외 — 시크릿이 없어 어차피 못 돌지만 스텝 `if:` 로 잠근다 (심층 방어). 고지
+  #     스텝은 fork 에도 남긴다.
+  #   · 멱등 — 같은 sha 에 App 승인이 이미 있으면 다시 게시하지 않는다.
+  #   · arm 은 App 토큰으로 — cross-review 가 arm 에 러너 로컬 gh 를 쓰는 이유(`workflows`
+  #     스코프)는 `.github/workflows/**` 를 담은 PR 의 것이라 문서 전용 PR 엔 해당 없다.
+  #     required 가 이미 전부 초록이면 GitHub 이 arm 을 거부하므로 그때는 직접 머지한다.
   docs-notice:
     name: "chore: docs-notice (비게이트)"
     # 초안에서는 안 돈다 — 테스트 잡과 같은 가드다. 초안 PR 은 아직 리뷰를 받을 상태가
@@ -1240,7 +1268,7 @@ jobs:
               echo "문서 전용 — 고지 이미 있음 (comment $EXISTING), 무행동"
               exit 0
             fi
-            BODY=$(printf '%s\n%s' "$MARKER" '**독립 리뷰 없음 — 문서 전용 PR.** 변경이 문서(`**.md`·`docs/**`)뿐이라 cross-review 가 돌지 않는다. 판정 코멘트도 네이티브 리뷰 기록도 생기지 않으므로, 체크가 전부 초록이어도 그것은 「리뷰 통과」가 아니라 「리뷰 없음」이다 — 사람이 읽는 것이 리뷰다.')
+            BODY=$(printf '%s\n%s' "$MARKER" '**독립 리뷰 없음 — 문서 전용 PR.** 변경이 문서(`**.md`·`docs/**`)뿐이라 cross-review 가 돌지 않는다. 뒤이어 App(`trading-lab-ci`)이 면제 규약(CLAUDE.md 「목표층 문서 변경」)에 따라 승인하고 자동 머지를 건다 — 그 승인은 「사람이 읽었다」가 아니다. 체크가 전부 초록이어도 그것은 「리뷰 통과」가 아니라 「리뷰 없음」이다 — 사람이 읽는 것이 리뷰다.')
             gh pr comment "$PR" --repo "$REPO" --body "$BODY" \
               && echo "문서 전용 — 「독립 리뷰 없음」 고지 게시" \
               || echo "::error::고지 게시 실패 — 문서 전용 PR 이 표식 없이 흐른다. 재실행하거나 사람이 확인하라."
@@ -1256,5 +1284,126 @@ jobs:
             else
               echo "코드 변경 포함 — 정상 리뷰 경로, 무행동 (비문서: $(jq -c .nondoc <<<"$DECISION"))"
             fi
+          fi
+          exit 0
+
+      # ── 승인 게시용 App 토큰 — cross-review.yml 의 같은 스텝과 한 벌 ──────────────
+      # GitHub 은 자기 PR 자기 승인을 금지하고 GITHUB_TOKEN 도 승인자로 못 쓴다 — 승인만
+      # GitHub App(`trading-lab-ci`) 신원으로 낸다. 앱 id·키는 시크릿이다. 값은 어디에도 안 찍는다.
+      - name: 문서 전용 PR 승인용 App 토큰
+        id: app_token
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        continue-on-error: true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+
+      - name: 문서 전용 → 네이티브 승인(App 명의) + 자동 머지 arm
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          APP_TOKEN: ${{ steps.app_token.outputs.token }}
+          APP_SLUG: ${{ steps.app_token.outputs.app-slug }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          AUTO_MERGE: ${{ vars.AUTO_MERGE }}
+          AUTO_MERGE_METHOD: ${{ vars.AUTO_MERGE_METHOD }}
+        run: |
+          # gh 실패를 직접 분류하므로 -e 를 끈다 (Actions 기본 셸은 `bash -e {0}`)
+          set -uo pipefail
+          set +e
+
+          if [ -z "${APP_TOKEN:-}" ]; then
+            echo "::error::App 토큰 발급 실패 — 승인·arm 을 건너뛴다. 문서 전용 PR 이면 승인자가 없어 머지가 막힌다 — 재실행하거나 사람이 승인하라"
+            exit 0
+          fi
+
+          # ── 0) 판정부 — 기본 브랜치 판본만 쓴다 (PR 이 자기 승인 판정을 고치지 못하게) ──
+          mkdir -p judge
+          for F in review_notice.py ci_path_filter.py; do
+            gh api "repos/$REPO/contents/scripts/$F?ref=$DEFAULT_BRANCH" --jq '.content // empty' \
+              | base64 -d > "judge/$F"
+            if [ ! -s "judge/$F" ]; then
+              echo "::error::판정부 scripts/$F 취득 실패 (출처: $DEFAULT_BRANCH) — 승인하지 않는다 (fail-closed)"
+              exit 0
+            fi
+          done
+
+          # ── 1) PR 상태 — 닫혔거나 head 가 이 run 의 sha 와 다르면 무행동 ─────────────
+          INFO=$(gh pr view "$PR" --repo "$REPO" --json state,headRefOid)
+          if [ -z "$INFO" ]; then
+            echo "::warning::PR #${PR} 조회 실패 — 승인하지 않는다 (fail-closed)"
+            exit 0
+          fi
+          STATE=$(jq -r .state <<<"$INFO")
+          HEAD_NOW=$(jq -r .headRefOid <<<"$INFO")
+          [ "$STATE" = "OPEN" ] || { echo "PR 상태 ${STATE} — 무행동"; exit 0; }
+          if [ "$HEAD_NOW" != "$HEAD_SHA" ]; then
+            echo "head 가 옮겨졌다 (run=${HEAD_SHA} now=${HEAD_NOW}) — 파일 목록이 이 sha 의 것이 아니라 승인하지 않는다. 새 run 이 맡는다"
+            exit 0
+          fi
+
+          # ── 2) 문서 전용 재판정 — 고지 스텝과 독립으로, 기본 브랜치 판정부로 (fail-closed) ──
+          FILES=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename' \
+            | jq -R -s 'split("\n") | map(select(length > 0))') || FILES=""
+          DECISION=$(jq -n --argjson files "${FILES:-null}" '{files: $files}' \
+            | python3 judge/review_notice.py)
+          if [ -z "$DECISION" ]; then
+            echo "::error::판정부가 출력을 내지 못했다 — 승인하지 않는다 (fail-closed)"
+            exit 0
+          fi
+          echo "승인 판정: $DECISION"
+          if [ "$(jq -r .docs_only <<<"$DECISION")" != "true" ]; then
+            echo "문서 전용 아님 — 승인하지 않는다 ($(jq -r '.error // ("비문서: " + (.nondoc | tojson))' <<<"$DECISION"))"
+            exit 0
+          fi
+          TOTAL=$(jq -r .total <<<"$DECISION")
+          LIST=$(jq -r 'join(", ")' <<<"$FILES")
+
+          # ── 3) 멱등 — 이 sha 에 App 승인이 이미 있으면 다시 게시하지 않는다 ────────
+          APP_LOGIN="${APP_SLUG}[bot]"
+          REVIEWS=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate | jq -s 'add // []')
+          [ -n "$REVIEWS" ] || { echo "::warning::리뷰 목록 조회 실패 — 기존 승인을 모른 채 게시한다 (중복 승인은 무해, 승인 부재는 차단)"; REVIEWS='[]'; }
+          EXISTING=$(jq -r --arg u "$APP_LOGIN" --arg sha "$HEAD_SHA" \
+            '[.[] | select(.user.login == $u and .state == "APPROVED" and .commit_id == $sha)] | length' <<<"$REVIEWS")
+          if [ "${EXISTING:-0}" -gt 0 ]; then
+            echo "App 승인이 이미 있다 (${APP_LOGIN} · sha=${HEAD_SHA}) — 게시하지 않는다 (멱등)"
+          else
+            BODY=$(printf '문서 전용 PR — 독립 리뷰 면제 규약에 따른 승인 (루트 CLAUDE.md 「목표층 문서 변경 — 통행료를 걷지 않는다」).\n\n- 문서 전용 (파일 %s개: %s)\n- 판정: scripts/review_notice.py (%s 판본) — cross-review 의 paths-ignore 와 같은 정의라, 독립 리뷰가 건너뛴 PR 이 정확히 이 승인을 받는다\n- sha: %s\n\n이 승인은 「사람이 읽었다」가 아니다 — 문서 PR 에 리뷰어를 띄우지 않는 규약의 집행이다. 사람이 읽는 것이 리뷰다.' \
+              "$TOTAL" "$LIST" "$DEFAULT_BRANCH" "$HEAD_SHA")
+            if OUT=$(jq -n --arg c "$HEAD_SHA" --arg b "$BODY" '{commit_id: $c, event: "APPROVE", body: $b}' \
+                  | GH_TOKEN="$APP_TOKEN" gh api -X POST "repos/$REPO/pulls/$PR/reviews" --input - 2>&1); then
+              echo "네이티브 승인 게시(App 명의 ${APP_LOGIN}): commit_id=${HEAD_SHA} · 파일 ${TOTAL}개"
+            else
+              echo "::error::승인 게시 실패 — ${OUT}. 문서 전용 PR 이 승인자 없이 막힌다 — 재실행하거나 사람이 승인하라"
+              exit 0
+            fi
+          fi
+
+          # ── 4) 자동 머지 arm (App 토큰) ──────────────────────────────────────────
+          if [ "$AUTO_MERGE" != "on" ]; then
+            echo "킬 스위치 AUTO_MERGE=${AUTO_MERGE:-미설정} — arm 생략 (승인은 남았다)"
+            exit 0
+          fi
+          # 머지 방식 화이트리스트: merge|squash 만 — rebase 는 단일 revert 앵커가 없어 제외
+          METHOD=squash
+          case "${AUTO_MERGE_METHOD:-}" in
+            merge|squash) METHOD="$AUTO_MERGE_METHOD" ;;
+            rebase) echo "::warning::AUTO_MERGE_METHOD=rebase 는 화이트리스트 밖 — squash 로 강제" ;;
+          esac
+          # `--match-head-commit` — 판정과 머지 사이에 push 가 끼면 GitHub 이 거부한다.
+          if ARM_OUT=$(GH_TOKEN="$APP_TOKEN" gh pr merge "$PR" --repo "$REPO" --auto --"$METHOD" \
+                         --match-head-commit "$HEAD_SHA" 2>&1); then
+            echo "자동 머지 arm 완료 (방식: ${METHOD} · App 명의) — required 가 초록이 되면 GitHub 이 머지한다"
+          elif MERGE_OUT=$(GH_TOKEN="$APP_TOKEN" gh pr merge "$PR" --repo "$REPO" --"$METHOD" \
+                             --match-head-commit "$HEAD_SHA" 2>&1); then
+            echo "직접 머지 완료 (arm 거부 — required 가 이미 전부 초록이면 GitHub 은 arm 을 받지 않는다: ${ARM_OUT})"
+          else
+            echo "::warning::arm·직접 머지 모두 실패 — arm: ${ARM_OUT} / 직접: ${MERGE_OUT}"
+            gh pr comment "$PR" --repo "$REPO" --body "문서 전용 PR 자동 머지 실패 — App 승인은 게시됐으나 arm 도 직접 머지도 거부됐다. 사람이 확인하라. arm 오류: \`${ARM_OUT}\` · 직접 머지 오류: \`${MERGE_OUT}\`" \
+              || echo "::warning::실패 코멘트 게시도 실패"
           fi
           exit 0
