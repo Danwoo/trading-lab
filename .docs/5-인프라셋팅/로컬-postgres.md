@@ -6,8 +6,10 @@
 
 ## 전제
 
-- **docker 데몬이 떠 있어야 한다.** `postgres` 프로세스가 `docker run` 으로 컨테이너를 띄운다
-  (WSL2 는 `.docs/5-인프라셋팅/wsl2-docker개발환경.md` 참조).
+- **이 경로를 쓰려면 docker 데몬이 떠 있어야 한다.** `postgres` 프로세스가 `docker run` 으로
+  컨테이너를 띄운다 (WSL2 는 `.docs/5-인프라셋팅/wsl2-docker개발환경.md` 참조).
+  docker 나 process-compose 가 없어도 같은 스택이 선다 — 아래 「Docker 가 없다면 /
+  process-compose 가 없다면」.
 - 각 python SQL 서비스에 **psycopg(v3) 의존성**이 있어야 한다 — backend·devactivity·file·
   multi-agent 네 서비스 모두 `pyproject.toml` 에 `psycopg[binary]`(v3) 를 갖는다.
 
@@ -204,6 +206,135 @@ docker exec -i fintech-pg psql -U fintech -d fintech < backend-service/alembic/i
 
 종료 시 `postgres` 프로세스가 SIGTERM 을 받으면 `docker run --rm` 이 컨테이너를 정리한다.
 데이터를 완전히 비우려면 볼륨까지 삭제: `docker volume rm fintech-pg-data`.
+
+### Docker 가 없다면 / process-compose 가 없다면 (#399)
+
+**결정: 도커 경로가 기본이고, pgserver 경로가 그와 나란한 대안이다.** 도커를 기본에서 내리지
+않은 이유는 셋이다 — ㉠ `vector` 확장을 주는 것은 `pgvector/pgvector:pg16` 하나뿐이고(pgserver 는
+순정 PostgreSQL 이다), ㉡ README·이 문서의 시드 명령과 `fintech-pg-data` 볼륨이 컨테이너를 전제로
+쓰여 있고, ㉢ 포트 SoT(5442)를 옮기면 `verify_dev_port_hygiene.py` 가 잠근 lockstep 다섯 자리가
+함께 움직인다. 대신 **pgserver 를 같은 포트 5442 에 띄운다** — 그러면 `.env` 를 한 줄도 고치지
+않고 나머지가 그대로 돈다.
+
+> **도커가 없을 때 `process-compose up` 이 어떻게 되나** — 종전에는 `postgres` 프로세스가 무한히
+> 재시도해 같은 오류만 흘렀다(리드 실측 2026-08-28). 지금은 명령 앞에서 docker 유무를 먼저 보고,
+> 없으면 이 절을 가리키며 종료한다. 재시도도 `max_restarts: 3` 으로 유한하다.
+
+#### 1. pgserver 로 DB 띄우기 (root·데몬 불필요)
+
+[`pgserver`](https://pypi.org/project/pgserver/) 는 PostgreSQL 16 바이너리를 통째로 담은 wheel 이다.
+`uv` 는 이미 전제이므로 추가로 깔 것이 없다.
+
+```bash
+export PGDATA="$HOME/pgdata-trading-lab"
+PGBIN=$(uv run --no-project --with pgserver python -c \
+  "import pgserver, inspect, pathlib; print(pathlib.Path(inspect.getfile(pgserver)).parent / 'pginstall' / 'bin')")
+
+"$PGBIN/initdb" -D "$PGDATA" -U fintech --auth=trust -E UTF8
+"$PGBIN/pg_ctl" -D "$PGDATA" -l "$PGDATA/server.log" -o "-p 5442 -c listen_addresses=127.0.0.1" start
+"$PGBIN/psql" -h 127.0.0.1 -p 5442 -U fintech -d postgres \
+  -c "CREATE DATABASE fintech OWNER fintech" -c "ALTER ROLE fintech PASSWORD 'fintech'"
+```
+
+✅ **검증** — `"$PGBIN/psql" -h 127.0.0.1 -p 5442 -U fintech -d fintech -Atc "select version()"` 가
+`PostgreSQL 16.x …` 을 낸다.
+
+- **`--auth=trust` 는 로컬 개발 전제다.** `listen_addresses=127.0.0.1` 이라 이 기계 밖에서는 못
+  붙지만, 여러 사람이 쓰는 기계라면 `--auth=scram-sha-256` 으로 바꾼다.
+- **세션 tz 는 걱정하지 않아도 된다.** `initdb` 는 호스트 tz 를 `postgresql.conf` 에 적으므로
+  이 파일은 도커(`UTC`)와 다를 수 있다. 그래도 앱·frontend 가 커넥션마다 `timezone=UTC` 를
+  박으므로(위 「세션 타임존은 UTC 다」) 저장되는 인스턴트는 같다.
+- **`vector` 확장은 없다.** doc-search 실색인(`USE_REAL_API=true`)만 그것을 요구하고, 나머지
+  스택은 쓰지 않는다. 실색인까지 하려면 도커 이미지를 쓰거나 pgvector 를 따로 빌드해야 한다.
+- 내릴 때: `"$PGBIN/pg_ctl" -D "$PGDATA" stop -m fast`. 데이터는 `$PGDATA` 에 남는다.
+
+순정 PostgreSQL 14 이상이면 무엇이든 좋다(시스템 패키지·Homebrew·Podman·매니지드). 포트만 5442 에
+맞추면 그 뒤는 같다.
+
+#### 2. DB 가 5442 가 아니라면 — 좌표를 말하는 네 곳
+
+| 파일 | 키 |
+|---|---|
+| `backend-service/app/.env.development` | `BACKEND_SQL_DB_HOST` · `BACKEND_SQL_DB_PORT` |
+| `multi-agent-service/app/.env.development` | `MULTI_AGENT_SQL_DB_HOST` · `MULTI_AGENT_SQL_DB_PORT` |
+| `doc-search-mcp-service/app/.env.development` | `DOC_VECTOR_DB_HOST` · `DOC_VECTOR_DB_PORT` |
+| `frontend/.env.development` | `DATABASE_URL` |
+
+**이 파일들은 한 번 만들어지면 레포가 좌표를 옮겨도 따라오지 않는다.** 실제로 #294 가 5432 →
+5442 로 옮긴 뒤에도 그 전에 만들어 둔 `.env.development` 는 5432 를 든 채 남았고, systemd 유닛이
+env 를 덮어써 주는 경로로만 쓰는 동안 가려져 있다가 손으로 마이그레이션을 돌리는 순간 터졌다
+(리드 실측 2026-08-28).
+
+그래서 `bootstrap_local_env.py` 는 **건너뛴 파일도 읽어 어긋남을 보고한다** — 아무 때나 다시
+돌려도 안전한 진단기다(덮어쓰기는 `--force` 뿐):
+
+```bash
+python3 scripts/bootstrap_local_env.py
+```
+
+```
+  ↷ 건너뜀 backend-service/app/.env.development (이미 있음 — 덮어쓰려면 --force) · 아래 「확인 필요」에 2건
+⚠ 확인 필요 — 로컬 기동 전제와 어긋나는 값이 있다 (이 스크립트는 고치지 않는다):
+  - backend-service/app/.env.development: BACKEND_SQL_DB_PORT=5432 — 로컬 Postgres 는 5442 (.env.development 가 로컬 기본값과 어긋남)
+```
+
+`alembic` 도 연결에 실패하면 **어디로 갔고 그 좌표가 어디서 왔는지**를 함께 낸다. 한 번만 다른
+DB 로 보내려면 파일을 고치지 말고 좌표를 명령에 준다 — pydantic-settings 는 env 파일보다
+프로세스 환경변수를 우선한다:
+
+```bash
+APP_ENV=development BACKEND_SQL_DB_HOST=127.0.0.1 BACKEND_SQL_DB_PORT=55440 \
+  uv run python -m alembic upgrade head
+```
+
+#### 3. process-compose 없이 — 같은 순서를 손으로
+
+`db-migrate` 가 하는 일이 그대로 세 줄이다. **새 DB** 기준:
+
+```bash
+# 1) 스키마
+python3 scripts/verify_alembic_head_freshness.py --fetch
+(cd frontend                && npm run dev:prisma:push)
+(cd backend-service/alembic && APP_ENV=development uv run python -m alembic upgrade head)
+
+# 2) 초기 데이터 (최초 1회 — seed.sql 은 전체 DELETE 로 시작한다). psql 은 아무 PostgreSQL
+#    클라이언트면 된다 — pgserver 경로라면 "$PGBIN/psql".
+psql postgresql://fintech:fintech@localhost:5442/fintech -f frontend/prisma/init/seed.sql
+psql postgresql://fintech:fintech@localhost:5442/fintech -f backend-service/alembic/init/init.sql
+
+# 3) 서비스 — 터미널 하나씩. 포트는 process-compose.yaml 의 vars.PORT 가 SoT 다.
+(cd backend-service/app && APP_ENV=development uv run python -m uvicorn main:app --reload --port 8000)
+(cd frontend            && PORT=3010 npm run dev)
+```
+
+- **`PORT=3010` 을 빼면 안 된다.** `npm run dev` 는 `next dev` 라 3000 으로 뜬다 — 그 포트는
+  다른 프로젝트와 겹치라고 피해 둔 자리이고(#308), 프론트가 3010 에 없으면 로그인 리다이렉트가
+  어긋난다. `process-compose` 는 `command: "PORT={{.PORT}} npm run dev"` 로 이 값을 넣어 준다.
+- **`--fetch` 는 원격이 있는 트리에서만 정본과 대조한다.** 릴리스 tarball·ZIP 다운로드처럼
+  `.git` 이 없거나 `origin` 이 없는 트리에서는 「무엇을 못 봤는지」를 찍고 종료 0 으로 넘어간다
+  (#399). 대조를 켜려면 원격이 걸린 클론에서 받는다.
+- **필요한 것만 띄운다.** frontend + `backend-service` 면 리서치 챗을 뺀 전부가 돈다. 리서치
+  챗은 `multi-agent-service`(8003)와 그것이 부르는 MCP 서버들(8002·8004~8008)이 더 필요하고,
+  명령은 위 backend 줄과 같고 `working_dir` 과 `--port` 만 다르다 — 값은 `process-compose.yaml`
+  이 SoT 다.
+- **DB 만 손으로 띄우고 나머지는 process-compose 로** 돌려도 된다. `postgres` 프로세스는 이미
+  5442 가 점유돼 있으면 바인딩 실패로 죽지만(`restart: on_failure` · `max_restarts: 3`),
+  `db-migrate` 는 `process_healthy` 를 기다리므로 그 조합은 서지 않는다 — 손으로 띄우려면
+  위 3단계를 그대로 쓴다.
+
+#### 4. 기존 DB 라면 순서가 다르다
+
+위 세 줄은 **새 DB** 용이다. `frontend` 스키마가 **이미 있는** DB 라면 `alembic` 을 `push`
+**앞에서 한 번 더** 돌려야 한다 — 위 「무엇이 도는가」와 `process-compose.yaml` 의 `db-migrate`
+주석이 이유를 적어 두었다(요약: `0019` 가 `frontend` 의 naive 값을 행 기원별 `USING` 으로 옮기는데,
+push 가 먼저 돌면 같은 컬럼을 `USING` 없이 SafeCast 로 바꿔 뜻을 뭉갠다). 판정은 손으로 하지 말고
+스크립트에 맡긴다:
+
+```bash
+(cd backend-service/app && APP_ENV=development uv run python ../scripts/frontend_schema_present.py)
+#  t → alembic → push → alembic     (기존 DB)
+#  f → push → alembic               (새 DB — 위 세 줄)
+```
 
 ### 업로드 경로 전제 — SFTP (리서치 문서 업로드 E2E)
 
