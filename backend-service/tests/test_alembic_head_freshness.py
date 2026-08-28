@@ -20,6 +20,10 @@
   (5) git 저장소지만 `origin` 원격이 없는 트리 → 종료 0, 같은 고지.
   (6) `origin` 은 있는데 `origin/main` 참조가 없는 트리 → 종전대로 **종료 1** (엄격함 유지).
   (7) 원격이 없어도 리비전 0건이면 **종료 1** — fail-closed 가 예외에 먹히지 않았는지.
+  (8) `.git` 없는 트리를 **`origin` 이 걸린 남의 저장소 안에** 풀었을 때(홈이 dotfiles 레포인
+      기계에 tarball 을 푼 꼴) → 종료 0, 그리고 남의 `origin/main` 을 정본으로 읽지 않는다.
+      (4)(5) 만으로는 못 잡는다 — 합성 트리에 `.git` 을 두거나 안 둘 뿐 다른 저장소 안에
+      중첩시키지 않아서, git 이 상위로 올라가 조상 저장소를 잡는 경로가 안 돈다.
 """
 
 from __future__ import annotations
@@ -162,6 +166,32 @@ def test_repo_without_origin_remote_skips_loudly() -> str:
     return "test_repo_without_origin_remote_skips_loudly"
 
 
+def test_tree_nested_in_foreign_repo_with_origin_skips_loudly() -> str:
+    """#399 — `.git` 없는 트리가 origin 원격이 있는 남의 저장소 안에 있어도 그 origin 을 안 읽는다.
+
+    바깥 저장소의 `origin/main` 에는 일부러 다른 리비전(0009_foreign)을 둔다 — 스크립트가
+    조상 저장소를 정본으로 읽으면 이 리비전이 「없는 head」로 잡혀 종료 1 이 된다.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        outer = Path(tmp) / "dotfiles"
+        foreign_versions = outer / "backend-service" / "alembic" / "versions"
+        foreign_versions.mkdir(parents=True)
+        (foreign_versions / "0009_foreign.py").write_text(_TEMPLATE.format(rev="0009_foreign", down="None"))
+        _git(outer, "init", "-q", "-b", "main", ".")
+        _git(outer, "add", ".")
+        _git(outer, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "outer")
+        _git(outer, "remote", "add", "origin", "https://example.invalid/dotfiles.git")
+        _git(outer, "update-ref", "refs/remotes/origin/main", "HEAD")
+        root = outer / "nested"
+        _synthetic_tree(root, revisions=("0001_a",))
+        result = _run_script(root)
+    assert result.returncode == 0, f"exit={result.returncode}\n{result.stdout}{result.stderr}"
+    _skip_notice_is_honest(result.stdout)
+    assert "0009_foreign" not in result.stdout, f"남의 origin/main 을 정본으로 읽었다:\n{result.stdout}"
+    assert "검사 실패" not in result.stdout, result.stdout
+    return "test_tree_nested_in_foreign_repo_with_origin_skips_loudly"
+
+
 def test_origin_remote_without_ref_still_fails() -> str:
     """원격이 걸린 트리(=개발자)의 엄격함은 그대로다 — 예외가 여기까지 번지면 #387 이 되살아난다."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -194,6 +224,7 @@ def _main() -> int:
         test_repo_versions_have_exactly_one_head,
         test_tree_without_git_skips_loudly,
         test_repo_without_origin_remote_skips_loudly,
+        test_tree_nested_in_foreign_repo_with_origin_skips_loudly,
         test_origin_remote_without_ref_still_fails,
         test_no_remote_with_zero_revisions_still_fails,
     ]

@@ -140,7 +140,11 @@ def _local_sources() -> dict[str, str]:
 
 
 def _origin_sources() -> dict[str, str] | None:
-    """origin/main 의 versions/ 소스 (참조가 없으면 None)."""
+    """origin/main 의 versions/ 소스 (참조가 없으면 None).
+
+    `remote_state()` 가 HAS_REMOTE 를 돌려준 뒤에만 부른다 — `.git` 없는 트리에서 git 은 상위
+    디렉터리의 조상 저장소를 찾아 성공하므로, 그 조상의 `origin/main` 을 정본으로 읽어 버린다.
+    """
     if _git("rev-parse", "--verify", "--quiet", ORIGIN_REF, check=False).returncode != 0:
         return None
     listed = _git("ls-tree", "-r", "--name-only", ORIGIN_REF, "--", VERSIONS_DIR)
@@ -210,14 +214,7 @@ def main(argv: list[str]) -> int:
         )
         return 1
 
-    origin_sources = _origin_sources()
-    if origin_sources is None:
-        if state == HAS_REMOTE:
-            print(
-                f"alembic head 검사 실패: {ORIGIN_REF} 참조가 없어 정본과 대조할 수 없다. "
-                f"`git fetch {ORIGIN_REMOTE} main` 후 다시 실행할 것"
-            )
-            return 1
+    if state != HAS_REMOTE:
         missing, how_to = SKIP_GUIDANCE[state]
         print(
             f"alembic head 검사 건너뜀 — {missing}. 대조할 정본이 없다.\n"
@@ -228,6 +225,14 @@ def main(argv: list[str]) -> int:
             f"  · 대조를 켜려면: {how_to}"
         )
         return 0
+
+    origin_sources = _origin_sources()
+    if origin_sources is None:
+        print(
+            f"alembic head 검사 실패: {ORIGIN_REF} 참조가 없어 정본과 대조할 수 없다. "
+            f"`git fetch {ORIGIN_REMOTE} main` 후 다시 실행할 것"
+        )
+        return 1
     origin = build_graph(origin_sources)
     if not origin:
         print(
