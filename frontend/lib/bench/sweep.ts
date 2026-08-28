@@ -1,6 +1,19 @@
 import type { StrategyField } from "@/schemas/bot/bot";
 
 /**
+ * 축 하나가 훑는 칸 수의 범위 — 아래는 양 끝점(1칸은 축이 아니다), 위는 두 축이 81칸으로 표에
+ * 읽히는 선. 폼의 네이티브 `min`/`max` 와 상태가 받는 범위가 **같은 숫자**여야 한다 — 갈리면
+ * 폼은 큰 칸 수를 약속하고 제출은 브라우저 제약에 조용히 막힌다 (#398).
+ */
+export const STEPS_MIN = 2;
+export const STEPS_MAX = 9;
+
+/** 칸 수를 선언 범위 안으로 누른다. */
+export function clampSteps(steps: number): number {
+  return Math.min(STEPS_MAX, Math.max(STEPS_MIN, steps));
+}
+
+/**
  * 전략 폼 필드 하나가 훑을 값 목록 — 선언된 min~max 를 `count` 개로 고르게 자른다.
  *
  * 격자는 봉우리 하나가 아니라 **지형**을 보는 도구다(스펙 D-Q1) — 그래서 기본값 주변이 아니라

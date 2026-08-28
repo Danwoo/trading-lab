@@ -1,7 +1,7 @@
 // 훑기 값 생성 — 선언 범위 전체를 고르게, step 배수로 (#203).
 import { describe, expect, it } from "vitest";
 
-import { sweepValues } from "@/lib/bench/sweep";
+import { STEPS_MAX, STEPS_MIN, clampSteps, sweepValues } from "@/lib/bench/sweep";
 import type { StrategyField } from "@/schemas/bot/bot";
 
 function field(overrides: Partial<StrategyField>): StrategyField {
@@ -33,5 +33,28 @@ describe("sweepValues", () => {
 
   it("min === max 면 한 값이다", () => {
     expect(sweepValues(field({ min: 7, max: 7 }), 5)).toEqual([7]);
+  });
+});
+
+// #398 (이 레포 이슈 — https://github.com/Danwoo/trading-lab/issues/398) — 칸 수는 선언 범위 밖으로 못 나간다.
+describe("clampSteps", () => {
+  it("상한을 넘긴 값은 상한으로 — 99 가 891칸을 약속하는 길을 닫는다", () => {
+    expect(clampSteps(99)).toBe(STEPS_MAX);
+    expect(clampSteps(59)).toBe(STEPS_MAX);
+    expect(clampSteps(STEPS_MAX + 1)).toBe(STEPS_MAX);
+  });
+
+  it("하한 아래는 하한으로 — 1칸은 축이 아니다", () => {
+    expect(clampSteps(1)).toBe(STEPS_MIN);
+    expect(clampSteps(-3)).toBe(STEPS_MIN);
+  });
+
+  it("범위 안의 값은 그대로다 — 눌림이 정상 입력을 건드리지 않는다", () => {
+    for (let steps = STEPS_MIN; steps <= STEPS_MAX; steps++) expect(clampSteps(steps)).toBe(steps);
+  });
+
+  it("범위 자체가 뒤집혀 있지 않다", () => {
+    expect(STEPS_MIN).toBeGreaterThanOrEqual(2);
+    expect(STEPS_MAX).toBeGreaterThan(STEPS_MIN);
   });
 });
