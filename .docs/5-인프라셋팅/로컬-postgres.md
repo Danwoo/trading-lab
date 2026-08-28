@@ -227,7 +227,7 @@ docker exec -i fintech-pg psql -U fintech -d fintech < backend-service/alembic/i
 
 ```bash
 export PGDATA="$HOME/pgdata-trading-lab"
-PGBIN=$(uv run --with pgserver python -c \
+PGBIN=$(uv run --no-project --with pgserver python -c \
   "import pgserver, inspect, pathlib; print(pathlib.Path(inspect.getfile(pgserver)).parent / 'pginstall' / 'bin')")
 
 "$PGBIN/initdb" -D "$PGDATA" -U fintech --auth=trust -E UTF8
@@ -297,7 +297,8 @@ python3 scripts/verify_alembic_head_freshness.py --fetch
 (cd frontend                && npm run dev:prisma:push)
 (cd backend-service/alembic && APP_ENV=development uv run python -m alembic upgrade head)
 
-# 2) 초기 데이터 (최초 1회 — seed.sql 은 전체 DELETE 로 시작한다)
+# 2) 초기 데이터 (최초 1회 — seed.sql 은 전체 DELETE 로 시작한다). psql 은 아무 PostgreSQL
+#    클라이언트면 된다 — pgserver 경로라면 "$PGBIN/psql".
 psql postgresql://fintech:fintech@localhost:5442/fintech -f frontend/prisma/init/seed.sql
 psql postgresql://fintech:fintech@localhost:5442/fintech -f backend-service/alembic/init/init.sql
 

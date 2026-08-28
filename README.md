@@ -92,7 +92,7 @@ stops, rather than retrying forever.) The quickest way with no root and no daemo
 
 ```bash
 export PGDATA="$HOME/pgdata-trading-lab"
-PGBIN=$(uv run --with pgserver python -c \
+PGBIN=$(uv run --no-project --with pgserver python -c \
   "import pgserver, inspect, pathlib; print(pathlib.Path(inspect.getfile(pgserver)).parent / 'pginstall' / 'bin')")
 
 "$PGBIN/initdb" -D "$PGDATA" -U fintech --auth=trust -E UTF8
@@ -126,7 +126,8 @@ python3 scripts/verify_alembic_head_freshness.py --fetch
 (cd backend-service/alembic && APP_ENV=development uv run python -m alembic upgrade head)
 
 # 2. Seed, once. The first file is what step 4 above pipes through the container; the second adds
-#    backend demo rows (boards, watchlists, portfolios) and is optional.
+#    backend demo rows (boards, watchlists, portfolios) and is optional. `psql` is any PostgreSQL
+#    client — with pgserver it is "$PGBIN/psql".
 psql postgresql://fintech:fintech@localhost:5442/fintech -f frontend/prisma/init/seed.sql
 psql postgresql://fintech:fintech@localhost:5442/fintech -f backend-service/alembic/init/init.sql
 
