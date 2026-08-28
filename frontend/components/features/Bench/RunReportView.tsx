@@ -17,9 +17,13 @@ import { redactReason } from "@/utils/common/errors/redactReason";
 /**
  * 원 단위 정수로 반올림 — 0.5 는 0 에서 먼 쪽으로(−4,123.5 → −4,124). `Math.round` 는 음수의
  * 반을 0 쪽으로 올려 부호에 따라 규칙이 갈린다.
+ *
+ * 반올림해서 0 이 되면 `-0` 이 아니라 `0` 을 낸다 — `-0 < 0` 은 거짓이라, 이 값으로 부호를 가르면
+ * 1원이 안 되는 손실이 손실이 아닌 것이 된다. 크기만 내는 함수이고 부호 판정은 원값의 몫이다.
  */
 function roundWon(value: number): number {
-  return Math.sign(value) * Math.round(Math.abs(value));
+  const magnitude = Math.round(Math.abs(value));
+  return value < 0 && magnitude > 0 ? -magnitude : magnitude;
 }
 
 /**
@@ -29,12 +33,13 @@ function roundWon(value: number): number {
  * `+1,810,707.32` 와 `+281,622` 가 섞인다 — 평가액(`won`)과 같은 규칙으로 맞춘다.
  */
 function SignedWon({ value }: { value: number }) {
-  const whole = roundWon(value);
-  const negative = whole < 0;
+  // 부호는 반올림 **전** 원값으로 가른다 — 백엔드가 소수 6자리를 그대로 내리므로 (−0.5, 0) 구간의
+  // 손실이 들어오는데, 반올림한 0 으로 가르면 그게 이익 쪽 색과 `+` 를 달고 앉는다.
+  const negative = value < 0;
   return (
     <span className={cn("tabular-nums", negative ? "text-market-down" : "text-market-up")}>
       {negative ? "−" : "+"}
-      {Math.abs(whole).toLocaleString("ko-KR")}
+      {Math.abs(roundWon(value)).toLocaleString("ko-KR")}
     </span>
   );
 }

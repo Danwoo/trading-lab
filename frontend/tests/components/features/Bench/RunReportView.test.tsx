@@ -190,6 +190,35 @@ describe("RunReportView", () => {
     expect(pnl).toEqual(["+1,810,707", "+281,622", "−4,124"]);
   });
 
+  it("1원이 안 되는 손실도 손실로 그린다 — 반올림해서 0 이 되어도 부호와 색은 원값의 것이다 (F7)", () => {
+    // 백엔드가 실현손익을 소수 6자리 그대로 내리므로(`quantize(t.realized_pnl, 6)`), 수수료·슬리피지가
+    // 가격차를 거의 상쇄한 거래는 (−0.5, 0) 구간에 앉는다. 반올림한 값으로 부호를 가르면 `-0` 이라
+    // `-0 < 0` 이 거짓 — 손실인데 손실로 안 보인다.
+    const tiny = report({
+      trades: [
+        trade({ trade_id: 1, realized_pnl: -0.3 }),
+        trade({ trade_id: 2, realized_pnl: -0.49 }),
+        trade({ trade_id: 3, realized_pnl: -0.0001 }),
+        trade({ trade_id: 4, realized_pnl: 0.3 }),
+        trade({ trade_id: 5, realized_pnl: 0 }),
+      ],
+    });
+    render(<RunReportView report={tiny} />);
+
+    const cells = within(screen.getByRole("region", { name: "거래 목록" }))
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell").at(-1));
+    expect(cells.map((cell) => cell?.textContent?.trim())).toEqual(["−0", "−0", "−0", "+0", "+0"]);
+    expect(cells.map((cell) => cell?.querySelector("span")?.className.includes("text-market-down"))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
   it("자산·낙폭 곡선이 그림으로 서고 요지를 이름으로 갖는다 — 캔버스만 있으면 보조기술에 곡선이 없다 (F9)", () => {
     render(<RunReportView report={report()} />);
 
