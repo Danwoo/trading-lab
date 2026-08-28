@@ -53,6 +53,20 @@ describe("clampSteps", () => {
     for (let steps = STEPS_MIN; steps <= STEPS_MAX; steps++) expect(clampSteps(steps)).toBe(steps);
   });
 
+  it("범위 안 소수는 정수 칸으로 눌린다 — 반 칸은 없고, 눈금 위반은 제출을 조용히 막는다", () => {
+    expect(clampSteps(5.5)).toBe(6);
+    expect(clampSteps(5.4)).toBe(5);
+    expect(clampSteps(2.5)).toBe(3);
+    for (const steps of [2.1, 3.7, 5.5, 8.9]) expect(Number.isInteger(clampSteps(steps))).toBe(true);
+  });
+
+  it("범위 밖 소수는 범위 끝으로 — 누른 결과가 다시 범위를 넘지 않는다", () => {
+    expect(clampSteps(9.6)).toBe(STEPS_MAX);
+    expect(clampSteps(1.4)).toBe(STEPS_MIN);
+    expect(clampSteps(-0.5)).toBe(STEPS_MIN);
+    expect(clampSteps(Infinity)).toBe(STEPS_MAX);
+  });
+
   it("범위 자체가 뒤집혀 있지 않다", () => {
     expect(STEPS_MIN).toBeGreaterThanOrEqual(2);
     expect(STEPS_MAX).toBeGreaterThan(STEPS_MIN);

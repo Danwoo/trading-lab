@@ -17,7 +17,11 @@ interface Props<T = any> {
   readOnly?: boolean;
   min?: number;
   max?: number;
-  step?: number; // 증감 단위 (기본: 1)
+  /**
+   * 증감 단위 (기본: 1). 안 주면 스핀 버튼의 폭으로만 쓰이고 **계약으로는 읽지 않는다** —
+   * 아무것도 선언하지 않은 칸(평균단가·목표가)의 소수를 그 기본값으로 빨갛게 만들면 거짓 경보다.
+   */
+  step?: number;
   /**
    * 표시 형식. DevExtreme 시절의 `#,##0원` 같은 패턴 문자열을 그대로 받되, 여기서는
    * **접미사(suffix)만** 해석한다 — 자릿수 구분은 `groupDigits` 가 켜졌을 때만 붙는다.
@@ -99,6 +103,31 @@ function outOfRangeMessage(value: number | null | undefined, min?: number, max?:
 }
 
 /**
+ * 선언한 눈금(`step`)에서 어긋난 상태를 글로 말한다 (#398).
+ *
+ * `step` 도 `min`/`max` 와 같은 네이티브 제약이다 — 어긋난 값은 **범위 안이어도** 제출이 위와
+ * 똑같이 막히고, 똑같은 이유로 말풍선이 안 뜬다. 범위만 보고 눈금을 빼면 그 자리에 침묵이
+ * 그대로 남는다. 실측(#398 리뷰): 칸 수(2~9)에 `5.5` → 폼은 `25칸` 을 약속하는데 실행은 0건.
+ *
+ * 기준점은 브라우저 판정과 같은 `min`(없으면 0)이다 — `min=5 step=2` 면 5·7·9 만 성하다.
+ */
+function stepMismatchMessage(
+  value: number | null | undefined,
+  min: number | undefined,
+  step: number | undefined,
+): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  if (step === undefined || !Number.isFinite(step) || step <= 0) return undefined;
+  const base = min ?? 0;
+  const onStep = (n: number) => Math.abs(n - Math.round(n)) < 1e-9;
+  // 부동소수 잔재(`(0.7 - 0.1) / 0.2 === 3.0000000000000004`)를 눈금 어긋남으로 읽지 않는다.
+  if (onStep((value - base) / step)) return undefined;
+  if (step === 1 && Number.isInteger(base)) return "정수로 적으세요.";
+  // 기준점이 눈금 위에 없으면 눈금만 말해서는 못 맞춘다 — `min=5 step=2` 에서 `4` 는 2의 배수다.
+  return onStep(base / step) ? `${step} 단위로 적으세요.` : `${base} 에서 ${step} 씩 더한 값으로 적으세요.`;
+}
+
+/**
  * 숫자 입력 컴포넌트 (#341 ② — 네이티브 `<input type="number">`)
  *
  * 나이, 연봉, 수량, 금액 등 숫자 값 입력에 사용합니다. 금액처럼 자릿수를 읽어야 하는 칸은
@@ -127,7 +156,7 @@ export function NumberBox<T = any>({
   readOnly = false,
   min,
   max,
-  step = 1,
+  step,
   format,
   groupDigits = false,
   showSpinButtons = false,
@@ -178,11 +207,20 @@ export function NumberBox<T = any>({
     onValueChanged(fieldName, parsed);
   };
 
-  // 범위 밖 판정은 네이티브 `min`/`max` 가 실제로 입력에 실리는 갈래에서만 한다 — `groupDigits`
-  // 는 그 둘을 떼고 텍스트 입력이 되므로 브라우저가 막지 않고, 여기서만 빨개지면 거짓 경보다.
-  const rangeError = groupDigits ? undefined : outOfRangeMessage(value, min, max);
-  const shownError = isInvalid ? errorMessage : unreadable ? UNREADABLE_MESSAGE : rangeError;
-  const showsError = isInvalid || unreadable || rangeError !== undefined;
+  // 스핀 버튼이 한 번에 움직이는 폭. 값이 성한지를 재는 자(`declaredStep`)와는 다르다.
+  const stepAttr = step ?? 1;
+  // 눈금을 계약으로 읽는 것은 이 칸이 제약을 **선언한** 경우뿐이다 — 눈금을 직접 줬거나,
+  // 범위를 선언해 「어떤 값이 성한지」를 이미 말한 칸. 아무것도 선언하지 않은 칸의 `step=1` 은
+  // 증감폭일 뿐이라, 그걸 근거로 소수를 막으면 값이 멀쩡히 저장되는 칸에 거짓 경보가 난다.
+  const declaredStep = step ?? (min !== undefined || max !== undefined ? 1 : undefined);
+  // 네이티브 제약(범위·눈금) 판정은 그 제약이 실제로 입력에 실리는 갈래에서만 한다 —
+  // `groupDigits` 는 셋을 떼고 텍스트 입력이 되므로 브라우저가 막지 않고, 여기서만 빨개지면
+  // 거짓 경보다. 둘 다 어긋났으면 범위를 말한다 — 눈금을 맞춰도 범위 밖이면 여전히 못 낸다.
+  const constraintError = groupDigits
+    ? undefined
+    : (outOfRangeMessage(value, min, max) ?? stepMismatchMessage(value, min, declaredStep));
+  const shownError = isInvalid ? errorMessage : unreadable ? UNREADABLE_MESSAGE : constraintError;
+  const showsError = isInvalid || unreadable || constraintError !== undefined;
   const describedByIds =
     [showsError && shownError ? errorMessageId : describedBy, showsSuffix ? suffixId : undefined]
       .filter(Boolean)
@@ -209,7 +247,7 @@ export function NumberBox<T = any>({
         tabIndex={tabIndex}
         min={groupDigits ? undefined : min}
         max={groupDigits ? undefined : max}
-        step={groupDigits ? undefined : step}
+        step={groupDigits ? undefined : stepAttr}
         // 못 읽은 글자가 남아 있으면 그대로 두고 고치게 한다 — 지우면 무엇이 틀렸는지 사라진다.
         onFocus={
           groupDigits

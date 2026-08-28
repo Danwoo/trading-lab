@@ -8,9 +8,15 @@ import type { StrategyField } from "@/schemas/bot/bot";
 export const STEPS_MIN = 2;
 export const STEPS_MAX = 9;
 
-/** 칸 수를 선언 범위 안으로 누른다. */
+/**
+ * 칸 수를 폼이 선언한 제약 안으로 누른다 — 범위(`min`/`max`)와 **눈금(`step`=1)** 둘 다.
+ *
+ * 눈금을 빼면 범위 안 소수(`5.5`)가 상태에 그대로 앉는다. 칸이 곧 시도라 반 칸은 애초에 없고,
+ * 네이티브 `step` 위반이라 제출은 `onSubmit` 에 닿기 전에 막힌다 — 범위만 눌러서는 #398 의
+ * 침묵이 그대로 남는다.
+ */
 export function clampSteps(steps: number): number {
-  return Math.min(STEPS_MAX, Math.max(STEPS_MIN, steps));
+  return Math.min(STEPS_MAX, Math.max(STEPS_MIN, Math.round(steps)));
 }
 
 /**
