@@ -15,9 +15,17 @@
 `--fetch` 는 검사 전에 `git fetch origin main` 으로 원격 참조를 갱신한다(process-compose 의
 db-migrate 가 그렇게 부른다). 네트워크·인증 실패 시에는 **경고를 크게 찍고 이미 있는
 `origin/main` 참조로 검사를 계속한다** — 오프라인에서 개발 기동 자체를 막지 않기 위해서다.
-참조가 아예 없으면 검사할 정본이 없으므로 실패한다(무엇을 해야 하는지 함께 출력한다).
+`origin` 원격이 걸린 트리에서 참조가 아예 없으면 검사할 정본이 없으므로 실패한다.
 
-**fail-closed**: 리비전을 0건 수집하거나 origin/main 참조가 없으면 통과가 아니라 실패다.
+**fail-closed**: 리비전을 0건 수집하면 통과가 아니라 실패다. `origin` 원격이 있는데
+`origin/main` 참조가 없어도 실패다.
+
+**예외 — 원격이 아예 없는 트리는 건너뛴다** (#399). 릴리스 tarball·GitHub ZIP 다운로드처럼
+`.git` 이 없거나 `origin` 이 안 걸린 트리에서는 대조할 정본이 **존재할 수 없다.** 여기서
+실패하면 이 검사가 `db-migrate` 의 첫 줄이라 `prisma db push` 도 `alembic upgrade head` 도
+못 돌고, 새로 받은 사람은 스키마 없는 DB 앞에서 멈춘다(실측: #399). 그래서 이 경우에만
+경고 후 0 으로 끝낸다 — 다만 **조용히 넘기지 않는다**: 무엇을 확인했고 무엇을 못 봤는지,
+대조를 켜려면 무엇을 해야 하는지 출력에 남긴다. 원격이 있는 트리(=개발자)의 엄격함은 그대로다.
 
 stdlib 전용 (AST 파싱 + git CLI): `python3 scripts/verify_alembic_head_freshness.py [--fetch]`.
 """
@@ -34,7 +42,27 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERSIONS_DIR = "backend-service/alembic/versions"
 ORIGIN_REF = "origin/main"
+ORIGIN_REMOTE = "origin"
 FETCH_TIMEOUT_SECONDS = 20
+
+# 트리가 정본과 대조할 수 있는 상태인가.
+NO_REPO = "no-repo"  # .git 이 없다 — tarball·ZIP 다운로드·git archive
+NO_REMOTE = "no-remote"  # git 저장소이긴 한데 origin 원격이 없다
+HAS_REMOTE = "has-remote"  # origin 이 걸려 있다 — 여기서는 엄격히 본다
+
+# 원격 없는 트리에 낼 문구: (무엇이 없나, 대조를 켜려면)
+SKIP_GUIDANCE: dict[str, tuple[str, str]] = {
+    NO_REPO: (
+        "이 트리가 git 저장소의 루트가 아니다 (.git 이 없다 — 릴리스 tarball·ZIP 다운로드·git archive; "
+        "남의 저장소 안에 풀어 놓은 경우도 여기다)",
+        "원격이 걸린 클론에서 받아라: `git clone <레포 URL>` "
+        "(이 트리를 그대로 쓰려면 `git init && git remote add origin <레포 URL> && git fetch origin main`)",
+    ),
+    NO_REMOTE: (
+        f"이 트리에 `{ORIGIN_REMOTE}` 원격이 없다",
+        f"`git remote add {ORIGIN_REMOTE} <레포 URL> && git fetch {ORIGIN_REMOTE} main`",
+    ),
+}
 
 
 def _git(*args: str, check: bool = True, timeout: float | None = None) -> subprocess.CompletedProcess[str]:
@@ -123,6 +151,22 @@ def _origin_sources() -> dict[str, str] | None:
     return sources
 
 
+def remote_state() -> str:
+    """이 트리가 `origin` 과 대조할 수 있는 상태인지 — NO_REPO / NO_REMOTE / HAS_REMOTE.
+
+    `--show-toplevel` 이 REPO_ROOT 와 같은지까지 본다: tarball 을 **다른 git 저장소 안**
+    (예: 홈 디렉터리가 dotfiles 레포)에 풀면 `--git-dir` 은 남의 저장소로 성공하고, 그 남의
+    `origin` 을 정본으로 삼아 엉뚱한 대조를 하게 된다.
+    """
+    toplevel = _git("rev-parse", "--show-toplevel", check=False)
+    if toplevel.returncode != 0 or Path(toplevel.stdout.strip() or "/nonexistent").resolve() != REPO_ROOT:
+        return NO_REPO
+    listed = _git("remote", check=False)
+    if listed.returncode != 0:
+        return NO_REPO
+    return HAS_REMOTE if ORIGIN_REMOTE in listed.stdout.split() else NO_REMOTE
+
+
 def _fetch() -> None:
     result = _git(
         "fetch",
@@ -146,11 +190,16 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--fetch", action="store_true", help="검사 전에 origin/main 참조를 갱신한다")
     args = parser.parse_args(argv)
 
+    state = remote_state()
+
     if args.fetch:
-        try:
-            _fetch()
-        except (subprocess.SubprocessError, OSError) as exc:
-            print(f"  ! git fetch 실행 자체가 실패했다 (이미 있는 참조로 계속한다): {exc}")
+        if state == HAS_REMOTE:
+            try:
+                _fetch()
+            except (subprocess.SubprocessError, OSError) as exc:
+                print(f"  ! git fetch 실행 자체가 실패했다 (이미 있는 참조로 계속한다): {exc}")
+        else:
+            print(f"  ! `git fetch {ORIGIN_REMOTE} main` 을 건너뛴다 — {SKIP_GUIDANCE[state][0]}")
 
     local_sources = _local_sources()
     local = build_graph(local_sources)
@@ -163,11 +212,22 @@ def main(argv: list[str]) -> int:
 
     origin_sources = _origin_sources()
     if origin_sources is None:
+        if state == HAS_REMOTE:
+            print(
+                f"alembic head 검사 실패: {ORIGIN_REF} 참조가 없어 정본과 대조할 수 없다. "
+                f"`git fetch {ORIGIN_REMOTE} main` 후 다시 실행할 것"
+            )
+            return 1
+        missing, how_to = SKIP_GUIDANCE[state]
         print(
-            f"alembic head 검사 실패: {ORIGIN_REF} 참조가 없어 정본과 대조할 수 없다. "
-            "`git fetch origin main` 후 다시 실행할 것"
+            f"alembic head 검사 건너뜀 — {missing}. 대조할 정본이 없다.\n"
+            f"  · 확인한 것: {VERSIONS_DIR} 에서 리비전 {len(local)}개를 수집했다 "
+            f"(head: {', '.join(heads(local))}).\n"
+            f"  · 못 본 것: 이 트리가 정본({ORIGIN_REF})보다 낡았는지. 낡은 트리의 "
+            "`alembic upgrade head` 는 리비전을 조용히 빠뜨리고도 종료 코드 0 으로 끝난다 (#387).\n"
+            f"  · 대조를 켜려면: {how_to}"
         )
-        return 1
+        return 0
     origin = build_graph(origin_sources)
     if not origin:
         print(
