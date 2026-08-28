@@ -101,3 +101,14 @@ export function toCreatePayload(draft: BotDraft, strategies: StrategyDraft[]) {
     })),
   };
 }
+
+/**
+ * 서버가 짚은 칸 — 전략 파라미터 오류는 화면 라벨을 「」 로 감싸 앞에 둔다
+ * (`「평균선 기간」: 5일~120일 범위여야 합니다 (받은 값 3일)`, 백엔드 `strategy_loader._coerce`).
+ * 그 라벨의 칸 이름을 돌려준다. 라벨이 없거나 폼에 그 라벨이 없으면 `null` — 그때는 토스트만 남는다.
+ */
+export function fieldNameFromServerError(message: string, fields: { name: string; label: string }[]): string | null {
+  const match = /^「(.+?)」/.exec(message.trim());
+  if (!match) return null;
+  return fields.find((field) => field.label === match[1])?.name ?? null;
+}
