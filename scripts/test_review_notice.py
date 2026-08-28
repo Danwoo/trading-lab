@@ -31,6 +31,12 @@ CASES = [
         False,
     ),
     ("이름이 md 로 끝나는 확장자 없는 파일", {"files": ["READMEmd"]}, False, False),
+    # `docs/**` 는 디렉터리 접두다 — 이름이 docs 로 시작할 뿐인 디렉터리는 문서가 아니다.
+    ("docs 로 시작하는 다른 디렉터리", {"files": ["docsite/a.txt"]}, False, False),
+    ("중간 경로의 docs/ 는 접두가 아니다", {"files": ["frontend/docs/a.txt"]}, False, False),
+    # 워크플로·판정부 자체는 문서가 아니다 — 승인 경로를 고치는 PR 은 반드시 리뷰를 받는다.
+    ("워크플로 + md", {"files": ["CLAUDE.md", ".github/workflows/ci.yml"]}, False, False),
+    ("판정부 + md", {"files": ["README.md", "scripts/review_notice.py"]}, False, False),
     # 판독 불가 → 문서 전용 아님 + error (fail-closed)
     ("빈 목록", {"files": []}, False, True),
     ("files 키 없음", {}, False, True),
