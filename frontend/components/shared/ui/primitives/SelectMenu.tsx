@@ -57,6 +57,26 @@ export interface SelectMenuProps {
   onChange: (next: any) => void;
 }
 
+/**
+ * 객체 항목은 `valueExpr`/`displayExpr` 키를 **둘 다** 가져야 한다 — 없으면 값은 `undefined`,
+ * 표시는 빈 문자열이 되어 목록이 빈 줄로 열리고 고르면 값이 지워진다(#397). 그 상태는 콘솔
+ * 경고(`same key`)만 남기고 화면은 멀쩡한 듯 서 있어 아무도 못 본다. 그래서 조용히 그리지 않고
+ * 던진다 — 어느 호출부가 어떤 키를 빠뜨렸는지 에러 한 줄이 말한다. 문자열·숫자 항목은 자기
+ * 자신이 값이자 표시라 검사 대상이 아니다.
+ */
+export function assertItemsMatchExprs(items: any[], displayExpr: string, valueExpr: string): void {
+  if (!Array.isArray(items)) return;
+  for (const item of items) {
+    if (item === null || typeof item !== "object") continue;
+    const missing = [valueExpr, displayExpr].filter((key) => !(key in item));
+    if (missing.length === 0) continue;
+    throw new Error(
+      `SelectMenu: 항목에 ${missing.map((key) => `"${key}"`).join("·")} 키가 없습니다 — ` +
+        `displayExpr="${displayExpr}", valueExpr="${valueExpr}" 인데 항목 키는 [${Object.keys(item).join(", ")}] 입니다.`,
+    );
+  }
+}
+
 /** 항목에서 값/표시를 뽑는다. 문자열 배열이면 항목 자체가 값이자 표시다. */
 function readValue(item: any, valueExpr: string): any {
   return item !== null && typeof item === "object" ? item[valueExpr] : item;
@@ -108,6 +128,8 @@ export function SelectMenu({
 
   const selectedValues: any[] = multiple ? (Array.isArray(value) ? value : []) : [];
   const canSearch = searchEnabled || acceptCustomValue;
+
+  assertItemsMatchExprs(items, displayExpr, valueExpr);
 
   const visibleItems = useMemo(() => {
     if (!canSearch || !search.trim()) return items;
