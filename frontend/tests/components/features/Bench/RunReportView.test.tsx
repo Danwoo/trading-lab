@@ -331,7 +331,40 @@ describe("RunReportView", () => {
     expect(section.textContent).toContain("구간 끝에 열린 자리 1건");
     expect(section.textContent).toContain("2025-08-05 진입");
     expect(section.textContent).toContain("36,814,411");
-    expect(section.textContent).toContain("이 성과의 100% 가 아직 안 판 자리의 평가액입니다");
+    expect(section.textContent).toContain("이 성과의 100% 가 아직 안 판 자리의 미실현 이익입니다");
+  });
+
+  it("미실현 비중이 음수면 「성과의 −5.7% 가 평가액」이라 하지 않고 깎고 있다고 말한다 (F8)", () => {
+    // 실측(run 843, ma=5·pullback=0.5) — 평가액 12,420,000 < 진입 원금 12,566,163 인 열린 자리.
+    const losing = openPosition({ value: 12420000, unrealized_pnl: -146163, unrealized_share_pct: -5.7 });
+    render(<RunReportView report={report({ open_position: losing })} />);
+
+    const section = screen.getByRole("region", { name: "구간 끝에 열린 자리" });
+    expect(section.textContent).toContain("열린 자리가 이 성과를 5.7% 깎고 있습니다(미실현 손실)");
+    expect(section.textContent).not.toContain("-5.7%");
+    expect(section.textContent).not.toContain("−5.7%");
+  });
+
+  it("총손익도 손실이면 「이 손실의 N%」로 — 미실현 손실이 손실의 일부다 (F8)", () => {
+    render(
+      <RunReportView
+        report={report({ open_position: openPosition({ unrealized_pnl: -100000, unrealized_share_pct: 40 }) })}
+      />,
+    );
+
+    const section = screen.getByRole("region", { name: "구간 끝에 열린 자리" });
+    expect(section.textContent).toContain("이 손실의 40% 가 아직 안 판 자리의 미실현 손실입니다");
+  });
+
+  it("손실 실행에서 열린 자리가 평가이익이면 「메우고 있다」로 (F8)", () => {
+    render(
+      <RunReportView
+        report={report({ open_position: openPosition({ unrealized_pnl: 30000, unrealized_share_pct: -12.5 }) })}
+      />,
+    );
+
+    const section = screen.getByRole("region", { name: "구간 끝에 열린 자리" });
+    expect(section.textContent).toContain("열린 자리가 이 손실을 12.5% 메우고 있습니다(미실현 이익)");
   });
 
   it("열린 자리가 없으면 그 자리를 만들지 않는다", () => {

@@ -91,6 +91,27 @@ function won(value: number): string {
  * 거래 목록·승률은 「없음」이라 답하는데 자산곡선의 마지막 점은 그 자리의 평가액을 담는다.
  * 두 사실을 나란히 놓고 아무 말도 안 하면 어느 쪽이 거짓인지 화면 안에서 가릴 수 없다.
  */
+/**
+ * 미실현 비중을 문장으로 — **부호에 따라 네 갈래**다.
+ *
+ * 비중은 `미실현 ÷ 총손익` 이라 둘의 부호가 다르면 음수로 온다. 그걸 「이 성과의 −5.7% 가
+ * 평가액입니다」로 찍으면 양수 전제의 문장이 무너진다(실측: 평가손실을 안은 열린 자리).
+ * 비중 부호는 「둘이 같은 방향인가」만 말하므로, 어느 쪽이 손실인지는 미실현손익의 부호로 가른다.
+ */
+function unrealizedShareSentence(sharePct: number, unrealizedPnl: number): string {
+  const share = Math.abs(sharePct).toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+  const losing = unrealizedPnl < 0;
+  const opposite = sharePct < 0;
+  const head = opposite
+    ? losing
+      ? `열린 자리가 이 성과를 ${share}% 깎고 있습니다(미실현 손실)`
+      : `열린 자리가 이 손실을 ${share}% 메우고 있습니다(미실현 이익)`
+    : losing
+      ? `이 손실의 ${share}% 가 아직 안 판 자리의 미실현 손실입니다`
+      : `이 성과의 ${share}% 가 아직 안 판 자리의 미실현 이익입니다`;
+  return `${head} — 매도 비용은 아직 안 물렸습니다.`;
+}
+
 function OpenPositionNotice({ position }: { position: OpenPositionOut }) {
   return (
     <section
@@ -105,7 +126,11 @@ function OpenPositionNotice({ position }: { position: OpenPositionOut }) {
       <p className="mt-1 break-keep text-2xs text-ink-muted">
         {position.unrealized_share_pct === null
           ? (redactReason(position.absent_reason) ?? "미실현 비중을 낼 수 없습니다.")
-          : `이 성과의 ${position.unrealized_share_pct.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}% 가 아직 안 판 자리의 평가액입니다 — 매도 비용은 아직 안 물렸습니다.`}
+          : // 백엔드는 비중과 미실현손익을 함께 낸다 — 손익이 빠진 응답은 계약 밖이라 비중 부호로 대신 읽는다.
+            unrealizedShareSentence(
+              position.unrealized_share_pct,
+              position.unrealized_pnl ?? position.unrealized_share_pct,
+            )}
       </p>
       <p className="mt-0.5 break-keep text-2xs text-ink-muted">유도: {position.derived_from}</p>
     </section>
