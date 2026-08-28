@@ -10,15 +10,28 @@ processes:
   # `LOCAL_DB_ENDPOINT`, 로컬 DB 를 기본값으로 두는 스크립트가 같은 포트여야 하며 그 lockstep 은
   # scripts/verify_dev_port_hygiene.py 가 검사한다. CI 서비스 컨테이너와 컨테이너 배포
   # (compose.*.yaml)의 5432 는 격리된 네트워크 안쪽이라 이 값과 무관하다.
+  # 도커가 없으면 여기서 **한 번 말하고 멈춘다** (#399). 종전에는 `docker run` 이 곧바로 실패하고
+  # `restart: on_failure` 가 무한히 다시 걸어, 화면에는 같은 오류만 흐르고 「도커가 필요하다」도
+  # 「도커 없이 세우는 법」도 어디에도 안 나왔다 — 리드가 실제로 여기서 막혔다.
+  # 처방 둘: (1) 명령 앞에 docker 유무를 먼저 보고 없으면 대안 경로를 가리키며 종료,
+  # (2) `max_restarts` 로 재시도를 유한하게. 진짜 일시적 실패(데몬 재시작 중)는 그 횟수 안에서 낫는다.
+  # YAML 은 `>`(folded)가 줄바꿈을 공백으로 접어 bash 문법을 깨뜨린다 — `|`(literal) 이어야 한다.
   postgres:
     vars:
       PORT: 5442
-    command: >
-      docker run --rm --name fintech-pg -p {{.PORT}}:5432
-      -e POSTGRES_USER=fintech -e POSTGRES_PASSWORD=fintech
-      -e POSTGRES_DB=fintech
-      -v fintech-pg-data:/var/lib/postgresql/data
-      pgvector/pgvector:pg16
+    command: |
+      bash -c 'if ! command -v docker >/dev/null 2>&1; then
+        echo "postgres: docker 를 찾지 못했다. 이 프로세스는 pgvector/pgvector:pg16 을 docker run 한다." >&2
+        echo "  도커 없이 같은 스택을 세우는 경로가 있다 — .docs/5-인프라셋팅/로컬-postgres.md 의" >&2
+        echo "  「Docker 가 없다면 / process-compose 가 없다면」 절 (pgserver 로 같은 포트 {{.PORT}} 에 띄운다)." >&2
+        echo "  그 절은 DB 를 띄운 뒤 나머지 서비스를 process-compose 없이 올리는 명령까지 적어 두었다." >&2
+        exit 1
+      fi
+      exec docker run --rm --name fintech-pg -p {{.PORT}}:5432 \
+        -e POSTGRES_USER=fintech -e POSTGRES_PASSWORD=fintech \
+        -e POSTGRES_DB=fintech \
+        -v fintech-pg-data:/var/lib/postgresql/data \
+        pgvector/pgvector:pg16'
     readiness_probe:
       exec:
         command: "docker exec fintech-pg pg_isready -U fintech -d fintech"
@@ -27,6 +40,7 @@ processes:
       failure_threshold: 15
     availability:
       restart: "on_failure"
+      max_restarts: 3
 
   # 스키마 적재 (일회성) — postgres healthy 후. DB 는 `fintech` 하나이고 소유를 스키마로 가른다:
   # 파이썬 서비스 alembic 이 `public` 에, frontend Prisma 가 `frontend` 스키마에 자기 소유
