@@ -214,12 +214,12 @@ function listSourceFiles(dir: string): string[] {
 
 const rel = (file: string) => path.relative(FRONTEND_ROOT, file).split(path.sep).join("/");
 
-/** `<NumberBox … />` 한 덩어리씩 — 자기 닫는 태그까지 붙여 자른다. */
-function numberBoxUsages(source: string): string[] {
+/** `<Tag … />` 한 덩어리씩 — 자기 닫는 태그까지 붙여 자른다(속성이 여러 줄이어도 통째로 잡힌다). */
+function usagesOf(source: string, tag: string): string[] {
   const out: string[] = [];
   let from = 0;
   for (;;) {
-    const open = source.indexOf("<NumberBox", from);
+    const open = source.indexOf(`<${tag}`, from);
     if (open === -1) return out;
     const close = source.indexOf("/>", open);
     if (close === -1) return out;
@@ -227,6 +227,9 @@ function numberBoxUsages(source: string): string[] {
     from = close + 2;
   }
 }
+
+/** 그 덩어리가 네이티브 범위를 선언하는가. */
+const declaresBound = (usage: string) => /(?<![\w-])(min|max)=/.test(usage);
 
 describe("#398 클래스 — 네이티브 범위를 단 칸의 전수와, 그 범위를 그리는 자리의 개수", () => {
   const files = listSourceFiles(path.join(FRONTEND_ROOT, SCAN_ROOTS[0])).concat(
@@ -238,9 +241,7 @@ describe("#398 클래스 — 네이티브 범위를 단 칸의 전수와, 그 �
     for (const file of files) {
       if (rel(file) === NUMBERBOX_SOURCE) continue;
       const source = fs.readFileSync(file, "utf8");
-      for (const usage of numberBoxUsages(source)) {
-        if (/\bmin=/.test(usage) || /\bmax=/.test(usage)) sites.push(rel(file));
-      }
+      for (const usage of usagesOf(source, "NumberBox")) if (declaresBound(usage)) sites.push(rel(file));
     }
     console.info(
       `[#398 census] 스캔한 소스 파일 ${files.length}개 (${SCAN_ROOTS.join(", ")}) · ` +
@@ -251,8 +252,15 @@ describe("#398 클래스 — 네이티브 범위를 단 칸의 전수와, 그 �
   });
 
   it("범위를 DOM 속성으로 그리는 자리가 등록된 목록과 정확히 같다", () => {
+    // 판정은 넓게 — `<input` 과 `min=`/`max=` 속성이 **같은 파일에** 있으면 후보로 본다.
+    // `<input …>` 한 태그 안으로 좁히면 속성 순서만 바꿔도(앞선 속성 식에 `>` 가 섞이면) 조용히
+    // 빠져나간다. 넓은 쪽의 오탐(무관한 raw input 과 NumberBox 가 한 파일에 있는 경우)은 사람이
+    // 한 번 보면 끝나지만, 좁은 쪽의 누락은 아무도 못 본다.
     const renderers = files
-      .filter((file) => /<input\b[^>]*\b(min|max)=/s.test(fs.readFileSync(file, "utf8")))
+      .filter((file) => {
+        const source = fs.readFileSync(file, "utf8");
+        return source.includes("<input") && /(?<![\w-])(min|max)=[{"]/.test(source);
+      })
       .map(rel)
       .sort();
     console.info(`[#398 census] 범위를 직접 그리는 파일 ${renderers.length}개 — ${renderers.join(", ")}`);
@@ -262,8 +270,7 @@ describe("#398 클래스 — 네이티브 범위를 단 칸의 전수와, 그 �
   it("DateBox 에 범위를 넘기는 호출부가 아직 없다 — 잠복이 살아나면 여기가 먼저 빨개진다", () => {
     const callers = files.filter((file) => {
       if (BOUND_RENDERERS.includes(rel(file))) return false;
-      const source = fs.readFileSync(file, "utf8");
-      return /<DateBox\b[^>]*\b(min|max)=/s.test(source);
+      return usagesOf(fs.readFileSync(file, "utf8"), "DateBox").some(declaresBound);
     });
     console.info(`[#398 census] DateBox 에 범위를 넘기는 호출부 ${callers.length}건`);
     expect(callers.map(rel)).toEqual([]);
