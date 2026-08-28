@@ -6,6 +6,7 @@ from core.exception_handler import get_exception_handlers
 from core.logger import logger
 from core.middlewares import get_middlewares
 from core.schema_version import SchemaVersionError, ensure_schema_matches_code
+from core.session_timezone import SessionTimezoneError, ensure_session_timezone_utc
 from fastapi import FastAPI
 from modules import BackgroundManager, load_managers, register_routers
 
@@ -40,7 +41,10 @@ async def lifespan(app: FastAPI):
     # 그 사유가 어디에도 안 남는다 (#311). 여기서 멈추면 사유와 처방이 기동 로그에 남는다.
     try:
         ensure_schema_matches_code(backend_sql_client)
-    except SchemaVersionError:
+        # 판이 맞아도 세션 타임존이 어긋나면 감사 시각이 **조용히** 어긋난다 (#359) — 판 검사 바로
+        # 뒤에 둬서 매니저·요청이 그 위에 서기 전에 멈춘다.
+        ensure_session_timezone_utc(backend_sql_client)
+    except (SchemaVersionError, SessionTimezoneError):
         _dispose_sql_client(backend_sql_client)
         raise
     managers = load_managers()

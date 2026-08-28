@@ -17,6 +17,9 @@
       (#375). 기동에 실패했다고 풀을 남겨 두지 않는다.
   (6) 정상 종료 중 stop() 이 던져도 나머지 매니저 정리와 dispose() 는 계속되고, 예외는 밖으로
       나가지 않는다 (종료 경로에서 던져 봐야 셧다운만 지저분해진다).
+  (8) DB 세션 타임존 대조(`ensure_session_timezone_utc`)도 **매니저보다 먼저** 돈다 — 판 대조 바로
+      뒤다 (#359). 세션 tz 가 어긋난 채로 서면 감사 시각이 조용히 어긋나므로, 매니저를 하나도
+      시작하지 않고 dispose() 후 그 예외가 그대로 올라간다. (7) 과 같은 이유·같은 모양이다.
   (7) DB 스키마 판 대조(`ensure_schema_matches_code`)는 **매니저보다 먼저** 돈다 — 판이 어긋나면
       매니저를 하나도 시작하지 않고 dispose() 후 그 예외가 그대로 올라간다 (#311). 매니저 뒤에
       두면 판 불일치가 매니저의 DB 조회 실패로 둔갑해, 로그에 사유 대신 무관한 예외가 남는다.
@@ -61,6 +64,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "app"))
 
 import main as main_module  # noqa: E402
 from core.schema_version import SchemaVersionError  # noqa: E402
+from core.session_timezone import SessionTimezoneError  # noqa: E402
 
 
 def _fail(msg: str) -> None:
@@ -116,13 +120,17 @@ def _fake_app(disposed: list[str] | None = None) -> MagicMock:
     return app
 
 
-def _no_schema_guard():
-    """판 대조를 눌러 둔다 — 매니저 계약을 보는 검사에서는 대조 대상(DB)이 없다."""
-    return patch.object(main_module, "ensure_schema_matches_code", lambda *a, **kw: None)
+def _no_startup_guards():
+    """기동 전 검사 2종을 눌러 둔다 — 매니저 계약을 보는 검사에서는 대조 대상(DB)이 없다."""
+    return (
+        patch.object(main_module, "ensure_schema_matches_code", lambda *a, **kw: None),
+        patch.object(main_module, "ensure_session_timezone_utc", lambda *a, **kw: None),
+    )
 
 
 async def _run_lifespan_expect_failure(managers: list[_FakeManager], app: MagicMock | None = None) -> Exception:
-    with _no_schema_guard(), patch.object(main_module, "load_managers", return_value=managers):
+    guard_schema, guard_timezone = _no_startup_guards()
+    with guard_schema, guard_timezone, patch.object(main_module, "load_managers", return_value=managers):
         try:
             async with main_module.lifespan(app or _fake_app()):
                 _fail("기동 실패에도 lifespan 이 yield 까지 진행됨")
@@ -193,7 +201,11 @@ def check_all_success_normal_shutdown_unaffected() -> None:
     m3.stop = lambda: _tracked_stop(m3)  # type: ignore[method-assign]
 
     async def _run() -> None:
-        with _no_schema_guard(), patch.object(main_module, "load_managers", return_value=[m1, m2, m3]):
+        with (
+            _no_startup_guards()[0],
+            _no_startup_guards()[1],
+            patch.object(main_module, "load_managers", return_value=[m1, m2, m3]),
+        ):
             async with main_module.lifespan(_fake_app()):
                 pass
 
@@ -250,7 +262,11 @@ def check_shutdown_stop_failure_continues_cleanup() -> None:
     m3 = _FakeManager("m3")
 
     async def _run() -> None:
-        with _no_schema_guard(), patch.object(main_module, "load_managers", return_value=[m1, m2, m3]):
+        with (
+            _no_startup_guards()[0],
+            _no_startup_guards()[1],
+            patch.object(main_module, "load_managers", return_value=[m1, m2, m3]),
+        ):
             async with main_module.lifespan(_fake_app(disposed)):
                 pass
 
@@ -299,6 +315,39 @@ def check_schema_drift_stops_before_managers() -> None:
     print("  ✓ 판 불일치: 매니저 0개 시작, dispose() 호출, 판정 예외가 그대로 올라옴")
 
 
+def check_session_timezone_stops_before_managers() -> None:
+    """(8) 세션 tz 가 어긋나면 매니저를 하나도 시작하지 않고 dispose 한 뒤 그 예외가 올라간다."""
+    disposed: list[str] = []
+    m1, m2 = _FakeManager("m1"), _FakeManager("m2")
+    mismatch = SessionTimezoneError("DB 세션 타임존이 UTC 이 아니다: Asia/Seoul")
+
+    def _raise(*_args: object, **_kwargs: object) -> None:
+        raise mismatch
+
+    async def _run() -> None:
+        with (
+            patch.object(main_module, "ensure_schema_matches_code", lambda *a, **kw: None),
+            patch.object(main_module, "ensure_session_timezone_utc", _raise),
+            patch.object(main_module, "load_managers", return_value=[m1, m2]),
+        ):
+            async with main_module.lifespan(_fake_app(disposed)):
+                _fail("세션 tz 불일치에도 lifespan 이 yield 까지 진행됨 — 앱이 그대로 선다")
+
+    try:
+        asyncio.run(_run())
+    except SessionTimezoneError as e:
+        if e is not mismatch:
+            _fail(f"올라온 예외가 판정 결과가 아님: {e!r}")
+    else:
+        _fail("세션 tz 불일치가 예외로 올라오지 않음")
+
+    if m1.started or m2.started:
+        _fail(f"세션 tz 가 어긋났는데 매니저가 시작됨 (m1={m1.started}, m2={m2.started})")
+    if not disposed:
+        _fail("세션 tz 불일치로 멈추면서 dispose() 가 호출되지 않음 — 커넥션 풀이 남는다")
+    print("  ✓ 세션 tz 불일치: 매니저 0개 시작, dispose() 호출, 판정 예외가 그대로 올라옴")
+
+
 def main() -> None:
     print("lifespan 매니저 롤백 검증")
     check_middle_failure_rolls_back_all_attempted_managers()
@@ -309,6 +358,7 @@ def main() -> None:
     check_rollback_disposes_sql_client()
     check_shutdown_stop_failure_continues_cleanup()
     check_schema_drift_stops_before_managers()
+    check_session_timezone_stops_before_managers()
     print("모든 검증 통과")
 
 

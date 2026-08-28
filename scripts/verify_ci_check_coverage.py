@@ -96,7 +96,7 @@ INVENTORY_AXES: list[tuple[str, str, int]] = [
     # 클래스라 채운다 (#23 Task 2).
     ("scripts", "test_*.py", 14),
     ("*/tests", "test_*.py", 35),  # 서비스별 standalone 테스트 (#335)
-    ("frontend/scripts", "check-*.js", 5),  # frontend 정적 스캔
+    ("frontend/scripts", "check-*.js", 6),  # frontend 정적 스캔
     ("frontend/scripts", "generate-*.js", 1),  # 생성물 재현 대조 (--check 모드, #361)
     ("scripts", "generate_*.py", 1),  # 루트 생성물 재현 대조 (--check 모드)
     # 주입 프로브 — 「그 검사가 무엇을 막는지」를 증명하는 자리다. 이 축이 없던 동안
@@ -394,6 +394,48 @@ def collect_inventory() -> dict[str, list[str]]:
     return per_axis
 
 
+def check_step_paths_resolve() -> tuple[int, list[str]]:
+    """run 블록이 이름 댄 `*.py` 가 **그 스텝의 cwd 기준으로** 실재하는지 본다 (#359).
+
+    배선 검사(`collect_coverage`)는 「이 검증 단위가 CI 어딘가에서 불리는가」를 본다 — 그래서
+    `_resolve` 가 cwd 로 못 찾으면 REPO_ROOT 로도 시도한다. 그 관대함이 배선 판정에는 맞지만,
+    **스텝이 실제로 돌 수 있는가**는 못 본다: `backend-service/scripts/x.py` 를
+    `working-directory` 없이 `scripts/x.py` 로 부르면 배선은 잡히는데 러너에서는
+    `can't open file` 로 죽는다.
+
+    잡을 합치며 `defaults.run.working-directory` 가 사라진 뒤 이 구멍이 실제로 두 번 열렸다
+    (#392 병합 · #359). 스텝이 이름 댄 경로가 자기 cwd 에 없으면 그것은 언제나 결함이다.
+    """
+    checked = 0
+    problems: list[str] = []
+    for wf in sorted(WORKFLOW_DIR.glob("*.yml")):
+        text = wf.read_text(encoding="utf-8")
+        for cwd, block in _iter_run_blocks(text):
+            for raw_line in block.splitlines():
+                stripped = raw_line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                try:
+                    tokens = shlex.split(stripped, comments=True)
+                except ValueError:
+                    continue
+                for token in tokens:
+                    # 스크립트 디렉터리를 명시한 파이썬 파일만 본다 — 셸 변수·글롭은 건너뛴다.
+                    if not token.endswith(".py") or "scripts/" not in token:
+                        continue
+                    if any(ch in token for ch in "$*?{}"):
+                        continue
+                    checked += 1
+                    base = (REPO_ROOT / cwd) if cwd else REPO_ROOT
+                    if not (base / token).is_file():
+                        where = f"working-directory: {cwd}" if cwd else "레포 루트"
+                        problems.append(
+                            f"{wf.name}: `{token}` 이 그 스텝의 cwd({where})에 없습니다 — "
+                            "러너에서 `can't open file` 로 죽습니다. working-directory 를 맞추세요"
+                        )
+    return checked, sorted(set(problems))
+
+
 def main() -> int:
     if not WORKFLOW_DIR.is_dir():
         _fail(f"워크플로 디렉터리가 없습니다: {WORKFLOW_DIR}")
@@ -420,6 +462,17 @@ def main() -> int:
         return 1
 
     ok = True
+
+    # 스텝이 이름 댄 경로가 그 스텝의 cwd 에 실재하는가 (#359)
+    path_checked, path_problems = check_step_paths_resolve()
+    print(f"스텝 경로 대조: run 블록이 이름 댄 스크립트 {path_checked}건")
+    if path_checked == 0:
+        _fail("스텝이 이름 댄 스크립트를 0건 수집했습니다 — 파싱이 깨졌습니다(fail-closed)")
+        ok = False
+    for problem in path_problems:
+        _fail(problem)
+    if path_problems:
+        ok = False
 
     # 축별 fail-closed — 축 하나가 통째로 사라지면 그 축의 미배선이 전부 안 보인다 (#402).
     # 합계 0건 검사는 이 구멍을 못 막는다: 나머지 축이 살아 있으면 총합은 0이 아니다.
