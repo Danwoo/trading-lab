@@ -41,6 +41,9 @@ export default defineConfig({
     alias: { "@": rootDir },
   },
   test: {
+    // 병렬 상한 — 기본값은 CPU 코어 수(이 기계 22)만큼 프로세스를 띄워 한 번의 npm test 가 3GB 를 넘겼다.
+    // 워커·self-hosted 러너가 같은 16GB VM 을 나눠 쓰므로 4 로 고정한다 (2026-08-28 실측: 18 프로세스 3,201MB).
+    maxWorkers: 4,
     include: API_REGRESSION_TESTS,
     environment: "node",
     // 검사 대상이 0건이면 실패한다 — vitest.config.ts 와 같은 원칙(#252). include 를 파일
