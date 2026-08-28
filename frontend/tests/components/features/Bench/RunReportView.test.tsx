@@ -190,6 +190,23 @@ describe("RunReportView", () => {
     expect(pnl).toEqual(["+1,810,707", "+281,622", "−4,124"]);
   });
 
+  it("자산·낙폭 곡선이 그림으로 서고 요지를 이름으로 갖는다 — 캔버스만 있으면 보조기술에 곡선이 없다 (F9)", () => {
+    render(<RunReportView report={report()} />);
+
+    const figure = screen.getByRole("img", { name: /자산곡선과 낙폭 곡선/ });
+    const name = figure.getAttribute("aria-label") ?? "";
+    expect(name).toContain("2026-01-02 ~ 2026-01-03");
+    expect(name).toContain("시작 1,000,000원 → 끝 1,010,000원");
+    expect(name).toContain("최대 낙폭 0%");
+  });
+
+  it("자산곡선이 없으면 빈 이름의 그림을 만들지 않는다", () => {
+    render(<RunReportView report={report({ equity: [] })} />);
+
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(document.body.textContent).toContain("자산곡선이 없습니다");
+  });
+
   it("비용 가정 3종을 그대로 읽어 준다 — 이 숫자들이 무엇 위에 서 있는지", () => {
     const withCosts = report();
     withCosts.run = {

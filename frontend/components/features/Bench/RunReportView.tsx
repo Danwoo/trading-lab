@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createEquityChart, type EquityChartHandle, type EquityChartPoint } from "@/lib/bench/equityChart";
-import { downsampleLttb, drawdownRatios } from "@/lib/bench/equityMath";
+import { downsampleLttb, drawdownRatios, equityCurveSummary } from "@/lib/bench/equityMath";
 import type {
   ExecutionAssumptionsOut,
   MetricOut,
@@ -249,7 +249,15 @@ function EquityCurve({ report }: { report: RunReportOut }) {
     return () => observer.disconnect();
   }, []);
 
-  return <div ref={containerRef} className="h-[30svh] w-full min-w-0" />;
+  // 캔버스는 보조기술에 비어 있다 — 컨테이너가 그림 하나로 서고 요지를 이름으로 갖는다.
+  return (
+    <div
+      ref={containerRef}
+      role="img"
+      aria-label={equityCurveSummary(report.equity)}
+      className="h-[30svh] w-full min-w-0"
+    />
+  );
 }
 
 /** 비용 항목의 사람 말 — 값 자체는 백엔드가 준 키다. */
