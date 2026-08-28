@@ -78,6 +78,28 @@ function parseAmount(raw: string, suffix: string): number | null {
 const UNREADABLE_MESSAGE = "숫자로 읽을 수 없습니다 — 숫자와 쉼표로 적으세요.";
 
 /**
+ * 선언한 범위를 값이 벗어난 상태를 글로 말한다 (#398).
+ *
+ * `min`/`max` 는 네이티브 입력에 그대로 실려 **브라우저의 제출 차단**이 된다. 그런데 그 차단은
+ * 잘못된 칸에 포커스를 줄 수 있을 때만 말풍선을 띄운다 — 이 레포의 폼 상당수가 넓은·좁은 배치에
+ * 두 벌 마운트되어 한 벌이 `display:none` 이라(§21.6), 안 보이는 쪽이 걸리면 **아무 말 없이
+ * 버튼만 죽는다**. 실측(#398): 칸 수에 `99` 를 넣으면 폼은 `495칸` 을 약속하는데 실행을 눌러도
+ * 요청 0건·콘솔 0건·글자 변화 0건이었다.
+ *
+ * 그래서 범위를 선언한 칸은 벗어난 값을 **그 자리에서** 말한다. 값을 대신 눌러 주지는 않는다 —
+ * `5~120` 같은 넓은 범위에서 한 글자씩 누르면 `12` 를 칠 수 없다. 눌러야 하는 칸(칸 수처럼
+ * 범위가 한 자리인 곳)은 상태를 가진 쪽이 누른다.
+ */
+function outOfRangeMessage(value: number | null | undefined, min?: number, max?: number): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  if (min !== undefined && max !== undefined && (value < min || value > max))
+    return `${min}~${max} 사이로 적으세요.`;
+  if (min !== undefined && value < min) return `${min} 이상으로 적으세요.`;
+  if (max !== undefined && value > max) return `${max} 이하로 적으세요.`;
+  return undefined;
+}
+
+/**
  * 숫자 입력 컴포넌트 (#341 ② — 네이티브 `<input type="number">`)
  *
  * 나이, 연봉, 수량, 금액 등 숫자 값 입력에 사용합니다. 금액처럼 자릿수를 읽어야 하는 칸은
@@ -157,8 +179,11 @@ export function NumberBox<T = any>({
     onValueChanged(fieldName, parsed);
   };
 
-  const shownError = isInvalid ? errorMessage : unreadable ? UNREADABLE_MESSAGE : undefined;
-  const showsError = isInvalid || unreadable;
+  // 범위 밖 판정은 네이티브 `min`/`max` 가 실제로 입력에 실리는 갈래에서만 한다 — `groupDigits`
+  // 는 그 둘을 떼고 텍스트 입력이 되므로 브라우저가 막지 않고, 여기서만 빨개지면 거짓 경보다.
+  const rangeError = groupDigits ? undefined : outOfRangeMessage(value, min, max);
+  const shownError = isInvalid ? errorMessage : unreadable ? UNREADABLE_MESSAGE : rangeError;
+  const showsError = isInvalid || unreadable || rangeError !== undefined;
   const describedByIds =
     [showsError && shownError ? errorMessageId : describedBy, showsSuffix ? suffixId : undefined]
       .filter(Boolean)

@@ -14,11 +14,16 @@
 //
 // 배치: 훅 + 폼 + 프리미티브(`NumberBox`)를 관통하는 회귀라 tests/regressions/ 에 둔다.
 
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { GridRunForm } from "@/components/features/Bench/GridRunForm";
+import { NumberBox } from "@/components/shared/ui/NumberBox";
 import { useGridRunForm } from "@/hooks/bench/useGridRunForm";
 import { STEPS_MAX, STEPS_MIN } from "@/lib/bench/sweep";
 import type { BacktestGridIn } from "@/schemas/backtest/backtest";
@@ -133,5 +138,127 @@ describe("#398 — 칸 수 상한을 넘긴 입력은 그 자리에서 눌리고
     expect(Object.keys(sweep)).toEqual(["ma_period", "dip_pct"]);
     for (const values of Object.values(sweep)) expect(values.length).toBeLessThanOrEqual(STEPS_MAX);
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 클래스 — 「칸 수」만의 일이 아니다.
+//
+// 네이티브 `min`/`max` 를 단 칸은 전부 같은 구조를 갖는다: 상태가 그 범위를 벗어나는 순간
+// 제출이 브라우저 단에서 막히고, 두 벌 마운트 때문에 말풍선조차 안 뜬다. 이 레포에는 그런 칸이
+// 「칸 수」 말고도 여럿 있다(전략 파라미터 · 손절/익절 % · 스케줄 시/분 · 메뉴 정렬순서).
+// 그래서 그물을 두 축으로 친다:
+//
+//   ㉠ 범위를 선언한 칸을 **전수로 센다** — 0건이면 실패한다(아무것도 안 본 통과를 막는다).
+//   ㉡ 그 범위가 DOM 속성이 되는 자리가 `NumberBox` **하나뿐**이다 — 두 번째가 생기면 이 그물이
+//      안 보는 새 우회로가 된다.
+//
+// 그리고 그 하나뿐인 자리가 범위 밖 값을 **글로 말하는지**를 렌더로 확인한다. 값을 대신 눌러
+// 주는 것은 범위가 한 자리인 칸(칸 수)에서만 상태 소유자가 한다 — 위의 훅 테스트가 그쪽이다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FRONTEND_ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
+const SCAN_ROOTS = ["app", "components", "hooks", "lib", "utils"];
+const NUMBERBOX_SOURCE = "components/shared/ui/NumberBox.tsx";
+
+/**
+ * 네이티브 범위(`min`/`max`)를 DOM 속성으로 그리는 파일 — **등록된 것이 전부여야 한다.**
+ * 세 번째가 생기면 이 그물이 안 보는 새 우회로가 되므로, 늘리는 대신 프리미티브를 쓰게 고친다.
+ *
+ * `DateBox` 도 여기 있다 — 날짜 갈래는 텍스트 입력 + 자체 사유(`dateProblem`)라 침묵하지 않지만,
+ * ㉠ 달력 팝업 앵커로 세워 둔 `aria-hidden` 숨은 `type="date"` 입력과 ㉡ `datetime`/`time` 갈래의
+ * 네이티브 입력은 범위를 달고도 사유를 말하지 않는다. **지금은 `min`/`max` 를 넘기는 호출부가
+ * 하나도 없어 잠복이다**(이 테스트가 전수로 확인한다). 살아나면 #398 과 같은 침묵이 된다.
+ */
+const BOUND_RENDERERS = [NUMBERBOX_SOURCE, "components/shared/ui/DateBox.tsx"];
+
+function listSourceFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules" || entry.name === "generated") continue;
+      out.push(...listSourceFiles(full));
+    } else if (entry.isFile() && /\.tsx?$/.test(entry.name)) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+const rel = (file: string) => path.relative(FRONTEND_ROOT, file).split(path.sep).join("/");
+
+/** `<NumberBox … />` 한 덩어리씩 — 자기 닫는 태그까지 붙여 자른다. */
+function numberBoxUsages(source: string): string[] {
+  const out: string[] = [];
+  let from = 0;
+  for (;;) {
+    const open = source.indexOf("<NumberBox", from);
+    if (open === -1) return out;
+    const close = source.indexOf("/>", open);
+    if (close === -1) return out;
+    out.push(source.slice(open, close + 2));
+    from = close + 2;
+  }
+}
+
+describe("#398 클래스 — 네이티브 범위를 단 칸의 전수와, 그 범위를 그리는 자리의 개수", () => {
+  const files = listSourceFiles(path.join(FRONTEND_ROOT, SCAN_ROOTS[0])).concat(
+    ...SCAN_ROOTS.slice(1).map((root) => listSourceFiles(path.join(FRONTEND_ROOT, root))),
+  );
+
+  it("범위를 선언한 칸이 0건이 아니다 — 몇 건을 봤는지 남긴다", () => {
+    const sites: string[] = [];
+    for (const file of files) {
+      if (rel(file) === NUMBERBOX_SOURCE) continue;
+      const source = fs.readFileSync(file, "utf8");
+      for (const usage of numberBoxUsages(source)) {
+        if (/\bmin=/.test(usage) || /\bmax=/.test(usage)) sites.push(rel(file));
+      }
+    }
+    console.info(
+      `[#398 census] 스캔한 소스 파일 ${files.length}개 (${SCAN_ROOTS.join(", ")}) · ` +
+        `네이티브 범위를 선언한 NumberBox ${sites.length}건 — ${[...new Set(sites)].join(", ")}`,
+    );
+    expect(files.length).toBeGreaterThan(0);
+    expect(sites.length).toBeGreaterThan(0);
+  });
+
+  it("범위를 DOM 속성으로 그리는 자리가 등록된 목록과 정확히 같다", () => {
+    const renderers = files
+      .filter((file) => /<input\b[^>]*\b(min|max)=/s.test(fs.readFileSync(file, "utf8")))
+      .map(rel)
+      .sort();
+    console.info(`[#398 census] 범위를 직접 그리는 파일 ${renderers.length}개 — ${renderers.join(", ")}`);
+    expect(renderers).toEqual([...BOUND_RENDERERS].sort());
+  });
+
+  it("DateBox 에 범위를 넘기는 호출부가 아직 없다 — 잠복이 살아나면 여기가 먼저 빨개진다", () => {
+    const callers = files.filter((file) => {
+      if (BOUND_RENDERERS.includes(rel(file))) return false;
+      const source = fs.readFileSync(file, "utf8");
+      return /<DateBox\b[^>]*\b(min|max)=/s.test(source);
+    });
+    console.info(`[#398 census] DateBox 에 범위를 넘기는 호출부 ${callers.length}건`);
+    expect(callers.map(rel)).toEqual([]);
+  });
+});
+
+describe("#398 클래스 — 범위를 선언한 칸은 벗어난 값을 글로 말한다", () => {
+  it("상한을 넘긴 값은 사유를 보이고 aria-invalid 가 선다", () => {
+    render(<NumberBox fieldName="hour" value={99} min={0} max={23} onValueChanged={() => {}} />);
+    const input = screen.getByRole("spinbutton") as HTMLInputElement;
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    const reason = screen.getByText("0~23 사이로 적으세요.");
+    // 사유가 보조기술에도 닿아야 한다 — 보이기만 하면 화면을 못 보는 사람에게는 여전히 침묵이다.
+    expect(input.getAttribute("aria-describedby")?.split(" ")).toContain(reason.id);
+  });
+
+  it("범위 안 값은 아무 말도 하지 않는다 — 거짓 경보를 만들지 않는다", () => {
+    render(<NumberBox fieldName="hour" value={9} min={0} max={23} onValueChanged={() => {}} />);
+    const input = screen.getByRole("spinbutton") as HTMLInputElement;
+    expect(input.getAttribute("aria-invalid")).toBeNull();
+    expect(screen.queryByText(/사이로 적으세요/)).toBeNull();
   });
 });
