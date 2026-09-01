@@ -153,6 +153,8 @@ export interface BotRunOut {
   run_id: number;
   status: string;
   strategy_key: string;
+  /** 돌린 조합 — 이력에서 「같은 조합을 이미 돌렸다」를 가리는 근거. */
+  params: Record<string, unknown>;
   universe_def: Record<string, unknown>;
   period_from: string;
   period_to: string;

@@ -425,6 +425,41 @@ def test_closed_run_has_no_open_position_field() -> None:
     check("열린 자리 없음", report["open_position"], None)
 
 
+class HistoryRepository:
+    """봇 이력 두 조회를 흉내 낸다 — `params` 가 목록에 실리는지 본다 (F13)."""
+
+    def __init__(self, rows: list[dict]):
+        self.rows = rows
+
+    def select_runs_by_bot(self, bot_id: int, workspace_id: int, limit: int):
+        return self.rows[:limit]
+
+    def count_runs_by_bot(self, bot_id: int, workspace_id: int):
+        return len(self.rows)
+
+
+def test_bot_history_carries_the_combination() -> None:
+    """같은 조합을 다시 돌리면 새 행이 생긴다 — 이력이 조합(`params`)을 실어야 화면이 반복을 가린다."""
+    from schemas.backtest.backtest_schema import BotRunListOut
+
+    row = {
+        "run_id": 686,
+        "status": "succeeded",
+        "strategy_key": "ma_pullback",
+        "params": {"ma_period": 120, "pullback_pct": 15},
+        "universe_def": {"market": "KOSPI", "symbols": ["005930"]},
+        "period_from": date(2023, 8, 27),
+        "period_to": date(2026, 8, 26),
+        "attempt_no": 1,
+        "parent_run_id": None,
+        "finished_dt": None,
+    }
+    result = service(HistoryRepository([row])).select_runs_by_bot({"bot_id": 1, "workspace_id": 1, "limit": 20})
+    out = BotRunListOut(**result)
+    check("이력 한 줄에 조합이 실린다", out.items[0].params, {"ma_period": 120, "pullback_pct": 15})
+    check("응답 모델이 조합을 버리지 않는다", "params" in out.items[0].model_dump(), True)
+
+
 def main() -> int:
     for fn in [v for k, v in sorted(globals().items()) if k.startswith("test_")]:
         fn()

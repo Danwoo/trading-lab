@@ -25,6 +25,11 @@ interface Props {
   catalogErrors: { source: string; message: string }[];
   onStrategyChange: (key: string) => void;
   onParamChange: (name: string, value: unknown) => void;
+  /**
+   * 서버가 칸을 짚어 돌려보낸 오류 — 칸 이름 → 문장. 토스트는 사라지지만 이건 칸에 남는다.
+   * 지금은 전략 파라미터 칸만 대상이다(백엔드가 라벨을 짚는 오류가 그것뿐이다).
+   */
+  fieldErrors?: Record<string, string>;
   /** 372px 패널처럼 좁은 자리 — 라벨과 컨트롤을 나란히 두지 않고 위아래로 쌓는다. */
   dense?: boolean;
 }
@@ -103,9 +108,14 @@ export function BotForm({
   catalogErrors,
   onStrategyChange,
   onParamChange,
+  fieldErrors = {},
   dense = false,
 }: Props) {
   const selectedForm = strategyForms.find((form) => form.key === strategy?.strategyKey) ?? null;
+  const fieldPropsOf = (name: string) => {
+    const message = fieldErrors[name];
+    return message === undefined ? {} : { validationStatus: "invalid" as const, validationError: { message } };
+  };
 
   return (
     <div
@@ -195,6 +205,7 @@ export function BotForm({
                 field={field}
                 value={strategy?.params[field.name]}
                 onChange={onParamChange}
+                getFieldProps={fieldPropsOf}
               />
             )}
           </Row>
@@ -215,7 +226,12 @@ export function BotForm({
             />
           )}
         </Row>
-        <Row label="조건 결합" help="전략을 여럿 실으면 어떻게 합칠지입니다.">
+        <Row
+          label="조건 결합"
+          // 「고른 전략」이 단일 선택이라 이 화면에서는 전략이 늘 하나다 — 그 사실을 말하지 않으면
+          // 도달할 수 없는 설정을 고르게 하는 칸이 된다. 값은 저장되므로 감추지 않고 말한다.
+          help="전략을 여럿 실으면 어떻게 합칠지입니다. 이 화면은 전략을 하나만 실으므로 지금은 쓰이지 않습니다."
+        >
           {(control) => (
             <SelectBox
               {...control}

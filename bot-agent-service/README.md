@@ -12,6 +12,8 @@ cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload
 
 `ANTHROPIC_API_KEY` 는 **프로세스 환경변수**로 온다. SDK 는 `.env` 를 자동으로 읽지 않으므로 `.env.development` 에 넣고 기동 스크립트가 주입하거나, 셸에서 export 한다. `build_options` 가 이 값을 `env` 로 자식 프로세스에 명시해 넘긴다.
 
+`STRATEGIES_DIR` 은 **비워 둔다** — 비우면 레포 루트의 `strategies/` 를 쓴다(전략 규약 §1 의 기본값, `app/services/bot_agent/bot_agent_service.py` 의 `strategies_dir`). 전략 파일을 다른 곳에 둘 때만 그 절대 경로를 적는다. 워크트리·클론마다 루트가 다르므로 경로를 짐작해 넣으면 오히려 틀린다. `scripts/bootstrap_local_env.py` 도 이 키를 「비워 두어도 되는 키」로 따로 보고한다.
+
 ### 인증 경계 — 키 설정만으로 다른 경로가 닫히지는 않는다
 
 기계에 Claude Code 로그인(`~/.claude/.credentials.json`)이 있으면 CLI 가 **그 자격증명으로 인증할 수 있다.** SDK 는 `options.env` 를 부모 환경 **위에 병합**할 뿐 격리하지 않아 `HOME` 이 그대로 상속되고, 그래서 그 파일이 계속 보이는 자리에 있다 — 여기까지는 SDK 소스(`subprocess_cli.py` 의 `inherited_env`)로 확인한 사실이다.

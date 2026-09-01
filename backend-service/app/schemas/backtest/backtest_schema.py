@@ -192,11 +192,16 @@ class RunSummaryOut(BaseModel):
 
 
 class BotRunOut(BaseModel):
-    """봇 이력의 한 줄 — 목록에 필요한 것만. 곡선·거래는 칸을 눌러 리포트로 간다."""
+    """봇 이력의 한 줄 — 목록에 필요한 것만. 곡선·거래는 칸을 눌러 리포트로 간다.
+
+    `params` 가 실리는 이유: 같은 조합을 다시 돌려도 새 행이 생기므로(run 은 불변), 이력에서
+    「이 조합은 이미 돌렸다」를 가리려면 조합이 목록에 있어야 한다.
+    """
 
     run_id: int
     status: str
     strategy_key: str
+    params: dict[str, Any]
     universe_def: dict[str, Any]
     period_from: str
     period_to: str
