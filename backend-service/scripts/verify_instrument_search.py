@@ -16,6 +16,7 @@
   ⑤ 사용자가 친 `%`·`_` 는 와일드카드가 아니라 **글자**다 (안 막으면 `_` 한 글자가 전 종목을 훑는다)
   ⑥ 4,303행을 한 번에 내려보내지 않는다 — `take` 만큼 자르고 전체 건수는 따로 답한다
   ⑦ 상한을 넘는 `take` 는 조용히 잘리지 않고 400 이다
+  ⑧ 같은 등급 안에서 파생상품(긴 이름)이 본종목을 밀어내지 않는다 — 「삼성」 첫 페이지에 005930 (#422)
 
     BACKTEST_TEST_DB_URL=postgresql+psycopg://u:p@host:port/db \
       uv run python scripts/verify_instrument_search.py
@@ -167,6 +168,31 @@ def main() -> int:
         check("상한 초과 take 는 거절한다", "통과됨", "BadRequestError")
     except BadRequestError as exc:
         check("상한 초과 take 는 거절한다", "100" in str(exc), True)
+
+    # ── ⑧ 같은 등급 안의 동점 — 파생상품이 본종목을 밀어내지 않는다 (#422) ──
+    # 실데이터의 모양: 삼성 계열 ETN 52종이 전부 「삼성 …」(공백)으로 시작해 issuer_nm
+    # 사전순으로 「삼성전자」보다 앞선다. market 은 못 가른다 — ETN 도 KOSPI 다 (실측).
+    derivatives = [("KR", "KOSPI", f"53{index:04d}", f"삼성 파생 {index:02d}호 ETN", "KRW") for index in range(20)]
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO tn_instrument (country, market, symbol, issuer_nm, currency)"
+                " VALUES (:country, :market, :symbol, :issuer_nm, :currency)"
+            ),
+            [
+                dict(zip(("country", "market", "symbol", "issuer_nm", "currency"), row, strict=True))
+                for row in derivatives
+            ],
+        )
+
+    crowded = service.select_instrument_list({"q": "삼성"})
+    check("동점 — 전부 세긴 센다", crowded["total_count"], 22)
+    check(
+        "동점 — 첫 페이지에 본종목이 있다 (#422)",
+        "005930" in [row["symbol"] for row in crowded["items"]],
+        True,
+    )
+    check("동점 — 본종목이 파생상품보다 위다 (#422)", crowded["items"][0]["issuer_nm"], "삼성전자")
 
     with admin.begin() as conn:
         conn.execute(text(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE"))
