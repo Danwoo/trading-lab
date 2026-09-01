@@ -873,6 +873,63 @@ ARM_CASES = [
         },
         {"arm": False},
     ),
+    # ㉶-a·㉶-b — `created_at` 은 초 단위라 **동률이 난다**. 그때 마지막 하나를 고르면 같은
+    # 사실이 조회 순서에 따라 다르게 판정된다 (실측: 순서만 뒤집자 거부가 허용으로 뒤집혔다).
+    # 동률은 전부 통과해야 열리므로 아래 두 케이스는 **입력 순서와 무관하게 둘 다 거부**다.
+    (
+        "㉶-a 봇·사람이 같은 시각에 붙었다 [봇, 사람] → 거부",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "github-actions[bot]",
+                    "actor_type": "Bot",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+            ],
+            "actor_permissions": {"Danwoo": "admin", "github-actions[bot]": "write"},
+        },
+        {"arm": False},
+    ),
+    (
+        "㉶-b 같은 사실을 순서만 뒤집어 넣는다 [사람, 봇] → 여전히 거부",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "github-actions[bot]",
+                    "actor_type": "Bot",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+            ],
+            "actor_permissions": {"Danwoo": "admin", "github-actions[bot]": "write"},
+        },
+        {"arm": False},
+    ),
     (
         "㉷ 다른 라벨의 부착 이벤트는 이 문을 열지 못한다",
         {

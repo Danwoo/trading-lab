@@ -523,7 +523,9 @@ def judge_human_label(payload) -> dict:
 
     **마지막 부착이 이긴다** — 뗐다 다시 붙이면 마지막에 붙인 사람이 연 것이다. 순서는
     입력 배열 순서가 아니라 `created_at` 으로 정한다 (조회 순서에 판정을 걸지 않는다).
-    `created_at` 이 없는 이벤트가 하나라도 있으면 순서를 못 세우므로 열지 않는다.
+    `created_at` 이 없는 이벤트가 하나라도 있으면 순서를 못 세우므로 열지 않는다. 그 시각이
+    **동률이면 마지막 하나를 못 고르므로 동률 전부가 통과해야 연다** — 하나를 골라 쓰면
+    조회 순서가 판정을 뒤집는다.
     """
     result = {"present": False, "allow": False, "actor": None, "actor_permission": None}
     labels = payload.get("pr_labels")
@@ -551,29 +553,38 @@ def judge_human_label(payload) -> dict:
             "reason": "부착 이벤트에 시각이 없다 — 마지막 부착을 정할 수 없어 열지 않는다 (fail-closed)",
         }
 
-    last = max(applied, key=lambda e: e["created_at"])
-    login = last.get("actor_login") or ""
-    actor_type = last.get("actor_type") or ""
-    result["actor"] = login or None
-    if actor_type != "User":
-        return {
-            **result,
-            "reason": f"라벨을 사람이 아닌 신원이 붙였다({login or '미상'} · type={actor_type or '미상'}) — "
-            "이 문은 사람만 연다 (fail-closed)",
-        }
+    latest_at = max(e["created_at"] for e in applied)
+    tied = [e for e in applied if e["created_at"] == latest_at]
     permissions = payload.get("actor_permissions")
-    permission = permissions.get(login) if isinstance(permissions, dict) else None
-    result["actor_permission"] = permission
-    if permission not in HUMAN_LABEL_PERMISSIONS:
-        return {
-            **result,
-            "reason": f"라벨을 붙인 계정({login})의 레포 권한이 {permission or '미상'} 이다 — "
-            f"쓰기 권한자만 연다 ({'·'.join(HUMAN_LABEL_PERMISSIONS)}, fail-closed)",
-        }
+
+    # 마지막 부착이 **여러 건**일 수 있다 (`created_at` 은 초 단위라 동률이 난다). 그때
+    # 아무거나 하나를 고르면 같은 사실이 조회 순서에 따라 다르게 판정된다 — 실측: 봇·사람이
+    # 같은 시각에 붙은 입력을 순서만 뒤집자 거부가 허용으로 뒤집혔다. 그래서 **동률은 전부
+    # 통과해야 연다** (fail-closed). 한 건이면 종전과 같은 판정이다.
+    opened_by = []
+    for event in tied:
+        login = event.get("actor_login") or ""
+        actor_type = event.get("actor_type") or ""
+        result["actor"] = login or None
+        if actor_type != "User":
+            return {
+                **result,
+                "reason": f"라벨을 사람이 아닌 신원이 붙였다({login or '미상'} · type={actor_type or '미상'}) — "
+                "이 문은 사람만 연다 (fail-closed)",
+            }
+        permission = permissions.get(login) if isinstance(permissions, dict) else None
+        result["actor_permission"] = permission
+        if permission not in HUMAN_LABEL_PERMISSIONS:
+            return {
+                **result,
+                "reason": f"라벨을 붙인 계정({login})의 레포 권한이 {permission or '미상'} 이다 — "
+                f"쓰기 권한자만 연다 ({'·'.join(HUMAN_LABEL_PERMISSIONS)}, fail-closed)",
+            }
+        opened_by.append(f"{login}({permission})")
     return {
         **result,
         "allow": True,
-        "reason": f"{login}({permission})가 붙였다 — 저자 미상 차단만 연다",
+        "reason": f"{' · '.join(opened_by)}가 붙였다 — 저자 미상 차단만 연다",
     }
 
 
