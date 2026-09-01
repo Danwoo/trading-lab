@@ -9,6 +9,7 @@ import { getClientIp, rateLimit } from "@/lib/rateLimit";
 import { emailVerificationOtpIdentifier, normalizeEmail } from "@/lib/auth/authUtils";
 import { classifyEmailFailure, describeSmtpError, EMAIL_FAILURE_STATUS } from "@/utils/common/errors/emailFailure";
 import { EMAIL_FAILURE_MESSAGES } from "@/utils/common/locale/ko/apierrors";
+import type { OtpDelivery } from "@/constants/signup";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -118,7 +119,8 @@ export async function POST(request: NextRequest) {
     await prisma.emailLog.create({
       data: { to, subject, status: "CONSOLE", reg_dt: new Date() },
     });
-    return NextResponse.json({ message: "Email sent successfully" });
+    // 코드가 **어디로 갔는지**는 서버만 안다 — 화면이 「메일을 보냈다」고 말하지 않게 실어 보낸다 (#424).
+    return NextResponse.json({ message: "Email sent successfully", delivery: "console" satisfies OtpDelivery });
   }
 
   const transporter = nodemailer.createTransport({
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest) {
     await prisma.emailLog.create({
       data: { to, subject, status: "SUCCESS", reg_dt: new Date() },
     });
-    return NextResponse.json({ message: "Email sent successfully" });
+    return NextResponse.json({ message: "Email sent successfully", delivery: "email" satisfies OtpDelivery });
   } catch (error) {
     // **진단은 로그로, 사용자에게는 사유 코드로** (#342). 원문에는 내부 메일 서버 이름이 그대로
     // 실린다(실측: `getaddrinfo ENOTFOUND smtp.…`) — 봉투를 건너는 것은 닫힌 집합의 코드와

@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, useState } from "react";
-import { signIn } from "@/lib/auth/auth-client";
+import { Fragment, useEffect, useState } from "react";
+import { signIn, useSession } from "@/lib/auth/auth-client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -13,7 +13,7 @@ import { TextBox } from "@/components/shared/ui/TextBox";
 import { showMessage } from "@/stores/shared/messageStore";
 import { useNavStore } from "@/stores/shared/navStore";
 import { resolvePostLoginDestination } from "@/lib/auth/postLoginDestination";
-import { RETURN_REASON_PARAM, type ReturnReason } from "@/constants/routes";
+import { BENCH_PATH, RETURN_REASON_PARAM, type ReturnReason } from "@/constants/routes";
 
 /**
  * 왜 이 화면으로 되돌아왔나. **로그인이 풀린 것이 아니라는 말이 먼저다** — 사유 없이 도착하면
@@ -37,6 +37,21 @@ export const Login = () => {
       : null;
   const [loginT, setLoginT] = useState("credentials");
   const [loading, setLoading] = useState(false);
+
+  // **이미 들어와 있는 사람에게 로그인 폼을 다시 내밀지 않는다** (#424). 로그인 착지는
+  // `/bench` 라 평상시엔 안 보이지만, 루트 URL 로 돌아온 사람은 로그아웃된 것처럼 보이는
+  // 화면을 만났다. 쿠키가 아니라 `useSession`(서버 판정)으로 가른다 — 미들웨어의 쿠키
+  // 검사는 서버가 거부한 세션도 있다고 말한다.
+  const { data: session, isPending: sessionPending } = useSession();
+  const hasSession = !sessionPending && Boolean(session?.user);
+  // 사유를 달고 왔다면 **셸이 방금 여기로 되돌린 것**이다 — 그 자리로 다시 밀면 왕복이 된다.
+  const returnedFromShell = returnReason !== null;
+  // 열린 메뉴가 0건이라 되돌아온 사람에게 실험대를 가리키면 같은 자리로 되돌아온다.
+  const showBenchLink = hasSession && returnReason !== "no-menu";
+
+  useEffect(() => {
+    if (hasSession && !returnedFromShell) router.replace(BENCH_PATH);
+  }, [hasSession, returnedFromShell, router]);
 
   const loginTypeChk = async (btnt: string) => {
     setLoginT(btnt);
@@ -192,6 +207,19 @@ export const Login = () => {
           <div className="rounded-panel border border-line bg-bg-panel/95 p-7 shadow-e1 sm:p-8">
             <h2 className="text-base font-semibold tracking-tight text-ink-strong">로그인</h2>
             <p className="mt-1 text-2xs text-ink-muted">계정으로 들어가면 실험대가 열립니다.</p>
+
+            {showBenchLink && (
+              // 자동 이동을 멈춘 경우(사유를 달고 왔다)에도 실험대로 가는 길은 화면에 남는다.
+              <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border border-line px-3 py-2 text-2xs text-ink">
+                이미 로그인되어 있습니다.
+                <Link
+                  href={BENCH_PATH}
+                  className="font-medium text-ink-strong underline decoration-line-strong underline-offset-4"
+                >
+                  실험대로 가기
+                </Link>
+              </p>
+            )}
 
             {returnReasonLine && (
               // 되돌아온 사유는 폼 위에 **남는다** — 토스트로 내면 2초 뒤 사라져 도착지가 다시 말이 없어진다.
