@@ -27,17 +27,23 @@ export const STREAM_FAILURE_CODES = [
 export type StreamFailureCode = (typeof STREAM_FAILURE_CODES)[number];
 
 /**
- * 사유별 HTTP 상태.
+ * **HTTP 봉투로 발행되는** 사유와 그 상태.
  *
- * 셋 다 사용자가 브라우저에서 고칠 수 있는 실패가 아니라 5xx 다. 화면 문구는 상태가 아니라
- * `code` 로 건너가므로 `apierrors.ts` 의 5xx 차단(서버가 쓴 문장을 화면에 싣지 않는다)은 그대로 선다.
+ * 여기 있는 둘만 프록시 라우트가 응답 자체로 낸다 — 업스트림에 **연결이 안 된** 경우라 스트림이
+ * 시작조차 못 했고, 그래서 상태를 고를 수 있다. 나머지 사유(`invalid_api_key`·`turn_failed`)는
+ * 스트림이 이미 열린 뒤에 정해지므로 **200 안의 `error` 이벤트**로만 발행된다 — 그 자리엔 상태가
+ * 없다. 실제로 발행되지 않는 상태를 표에 남기면, 읽는 사람이 없는 경로를 있다고 읽는다.
+ *
+ * 화면 문구는 상태가 아니라 `code` 로 건너가므로 `apierrors.ts` 의 5xx 차단(서버가 쓴 문장을
+ * 화면에 싣지 않는다)은 그대로 선다.
  */
-export const STREAM_FAILURE_STATUS: Record<StreamFailureCode, number> = {
+export const STREAM_FAILURE_HTTP_STATUS = {
   "botAgent.service_unreachable": 503,
-  "botAgent.invalid_api_key": 502,
-  "botAgent.turn_failed": 502,
   "research.service_unreachable": 503,
-};
+} as const satisfies Partial<Record<StreamFailureCode, number>>;
+
+/** HTTP 봉투로 낼 수 있는 사유 — `createStreamFailureResponse` 가 이 집합만 받는다. */
+export type HttpStreamFailureCode = keyof typeof STREAM_FAILURE_HTTP_STATUS;
 
 export function isStreamFailureCode(value: unknown): value is StreamFailureCode {
   return typeof value === "string" && (STREAM_FAILURE_CODES as readonly string[]).includes(value);

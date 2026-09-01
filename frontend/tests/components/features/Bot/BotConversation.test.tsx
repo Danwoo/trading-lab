@@ -45,6 +45,15 @@ function sseResponse(lines: string[]): Response {
   return new Response(stream, { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }
 
+/** 턴마다 다른 본문을 내려 주는 서버 — 두 턴을 이어 볼 때 쓴다. */
+function givenServerPerTurn(turns: string[][]) {
+  const queue = [...turns];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => sseResponse(queue.shift() ?? [])),
+  );
+}
+
 function givenServer(streamLines: string[]) {
   // 준비 조회는 위에서 모킹했다 — 여기 `fetch` 는 스트림 경로 전용이다.
   vi.stubGlobal(
@@ -156,5 +165,40 @@ describe("BotConversation — 스트림 중 실패가 사라지지 않는다 (�
 
     // 배너도 같은 말을 한다 — 종전에는 배너만 「기동하라」를 알고 실패 턴은 딴말을 했다.
     expect(screen.getByRole("status").textContent).toMatch(/떠 있지 않습니다/);
+  });
+
+  // ── 배너는 되돌아온다 ──────────────────────────────────────────────────────
+  //
+  // 실패가 세운 배너를 내리는 자리가 없으면, 서비스를 띄우고 재전송이 성공해도 「떠 있지
+  // 않습니다」가 그대로 남는다 — 준비 상태 재조회는 마운트뿐이라 새로고침 전까지 안 풀린다.
+  it("성공한 다음 턴이 오면 배너가 풀린다", async () => {
+    givenServerPerTurn([
+      [
+        JSON.stringify({
+          type: "error",
+          code: "botAgent.service_unreachable",
+          message: "대화 서비스에 닿지 못했습니다.",
+        }),
+      ],
+      [JSON.stringify({ type: "text", text: "이제 붙었습니다" })],
+    ]);
+
+    render(<BotConversation formState={{ strategy_key: null, params: {} }} />);
+    await send("안녕");
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/떠 있지 않습니다/));
+
+    await send("다시 해줘");
+
+    await waitFor(() => expect(screen.getByText(/이제 붙었습니다/)).toBeTruthy());
+    expect(screen.queryByRole("status"), "성공한 턴 뒤에도 배너가 남아 있다").toBeNull();
+  });
+
+  it("`unavailable` 로 끝난 턴은 배너를 풀지 않는다 — 그건 성공이 아니다", async () => {
+    givenServer([JSON.stringify({ type: "unavailable", reasons: ["ANTHROPIC_API_KEY 가 설정되지 않았습니다."] })]);
+
+    render(<BotConversation formState={{ strategy_key: null, params: {} }} />);
+    await send("안녕");
+
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/ANTHROPIC_API_KEY/));
   });
 });

@@ -144,18 +144,31 @@ describe("#423 스트리밍 실패 사유", () => {
     vi.clearAllMocks();
   });
 
-  it("사유 갈래 전부에 상태·ko/en 문구가 있다", async () => {
-    const { STREAM_FAILURE_CODES, STREAM_FAILURE_STATUS } = await import("@/utils/common/errors/streamFailure");
+  it("사유 갈래 전부에 ko/en 문구가 있고, HTTP 상태표는 실제로 봉투를 내는 갈래만 담는다", async () => {
+    const { STREAM_FAILURE_CODES, STREAM_FAILURE_HTTP_STATUS, isStreamFailureCode } =
+      await import("@/utils/common/errors/streamFailure");
     const { STREAM_FAILURE_MESSAGES: KO } = await import("@/utils/common/locale/ko/apierrors");
     const { STREAM_FAILURE_MESSAGES: EN } = await import("@/utils/common/locale/en/apierrors");
 
     expect(STREAM_FAILURE_CODES.length).toBeGreaterThan(0);
     for (const code of STREAM_FAILURE_CODES) {
-      expect(STREAM_FAILURE_STATUS[code], code).toBeTypeOf("number");
       expect(KO[code], `ko ${code}`).toBeTruthy();
       expect(EN[code], `en ${code}`).toBeTruthy();
     }
-    console.info(`[#423] 사유 갈래 ${STREAM_FAILURE_CODES.length}건 — 상태·ko·en 전부 확인`);
+
+    // 상태표는 **HTTP 봉투로 발행되는** 갈래만 담는다. 스트림이 열린 뒤 정해지는 사유
+    // (`invalid_api_key`·`turn_failed`)는 200 안의 error 이벤트로만 나가므로 상태가 없다 —
+    // 그것을 표에 남기면 없는 경로를 있다고 읽게 된다.
+    const withStatus = Object.keys(STREAM_FAILURE_HTTP_STATUS);
+    expect(withStatus.length, "상태표가 비었다 — 대조가 죽었다").toBeGreaterThan(0);
+    for (const code of withStatus) {
+      expect(isStreamFailureCode(code), `${code} 가 닫힌 집합 밖이다`).toBe(true);
+    }
+    expect(new Set(withStatus)).toEqual(new Set(ROUTES.map((route) => route.expectedCode)));
+
+    console.info(
+      `[#423] 사유 갈래 ${STREAM_FAILURE_CODES.length}건 — ko·en 확인, 그중 HTTP 봉투 ${withStatus.length}건`,
+    );
   });
 
   it("서비스가 안 떠 있으면 화면이 「기동하라」고 말한다 — 재시도를 시키지 않는다", async () => {

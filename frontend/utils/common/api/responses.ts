@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/prisma/generated/client";
 import { convertPrismaErrorToValidation } from "@/lib/prisma/error";
 import { OPERATION_SUCCESS_STATUS_CODES, OPERATION_SUCCESS_MESSAGES, OPERATION_ERROR_MESSAGES } from "./constants";
-import { STREAM_FAILURE_STATUS, type StreamFailureCode } from "@/utils/common/errors/streamFailure";
+import { STREAM_FAILURE_HTTP_STATUS, type HttpStreamFailureCode } from "@/utils/common/errors/streamFailure";
 
 export function createErrorResponse(error: any, operation: string) {
   const message = OPERATION_ERROR_MESSAGES[operation] || "처리 중 오류가 발생했습니다.";
@@ -109,6 +109,6 @@ export function createSuccessResponse(data: any, operation?: string, customStatu
  * 하나뿐이고, 문구는 받는 쪽이 자기 언어 표에서 고른다: 업스트림 호스트·포트·소켓 오류
  * 원문이 실릴 자리가 없다.
  */
-export function createStreamFailureResponse(code: StreamFailureCode) {
-  return NextResponse.json({ code }, { status: STREAM_FAILURE_STATUS[code] });
+export function createStreamFailureResponse(code: HttpStreamFailureCode) {
+  return NextResponse.json({ code }, { status: STREAM_FAILURE_HTTP_STATUS[code] });
 }

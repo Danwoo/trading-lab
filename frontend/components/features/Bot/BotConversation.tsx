@@ -87,6 +87,9 @@ export function BotConversation({
     const apply = (update: (turn: Turn) => Turn) =>
       setTurns((prev) => prev.map((turn, index) => (index === prev.length - 1 ? update(turn) : turn)));
 
+    // 이 턴이 `unavailable` 로 끝났는가 — 그건 정상 응답이라 예외로 오지 않는다.
+    let unavailable = false;
+
     try {
       await streamBotAgent(
         message,
@@ -104,6 +107,7 @@ export function BotConversation({
             apply((turn) => ({ ...turn, filled: [...(turn.filled ?? []), ...filled] }));
           } else if (event.type === "unavailable") {
             // 정상 응답이다 — 대화가 왜 안 도는지 그대로 보여준다.
+            unavailable = true;
             setReady(false);
             setReasons(event.reasons);
             apply((turn) => ({ ...turn, text: event.reasons.join("\n") }));
@@ -111,6 +115,14 @@ export function BotConversation({
         },
         { form: formState },
       );
+
+      // 한 턴이 끝까지 갔으면 배너가 말하던 이유는 지나간 일이다. 되돌리는 자리가 없으면
+      // 서비스를 띄우고 재전송이 성공해도 「떠 있지 않습니다」가 화면에 남는다 — 준비 상태
+      // 재조회는 마운트뿐이라 새로고침 전까지 안 풀린다.
+      if (!unavailable) {
+        setReady(true);
+        setReasons(null);
+      }
     } catch (error) {
       // 스트림이 시작된 뒤 난 실패도 여기로 온다 — `fetchSSE` 가 `{type:"error"}` 이벤트를
       // 가로채 예외로 바꾸기 때문이다. 그래서 이 한 자리가 실패의 유일한 출구다.
