@@ -313,7 +313,9 @@ describe("시세 화면 — 좁은 폭에서 사이드바와 패널 열이 세�
 
     // 패널 열은 사이드바 바로 아래에서 시작한다 — 사이 공백은 접힘이 어정쩡하다는 뜻이다.
     expect(boxes.panelColumn.y, "패널 열이 사이드바 바로 아래에서 시작하지 않는다").toBe(boxes.aside.y + boxes.aside.h);
-  });
+    // Tailwind 컴파일 + 크롬 기동이라 기본 5초 안에 안 끝난다 — 전체 스위트 병렬 실행에서 실측
+    // (로컬 단독 0.7초 / CI 전량 실행 5초 초과). `touchTargets.test.tsx` 와 같은 사유·같은 값.
+  }, 240_000);
 
   it(`넓은 폭(${WIDE_WIDTH}): 가로 분할 그대로다 (회귀 없음)`, async () => {
     const boxes = await measure(WIDE_WIDTH);
@@ -328,5 +330,5 @@ describe("시세 화면 — 좁은 폭에서 사이드바와 패널 열이 세�
     expect(boxes.aside.y, "넓은 폭에서 사이드바와 패널 열은 같은 줄에 선다").toBe(boxes.panelColumn.y);
     expect(boxes.aside.w, "사이드바는 넓은 폭에서 256px(w-64) 고정이다").toBe(256);
     expect(boxes.panelColumn.x, "패널 열은 사이드바 오른쪽에서 시작한다").toBe(boxes.aside.x + boxes.aside.w);
-  });
+  }, 240_000);
 });
