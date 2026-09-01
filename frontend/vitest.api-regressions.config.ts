@@ -34,6 +34,7 @@ export const API_REGRESSION_TESTS = [
   "tests/regressions/343-signup-requires-verification.test.ts",
   "tests/regressions/341-signup-grants-operator.test.ts",
   "tests/regressions/354-stale-authorization.test.ts",
+  "tests/regressions/424-otp-delivery-mode.test.ts",
 ];
 
 export default defineConfig({
