@@ -122,6 +122,8 @@
 #   판별 불가 → **미상**(`author_kind=unknown`): 리뷰는 한다 (아무 모델 — 기본 claude).
 #          「사람이다」로 접지 않는다 — 신원 설정을 빠뜨린 에이전트와 같은 모양이라 가를 수
 #          없다. 그래서 **자동 머지 arm 은 거부된다** (review_record 조건 ③, 봇만 면제).
+#          탈출구는 `author: human` 라벨 하나 — 쓰기 권한자(사람)가 붙인 것만 유효하고,
+#          이 차단 하나만 연다 (리드 결정 2026-08-28, 계약은 review_record.py 상수 블록).
 #   혼재(복수 에이전트) → 전 저자 모델 제외 후 리뷰어 산출, 공집합이면 리뷰 불가 (사람 경로)
 #   티어 혼재(claude-opus@ + claude-sonnet@, 또는 신·구 형식 혼재) → 벤더는 claude 단일이라
 #          라우팅은 정상 진행하되 **티어는 미상** 처리 (다른 티어 보장 불가 — 코멘트로 드러낸다)
@@ -2269,7 +2271,7 @@ jobs:
           fi
 
           # ②③④ — 전부 fresh 조회로 판정한다 (게이트 대기 동안 push·라벨 변경이 있을 수 있다)
-          FRESH=$(gh pr view "$PR" --repo "$REPO" --json headRefOid,title,body,author,headRefName)
+          FRESH=$(gh pr view "$PR" --repo "$REPO" --json headRefOid,title,body,author,headRefName,labels)
           if [ -z "$FRESH" ]; then
             echo "::warning::arm 직전 PR 재조회 실패 — arm 하지 않는다 (fail-closed)"
             exit 0
@@ -2320,12 +2322,42 @@ jobs:
             | jq -s '.') || COMMITS=""
           EMAILS=$(jq -c '[.[].author_email | select(length > 0)]' <<<"${COMMITS:-[]}")
 
+          # `author: human` 라벨 — 저자 미상 차단의 탈출구 (scripts/review_record.py 상수 블록의
+          # 계약). 이 스텝은 배관이다 — 라벨이 붙어 있을 때만 부착 이력(timeline)과 부착자의
+          # 레포 권한을 모아 넘기고, 누가 열 수 있는지의 판정은 전부 judge_human_label 이 한다.
+          # 조회 실패는 null 로 실어 판정부가 fail-closed 로 접는다 (이력을 못 읽으면 안 연다).
+          HUMAN_LABEL='author: human'
+          LABELS_NOW=$(jq -c '[.labels[].name]' <<<"$FRESH")
+          HUMAN_EVENTS=null
+          HUMAN_PERMS=null
+          if jq -e --arg l "$HUMAN_LABEL" 'any(.labels[].name; . == $l)' <<<"$FRESH" >/dev/null; then
+            HUMAN_EVENTS=$(gh api "repos/$REPO/issues/$PR/timeline" --paginate \
+              | jq -s --arg l "$HUMAN_LABEL" 'add // []
+                  | map(select((.event == "labeled" or .event == "unlabeled")
+                               and (.label.name? == $l))
+                        | {event, label: .label.name,
+                           actor_login: (.actor.login // null),
+                           actor_type: (.actor.type // null),
+                           created_at: (.created_at // null)})') || HUMAN_EVENTS=null
+            if [ "$HUMAN_EVENTS" != "null" ]; then
+              HUMAN_PERMS='{}'
+              for LOGIN in $(jq -r '[.[] | select(.event == "labeled") | .actor_login // empty] | unique | .[]' <<<"$HUMAN_EVENTS"); do
+                PERM=$(gh api "repos/$REPO/collaborators/$LOGIN/permission" --jq .permission) || PERM=""
+                if [ -n "$PERM" ]; then
+                  HUMAN_PERMS=$(jq -c --arg l "$LOGIN" --arg p "$PERM" '.[$l] = $p' <<<"$HUMAN_PERMS")
+                fi
+              done
+            fi
+          fi
+
           ARM=$(jq -n --arg head "$HEAD_NOW" --arg marker "$MARKER_SHA_NOW" --arg model "$MODEL_NOW" \
               --arg tier "$TIER_NOW" \
               --arg verdict "$VERDICT_NOW" --argjson manual "${MANUAL_NOW:-true}" \
               --argjson fresh "$FRESH" --argjson reviews "${REVIEWS_NOW:-[]}" \
               --argjson refs "$REFS" --argjson dropped "${DROPPED:-[]}" \
               --argjson emails "${EMAILS:-[]}" \
+              --argjson labels "${LABELS_NOW:-[]}" \
+              --argjson hevents "${HUMAN_EVENTS:-null}" --argjson hperms "${HUMAN_PERMS:-null}" \
               '{head_sha: $head, marker_sha: $marker, marker_model: $model,
                 marker_tier: $tier,
                 verdict: $verdict, manual: $manual,
@@ -2333,7 +2365,9 @@ jobs:
                 pr_author_is_bot: ($fresh.author.is_bot // false),
                 pr_title: $fresh.title, head_ref: $fresh.headRefName,
                 issue_refs: $refs, dropped_refs: $dropped,
-                commit_author_emails: $emails}' \
+                commit_author_emails: $emails,
+                pr_labels: $labels, human_label_events: $hevents,
+                actor_permissions: $hperms}' \
             | python3 "$JUDGE_DIR/review_record.py" arm)
           echo "arm 판정: $ARM"
           if [ -z "$ARM" ]; then

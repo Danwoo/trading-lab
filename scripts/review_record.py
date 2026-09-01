@@ -89,6 +89,26 @@ REVIEWER_VENDORS = ("claude", "kimi", "codex")
 # 이유로 kimi 리뷰의 차단이 풀리면, 아는 티어와 겹치는 벤더가 달라 아무것도 배제하지 못한다.
 TIER_KNOWN_VENDOR = "claude"
 
+# ── `author: human` — 저자 미상 차단을 여는 유일한 탈출구 (리드 결정 2026-08-28) ──────
+#
+# 저자 신원이 없으면 arm 을 거부한다(조건 ③). 그런데 **리드가 직접 쓴 PR 도 같은 모양**이라
+# (에이전트와 같은 GitHub 계정·같은 git 신원) 그대로 두면 사람이 쓴 PR 은 영영 자동 머지가
+# 안 된다. 그 자리를 사람이 명시적으로 여는 표면이 이 라벨이다.
+#
+# **라벨은 게이트를 여는 표면이므로 존재만으로 열지 않는다.** 누가 붙였는지를 판정에 쓴다:
+#   - 마지막으로 붙인 액터가 `User` 여야 한다 — 봇·앱이 붙인 것은 무효다. 워크플로가 라벨을
+#     붙일 수 있는 이상, 존재만 보면 자동화가 자기 차단을 스스로 여는 경로가 생긴다.
+#   - 그 계정이 이 레포에 **쓰기 권한**이 있어야 한다 (아래 목록). 권한 없는 계정이 붙인
+#     라벨은 무효다.
+#   - 부착 이력을 못 읽으면(timeline 조회 실패·라벨은 있는데 이벤트가 없음) **열지 않는다.**
+# 열어 주는 것은 **저자 미상 차단 하나**다 — 자기리뷰 차단·티어 차단·승인 부재·위험도는
+# 그대로 남는다.
+HUMAN_LABEL = "author: human"
+# `repos/{owner}/{repo}/collaborators/{login}/permission` 의 `permission` 값 어휘.
+# 이 엔드포인트는 admin·maintain 을 별도로 내므로 셋을 명시한다 (write 하나만 보면 관리자가
+# 붙인 라벨이 무효가 된다). read·none·조회 실패는 전부 무효다.
+HUMAN_LABEL_PERMISSIONS = ("admin", "maintain", "write")
+
 # cross-review.yml 의 마커 게시부와 같은 문법 (구 merge-router 의 arm 가드에서 승계). sha 자릿수는
 # 여기서 안 좁힌다 — 접두 sha 를 정규식에서 거르면 「40자 동등 비교」가 검증 불가능한
 # 암묵이 된다. 아래 판정이 길이 40 + 문자열 동등을 명시적으로 검사한다.
@@ -484,6 +504,71 @@ def read_risk(refs, dropped=()):
     return fold("low", evidence, excluded)
 
 
+def judge_human_label(payload) -> dict:
+    """`author: human` 라벨이 저자 미상 차단을 여는가 — 순수 판정 (위 상수 블록의 계약).
+
+    입력은 워크플로가 모아 준다:
+      `pr_labels`            현재 붙어 있는 라벨 이름 목록
+      `human_label_events`   그 라벨의 `labeled`/`unlabeled` 타임라인 이벤트
+                             (`event` · `label` · `actor_login` · `actor_type` · `created_at`)
+      `actor_permissions`    위 이벤트에 나오는 로그인 → 레포 권한 문자열
+
+    **마지막 부착이 이긴다** — 뗐다 다시 붙이면 마지막에 붙인 사람이 연 것이다. 순서는
+    입력 배열 순서가 아니라 `created_at` 으로 정한다 (조회 순서에 판정을 걸지 않는다).
+    `created_at` 이 없는 이벤트가 하나라도 있으면 순서를 못 세우므로 열지 않는다.
+    """
+    result = {"present": False, "allow": False, "actor": None, "actor_permission": None}
+    labels = payload.get("pr_labels")
+    if not isinstance(labels, list) or HUMAN_LABEL not in labels:
+        return {**result, "reason": f"`{HUMAN_LABEL}` 라벨 없음"}
+
+    result["present"] = True
+    events = payload.get("human_label_events")
+    if not isinstance(events, list):
+        return {
+            **result,
+            "reason": "라벨 부착 이력(timeline)을 읽지 못했다 — 누가 붙였는지 모르면 열지 않는다 (fail-closed)",
+        }
+    applied = [
+        e for e in events if isinstance(e, dict) and e.get("event") == "labeled" and e.get("label") == HUMAN_LABEL
+    ]
+    if not applied:
+        return {
+            **result,
+            "reason": "라벨은 붙어 있는데 부착 이벤트가 이력에 없다 — 판독 불가 (fail-closed)",
+        }
+    if any(not e.get("created_at") for e in applied):
+        return {
+            **result,
+            "reason": "부착 이벤트에 시각이 없다 — 마지막 부착을 정할 수 없어 열지 않는다 (fail-closed)",
+        }
+
+    last = max(applied, key=lambda e: e["created_at"])
+    login = last.get("actor_login") or ""
+    actor_type = last.get("actor_type") or ""
+    result["actor"] = login or None
+    if actor_type != "User":
+        return {
+            **result,
+            "reason": f"라벨을 사람이 아닌 신원이 붙였다({login or '미상'} · type={actor_type or '미상'}) — "
+            "이 문은 사람만 연다 (fail-closed)",
+        }
+    permissions = payload.get("actor_permissions")
+    permission = permissions.get(login) if isinstance(permissions, dict) else None
+    result["actor_permission"] = permission
+    if permission not in HUMAN_LABEL_PERMISSIONS:
+        return {
+            **result,
+            "reason": f"라벨을 붙인 계정({login})의 레포 권한이 {permission or '미상'} 이다 — "
+            f"쓰기 권한자만 연다 ({'·'.join(HUMAN_LABEL_PERMISSIONS)}, fail-closed)",
+        }
+    return {
+        **result,
+        "allow": True,
+        "reason": f"{login}({permission})가 붙였다 — 저자 미상 차단만 연다",
+    }
+
+
 def judge_author_identity(payload) -> dict:
     """조건 ③ — 리뷰어 벤더가 저자 벤더와 같을 때 작성 티어를 아는가.
 
@@ -498,7 +583,10 @@ def judge_author_identity(payload) -> dict:
     에이전트가 같은 GitHub 계정·같은 git 신원을 쓰므로 둘을 가를 방법이 없다. 모르는 채로
     통과시키면 자기리뷰가 조용히 arm 되므로 여기서 막는다. **봇 PR 은 면제다** — 봇 신원은
     GitHub 이 보증하고(`pr_authorship` 의 R1~R4 면제와 같은 근거), 막으면 dependabot 자동
-    머지가 통째로 멎는다. 막힌 PR 은 리뷰·코멘트·승인은 그대로 받고 **사람이 버튼을 누른다.**
+    머지가 통째로 멎는다. 막힌 PR 은 리뷰·코멘트·승인은 그대로 받고 **사람이 버튼을 누른다** —
+    또는 쓰기 권한자가 `author: human` 라벨을 붙여 이 차단 하나만 연다 (위 상수 블록의 계약,
+    판정은 `judge_human_label`). 라벨은 **저자 미상 차단만** 열고 자기리뷰·티어·승인·위험도
+    차단은 그대로 남는다.
 
     **어휘 밖 에이전트형 이메일은 「사람 저자」가 아니라 「판독 불가」다.** 어휘
     (`review_route` 의 티어·벤더 목록)는 새 모델이 붙을 때 사람이 갱신하므로, 디스패치가
@@ -528,6 +616,7 @@ def judge_author_identity(payload) -> dict:
         "author_tier": None,
         "reviewer_tier": reviewer_tier,
         "author_kind": None,
+        "human_label": None,
         "identity_source": None,
         "unknown_agentish": None,
         "block": None,
@@ -553,6 +642,7 @@ def judge_author_identity(payload) -> dict:
         "author_tier": identity["author_tier"],
         "reviewer_tier": reviewer_tier,
         "author_kind": identity["author_kind"],
+        "human_label": None,
         "identity_source": identity["identity_source"],
         "unknown_agentish": unknown_agentish or None,
         "block": None,
@@ -566,13 +656,18 @@ def judge_author_identity(payload) -> dict:
         }
     # 저자 미상 — 「사람이다」가 아니라 「모른다」다 (위 docstring). `self_vendor` 는 저자
     # 벤더 목록이 비어 늘 거짓이므로 아래 자기리뷰 축에 걸리지 않는다. 그래서 여기서 막는다.
+    # 유일한 탈출구는 사람이 붙인 `author: human` 라벨이다 (상수 블록의 계약).
     if identity["author_kind"] == "unknown" and not payload.get("pr_author_is_bot"):
-        return {
-            **result,
-            "block": "저자 신원 미상(커밋에 에이전트 신원 없음 · 브랜치도 벤더 미선언) — "
-            "사람인지 `git config --worktree user.email` 을 빠뜨린 에이전트인지 가를 수 없어 "
-            "자기리뷰를 배제할 수 없다. arm 하지 않는다 (fail-closed — 사람이 머지한다)",
-        }
+        human_label = judge_human_label(payload)
+        result["human_label"] = human_label
+        if not human_label["allow"]:
+            return {
+                **result,
+                "block": "저자 신원 미상(커밋에 에이전트 신원 없음 · 브랜치도 벤더 미선언) — "
+                "사람인지 `git config --worktree user.email` 을 빠뜨린 에이전트인지 가를 수 없어 "
+                f"자기리뷰를 배제할 수 없다. arm 하지 않는다 (fail-closed — {human_label['reason']}. "
+                f"사람이 `{HUMAN_LABEL}` 라벨을 붙이거나 직접 머지한다)",
+            }
     if not self_vendor:
         return result
 
@@ -626,6 +721,7 @@ def decide_arm(payload) -> dict:
         "author_tier": identity["author_tier"],
         "reviewer_tier": identity["reviewer_tier"],
         "author_kind": identity["author_kind"],
+        "human_label": identity["human_label"],
         "identity_source": identity["identity_source"],
         "unknown_agentish": identity["unknown_agentish"],
     }
