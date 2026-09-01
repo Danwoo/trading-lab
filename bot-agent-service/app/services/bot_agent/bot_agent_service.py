@@ -126,7 +126,9 @@ class BotAgentService:
             self._sessions.pop(key, None)
             # 원본은 서버 로그에만 — 클라이언트엔 사유 코드만 낸다 (내부 경로·키가 새지 않게)
             logger.exception("봇 만들기 대화가 실패했습니다")
-            yield failure_event(auth_failure=auth_failure or looks_like_auth_failure(repr(exc)))
+            # `str` 로 본다 — `repr` 은 클래스 이름 래퍼를 덧붙여, 「마커가 주된 내용인가」를
+            # 재는 판정(`looks_like_auth_failure`)에 없던 글자를 섞는다.
+            yield failure_event(auth_failure=auth_failure or looks_like_auth_failure(str(exc)))
         else:
             # 예외 없이 끝났어도 자격증명이 거부된 턴은 **실패**다. 이걸 안 내면 화면은 CLI 의
             # 영문 한 줄을 봇의 말로 읽는다 — 무엇을 해야 하는지는 어디에도 안 남는다.

@@ -5,11 +5,12 @@ API key`) `result.subtype` 은 `success` 로 끝낸 뒤, 서버는 그 턴을 �
 잠시 후 다시 시도해 주세요.」 하나로 닫았다. **다시 시도해도 안 된다** — 처방은 키 교체다.
 사유를 코드로 실어 보내야 화면이 그 처방을 말할 수 있다 (#342 와 같은 구조).
 
-이 파일이 잠그는 것 넷:
+이 파일이 잠그는 것 다섯:
   ① 무효 키 턴이 `botAgent.invalid_api_key` 로 끝난다 (예외가 없어도).
   ② 예외로 끝난 턴이 `botAgent.turn_failed` 로 끝난다.
   ③ 봉투에 SDK 원문·내부 경로·키가 실리지 않는다.
   ④ **lockstep** — 여기서 내는 코드가 프론트의 닫힌 집합에 실제로 있다. 대조 대상이 0건이면 실패한다.
+  ⑤ 인증 오류를 **인용한** 정상 턴은 실패로 닫히지 않는다 (거짓 처방을 고정하지 않는다).
 
 standalone 실행:
     APP_ENV=development uv run python tests/test_failure_reason.py
@@ -133,6 +134,20 @@ def test_other_failures_end_with_the_generic_reason_code() -> str:
     return "test_other_failures_end_with_the_generic_reason_code"
 
 
+def test_auth_failure_raised_as_an_exception_still_gets_the_key_code() -> str:
+    """예외로 온 인증 거부도 「키 교체」로 닫힌다 — 이 갈래가 조용히 죽지 않는다.
+
+    판정이 「마커가 주된 내용인가」로 좁아진 뒤, 예외를 `repr` 로 재면 클래스 이름 래퍼가
+    예산을 다 먹어 이 갈래가 **영영 거짓**이 된다. 그래서 서비스는 `str(exc)` 를 본다.
+    """
+    events = _post_with_fake_sdk(lambda: [RuntimeError("Invalid API key · Fix external API key")])
+
+    errors = [e for e in events if e["type"] == "error"]
+    assert errors, f"실패했는데 실패 이벤트가 없다: {events}"
+    assert errors[-1]["code"] == FAILURE_INVALID_API_KEY, errors[-1]
+    return "test_auth_failure_raised_as_an_exception_still_gets_the_key_code"
+
+
 def test_envelope_carries_no_raw_sdk_text() -> str:
     """봉투에는 사유 코드와 우리가 쓴 문구뿐 — 키·내부 경로·스택이 실릴 자리가 없다."""
     leaky = RuntimeError(f"spawn failed: ANTHROPIC_API_KEY={KEY_CANARY} credentials={PATH_CANARY}")
@@ -166,27 +181,59 @@ def test_reason_codes_exist_in_the_frontend_closed_set() -> str:
 
 
 def test_auth_marker_is_narrow_enough() -> str:
-    """사용자가 그 단어를 말했다고 「키가 무효다」로 오진하지 않는다."""
+    """마커가 **주된 내용**일 때만 참 — 문장 속에 인용된 것은 아니다.
+
+    앞선 판은 substring 매칭이라 마커가 **포함**되기만 하면 참이었다. 그래서 사용자가 인증 오류를
+    붙여넣고 봇이 그것을 설명하는 정상 턴까지 「키가 무효다」로 닫혔다 (리뷰 지적, PR #428).
+    """
+    # 진짜 CLI 출력 — 마커가 사실상 전부다.
     assert looks_like_auth_failure("Invalid API key · Fix external API key")
     assert looks_like_auth_failure("API Error: authentication_error")
+    assert looks_like_auth_failure("  Credit balance is too low  ")
+    # 인용 — 마커가 설명하는 문장의 일부다.
+    assert not looks_like_auth_failure(
+        "말씀하신 Invalid API key · Fix external API key 오류는 CLI 가 자격증명을 거부할 때 내는 문구입니다."
+    )
+    assert not looks_like_auth_failure(
+        "Invalid API key 라는 문구가 보이면 키를 바꾸면 되지만, 지금 대화의 키는 정상입니다."
+    )
+    # 마커가 아예 없는 말.
     assert not looks_like_auth_failure("API 키를 어디에 넣는지 알려줘")
     assert not looks_like_auth_failure("눌림목 봇을 만들었습니다. 손절은 3%입니다.")
-    return "test_auth_marker_is_narrow_enough (4건)"
+    return "test_auth_marker_is_narrow_enough (7건)"
+
+
+def test_quoted_auth_error_does_not_fail_a_healthy_turn() -> str:
+    """인증 오류를 **인용한** 정상 턴은 실패로 닫지 않는다 — 거짓 처방을 고정하지 않는다.
+
+    이 PR 의 주제가 그 오류라 「이 오류가 뜨는데」 류의 문의는 실현 가능한 입력이다. 오진하면
+    키가 멀쩡한데 화면이 「키를 교체한 뒤 다시 보내세요」를 붙이고, 배너가 「인증이 거부됐습니다」로
+    굳어 다음 턴에도 남는다(배너 재조회가 마운트뿐이라). 리뷰어의 재현 입력을 그대로 박는다.
+    """
+    quoted = "말씀하신 Invalid API key · Fix external API key 오류는 … 지금 대화의 키는 정상입니다."
+    events = _post_with_fake_sdk(lambda: [_assistant_text(quoted), _result("success")])
+
+    assert any(e["type"] == "text" and quoted in e["text"] for e in events), events
+    errors = [e for e in events if e["type"] == "error"]
+    assert not errors, f"정상 턴을 인증 실패로 닫았다: {errors}"
+    return "test_quoted_auth_error_does_not_fail_a_healthy_turn"
 
 
 TESTS = [
     test_invalid_key_turn_ends_with_a_reason_code,
     test_other_failures_end_with_the_generic_reason_code,
+    test_auth_failure_raised_as_an_exception_still_gets_the_key_code,
     test_envelope_carries_no_raw_sdk_text,
     test_reason_codes_exist_in_the_frontend_closed_set,
     test_auth_marker_is_narrow_enough,
+    test_quoted_auth_error_does_not_fail_a_healthy_turn,
 ]
 
 
 if __name__ == "__main__":
     # 검사 0건은 통과가 아니다 — TESTS 가 비면(나쁜 머지·실수) 조용히 exit 0 이 된다.
-    if len(TESTS) < 5:
-        print(f"  FAIL 검사가 {len(TESTS)}건뿐이다 — 그물이 죽어 있다 (하한 5)")
+    if len(TESTS) < 7:
+        print(f"  FAIL 검사가 {len(TESTS)}건뿐이다 — 그물이 죽어 있다 (하한 7)")
         raise SystemExit(1)
     failures = 0
     for test in TESTS:
