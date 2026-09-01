@@ -82,7 +82,7 @@ describe("터미널 패널 줄 — 0 으로 접히지 않는다 (#289)", () => {
   it.each([
     ["패널 줄", PANEL_ROW],
     ["패널 열", PANEL_COLUMN],
-  ])("%s 이 높이 하한을 갖는다 — `min-h-0` 이면 위 형제가 클 때 0 으로 접힌다", (name, pattern) => {
+  ])("%s — 높이 하한을 갖는다. `min-h-0` 이면 위 형제가 클 때 0 으로 접힌다", (name, pattern) => {
     const classes = pattern.exec(SOURCE)?.[1] ?? "";
     const sizing = pickBaseMinHeight(classes);
     const px = resolveMinHeightPx(sizing);
