@@ -22,7 +22,30 @@ export type BotAgentEvent =
   | { type: "tool"; name: string }
   | { type: "result"; subtype: string }
   | { type: "unavailable"; reasons: string[] }
-  | { type: "error"; message: string };
+  /** `code` 는 닫힌 집합의 사유 코드 — 화면 문구는 클라이언트 표가 고른다 (#423). */
+  | { type: "error"; message: string; code?: string };
+
+/**
+ * 서비스가 안 떠 있을 때의 배너 문구.
+ *
+ * 준비 조회 실패와 **전송 실패**가 같은 말을 하게 하려고 한 자리에 둔다 — 종전에는 배너만
+ * 「기동하라」를 알고 실패 턴은 「잠시 후 다시 시도」라고 말해 둘이 딴말을 했다 (#423 F4).
+ */
+export const BOT_AGENT_DOWN_REASONS = [
+  "봇 대화 서비스(:8011)가 떠 있지 않습니다 — process-compose 에 없어 손으로 띄웁니다.",
+  "cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload --port 8011",
+];
+
+/**
+ * 키가 **설정은 됐는데 인증이 거부됐을** 때의 배너 문구.
+ *
+ * 준비 조회는 키가 비었는지만 본다 — 「설정됨」이지 「유효함」이 아니다. 그 차이는 대화를 실제로
+ * 걸어야 드러나고, 드러난 순간 화면이 그것을 말해야 한다 (#423 F5 — 종전에는 배너가 없었다).
+ */
+export const BOT_AGENT_KEY_REJECTED_REASONS = [
+  "ANTHROPIC_API_KEY 는 설정돼 있지만 인증이 거부됐습니다 — 준비 상태 검사는 「설정됨」만 봅니다.",
+  "키를 교체한 뒤 다시 보내세요 (.env 의 프로세스 환경변수).",
+];
 
 /**
  * 준비 상태 조회. 서비스가 안 떠 있으면 예외가 아니라 **이유**로 바꿔 돌려준다 —
@@ -33,14 +56,7 @@ export const selectBotAgentReadiness = async (): Promise<BotAgentReadiness> => {
     const result = await apiCall<BotAgentReadiness>(`${BASE_URL}/readiness`, { method: "GET" });
     return result ?? { ready: false, reasons: ["대화 서비스가 응답하지 않았습니다."], strategies_dir: "" };
   } catch {
-    return {
-      ready: false,
-      reasons: [
-        "봇 대화 서비스(:8011)가 떠 있지 않습니다 — process-compose 에 없어 손으로 띄웁니다.",
-        "cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload --port 8011",
-      ],
-      strategies_dir: "",
-    };
+    return { ready: false, reasons: BOT_AGENT_DOWN_REASONS, strategies_dir: "" };
   }
 };
 

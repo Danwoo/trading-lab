@@ -21,7 +21,8 @@ export type Action =
   | { type: "SET_TITLE"; gid: number; title: string }
   | { type: "SET_FOLLOWUPS"; gid: number; followUps: string[] }
   | { type: "END_ASSISTANT_MSG"; gid: number }
-  | { type: "ABORT_ASSISTANT_MSG"; gid: number };
+  | { type: "ABORT_ASSISTANT_MSG"; gid: number }
+  | { type: "FAIL_ASSISTANT_MSG"; gid: number; failure: string };
 
 export const INITIAL: State = { sessions: [], activeGid: null };
 
@@ -107,6 +108,13 @@ export function researchChatReducer(state: State, action: Action): State {
         const firstUser = s.messages.find((m) => m.role === "user");
         return firstUser ? { ...s, title: firstUser.content.slice(0, 40) } : s;
       });
+
+    case "FAIL_ASSISTANT_MSG":
+      // **말풍선을 지우지 않는다.** 도중까지 받은 답변은 그대로 두고 실패 사유를 붙인다 —
+      // 흔적이 남아야 「무엇을 물었고 왜 답이 없는지」가 화면에 선다 (#423 F7).
+      return updateSession(state, action.gid, (s) =>
+        updateLastAssistant(s, (m) => ({ ...m, failure: action.failure })),
+      );
 
     case "ABORT_ASSISTANT_MSG":
       // 부분 답변이 있으면 보존, 아무 내용/근거도 없으면 빈 말풍선 제거.

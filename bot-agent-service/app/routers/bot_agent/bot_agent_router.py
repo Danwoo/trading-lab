@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from schemas.bot_agent.bot_agent_schema import BotAgentIn, ReadinessOut
 from services.bot_agent.bot_agent_service import BotAgentService
+from services.bot_agent.failure_reasons import failure_event
 
 # 대화 한 턴은 기계 소유자의 LLM 자격증명을 소모한다 — 읽기전용 게스트가 그것을 태우면 안 되므로
 # 쓰기 권한자(operator·admin)만 통과시킨다. `readiness` 도 같은 게이트다: 게스트에게 「쓸 수
@@ -53,7 +54,8 @@ async def chat(
             # StreamingResponse 는 응답 시작 후 예외를 exception_handler 가 못 잡는다 —
             # 여기서 마스킹하고 원본은 로그에만 남긴다.
             logger.warning(f"bot-agent stream 실패: {e!r}")
-            error = {"type": "error", "message": "대화 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."}
+            # 사유 코드만 낸다 — 문구는 화면이 자기 표에서 고른다 (#423).
+            error = failure_event(auth_failure=False)
             yield "data: " + json.dumps(error, ensure_ascii=False) + "\n\n"
         yield "data: [DONE]\n\n"
 

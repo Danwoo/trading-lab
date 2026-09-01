@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/prisma/generated/client";
 import { convertPrismaErrorToValidation } from "@/lib/prisma/error";
 import { OPERATION_SUCCESS_STATUS_CODES, OPERATION_SUCCESS_MESSAGES, OPERATION_ERROR_MESSAGES } from "./constants";
+import { STREAM_FAILURE_STATUS, type StreamFailureCode } from "@/utils/common/errors/streamFailure";
 
 export function createErrorResponse(error: any, operation: string) {
   const message = OPERATION_ERROR_MESSAGES[operation] || "처리 중 오류가 발생했습니다.";
@@ -97,4 +98,17 @@ export function createSuccessResponse(data: any, operation?: string, customStatu
   }
 
   return NextResponse.json(responseData, { status });
+}
+
+/**
+ * **사유 코드만** 실은 응답 — 스트리밍 프록시가 「업스트림에 연결 자체가 안 됐다」를 화면에
+ * 건네는 자리다 (#423, #342 와 같은 구조).
+ *
+ * `createErrorResponse` 의 일반 5xx 로 보내면 화면은 「잠시 후 다시 시도해 주세요」만 받는다 —
+ * 다시 시도해도 안 되는 실패라 그 안내가 거짓이 된다. 봉투에 싣는 것은 닫힌 집합의 코드
+ * 하나뿐이고, 문구는 받는 쪽이 자기 언어 표에서 고른다: 업스트림 호스트·포트·소켓 오류
+ * 원문이 실릴 자리가 없다.
+ */
+export function createStreamFailureResponse(code: StreamFailureCode) {
+  return NextResponse.json({ code }, { status: STREAM_FAILURE_STATUS[code] });
 }

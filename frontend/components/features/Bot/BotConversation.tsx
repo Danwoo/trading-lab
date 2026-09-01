@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { TextArea } from "@/components/shared/ui/TextArea";
 import Button from "@/components/shared/ui/Button";
 import { getApiErrorMessage } from "@/utils/common/errors";
+import { getStreamFailureCode } from "@/utils/common/errors/streamFailure";
 import {
+  BOT_AGENT_DOWN_REASONS,
+  BOT_AGENT_KEY_REJECTED_REASONS,
   selectBotAgentReadiness,
   streamBotAgent,
   type BotAgentEvent,
@@ -25,8 +28,12 @@ interface Turn {
   tools?: string[];
   /** 이 턴이 폼에 채운 것 — 대화만 보고도 무엇이 바뀌었는지 알 수 있어야 한다. */
   filled?: string[];
-  /** 스트림 도중 실패했다 — 조용히 빈 턴으로 끝나지 않게 이유를 남긴다. */
-  failed?: boolean;
+  /**
+   * 스트림 도중 실패했다 — 그 사유·처방. `text` 와 **따로** 둔다: 종전에는 이 문구로 `text` 를
+   * 갈아치워, 실패 직전까지 스트리밍된 내용(무효 키에서는 원인 그 자체였다)이 함께 지워졌다
+   * (#423 F5). 받은 말은 봇이 한 말이고, 이것은 실패의 말이라 자리도 색도 다르다.
+   */
+  failure?: string;
 }
 
 /**
@@ -107,7 +114,21 @@ export function BotConversation({
     } catch (error) {
       // 스트림이 시작된 뒤 난 실패도 여기로 온다 — `fetchSSE` 가 `{type:"error"}` 이벤트를
       // 가로채 예외로 바꾸기 때문이다. 그래서 이 한 자리가 실패의 유일한 출구다.
-      apply((turn) => ({ ...turn, text: getApiErrorMessage(error), failed: true }));
+      //
+      // **받은 것을 지우지 않는다.** 사유는 덧붙일 뿐이다 — 무효 키에서는 CLI 가 원인을
+      // 일반 `text` 로 흘려보내므로(실측), 텍스트를 갈아치우면 화면이 이미 받은 원인을
+      // 스스로 지운다.
+      apply((turn) => ({ ...turn, failure: getApiErrorMessage(error) }));
+
+      // 배너도 함께 고친다 — 이 둘은 「지금 대화가 왜 안 도는가」를 다음 턴에도 말해야 한다.
+      const code = getStreamFailureCode(error);
+      if (code === "botAgent.service_unreachable") {
+        setReady(false);
+        setReasons(BOT_AGENT_DOWN_REASONS);
+      } else if (code === "botAgent.invalid_api_key") {
+        setReady(false);
+        setReasons(BOT_AGENT_KEY_REJECTED_REASONS);
+      }
     } finally {
       setIsStreaming(false);
     }
@@ -148,13 +169,14 @@ export function BotConversation({
             {turns.map((turn, index) => (
               <li key={index} className="text-sm leading-relaxed">
                 <span className="mr-2 font-mono text-2xs text-ink-muted">{turn.role === "user" ? "나" : "봇"}</span>
-                <span
-                  className={`whitespace-pre-wrap ${
-                    turn.failed ? "text-danger" : turn.role === "user" ? "text-ink" : "text-ink-muted"
-                  }`}
-                >
+                <span className={`whitespace-pre-wrap ${turn.role === "user" ? "text-ink" : "text-ink-muted"}`}>
                   {turn.text || (isStreaming && index === turns.length - 1 ? "…" : "")}
                 </span>
+                {turn.failure && (
+                  <p role="alert" className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-danger">
+                    {turn.failure}
+                  </p>
+                )}
                 {turn.tools && turn.tools.length > 0 && (
                   <p className="mt-1 font-mono text-2xs text-ink-muted">읽음: {turn.tools.join(" · ")}</p>
                 )}

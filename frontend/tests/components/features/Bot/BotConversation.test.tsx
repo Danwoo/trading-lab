@@ -106,4 +106,55 @@ describe("BotConversation — 스트림 중 실패가 사라지지 않는다 (�
       expect(screen.getByText(/이렇게 만들어 봤습니다/).className).not.toContain("text-danger");
     });
   });
+
+  // ── #423 F5 — 무효 키 ──────────────────────────────────────────────────────
+  //
+  // CLI 는 인증 실패를 **일반 `text` 이벤트**로 흘리고 `result.subtype` 은 `success` 로 끝낸다
+  // (실측 SSE, Cycle 6 F5). 그 뒤 `error` 하나가 온다. 종전에는 그 `error` 를 받은 catch 가
+  // 턴 텍스트를 통째로 갈아치워, **받은 원인을 띄웠다가 지웠다.**
+  it("무효 키 — 스트리밍된 원인이 지워지지 않고, 처방이 「키 교체」로 남는다", async () => {
+    givenServer([
+      JSON.stringify({ type: "text", text: "Invalid API key · Fix external API key" }),
+      JSON.stringify({ type: "result", subtype: "success" }),
+      JSON.stringify({
+        type: "error",
+        code: "botAgent.invalid_api_key",
+        message: "봇 대화의 API 키 인증이 거부됐습니다.",
+      }),
+    ]);
+
+    render(<BotConversation formState={{ strategy_key: null, params: {} }} />);
+    await send("눌림목 봇 만들어줘");
+
+    await waitFor(() => {
+      // ① 처방이 재시도가 아니라 키 교체다 — 실패 턴이 그 말을 한다.
+      expect(screen.getByRole("alert").textContent).toMatch(/키를 교체/);
+    });
+
+    // ② 받은 원인이 화면에 남는다 — 덮어쓰기가 없어졌다는 것이 이 줄의 뜻이다.
+    expect(screen.getByText(/Invalid API key · Fix external API key/)).toBeTruthy();
+
+    // ③ 배너가 「설정됨」과 「유효함」의 차이를 말한다 — readiness 는 설정 여부만 본다.
+    expect(screen.getByRole("status").textContent).toMatch(/설정돼 있지만/);
+  });
+
+  it("서비스가 안 떠 있으면 실패 턴이 「띄우라」고 말한다 — 재시도가 아니다", async () => {
+    givenServer([
+      JSON.stringify({
+        type: "error",
+        code: "botAgent.service_unreachable",
+        message: "대화 서비스에 닿지 못했습니다.",
+      }),
+    ]);
+
+    render(<BotConversation formState={{ strategy_key: null, params: {} }} />);
+    await send("안녕");
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/띄운 뒤 다시 보내세요/);
+    });
+
+    // 배너도 같은 말을 한다 — 종전에는 배너만 「기동하라」를 알고 실패 턴은 딴말을 했다.
+    expect(screen.getByRole("status").textContent).toMatch(/떠 있지 않습니다/);
+  });
 });
