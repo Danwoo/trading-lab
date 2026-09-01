@@ -170,8 +170,8 @@ def main() -> int:
         check("상한 초과 take 는 거절한다", "100" in str(exc), True)
 
     # ── ⑧ 같은 등급 안의 동점 — 파생상품이 본종목을 밀어내지 않는다 (#422) ──
-    # 실데이터의 모양: 삼성 계열 ETN 52종이 전부 「삼성 …」(공백)으로 시작해 issuer_nm
-    # 사전순으로 「삼성전자」보다 앞선다. market 은 못 가른다 — ETN 도 KOSPI 다 (실측).
+    # 실데이터의 모양: 「삼성 」(공백)으로 시작하는 파생상품 51종이 issuer_nm 사전순으로
+    # 「삼성전자」보다 앞선다. market 은 못 가른다 — 그 51종도 전부 KOSPI 다 (실측).
     derivatives = [("KR", "KOSPI", f"53{index:04d}", f"삼성 파생 {index:02d}호 ETN", "KRW") for index in range(20)]
     with engine.begin() as conn:
         conn.execute(
