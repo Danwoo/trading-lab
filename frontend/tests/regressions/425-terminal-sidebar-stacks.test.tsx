@@ -112,9 +112,24 @@ const RAIL_PX = 46;
  */
 const NARROW_PANEL_MIN_PX = 300;
 
+/** 격자 한 줄의 높이(`auto-rows-[minmax(20rem,1fr)]`) — 누운 사이드바의 높이 상한으로도 쓴다.
+ *  그보다 높으면 목록이 패널 한 칸보다 커져 차트가 첫 화면에서 밀려난다. */
+const GRID_ROW_FLOOR_PX = 320;
+
+/**
+ * 관심종목은 사이드바가 200건까지 한 번에 그린다(`SIDEBAR_LIST_PAGE_SIZE`). 픽스처를 두어 줄로
+ * 두면 **높이가 안 걸려도 통과한다** — 실제 계정에서는 사이드바가 2,487px 로 자라 차트를 화면
+ * 밖으로 밀어낸다(공용 스택 실측). 그래서 목록을 넉넉히 준다.
+ */
 const WATCHLIST_ROWS: WatchlistOut[] = [
   { ticker: "005930", issuer_nm: "삼성전자", market: "KOSPI", use_at: "Y" } as WatchlistOut,
   { ticker: "AAPL", issuer_nm: "Apple Inc.", market: "NASDAQ", use_at: "Y" } as WatchlistOut,
+  ...(Array.from({ length: 60 }, (_, i) => ({
+    ticker: `T${String(i).padStart(5, "0")}`,
+    issuer_nm: `종목 ${i}`,
+    market: "KOSPI",
+    use_at: "Y",
+  })) as WatchlistOut[]),
 ];
 
 interface Boxes {
@@ -246,6 +261,10 @@ async function measure(width: number): Promise<Boxes> {
   const html = wrapInShell(inner);
   const css = await buildCss(html);
   const page = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}<script>${MEASURE_SCRIPT}</script></body></html>`;
+  // 사람이 같은 화면을 눈으로 보고 싶을 때 — 하네스 페이지를 그대로 꺼내 준다.
+  // `TERMINAL_LAYOUT_HARNESS_DUMP=<경로>` 로 켠다(기본은 아무것도 안 쓴다).
+  const dump = process.env.TERMINAL_LAYOUT_HARNESS_DUMP;
+  if (dump) writeFileSync(dump, page, "utf8");
   return measureInChrome(page, width);
 }
 
@@ -284,6 +303,16 @@ describe("시세 화면 — 좁은 폭에서 사이드바와 패널 열이 세�
       boxes.aside.y,
       `사이드바 y=${boxes.aside.y}, 패널 열 y=${boxes.panelColumn.y} — 세로로 안 쌓였다`,
     ).toBeLessThan(boxes.panelColumn.y);
+
+    // 그리고 그 위쪽이 **목록 길이만큼 자라지 않는다** — 자라면 차트가 화면 밖으로 밀린다.
+    // 높이 유틸리티가 안 걸리면 실제 계정에서 2,487px 가 된다(공용 스택 실측).
+    expect(
+      boxes.aside.h,
+      `사이드바가 ${boxes.aside.h}px 로 자랐다 (관심종목 ${WATCHLIST_ROWS.length}건) — 목록은 사이드바 **안**에서 스크롤해야 한다`,
+    ).toBeLessThanOrEqual(GRID_ROW_FLOOR_PX);
+
+    // 패널 열은 사이드바 바로 아래에서 시작한다 — 사이 공백은 접힘이 어정쩡하다는 뜻이다.
+    expect(boxes.panelColumn.y, "패널 열이 사이드바 바로 아래에서 시작하지 않는다").toBe(boxes.aside.y + boxes.aside.h);
   });
 
   it(`넓은 폭(${WIDE_WIDTH}): 가로 분할 그대로다 (회귀 없음)`, async () => {
