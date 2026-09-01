@@ -127,7 +127,7 @@ process-compose up        # staging+ 는 docker-compose (compose.staging.yaml + 
 소문자, 단어는 하이픈으로, 설명은 3~5 단어. 워크트리를 받으면 **첫 일로** 규약 이름의 브랜치를 직접 판다 — `git fetch origin && git checkout -b <이름> origin/main`. Orca 가 붙이는 기본 이름(`<git 사용자명>/…`)을 그대로 쓰지 않는다.
 
 - **PR 을 연 뒤에 이름을 바꾸지 마라 — 그 PR 이 닫힌다.** GitHub 의 브랜치 rename 은 열린 PR 을 따라오지 않는다 (2026-08-27 실측: PR #395 가 닫혀 #396 으로 다시 열어야 했다). 처음에 맞게 판다.
-- **이름에 벤더 슬러그를 싣지 않는다.** 옛 형식은 `fix-<이슈>-<에이전트>` 였고 그 끝의 `-claude`·`-kimi`·`-codex` 를 자동화가 읽어 저자를 판별했다. 이제 **커밋 신원이 유일한 저자 근거**다 — 워크트리를 받으면 `git config --worktree user.email <벤더>[-<티어>]-agent@noreply.local` 을 반드시 설정하라. 안 하면 저자가 「미상」으로 읽혀 **자동 머지가 막힌다**(`scripts/review_record.py` 조건 ③).
+- **이름에 벤더 슬러그를 싣지 않는다.** 옛 형식은 `fix-<이슈>-<에이전트>` 였고 그 끝의 `-claude`·`-kimi`·`-codex` 를 자동화가 읽어 저자를 판별했다. 이제 **커밋 신원이 유일한 저자 근거**다 — 워크트리를 받으면 `git config --worktree user.email <벤더>[-<티어>]-agent@noreply.local` 을 반드시 설정하라. 안 하면 저자가 「미상」으로 읽혀 **자동 머지가 막힌다**(`scripts/review_record.py` 조건 ③). 사람이 직접 쓴 PR 도 같은 모양이라 같이 막히는데, 그 탈출구는 **`author: human` 라벨** 하나다 — 레포에 쓰기 권한이 있는 사람이 붙여야 유효하고(봇이 붙인 것은 무효), 저자 미상 차단 하나만 연다. 자기리뷰·승인·위험도 차단은 그대로 남는다.
 - **이 절이 정본이다.** 오더용 상세본이 `.work/orders/BRANCH-RULE.md` 에 있지만 `.work/` 는 gitignored 라 clone 을 따라가지 않는다 — 다른 기계에서 받으면 이 절만 남는다. 둘이 어긋나면 이 절을 따른다.
 
 ---
