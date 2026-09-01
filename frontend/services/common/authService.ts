@@ -1,10 +1,12 @@
 import { apiCall } from "@/utils/common/api/client";
+import type { OtpDelivery } from "@/constants/signup";
 
 const EMAIL_URL = "/api/common/email";
 const SIGNUP_URL = "/api/common/signup";
 
 export const sendEmail = async (to: string) => {
-  return apiCall<{ message: string }>(EMAIL_URL, {
+  // `delivery` 는 코드가 실제로 간 곳이다 — 화면이 이것 없이 「메일을 보냈다」고 말하던 것이 #424.
+  return apiCall<{ message: string; delivery: OtpDelivery }>(EMAIL_URL, {
     method: "POST",
     data: { to },
   });
