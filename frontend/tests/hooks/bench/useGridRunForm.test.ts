@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 
 import { useGridRunForm } from "@/hooks/bench/useGridRunForm";
+import { STEPS_MAX, STEPS_MIN } from "@/lib/bench/sweep";
 import { selectBot } from "@/services/bot/botService";
 
 vi.mock("@/services/bot/botService", () => ({ selectBot: vi.fn() }));
@@ -96,5 +97,50 @@ describe("#317 격자 폼이 뒤집힌 구간을 서버로 보내지 않는다",
     });
 
     expect(input).not.toBeNull();
+  });
+});
+
+// #398 (이 레포 이슈 — https://github.com/Danwoo/trading-lab/issues/398) — **칸 수 상태는 폼이 선언한
+// 범위 밖의 값을 갖지 않는다.** 종전엔 `changeAxisSteps` 가 0 만 걸러 99 를 그대로 받아
+// `comboCount` 가 891 을 약속했고, 정작 제출은 입력의 네이티브 `max=9` 위반으로 브라우저가
+// 조용히 막아 요청 0건·사유 0건이었다. 상태가 받는 범위와 폼이 선언한 범위가 갈린 것이 결함이다.
+describe("#398 칸 수는 선언 범위 안으로 눌린다", () => {
+  it("상한을 넘긴 칸 수는 상한으로 눌리고, 칸 수 약속도 그만큼만 한다", async () => {
+    const result = await givenBotPicked();
+
+    act(() => result.current.changeAxisSteps(0, 99));
+
+    expect(result.current.axes[0].steps).toBe(STEPS_MAX);
+    expect(result.current.comboCount).toBe(STEPS_MAX);
+  });
+
+  it("눌린 칸 수로 입력이 만들어진다 — 실행이 조용히 죽지 않는다", async () => {
+    const result = await givenBotPicked();
+    act(() => result.current.changeAxisSteps(0, 99));
+
+    let input: { sweep: Record<string, number[]> } | null = null;
+    act(() => {
+      input = result.current.buildInput() as never;
+    });
+
+    expect(input).not.toBeNull();
+    expect(input!.sweep.window).toHaveLength(STEPS_MAX);
+    expect(result.current.formError).toBeNull();
+  });
+
+  it("하한 아래는 하한으로 — 1칸은 축이 아니다", async () => {
+    const result = await givenBotPicked();
+
+    act(() => result.current.changeAxisSteps(0, 1));
+
+    expect(result.current.axes[0].steps).toBe(STEPS_MIN);
+  });
+
+  it("비운 칸은 기본값으로 돌아간다 — 종전 계약 유지", async () => {
+    const result = await givenBotPicked();
+    act(() => result.current.changeAxisSteps(0, 7));
+    act(() => result.current.changeAxisSteps(0, Number(null)));
+
+    expect(result.current.axes[0].steps).toBe(5);
   });
 });
