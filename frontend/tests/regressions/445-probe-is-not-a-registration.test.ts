@@ -13,6 +13,8 @@
 // 저장됐다고 읽는다. 실제로는 아무 일도 안 일어났다.
 //
 // `responses.ts` 가 Prisma 를 import 하므로 `npm run test:api-regressions` 로만 돈다.
+// 설정 이름은 **가짜**다 — 실제 이름을 쓰면 `verify_data_key_env_boundary.py` 가 잡는다
+// (키를 읽는 자리는 `services/data_key/` 하나라는 규약, 리드 결정 2026-08-07).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -33,7 +35,7 @@ function request() {
   return new NextRequest("http://localhost:3010/api/external/backend/data-key/probe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source: "data_go_kr", value: "NOT-A-REAL-KEY", setting: "MARKET_DATA_GOKR_SERVICE_KEY" }),
+    body: JSON.stringify({ source: "data_go_kr", value: "NOT-A-REAL-KEY", setting: "FIXTURE_SETTING_NOT_A_REAL_KEY" }),
   });
 }
 
