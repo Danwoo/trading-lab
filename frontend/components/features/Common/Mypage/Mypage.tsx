@@ -66,25 +66,11 @@ export const Mypage: FC<Props> = () => {
   const handleSubmit = async (e: any) => {
     e.preventDefault();
 
-    // **`form.elements` 로 읽는다.** `form.name` 은 폼 자신의 name 속성(문자열)이라 같은 이름의
-    // 입력을 가린다 — `e.target.name.value` 는 입력값이 아니라 `undefined` 였다. 칸이 조건부로
-    // 안 그려질 수 있으므로 없는 칸도 빈 문자열로 받는다(읽다 죽으면 저장이 통째로 멈춘다).
-    const fields = (e.target as HTMLFormElement)?.elements as HTMLFormControlsCollection | undefined;
-    const valueOf = (field: string) => ((fields?.namedItem(field) as HTMLInputElement | null)?.value ?? "") as string;
-    const userEmail = valueOf("email");
-    const userPass = valueOf("password");
-    const userConfirmPass = valueOf("confirmPassword");
-    const userName = valueOf("name");
-    const userDept = valueOf("dept");
-
-    // **바뀐 것이 없으면 「변경되었습니다」라고 하지 않는다** (#446 F33). 그 문장은 무언가
-    // 달라졌다는 말이고, 안 달라졌을 때 같은 말을 하면 진짜 변경의 신호가 값을 잃는다.
-    // 비밀번호는 값이 있으면 그 자체가 변경이다(현재 값과 비교할 방법이 없다).
-    const unchanged = !userPass && userName === (data?.name ?? "") && userDept === (data?.dept ?? "");
-    if (unchanged) {
-      showMessage("알림", <div>바뀐 것이 없습니다.</div>);
-      return;
-    }
+    const userEmail = e.target.email.value;
+    const userPass = e.target.password.value;
+    const userConfirmPass = e.target.confirmPassword.value;
+    const userName = e.target.name.value;
+    const userDept = e.target.dept.value;
 
     // 비밀번호 확인 로직
     if (userPass && !validatePassword(userPass, userConfirmPass)) {
