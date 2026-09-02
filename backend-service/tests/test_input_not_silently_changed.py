@@ -24,7 +24,7 @@ sys.path.insert(0, str(BACKEND / "app"))
 
 from pydantic import ValidationError  # noqa: E402
 from schemas.bot.bot_schema import BotStrategyIn  # noqa: E402
-from schemas.portfolio.portfolio_schema import Holding  # noqa: E402
+from schemas.portfolio.portfolio_schema import Holding, HoldingCreateIn  # noqa: E402
 from schemas.watchlist.watchlist_schema import WatchlistCreateIn  # noqa: E402
 
 
@@ -85,6 +85,20 @@ def test_컬럼_안의_가중치는_통과한다() -> str:
     return "컬럼 안의 가중치는 통과한다"
 
 
+def test_오타_필드는_조용히_사라지지_않는다() -> str:
+    # `quantity` 를 `quantiy` 로 잘못 쓰면 종전에는 그 값이 통째로 버려지고 저장은 성공했다.
+    # 사용자는 0주가 저장된 것을 나중에 보드에서 발견한다.
+    _rejects(lambda: HoldingCreateIn(ticker="005930", holding_nm="삼성전자", quantiy=10))
+    _rejects(lambda: WatchlistCreateIn(ticker="005930", target_pric=70000))
+    return "오타 필드는 조용히 사라지지 않는다"
+
+
+def test_아는_필드만_있으면_종전대로_통과한다() -> str:
+    holding = HoldingCreateIn(ticker="005930", holding_nm="삼성전자", quantity=10)
+    assert holding.quantity == 10
+    return "아는 필드만 있으면 종전대로 통과한다"
+
+
 def _main() -> int:
     tests = [
         test_음수_수량은_거부된다,
@@ -96,6 +110,8 @@ def _main() -> int:
         test_저장_한도를_넘는_평단은_거부된다,
         test_가중치는_컬럼_상한을_넘지_못한다,
         test_컬럼_안의_가중치는_통과한다,
+        test_오타_필드는_조용히_사라지지_않는다,
+        test_아는_필드만_있으면_종전대로_통과한다,
     ]
     passed = 0
     failed = []

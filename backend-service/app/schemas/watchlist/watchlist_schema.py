@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from schemas.common_schema import MONEY_MAX, CommonEntity, Money, TrimmedBaseModel
 
 
@@ -54,6 +54,9 @@ class WatchlistsOut(BaseModel):
 
 
 class WatchlistCreateIn(Watchlist):
+    # 모르는 필드를 조용히 버리지 않는다 — 오타 하나로 값이 사라지고도 저장은 성공했다고 뜬다.
+    model_config = ConfigDict(extra="forbid")
+
     ticker: str = Field(
         ...,
         max_length=20,
@@ -63,4 +66,4 @@ class WatchlistCreateIn(Watchlist):
 
 
 class WatchlistUpdateIn(Watchlist):
-    pass
+    model_config = ConfigDict(extra="forbid")

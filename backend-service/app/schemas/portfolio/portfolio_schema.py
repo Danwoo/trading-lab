@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from schemas.common_schema import MONEY_MAX, QUANTITY_MAX, CommonEntity, Money, TrimmedBaseModel
 
 
@@ -26,13 +26,16 @@ class PortfoliosOut(BaseModel):
 
 
 class PortfolioCreateIn(Portfolio):
+    # 모르는 필드를 조용히 버리지 않는다 — 오타 하나로 값이 사라지고도 저장은 성공했다고 뜬다.
+    model_config = ConfigDict(extra="forbid")
+
     portfolio_id: str = Field(
         ..., max_length=20, description="포트폴리오 id — 직접 정하는 값입니다. 20자까지, 이미 있는 id 면 거부됩니다."
     )
 
 
 class PortfolioUpdateIn(Portfolio):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 # ── Holding (detail) ───────────────────────────────────────────────────
@@ -67,6 +70,8 @@ class HoldingsOut(BaseModel):
 
 
 class HoldingCreateIn(Holding):
+    model_config = ConfigDict(extra="forbid")
+
     ticker: str = Field(
         ...,
         max_length=20,
@@ -76,4 +81,4 @@ class HoldingCreateIn(Holding):
 
 
 class HoldingUpdateIn(Holding):
-    pass
+    model_config = ConfigDict(extra="forbid")

@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from schemas.common_schema import WEIGHT_MAX, CommonEntity, Money, TrimmedBaseModel
 
 CombineRule = Literal["AND", "OR", "SCORE"]
@@ -11,6 +11,9 @@ ParamSource = Literal["USER", "AI_SUGGESTED"]
 
 class BotStrategyIn(BaseModel):
     """봇에 싣는 전략 하나. `params` 는 전략 선언에 대해 서비스가 검증한다."""
+
+    # 모르는 필드를 조용히 버리지 않는다 — 오타 하나로 값이 사라지고도 저장은 성공했다고 뜬다.
+    model_config = ConfigDict(extra="forbid")
 
     strategy_key: str = Field(
         ...,
@@ -103,6 +106,8 @@ class BotsOut(BaseModel):
 
 
 class BotCreateIn(Bot):
+    model_config = ConfigDict(extra="forbid")
+
     bot_nm: str = Field(..., min_length=1, max_length=100, description="봇 이름 — 1~100자, 빈 문자열은 안 됩니다.")
     # 전략 없는 봇은 아무 판정도 못 한다 — 서비스가 빈 목록을 거부한다.
     strategies: list[BotStrategyIn] = Field(
@@ -113,6 +118,8 @@ class BotCreateIn(Bot):
 
 
 class BotUpdateIn(Bot):
+    model_config = ConfigDict(extra="forbid")
+
     bot_nm: str = Field(..., min_length=1, max_length=100, description="봇 이름 — 1~100자, 빈 문자열은 안 됩니다.")
     # None 이면 전략 목록을 건드리지 않는다. 목록이 오면 통째로 갈아 끼운다.
     strategies: list[BotStrategyIn] | None = Field(
