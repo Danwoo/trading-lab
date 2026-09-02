@@ -158,6 +158,19 @@ const patchHandler = async (req: NextRequest, session: any, params?: any) => {
         where: { userId: existingUser.id, providerId: "credential" },
         data: { password: hashedPassword },
       });
+
+      // **다른 기기의 세션을 끊는다.** `auth.ts` 의 `revokeSessionsOnPasswordReset` 은 Better
+      // Auth 가 스스로 처리하는 재설정 흐름에만 걸린다 — 이 경로는 Prisma 로 해시를 직접 쓰므로
+      // 그 옵션이 발동할 자리가 없었고, 실제로 옛 세션이 그대로 살아 있었다 (#433).
+      // 지금 쓰는 세션은 남긴다(방금 인증한 기기다). **토큰을 못 읽으면 전부 끊는다** —
+      // 「누구를 남길지 모르는데 남기는 것」보다 다시 로그인시키는 편이 안전하다.
+      const currentToken = (session as { session?: { token?: string } }).session?.token;
+      await prisma.baSession.deleteMany({
+        where: {
+          userId: existingUser.id,
+          ...(currentToken ? { NOT: { token: currentToken } } : {}),
+        },
+      });
     }
 
     // 사용자 정보 업데이트 (세션 이메일로)
