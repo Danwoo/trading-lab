@@ -5,23 +5,20 @@ import { usePanelProvenance } from "@/components/features/Terminal/panelProvenan
 import { useRealtimeQuote } from "@/hooks/terminal/useRealtimeQuote";
 import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
 import { formatNumber } from "@/utils/common/formatters/number";
-import type { Quote } from "@/lib/terminal/realtimeArbiter";
 import type { Provenance } from "@/types/terminal/provenance";
 import type { PanelProps } from "@/types/terminal/panel";
 
 /**
- * 임시 시세 — `provenance.kind === "placeholder"` 일 때만 쓴다. 실시간 계약이 없는 동안
- * (`NullTransport`, #242 O4) 화면에 무엇이 뜨는지 증명하기 위한 값이지 API 계약이 아니다.
- * 캔들 패널의 임시 캔들 데이터와 같은 성격이지만, 이 값은 이 파일 밖으로 내보내지 않는다 —
- * 공유 계약처럼 보이면 다른 곳에서 실데이터로 오인해 import 할 위험이 있다.
+ * 실시간 계약이 없는 동안(`NullTransport`, #242 O4) 값 자리에 그리는 것 — **읽을 수 없는 표시**다.
+ *
+ * 종전에는 그럴듯한 숫자(74,200원 ▲1,200)를 그렸다. 배지가 「임시 데이터」라고 정직하게 말해도,
+ * **여러 종목을 훑기 전에는 종목마다 같은 값인 줄 모른다** — 하나만 보고 있으면 진짜인지 가릴
+ * 단서가 화면에 없다 (#445 F11). 리드 결정(2026-09-02 Q1)은 **오독이 원리적으로 불가능한 표시**다:
+ * 「그럴듯한 값 유지」와 「종목마다 다른 합성값」은 기각됐다 — 후자가 가장 위험하다.
+ *
+ * 자리는 지킨다. 값이 실제로 오면 레이아웃이 튀지 않아야 한다.
  */
-const PLACEHOLDER_QUOTE: Quote = {
-  price: 74200,
-  change: 1200,
-  changeRate: 1.64,
-  volume: 8_423_190,
-  at: new Date().toISOString(),
-};
+const UNREADABLE = "—";
 
 /**
  * 종목 정보 패널(#242 O6, FR-019). 실시간 시세 한 갈래(`useRealtimeQuote`)만 읽는다.
@@ -67,9 +64,9 @@ export default function SymbolInfoPanel({ instanceId }: PanelProps) {
     // 무한 루프가 된다(실측: "Maximum update depth exceeded"). 내용 기준 키(JSON)로 비교한다.
   }, [isPlaceholder, JSON.stringify(quoteState.provenance), symbol?.ticker, reportProvenance]);
 
-  const quote = quoteState.data ?? (isPlaceholder ? PLACEHOLDER_QUOTE : null);
+  const quote = quoteState.data;
 
-  if (!quote) {
+  if (!quote && !isPlaceholder) {
     return (
       <div role="status" className="flex h-full items-center justify-center px-6 text-center text-sm text-ink-muted">
         시세 정보를 아직 받지 못했습니다.
@@ -77,8 +74,9 @@ export default function SymbolInfoPanel({ instanceId }: PanelProps) {
     );
   }
 
-  const isUp = quote.change >= 0;
-  const directionClassName = isUp ? "text-market-up" : "text-market-down";
+  // 값이 없으면 방향도 없다 — 색도 기호도 지어내지 않는다.
+  const isUp = quote ? quote.change >= 0 : null;
+  const directionClassName = isUp === null ? "text-ink-muted" : isUp ? "text-market-up" : "text-market-down";
 
   return (
     <div className="flex h-full flex-col gap-4 p-3 font-mono text-xs">
@@ -88,17 +86,23 @@ export default function SymbolInfoPanel({ instanceId }: PanelProps) {
       </div>
 
       <div className={directionClassName}>
-        <p className="text-lg">{formatNumber(quote.price, "number")}</p>
+        <p className="text-lg">{quote ? formatNumber(quote.price, "number") : UNREADABLE}</p>
         {/* 색만으로 방향을 표시하지 않는다 — 부호(▲/▼)를 항상 함께 그린다 (#242 O3 착수 코멘트). */}
         <p>
-          {isUp ? "▲" : "▼"} {formatNumber(Math.abs(quote.change), "number")} (
-          {formatNumber(Math.abs(quote.changeRate), "decimal", { decimals: 2 })}%)
+          {quote ? (
+            <>
+              {isUp ? "▲" : "▼"} {formatNumber(Math.abs(quote.change), "number")} (
+              {formatNumber(Math.abs(quote.changeRate), "decimal", { decimals: 2 })}%)
+            </>
+          ) : (
+            UNREADABLE
+          )}
         </p>
       </div>
 
       <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-ink-muted">
         <dt>거래량</dt>
-        <dd className="text-right text-ink">{formatNumber(quote.volume, "number")}</dd>
+        <dd className="text-right text-ink">{quote ? formatNumber(quote.volume, "number") : UNREADABLE}</dd>
       </dl>
     </div>
   );
