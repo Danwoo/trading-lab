@@ -32,7 +32,11 @@ export function MessagePopup() {
   }, [currentMessage]);
 
   useEffect(() => {
-    if (!currentMessage) return;
+    // Enter 로 닫는 것은 **선택지가 하나뿐인 알림에만** 준다. 확인/취소가 갈리는 창에서 Enter 를
+    // 확인으로 묶으면 포커스가 어디에 있든 한 번의 Enter 가 파괴적 동작을 실행한다 — 목록에서
+    // Enter 로 삭제를 부른 손이 한 번 더 치면 그대로 나간다 (#443). 확인창은 버튼을 골라 누르게 하고,
+    // 그래서 초기 포커스도 안전한 쪽(취소)에 둔다.
+    if (!currentMessage || currentMessage.type === "confirm") return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -80,6 +84,7 @@ export function MessagePopup() {
               stylingMode={displayed.cancelButtonStyle}
               type={displayed.cancelButtonType}
               className="min-w-[60px]"
+              elementAttr={{ "data-confirm-cancel": "true", autofocus: "true" }}
             />
           </>
         ) : (
