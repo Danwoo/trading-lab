@@ -28,7 +28,8 @@ from sqlalchemy.exc import DataError, IntegrityError, OperationalError
 # PostgreSQL SQLSTATE → 도메인 예외 매핑. psycopg 는 네이티브 에러 번호가 아니라 SQLSTATE 로
 # 원인을 알려 주므로, 코드를 메시지 문자열에서 긁지 않고 예외 객체의 sqlstate 를 읽는다.
 SQLSTATE_MAP: dict[str, HTTPError] = {
-    "23505": ConflictError("이미 등록된 값입니다."),  # unique_violation
+    # 문구는 서비스 경로(`select` 로 먼저 걸러내는 쪽)와 같아야 한다 — 사용자에게는 같은 사건이다.
+    "23505": ConflictError("이미 존재하는 데이터입니다."),  # unique_violation
     "23503": ConflictError("참조 중인 데이터가 있어 처리할 수 없습니다."),  # foreign_key_violation
     "23502": BadRequestError("필수 입력 항목이 누락되었습니다."),  # not_null_violation
     "23514": BadRequestError("입력 값이 허용된 범위를 벗어났습니다."),  # check_violation

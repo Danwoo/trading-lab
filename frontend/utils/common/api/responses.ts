@@ -59,7 +59,23 @@ export function createErrorResponse(error: any, operation: string) {
     if (error.response) {
       return NextResponse.json(error.response.data, { status: error.response.status });
     }
-    return NextResponse.json({ detail: [{ type: "server_error", loc: ["server"], msg: message }] }, { status: 503 });
+    // `response` 가 없다는 것은 **연결 자체가 안 됐다**는 뜻이다 — 서버가 답했는데 실패한 것과
+    // 사용자가 할 일이 다르다. 이 사실을 일반 문구로 뭉개면 클라이언트가 분류할 근거를 잃고
+    // 마지막 폴백(「네트워크 연결을 확인해주세요」)으로 떨어져, **멀쩡한 자기 네트워크를**
+    // 고치러 간다 (#435 B-3). 아는 것만 말하고, 확인할 수 있는 곳을 가리킨다.
+    // 주소·포트는 싣지 않는다 — 내부 호스트는 화면에 낼 것이 아니다.
+    return NextResponse.json(
+      {
+        detail: [
+          {
+            type: "upstream_unreachable",
+            loc: ["server"],
+            msg: "서비스가 응답하지 않았습니다. 그 서비스가 떠 있는지, 설정의 주소·포트가 맞는지 확인하세요.",
+          },
+        ],
+      },
+      { status: 503 },
+    );
   }
 
   // 4. 커스텀 메시지 ({ message: "..." } plain object)
