@@ -113,6 +113,9 @@ export const FileListDisplay: React.FC<Props> = ({ atchFileId, compact = false, 
   // 파일 목록 조회
   const fileGroups = useFileGroups(atchFileId ? [{ key: "files", fileId: atchFileId }] : []);
   let files = fileGroups.files?.files || [];
+  // 「없다」와 「못 읽었다」를 가른다 — 조회 실패를 「없음」으로 그리면 사용자는 첨부가 유실됐다고
+  // 믿고 다시 올리려 든다 (#440·B-10).
+  const loadFailed = fileGroups.files?.error === true;
 
   if (fileSn !== undefined) {
     files = files.filter((file) => file.file_sn === fileSn);
@@ -187,6 +190,14 @@ export const FileListDisplay: React.FC<Props> = ({ atchFileId, compact = false, 
   // 일반 모드
   if (!atchFileId?.trim()) {
     return <div className="text-gray-400">첨부된 파일이 없습니다.</div>;
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="text-amber-700" role="status">
+        첨부 목록을 불러오지 못했습니다 — 파일이 없다는 뜻은 아닙니다. 잠시 후 화면을 다시 열어 주세요.
+      </div>
+    );
   }
 
   if (files.length === 0) {

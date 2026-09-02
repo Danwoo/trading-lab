@@ -12,6 +12,14 @@ export interface FileConfig {
 export interface FileState {
   files: FileDetail[];
   isLoading: boolean;
+  /**
+   * 목록을 **못 읽었다**. `files: []` 와 다르다 — 빈 배열은 「없다」이고 이것은 「모른다」다.
+   *
+   * 종전에는 실패가 빈 배열로 접혀, 화면이 조회 실패를 「첨부된 파일이 없습니다」로 단언했다.
+   * 파일은 있는데 사용자는 유실됐다고 믿고 다시 올리려 든다 (#440·B-10). 이 레포는 종목 검색에서
+   * 같은 구분(`unavailable_reason` — 「없다」와 「아직 안 받았다」)을 이미 하고 있다.
+   */
+  error?: boolean;
 }
 
 /**
@@ -28,7 +36,7 @@ export function useFileGroups(
   // 각 파일 그룹의 초기 상태 설정
   const initialStates: Record<string, FileState> = {};
   configs.forEach((config) => {
-    initialStates[config.key] = { files: [], isLoading: false };
+    initialStates[config.key] = { files: [], isLoading: false, error: false };
   });
 
   const [fileStates, setFileStates] = useState<Record<string, FileState>>(initialStates);
@@ -62,7 +70,7 @@ export function useFileGroups(
         if (!abortController.signal.aborted) {
           setFileStates((prev) => ({
             ...prev,
-            [key]: { files, isLoading: false },
+            [key]: { files, isLoading: false, error: false },
           }));
         }
       } catch (error) {
@@ -71,7 +79,8 @@ export function useFileGroups(
           showToast("파일 목록을 불러오지 못했습니다.", "error");
           setFileStates((prev) => ({
             ...prev,
-            [key]: { files: [], isLoading: false },
+            // 빈 배열로 접지 않는다 — 화면이 「없다」와 「못 읽었다」를 갈라야 한다.
+            [key]: { files: [], isLoading: false, error: true },
           }));
         }
       }
