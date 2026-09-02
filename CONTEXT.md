@@ -132,27 +132,29 @@ LLM 은 **내가 원할 때** 옆에서 돕는다 — 전략을 만들어주고,
 
 <!-- 운영 규약(2026-08-19 리드 프롬프트, Cycle 0~10)의 상태 커서. 매 단계 종료 시 갱신 · 세션이 끊겨도 여기서 복구한다. -->
 
-현재: **PR 9건이 리뷰 승인만 기다린다** (2026-09-03). CI 는 전부 초록이거나 도는 중이고, 막힌 것은
-`review: unable` 하나다 — cross-review 가 **Orca 런타임 없이는** 리뷰 워커를 못 세우고, 승인 리뷰가
-없으면 ruleset 이 머지를 막는다. **리드가 Windows Orca 앱을 띄우는 것 외에 에이전트가 풀 수 있는
-경로가 없다.**
+현재: **PR 11건이 리뷰 승인만 기다린다 · Cycle 9 발굴 완료** (2026-09-03). CI 는 11건 전부 초록이고,
+막힌 것은 `review: unable` 하나다 — cross-review 가 **Orca 런타임 없이는** 리뷰 워커를 못 세우고,
+승인 리뷰가 없으면 ruleset 이 머지를 막는다. **리드가 Windows Orca 앱을 띄우는 것 외에 에이전트가
+풀 수 있는 경로가 없다.**
 
 | PR | 이슈 | 담은 것 |
 |---|---|---|
-| [#460](https://github.com/Danwoo/trading-lab/pull/460) | #446 | 안 바뀐 저장이 「변경됨」이라 하지 않는다 (+ `form.name` 이 입력을 가리던 진짜 버그) |
-| [#459](https://github.com/Danwoo/trading-lab/pull/459) | #420 | **private 전환 P1·P2·P3** — main 직접 push 차단·착륙 사후 감사·위협 모델 |
-| [#458](https://github.com/Danwoo/trading-lab/pull/458) | #442 | 옛 제품 낱말 (전수 1건) |
-| [#457](https://github.com/Danwoo/trading-lab/pull/457) | #445 | 지어낸 시세를 못 읽게·설정됨≠유효함·확인은 등록이 아니다 (4건) |
-| [#456](https://github.com/Danwoo/trading-lab/pull/456) | #435 | 틀린 처방 (5건) |
-| [#451](https://github.com/Danwoo/trading-lab/pull/451) | #434 | 조용한 데이터 변형 (8건) |
+| [#463](https://github.com/Danwoo/trading-lab/pull/463) | #439 | 스케줄러 멤버 계약 — 추가·조회·삭제가 전부 어긋나 있었다 |
+| [#462](https://github.com/Danwoo/trading-lab/pull/462) | #441 | 문서 삭제가 사유를 말한다 · 레일이 무엇을 기다리는지 말한다 |
+| [#460](https://github.com/Danwoo/trading-lab/pull/460) | #446 | 안 바뀐 저장이 「변경됨」이라 하지 않는다 (+ `form.name` 이 입력을 가리던 버그) |
+| [#459](https://github.com/Danwoo/trading-lab/pull/459) | #420 | **private 전환 P1·P2·P3** |
+| [#458](https://github.com/Danwoo/trading-lab/pull/458) | #442 | 옛 제품 낱말 |
+| [#457](https://github.com/Danwoo/trading-lab/pull/457) | #445 | 지어낸 시세를 못 읽게 · 설정됨≠유효함 · 확인은 등록이 아니다 |
+| [#456](https://github.com/Danwoo/trading-lab/pull/456) | #435 | 틀린 처방 5건 |
+| [#451](https://github.com/Danwoo/trading-lab/pull/451) | #434 | 조용한 데이터 변형 8건 |
 | [#450](https://github.com/Danwoo/trading-lab/pull/450)·[#449](https://github.com/Danwoo/trading-lab/pull/449)·[#448](https://github.com/Danwoo/trading-lab/pull/448) | #440·#433·#443 | Cycle 7 의 앞선 셋 |
 
-**#449·#450 은 Orca 문제만이 아니었다** — `test: backend` 가 실제로 빨갰다. `.env` 편집을 지시하는
-문구(레포 규약 `verify_no_env_edit_guidance.py` 위반)와, 새 테스트 셋이 `.env.development` 없는
-러너에서 **import 단계에** 죽던 것이다. 둘 다 고쳐 초록이 됐다.
+**착륙 순서 주의**: #456↔#457 이 `vitest.api-regressions.config.ts` 의 같은 자리에 각각 한 줄을
+더해 나중 쪽이 충돌한다(두 줄 다 남기면 된다). 그 밖에 11건 사이에 겹치는 파일은 없다(전수 대조).
 
-**리드 판단 대기 3건**: ① P4 전환 리허설(`CI_RUNNER=ci` 는 CI 를 리드의 WSL 로 끌어온다) ②
-낙관적 잠금(#446 F32 — 요청 계약 변경이라 고위험) ③ #437 NAV 합성 데이터(Q2)·#434 F15 관심목록(Q4).
+**리드 판단 대기 5건**: ① P4 전환 리허설(`CI_RUNNER=ci` 는 CI 를 리드의 WSL 로 끌어온다) ②
+낙관적 잠금(#446 F32 — 요청 계약 변경이라 고위험) ③ NAV 합성 데이터(#437 Q2) ④ 관심목록
+미등록 종목(#434 F15 Q4) ⑤ 관리자가 만든 계정이 볼 화면(#441 B-21).
 
 **Cycle 5 결과**: 이슈 11건 중 **4건 닫힘**(#397·#398·#399·#407). 남은 7건은 M4/M5 소속이라 굳히기 뒤 차례다.
 
@@ -176,6 +178,7 @@ Cycle 5 의 #397(#410)·#399(#409).
 | 6 | **9건** (W2 종목·W6 봇 대화·W7 리서치·S4 390px·S1 첫 진입·게스트 403·회귀) | 이슈 **4건**으로 묶어 발행 → **4건 전부 닫힘** — [#422](https://github.com/Danwoo/trading-lab/issues/422) 종목 검색 정렬 · [#423](https://github.com/Danwoo/trading-lab/issues/423) 스트리밍 실패 사유 3건 · [#424](https://github.com/Danwoo/trading-lab/issues/424) 화면 상태 불일치 2건 · [#425](https://github.com/Danwoo/trading-lab/issues/425) 390px 차트. F2 는 #402 에 원인 근거 첨부, F3 는 오독으로 정정. **통과 확인 6건**(게스트 403·operator 첫 진입·390px CLS 0·격자 실주행 25칸·봇 서비스 부재 배너·/admin MDI) |
 | 7 | **71건** (포트폴리오·NAV·호가/종목정보·관심목록·스케줄러 + 파일·리서치문서·설정키·마이페이지·접근성·경계값·동시성) | **[사용자] 19건 · [개발자] 20건** — 리드 지시로 체감 시간(초 단위)과 개발자 렌즈(기능 부재·레거시·코드 패턴)를 오더에 넣은 결과다. 이슈 **13건**: [#433](https://github.com/Danwoo/trading-lab/issues/433) 보안 경계(critical) · [#434](https://github.com/Danwoo/trading-lab/issues/434) 조용한 데이터 변형 · [#435](https://github.com/Danwoo/trading-lab/issues/435) 틀린 처방 · [#436](https://github.com/Danwoo/trading-lab/issues/436) 파일 모듈 · [#437](https://github.com/Danwoo/trading-lab/issues/437) NAV · [#438](https://github.com/Danwoo/trading-lab/issues/438) 체감 시간 · [#439](https://github.com/Danwoo/trading-lab/issues/439) 스케줄러 · [#440](https://github.com/Danwoo/trading-lab/issues/440) 실패가 성공처럼 · [#441](https://github.com/Danwoo/trading-lab/issues/441) 기능 부재 · [#442](https://github.com/Danwoo/trading-lab/issues/442) 템플릿 잔재 · [#443](https://github.com/Danwoo/trading-lab/issues/443) 접근성 · [#445](https://github.com/Danwoo/trading-lab/issues/445) 오해시키는 화면 · [#446](https://github.com/Danwoo/trading-lab/issues/446) 동시성. **리드 결정 4건**은 결정 로그 2026-09-02 |
 | 8 | **12건** (띄우기 7 · 화면 5) | 이슈 **2건**: [#452](https://github.com/Danwoo/trading-lab/issues/452) 띄우기 7건 · [#453](https://github.com/Danwoo/trading-lab/issues/453) 화면 3건. **오탐 6건을 확인으로 취소**한 것이 이 사이클의 주된 산출이다. #404 로 보낸 것 1건 |
+| 9 | **5건** (결함 2 · 통과 확인 3) | 새 이슈 **0건** — 결함 2건이 이미 열린 [#438](https://github.com/Danwoo/trading-lab/issues/438) 의 **원인**이라 그 이슈에 근거를 붙였다. 오탐 3건은 확인으로 취소 |
 
 **Cycle 4 부터 실 DB 로 검증한다.** 도커가 죽어(dockerd 미기동) 세 사이클 내내 「검증 없음」이
 쌓였는데, 유저스페이스 wheel(`pgserver`)로 우회했다 — PostgreSQL 16.2 를 root·도커 없이
@@ -211,7 +214,24 @@ Projects 패널 가시성과 Orca 의 자원 계정·정리를 취함). #364·#3
 성립하지 않는데, **자른 사실이 출력에 안 남아 스스로도 못 알아챈다.** 발굴량을 늘리라는 지시가 있을 때 특히
 위험한 자리다.
 
-다음: Orca 복구 → PR 4건 머지 → Cycle 9
+**Cycle 9 의 결론 — 관리 셸은 탭이 쌓일수록 느려지고, 백테스트 보드는 이미 검산된다 (2026-09-03).**
+
+`/admin` 은 **화면 고유의 무게가 아니라 몇 번째로 열었는가**로 느려진다. 순서를 뒤집어도 곡선이
+같고(`portfolio` 688→1308ms, `scheduler` 838→1330ms), 여덟 개까지 열면 **같은 화면이 625→2619ms
+로 4.2배**·힙 58→189MB 다. **2초 선은 다섯 번째 탭에서 넘는다** — #438 의 관측이 그 상태로 보인다.
+서버가 아니다(가장 느린 응답 410ms · 2초 초과 0건). 원인 후보는 탭마다 살아 있는 iframe 이고,
+처방(안 보이는 탭을 떼거나 재우기)은 **MDI 의 「돌아가면 그대로 있다」와 맞바꾸는 결정**이다.
+
+반대로 **백테스트 리포트에서는 결함을 못 찾았다.** 화면이 적어 준 비용 가정만으로 첫 거래의
+실현손익을 되짚으니 **차이 0원**이었다(1,810,707 = 1,810,707). 지표마다 유도를 적고, 비슷한 두
+값을 왜 따로 내는지까지 말하며, 미청산은 따로 표시하고, 자기 성능 예산까지 잰다. M4 「보드를
+믿는다」가 이 화면에서는 이미 참이다.
+
+**측정 함정 셋을 Cycle 8 에 이어 또 만났다** — `/admin` 은 iframe 이라 본 프레임만 보면 행이 0 ·
+앞에 둔 고정 대기가 곧 측정 결과(모든 화면이 「2.07초」로 나왔다) · 권한 리다이렉트를 「셸이
+무너졌다」로 오독. 셋 다 확인으로 걷어냈다.
+
+다음: Orca 복구 → PR 11건 머지 → Cycle 10
 
 ## 교훈
 
