@@ -97,7 +97,11 @@ export const RAIL_ITEMS: readonly RailItem[] = [
     label: "포트폴리오",
     icon: "money",
     kind: "panel",
-    pending: "포트폴리오는 아직 없습니다 — 봇 실행 엔진이 체결을 남기기 시작하면 옵니다.",
+    // 이 자리가 기다리는 것은 **봇 체결로 만들어진 포지션**이지 「포트폴리오」 일반이 아니다.
+    // 종전 문구(「포트폴리오는 아직 없습니다」)는 방금 관리 화면에서 포트폴리오를 만든
+    // 사람에게 **저장이 안 됐다**로 읽혔다 (#441 F7).
+    pending:
+      "봇 체결로 만들어진 포지션이 쌓이는 자리입니다 — 봇 실행 엔진에서 옵니다. 직접 등록한 보유종목은 시세 패널의 「보유」에서 봅니다.",
   },
   { id: "settings", label: "설정", icon: "preferences", kind: "route", path: SETTINGS_PATH, footer: true },
 ] as const;
