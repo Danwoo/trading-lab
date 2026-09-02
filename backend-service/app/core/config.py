@@ -177,9 +177,10 @@ class Settings(BaseSettings):
             )
 
         # 개발 — 막지는 않되 조용히 넘어가지 않는다.
+        # 어디를 어떻게 고치라고 말하지 않는다 — 무엇이 없는지까지다
+        # (`scripts/verify_no_env_edit_guidance.py`, #317). 변수 이름이 이미 자리를 가리킨다.
         logging.getLogger("uvicorn.error").warning(
-            "자리표시자 자격증명이 남아 있습니다: %s — 파일(SFTP) 기능은 실패합니다. "
-            "backend-service/app/.env.development 를 채우세요.",
+            "자리표시자 자격증명이 남아 있습니다: %s — 실제 값이 들어오기 전까지 파일(SFTP) 기능은 실패합니다.",
             joined,
         )
         return self

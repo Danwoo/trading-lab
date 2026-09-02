@@ -16,11 +16,45 @@ Cycle 7 발굴(B-6·F27)이 실측한 것: 업로드 503 본문이
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND / "app"))
+
+
+def _seed_env_from_example() -> int:
+    """`app/.env.example` 로 필수 환경변수를 채운다 — **import 전에** 불러야 한다.
+
+    `core.config` 는 모듈을 읽는 순간 `settings = Settings()` 를 만들고, 그 값은 cwd 의
+    `.env.{APP_ENV}` 에서 온다. 그 파일은 gitignore 라 **워크트리·CI 에는 없다** — 그대로 두면
+    이 테스트는 자기 대상에 닿기도 전에 ValidationError 로 죽는다(실측: CI 에서만 빨갛고
+    로컬에서만 초록이었다). 레포에 있는 `.env.example` 을 쓰면 어디서 돌든 같은 값이다.
+
+    이미 있는 환경변수는 덮지 않는다 — 실제 설정으로 도는 자리를 이 파일이 흔들지 않게.
+    """
+    # 개발 모드로 읽는다 — production 에서는 `.env.example` 의 CHANGE_ME 가 기동을 막으므로
+    # (이 PR 이 세운 규칙 그대로) import 자체가 실패한다. production 경로는 아래에서
+    # `Settings(...)` 를 직접 만들어 확인한다.
+    os.environ.setdefault("APP_ENV", "development")
+    example = BACKEND / "app/.env.example"
+    assert example.is_file(), f"{example} 가 없다 — 이 테스트의 전제가 사라졌다"
+    seeded = 0
+    for line in example.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if key and key not in os.environ:
+            os.environ[key] = value.strip().strip('"').strip("'")
+            seeded += 1
+    assert seeded > 0, ".env.example 에서 채운 키가 0건이다 — 형식이 바뀌었다면 이 그물을 고쳐라"
+    return seeded
+
+
+_SEEDED = _seed_env_from_example()
 
 from clients.file.sftp_client import SftpClient  # noqa: E402
 from core.exceptions import ServiceUnavailableError  # noqa: E402
