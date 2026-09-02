@@ -566,7 +566,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: npm
+          # **self-hosted 에서는 npm 캐시를 끈다.** GitHub-hosted 는 잡마다 새 VM 이라 이 캐시가
+          # 값을 하지만, 이 레포의 self-hosted 러너는 비ephemeral 이라 `~/.npm` 이 기계에 그대로
+          # 남는다(실측 5.8GB) — 캐시가 주는 이득이 거의 0이다.
+          #
+          # 반면 **캐시 미스(락파일 변경·캐시 부재)일 때의 저장 비용은 크다**. 실측 두 판:
+          #   · 미스 — `Post Setup Node` **1,135초**, 그 잡 전체 1,491초의 **76%**
+          #   · 히트 — 무시할 수준 (같은 잡 합계 196초, 상위 6스텝에 들지도 않는다)
+          # 즉 매 잡이 아니라 **락파일이 바뀔 때마다** 19분을 문다. dependabot PR 과 프론트
+          # 의존 변경이 그 자리다. 이득 0 · 최악 19분이라 끄는 쪽이 맞다.
+          #
+          # 식이 `vars.CI_RUNNER && '' || 'npm'` 이 아닌 이유: 참 갈래의 값이 빈 문자열이면
+          # falsy 라 `||` 로 새어 `'npm'` 이 된다. 참 갈래에 비지 않은 값을 둔다.
+          cache: ${{ vars.CI_RUNNER == '' && 'npm' || '' }}
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
