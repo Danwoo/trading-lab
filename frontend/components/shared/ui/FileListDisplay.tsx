@@ -9,6 +9,7 @@ import { selectFileDownloadUrl, selectFilePreviewUrl } from "@/services/common/f
 import { useFileGroups } from "@/hooks/shared/useFileGroups";
 import { formatFileSize } from "@/utils/common/fileUtils";
 import { showToast } from "@/components/shared/Feedback";
+import { getApiErrorMessage } from "@/utils/common/errors";
 import { FileTypeIcon } from "@/components/shared/ui/primitives/FileTypeIcon";
 import { Icon } from "@/components/shared/ui/primitives/icons";
 
@@ -127,7 +128,11 @@ export const FileListDisplay: React.FC<Props> = ({ atchFileId, compact = false, 
       const url = await selectFileDownloadUrl(atchFileId!, file.file_sn);
       window.open(url, "_blank");
     } catch (error) {
+      // 바로 아래 `handleDownloadAll` 은 같은 실패에 토스트를 띄운다. 한 파일이면 조용하고
+      // 여러 파일이면 말하는 것은 정책이 아니라 누락이었다 — 사용자에게는 아무 일도
+      // 안 일어난 것처럼 보였다 (#440·B-8). 형제 함수와 같은 층으로 올린다.
       console.error("파일 다운로드 실패:", error);
+      showToast(getApiErrorMessage(error), "error");
     }
   };
 

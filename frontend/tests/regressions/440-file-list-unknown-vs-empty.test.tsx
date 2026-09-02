@@ -18,13 +18,22 @@ vi.mock("@/env", () => ({ env: { APP_KEY: "fstpl", NODE_ENV: "development" } }))
 
 const useFileGroups = vi.fn();
 vi.mock("@/hooks/shared/useFileGroups", () => ({ useFileGroups }));
-vi.mock("@/utils/common/ui/toast", () => ({ showToast: vi.fn() }));
+const showToast = vi.fn();
+vi.mock("@/components/shared/Feedback", () => ({ showToast }));
+
+const selectFileDownloadUrl = vi.fn();
+vi.mock("@/services/common/fileService", () => ({
+  selectFileDownloadUrl,
+  selectFilePreviewUrl: vi.fn(),
+}));
 
 const { FileListDisplay } = await import("@/components/shared/ui/FileListDisplay");
 
 afterEach(() => {
   cleanup();
   useFileGroups.mockReset();
+  showToast.mockReset();
+  selectFileDownloadUrl.mockReset();
 });
 
 describe("파일 목록이 「없다」와 「못 읽었다」를 가른다 (#440)", () => {
@@ -45,5 +54,26 @@ describe("파일 목록이 「없다」와 「못 읽었다」를 가른다 (#44
     render(<FileListDisplay atchFileId="C7B000" />);
 
     expect(screen.getByText(/첨부된 파일이 없습니다/)).toBeTruthy();
+  });
+});
+
+describe("단일 다운로드 실패도 화면에 남는다 (#440·B-8)", () => {
+  it("한 파일 다운로드가 실패하면 토스트가 뜬다 — 형제 함수와 같은 정책", async () => {
+    useFileGroups.mockReturnValue({
+      files: {
+        files: [{ file_sn: 1, orignl_file_nm: "보고서.pdf", file_ty: "DOC", file_extsn: ".pdf", file_size: 100 }],
+        isLoading: false,
+        error: false,
+      },
+    });
+    selectFileDownloadUrl.mockRejectedValue(new Error("boom"));
+
+    render(<FileListDisplay atchFileId="C7B000" />);
+    const button = screen.getAllByRole("button").find((b) => /다운로드/.test(b.textContent ?? ""));
+    expect(button).toBeTruthy();
+    button!.click();
+
+    await vi.waitFor(() => expect(showToast).toHaveBeenCalled());
+    expect(showToast.mock.calls[0]?.[1]).toBe("error");
   });
 });
