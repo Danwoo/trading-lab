@@ -639,14 +639,365 @@ ARM_CASES = [
         {"commit_author_emails": ["claude-agent@noreply.local"]},
         {"arm": True, "self_vendor": False},
     ),
+    # ── 저자 신원 미상 = arm 거부 (리드 결정 2026-08-28, 브랜치 규약 전환) ──────────
+    # 종전에는 이 입력이 `arm: True` 였다. 에이전트형이 아닌 이메일뿐이면 `review_route` 가
+    # `human` 을 내고, 자기리뷰 축(`self_vendor`)에 해당 없음으로 통과했기 때문이다.
+    # 브랜치명이 벤더를 싣던 동안에는 그 폴백이 남아 있었지만 새 규약에는 없다 —
+    # 즉 **신원 설정을 빠뜨린 에이전트 PR 이 사람으로 읽혀 자기리뷰 arm 까지 갔다.**
     (
-        "사람 저자(에이전트형이 아닌 이메일) → 자기리뷰 축 미해당, risk: low 면 arm",
+        "저자 신원 미상(에이전트형이 아닌 이메일 + 새 형식 브랜치) → arm 거부  (fail-closed)",
         {
             "marker_model": "claude",
             "commit_author_emails": ["dev@example.test"],
-            "head_ref": "feature/x",
+            "head_ref": "feature/359-timestamptz-audit-columns",
         },
-        {"arm": True, "self_vendor": False, "identity_source": "none"},
+        {
+            "arm": False,
+            "self_vendor": False,
+            "author_kind": "unknown",
+            "identity_source": "none",
+        },
+    ),
+    (
+        "저자 신원 미상 + risk: low 여도 arm 거부 — 위험도가 낮다고 신원이 생기지 않는다",
+        {
+            "marker_model": "kimi",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "chore/ci-npm-cache",
+            "issue_refs": [{"number": 23, "labels": ["risk: low"]}],
+        },
+        {"arm": False, "risk": "low", "author_kind": "unknown"},
+    ),
+    (
+        # 봇 면제가 없으면 dependabot 자동 머지가 통째로 멎는다 — 봇 신원은 GitHub 이 보증한다
+        # (`pr_authorship` 의 R1·R2 면제와 같은 근거). 위 두 케이스와 **같은 신원 모양**인데
+        # `pr_author_is_bot` 하나로 갈린다는 것이 이 케이스의 요점이다.
+        "봇 PR 은 신원 미상이어도 arm — 면제는 봇 플래그 하나로만 열린다",
+        {
+            "marker_model": "claude",
+            "pr_author_is_bot": True,
+            "pr_author_login": "dependabot[bot]",
+            "pr_title": "build(deps): bump pyjwt from 2.12.1 to 2.13.0 in /template-mcp-service",
+            "issue_refs": [],
+            "commit_author_emails": ["49699333+dependabot[bot]@users.noreply.github.com"],
+            "head_ref": "dependabot/uv/template-mcp-service/pyjwt-2.13.0",
+        },
+        {"arm": True, "author_kind": "unknown", "bot_bump": "non-major"},
+    ),
+    (
+        # 옛 형식은 전환기 동안 계속 읽힌다 — 브랜치명이 벤더를 실으면 미상이 아니다.
+        # 그리고 그 값은 **자기리뷰 차단으로 이어진다** (공격 ⑨ 케이스와 같은 계약).
+        "옛 형식 브랜치 + 신원 없음 → 미상이 아니라 branch-name 판별 (전환기)",
+        {
+            "marker_model": "kimi",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "fix-42-claude",
+        },
+        {"arm": True, "author_kind": "agent", "identity_source": "branch-name", "self_vendor": False},
+    ),
+    # ── `author: human` 라벨 — 저자 미상 차단의 유일한 탈출구 (리드 결정 2026-08-28) ──
+    # 라벨은 **게이트를 여는 표면**이라 존재만으로 열지 않는다: 마지막으로 붙인 액터가
+    # 사람이고 쓰기 권한이 있어야 한다. 아래는 그 계약의 양성·음성 양쪽이다.
+    (
+        "㉮ 라벨 없음 → 종전대로 arm 거부",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": [],
+        },
+        {"arm": False, "author_kind": "unknown"},
+    ),
+    (
+        "㉯ 쓰기 권한자가 붙인 라벨 → arm 허용 (미상이어도)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                }
+            ],
+            "actor_permissions": {"Danwoo": "admin"},
+        },
+        {"arm": True, "author_kind": "unknown"},
+    ),
+    (
+        "㉰ **봇이 붙인 라벨 → 거부** — 자동화가 자기 차단을 스스로 열지 못한다",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "github-actions[bot]",
+                    "actor_type": "Bot",
+                    "created_at": "2026-08-28T10:00:00Z",
+                }
+            ],
+            "actor_permissions": {"github-actions[bot]": "write"},
+        },
+        {"arm": False, "author_kind": "unknown"},
+    ),
+    (
+        "㉱ 라벨 + 판정이 merge_ok 아님 → 거부 (라벨은 저자 미상 차단만 연다)",
+        {
+            "verdict": "needs_changes",
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                }
+            ],
+            "actor_permissions": {"Danwoo": "admin"},
+        },
+        {"arm": False},
+    ),
+    (
+        "㉲ 읽기 권한만 있는 계정이 붙인 라벨 → 거부",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "passerby",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                }
+            ],
+            "actor_permissions": {"passerby": "read"},
+        },
+        {"arm": False},
+    ),
+    (
+        "㉳ 라벨은 붙어 있는데 부착 이력을 못 읽었다 → 거부 (fail-closed)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+        },
+        {"arm": False},
+    ),
+    (
+        "㉴ 라벨은 붙어 있는데 부착 이벤트가 0건 → 거부 (fail-closed)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [],
+            "actor_permissions": {},
+        },
+        {"arm": False},
+    ),
+    (
+        "㉵ 봇이 붙인 뒤 사람이 다시 붙였다 → 마지막 부착이 이긴다 (허용)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "github-actions[bot]",
+                    "actor_type": "Bot",
+                    "created_at": "2026-08-28T09:00:00Z",
+                },
+                {
+                    "event": "unlabeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T09:30:00Z",
+                },
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+            ],
+            "actor_permissions": {"Danwoo": "admin", "github-actions[bot]": "write"},
+        },
+        {"arm": True},
+    ),
+    (
+        # 배열 순서가 뒤집혀 와도 판정이 같아야 한다 — 순서는 `created_at` 이 정한다
+        "㉶ 사람이 붙인 뒤 봇이 다시 붙였다 → 마지막이 봇이라 거부 (입력 순서 무관)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "github-actions[bot]",
+                    "actor_type": "Bot",
+                    "created_at": "2026-08-28T11:00:00Z",
+                },
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+            ],
+            "actor_permissions": {"Danwoo": "admin", "github-actions[bot]": "write"},
+        },
+        {"arm": False},
+    ),
+    # ㉶-a·㉶-b — `created_at` 은 초 단위라 **동률이 난다**. 그때 마지막 하나를 고르면 같은
+    # 사실이 조회 순서에 따라 다르게 판정된다 (실측: 순서만 뒤집자 거부가 허용으로 뒤집혔다).
+    # 동률은 전부 통과해야 열리므로 아래 두 케이스는 **입력 순서와 무관하게 둘 다 거부**다.
+    (
+        "㉶-a 봇·사람이 같은 시각에 붙었다 [봇, 사람] → 거부",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "github-actions[bot]",
+                    "actor_type": "Bot",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+            ],
+            "actor_permissions": {"Danwoo": "admin", "github-actions[bot]": "write"},
+        },
+        {"arm": False},
+    ),
+    (
+        "㉶-b 같은 사실을 순서만 뒤집어 넣는다 [사람, 봇] → 여전히 거부",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "github-actions[bot]",
+                    "actor_type": "Bot",
+                    "created_at": "2026-08-28T10:00:00Z",
+                },
+            ],
+            "actor_permissions": {"Danwoo": "admin", "github-actions[bot]": "write"},
+        },
+        {"arm": False},
+    ),
+    (
+        "㉷ 다른 라벨의 부착 이벤트는 이 문을 열지 못한다",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["dev@example.test"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "human: merge",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                }
+            ],
+            "actor_permissions": {"Danwoo": "admin"},
+        },
+        {"arm": False},
+    ),
+    (
+        "㉸ 신원이 **있는** PR 에는 라벨이 아무 영향을 안 준다 — 자기리뷰 차단은 그대로",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["claude-agent@noreply.local"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+            "pr_labels": ["author: human"],
+            "human_label_events": [
+                {
+                    "event": "labeled",
+                    "label": "author: human",
+                    "actor_login": "Danwoo",
+                    "actor_type": "User",
+                    "created_at": "2026-08-28T10:00:00Z",
+                }
+            ],
+            "actor_permissions": {"Danwoo": "admin"},
+        },
+        {"arm": False, "self_vendor": True, "author_kind": "agent"},
+    ),
+    (
+        "새 형식 + claude 신원 + claude 리뷰 → 자기리뷰 차단은 그대로 선다  (티어 미상)",
+        {
+            "marker_model": "claude",
+            "commit_author_emails": ["claude-agent@noreply.local"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+        },
+        {"arm": False, "self_vendor": True, "author_kind": "agent", "author_tier": None},
+    ),
+    (
+        "새 형식 + claude/opus 저자 + claude/opus 리뷰 → 동일-티어 자기리뷰 차단",
+        {
+            "marker_model": "claude",
+            "marker_tier": "opus",
+            "commit_author_emails": ["claude-opus-agent@noreply.local"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+        },
+        {"arm": False, "self_vendor": True, "author_tier": "opus", "reviewer_tier": "opus"},
+    ),
+    (
+        "새 형식 + claude/opus 저자 + claude/sonnet 리뷰 → 티어가 갈리면 arm",
+        {
+            "marker_model": "claude",
+            "marker_tier": "sonnet",
+            "commit_author_emails": ["claude-opus-agent@noreply.local"],
+            "head_ref": "feature/359-timestamptz-audit-columns",
+        },
+        {"arm": True, "self_vendor": True, "author_tier": "opus", "reviewer_tier": "sonnet"},
     ),
     (
         "어휘 밖 티어 신원(claude-opus5-agent@) → 사람 저자로 접지 않고 arm 거부  (공격 ⑨)",

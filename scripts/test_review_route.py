@@ -1,9 +1,16 @@
 """review_route.decide 회귀 그물 — 종전 cross-review.yml 의 bash decide() 와 동작 동일.
 
-배정이 뒤집히기 쉬운 세 자리를 케이스로 못박는다:
+배정이 뒤집히기 쉬운 네 자리를 케이스로 못박는다:
   ① 고위험 codex 는 **claude 저자**일 때다 (kimi 저자가 아니다)
   ② 벤더 혼재 + codex 불가 → reviewer=none (후보 소진)
-  ③ 커밋 신원이 없어도 브랜치명(fix-N-<model>)으로 저자를 판별한다
+  ③ 커밋 신원이 없어도 **옛 형식** 브랜치명(fix-N-<model>)으로 저자를 판별한다 (전환기 잔존)
+  ④ **아무 신호도 없으면 `unknown`** — `human` 으로 접히지 않는다 (리드 결정 2026-08-28).
+     이 한 글자가 `review_record` 의 arm 판정을 뒤집는다: `human` 이면 자기리뷰 축에
+     해당 없음으로 통과하고, `unknown` 이면 fail-closed 로 막힌다.
+
+새 브랜치 규약(`feature/<이슈>-<설명>` · `chore/<설명>` · `docs/<주제>`)에는 벤더 신호가
+없다 — 그 네 갈래(옛 형식 · 새 형식 · 신원만 · 아무 신호 없음)를 아래 「브랜치 규약 전환」
+묶음이 전부 판다.
 """
 
 import sys
@@ -18,6 +25,13 @@ K = "kimi-agent@noreply.local"
 X = "codex-agent@noreply.local"
 HUMAN = "danwoo@example.com"
 BOT = "49699333+dependabot[bot]@users.noreply.github.com"
+
+# 「아무 신호 없음」의 주의 문구 — 이 문장이 판정 코멘트에 실려 사람에게 무슨 일인지 말한다.
+UNKNOWN_NOTE = (
+    "저자 신원 미상 — 커밋에 에이전트 신원이 없고 브랜치도 벤더를 선언하지 않는다. "
+    "사람일 수도, `git config --worktree user.email` 을 빠뜨린 에이전트일 수도 있어 "
+    "**둘을 가를 방법이 없다** — 판정 라벨 미부착 · 자동 머지 arm 거부(사람이 머지한다)"
+)
 
 CASES = [
     # (설명, emails, head_ref, issue_risks, codex_on, 기대 dict 부분집합)
@@ -107,28 +121,28 @@ CASES = [
         },
     ),
     (
-        "신원 없음 + 브랜치명 없음 → human/claude",
+        "신원 없음 + 브랜치명 없음 → unknown/claude  (④ 리뷰는 하되 저자는 미상)",
         [HUMAN],
         "some-branch",
         ["low"],
         False,
         {
             "reviewer": "claude",
-            "author_kind": "human",
+            "author_kind": "unknown",
             "author_models": "",
             "label_allowed": False,
-            "identity_note": "에이전트 신원 없음 — 사람 저자 취급, 판정 라벨 미부착(사람 경로)",
+            "identity_note": UNKNOWN_NOTE,
         },
     ),
     (
-        "봇 저자 → human 취급",
+        "봇 저자 → unknown 취급 (봇 면제는 arm 판정 쪽에 있다 — review_record)",
         [BOT],
         "",
         ["low"],
         False,
         {
             "reviewer": "claude",
-            "author_kind": "human",
+            "author_kind": "unknown",
             "author_models": "",
             "label_allowed": False,
         },
@@ -182,7 +196,7 @@ CASES = [
         "",
         ["low"],
         False,
-        {"author_kind": "human", "label_allowed": False},
+        {"author_kind": "unknown", "label_allowed": False},
     ),
     (
         "커밋 신원과 브랜치명 불일치 → 커밋 신원 우선",
@@ -198,7 +212,7 @@ CASES = [
         "",
         ["low"],
         False,
-        {"author_kind": "human", "author_models": "", "label_allowed": False},
+        {"author_kind": "unknown", "author_models": "", "label_allowed": False},
     ),
     (
         "브랜치명과 커밋 신원 불일치 → 주의 문구를 남긴다",
@@ -258,6 +272,94 @@ CASES = [
         "",
         True,
         {"reviewer": "claude"},
+    ),
+    # ── 브랜치 규약 전환 `fix-<이슈>-<벤더>` → `feature/<이슈>-<설명>` (2026-08-27/28) ──
+    # 네 갈래를 전부 판다. ③ 과 ④ 를 가르는 것이 이 전환의 전부다 — 옛 이름은 벤더를
+    # 실어 날랐고 새 이름은 안 싣는다. 새 이름에서 신원까지 없으면 **모르는 것**이다.
+    (
+        "전환 ㉠ 옛 형식 + 신원 없음 → 브랜치명으로 판별 (전환기 동안 유지)",
+        [HUMAN],
+        "fix-42-claude",
+        ["low"],
+        False,
+        {
+            "author_kind": "agent",
+            "author_vendor": "claude",
+            "identity_source": "branch-name",
+            "label_allowed": False,
+        },
+    ),
+    (
+        "전환 ㉡ 새 형식 + 신원 있음 → 커밋 신원으로 판별 (정상 경로, 변화 없음)",
+        [C],
+        "feature/359-timestamptz-audit-columns",
+        ["low"],
+        False,
+        {
+            "author_kind": "agent",
+            "author_vendor": "claude",
+            "author_tier": "opus",
+            "identity_source": "commit-email",
+            "reviewer": "kimi",
+            "label_allowed": True,
+        },
+    ),
+    (
+        "전환 ㉢ 브랜치명 없음 + 신원만 있음 → 커밋 신원으로 판별",
+        [K],
+        "",
+        ["low"],
+        False,
+        {
+            "author_kind": "agent",
+            "author_vendor": "kimi",
+            "identity_source": "commit-email",
+            "reviewer": "claude",
+            "label_allowed": True,
+        },
+    ),
+    (
+        "전환 ㉣ 새 형식 + 신원 없음 → **unknown** (human 으로 안 떨어진다 — 이 전환의 핵심)",
+        [HUMAN],
+        "feature/359-timestamptz-audit-columns",
+        ["low"],
+        False,
+        {
+            "author_kind": "unknown",
+            "author_vendor": None,
+            "author_models": "",
+            "identity_source": "none",
+            "reviewer": "claude",
+            "label_allowed": False,
+            "identity_note": UNKNOWN_NOTE,
+        },
+    ),
+    (
+        "전환 ㉤ chore/ 도 벤더를 선언하지 않는다 → unknown",
+        [HUMAN],
+        "chore/ci-npm-cache",
+        ["low"],
+        False,
+        {"author_kind": "unknown", "identity_source": "none"},
+    ),
+    (
+        "전환 ㉥ docs/ 도 벤더를 선언하지 않는다 → unknown",
+        [HUMAN],
+        "docs/decision-log-0827",
+        ["low"],
+        False,
+        {"author_kind": "unknown", "identity_source": "none"},
+    ),
+    (
+        # 옛 `pr_authorship._BRANCH_DECLARES` 는 **끝의 `-<벤더>`** 를 부분 검색했으므로 이
+        # 이름을 claude 선언으로 읽었다. `review_route._BRANCH` 는 줄 전체 앵커라 안 읽는다 —
+        # 그 차이가 새 규약에서 오탐이 되는 자리이므로 반례로 못박는다.
+        "전환 ㉦ 설명이 우연히 벤더 이름으로 끝나도 선언이 아니다 → unknown",
+        [HUMAN],
+        "feature/42-refactor-claude",
+        ["low"],
+        False,
+        {"author_kind": "unknown", "author_vendor": None, "identity_source": "none"},
     ),
 ]
 

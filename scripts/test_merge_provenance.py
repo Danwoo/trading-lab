@@ -42,7 +42,7 @@ LINE_CASES = [
         "에이전트 저자(티어 있음) + claude(sonnet) 리뷰 + 자동 머지",
         {
             "commits": [commit(AGENT_OPUS)],
-            "head_ref": "Danwoo/x",
+            "head_ref": "feature/23-provenance-line",
             "reviewer_model": "claude",
             "reviewer_tier": "sonnet",
             "merged_by": "auto",
@@ -94,23 +94,24 @@ LINE_CASES = [
         "작성: claude(opus) · 리뷰: claude(sonnet) · 머지: 미상",
     ),
     (
-        "사람 저자",
+        "에이전트 신원 없는 커밋 → 「사람」이 아니라 「미상(신원 없음)」 — 신원 설정을 "
+        "빠뜨린 에이전트와 가를 수 없다 (2026-08-28)",
         {
             "commits": [commit(LEAD)],
             "reviewer_model": "claude",
             "reviewer_tier": "opus",
             "merged_by": "human",
         },
-        "작성: 사람 · 리뷰: claude(opus) · 머지: 사람",
+        "작성: 미상(신원 없음) · 리뷰: claude(opus) · 머지: 사람",
     ),
     (
-        "에이전트 + 사람 혼재",
+        "에이전트 + 신원 없는 커밋 혼재 — 아는 쪽은 적고 모르는 쪽은 모른다고 적는다",
         {
             "commits": [commit(AGENT_OPUS), commit(LEAD)],
             "reviewer_model": "kimi",
             "merged_by": "auto",
         },
-        "작성: claude(opus) + 사람 · 리뷰: kimi · 머지: 자동",
+        "작성: claude(opus) + 미상(신원 없음) · 리뷰: kimi · 머지: 자동",
     ),
     (
         "claude 티어 혼재 → 티어 미상 (한쪽으로 정하지 않는다)",
@@ -201,7 +202,7 @@ def main() -> int:
     for fx in fixtures:
         payload = {
             "commits": fx["commits"],
-            "head_ref": "Danwoo/x",
+            "head_ref": "feature/23-provenance-line",
             "reviewer_model": "claude",
             "reviewer_tier": "sonnet",
             "merged_by": "auto",
