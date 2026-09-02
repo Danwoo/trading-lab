@@ -76,6 +76,15 @@ export function DataTableHeader<T>({
             const column = columns.find((col) => col.field === header.column.id);
             const align = column?.align ?? "left";
             const sorted = header.column.getIsSorted();
+            // 정렬 상태를 읽어 주는 쪽에도 알린다 — 눈으로 보는 사람은 ▲▼ 로 아는데 스크린리더에는
+            // 그 신호가 없었다 (#443). 정렬 불가 열에는 속성을 아예 붙이지 않는다.
+            const ariaSort = !header.column.getCanSort()
+              ? undefined
+              : sorted === "asc"
+                ? "ascending"
+                : sorted === "desc"
+                  ? "descending"
+                  : "none";
             const layout = columnLayout[header.column.id];
             const sticky = layout?.sticky;
             const minWidth = column?.minWidth ?? DEFAULT_MIN_COLUMN_WIDTH;
@@ -85,6 +94,7 @@ export function DataTableHeader<T>({
               <th
                 key={header.id}
                 scope="col"
+                aria-sort={ariaSort}
                 className={`relative border-b px-2 py-1.5 font-medium text-gray-700 ${ALIGN_CLASS[align]} ${
                   sticky ? `bg-gray-50 ${sticky.isBoundary ? STICKY_SHADOW_CLASS[sticky.position] : ""}` : ""
                 }`}
