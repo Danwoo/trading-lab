@@ -973,6 +973,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_ci_path_filter.py
 
+      # main 착륙 감사의 판정부 (#420 P2). 이 잡이 지키는 것은 **감사가 조용히 초록이 되지
+      # 않는 것**이다 — private 전환 뒤 main 을 지키는 층이 예방에서 발각으로 옮겨가므로,
+      # 발각이 fail-open 이면 남는 것이 아무것도 없다. 합성 증거로 양성·음성·fail-closed 를 본다.
+      - name: main 착륙 감사 판정부 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_audit_main_landing.py
+
       # 머지 게이트 판정 (#23 Task 5) — 통과 집합(success·skipped)과 상류 0건 실패.
       # 게이트는 초록일 때 아무 일도 안 하는 검사라 죽어도 티가 안 난다.
       # 케이스를 0건 모으면 실패한다.
@@ -1413,3 +1420,47 @@ jobs:
               || echo "::warning::실패 코멘트 게시도 실패"
           fi
           exit 0
+
+  # ── main 착륙 사후 감사 (#420 P2) ──────────────────────────────────────
+  # **왜 있나** — 이 계정은 GitHub Free 라 private 으로 돌리는 순간 `main protection` ruleset 이
+  # 통째로 사라진다(PR 필수·승인 1건·게이트 3종). 리드 결정은 결제하지 않는다(2026-08-29)이므로
+  # 예방의 일부를 **발각**으로 옮긴다. 이 레포의 적대자는 침입자가 아니라 **실수**다 —
+  # 실수는 조용히 지나가면 굳고, 시끄럽게 잡히면 즉시 되돌려진다.
+  #
+  # **비게이트다.** 이미 착륙한 커밋을 막을 수는 없다. 이 잡이 하는 일은 「지나갔다」를 빨갛게
+  # 남겨 사람이 보게 하는 것이고, 그것이 이 층의 전부다.
+  #
+  # 판정부는 `scripts/audit_main_landing.py` 의 순수 함수이고 합성 증거로 전수 검증된다
+  # (`scripts/test_audit_main_landing.py` — 양성·음성·fail-closed 17건). 여기서는 조회만 한다.
+  main-landing-audit:
+    name: "audit: main 착륙 (비게이트)"
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 이 push 가 옮긴 커밋을 감사한다 (fail-closed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          # 새 브랜치·강제 push 로 before 가 0 이면 이 push 의 head 하나만 본다 —
+          # 「범위를 못 읽었다」를 빈 목록으로 뭉개면 조용히 초록이 된다.
+          if [ -z "${BEFORE}" ] || [ "${BEFORE}" = "0000000000000000000000000000000000000000" ]; then
+            COMMITS="$AFTER"
+          else
+            COMMITS=$(git rev-list "${BEFORE}..${AFTER}" 2>/dev/null) || COMMITS=""
+            [ -z "$COMMITS" ] && COMMITS="$AFTER"
+          fi
+          echo "감사 대상: $(echo "$COMMITS" | wc -l)건"
+          # shellcheck disable=SC2086
+          python3 scripts/audit_main_landing.py --repo "$REPO" --commits $COMMITS
