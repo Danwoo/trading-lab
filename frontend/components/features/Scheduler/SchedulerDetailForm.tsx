@@ -28,8 +28,10 @@ interface Props {
   periodItems?: { code: number; code_nm: string }[];
 }
 
-// 후보 목록의 식별자는 계좌 식별자다 — 등록 API 의 git_id 는 tn_scheduler_member.account_id 로
-// 들어가고, backend 가 그 값을 portfolio-mcp 소유 계좌 목록과 대조한다 (#115).
+// 후보 목록의 식별자는 계좌 식별자다 — 등록·조회·삭제 모두 `account_id` 다
+// (`SchedulerMemberIn`·`SchedulerMemberOut`). backend 가 그 값을 portfolio-mcp 소유 계좌
+// 목록과 대조한다 (#115). 종전에는 프론트만 `git_id` 라 불러 **추가·조회·삭제가 전부**
+// 어긋나 있었다 (#439 F21).
 interface UserOption {
   account_id: string;
   name: string;
@@ -43,7 +45,7 @@ const userColumns: LegacyGridColumn[] = [
 ];
 
 const memberColumns: LegacyGridColumn[] = [
-  { dataField: "git_id", caption: "계좌주 ID" },
+  { dataField: "account_id", caption: "계좌주 ID" },
   { dataField: "name", caption: "이름" },
   { dataField: "email", caption: "이메일" },
 ];
@@ -94,18 +96,24 @@ export default function SchedulerDetailForm({
       showToast("추가할 멤버를 선택해주세요.", "warning");
       return;
     }
-    const newIds = selectedUserIds.filter((id) => !members.map((m) => m.git_id).includes(id));
+    const newIds = selectedUserIds.filter((id) => !members.map((m) => m.account_id).includes(id));
     if (newIds.length === 0) {
       showToast("이미 추가된 멤버입니다.", "warning");
       return;
     }
     for (const accountId of newIds) {
       const user = holders.find((u) => u.account_id === accountId);
+      // 이메일은 백엔드가 **필수**로 받는다 — 없는 채로 보내면 422 다. 보낼 곳이 없는 사람을
+      // 조용히 건너뛰지 않고 그 사실을 말한다(이 자리가 하는 일이 「메일 받을 사람 추가」다).
+      if (!user?.email) {
+        showMessage("알림", <div>{`${accountId} 는 이메일이 없어 추가할 수 없습니다.`}</div>);
+        continue;
+      }
       try {
         await addSchedulerMember(formData.scheduler_id!, {
-          git_id: accountId,
-          email: user?.email,
-          name: user?.name,
+          account_id: accountId,
+          email: user.email,
+          name: user.name,
         });
       } catch (error) {
         showToast(getApiErrorMessage(error), "error");
@@ -120,9 +128,9 @@ export default function SchedulerDetailForm({
       showToast("제거할 멤버를 선택해주세요.", "warning");
       return;
     }
-    for (const git_id of selectedMemberIds) {
+    for (const account_id of selectedMemberIds) {
       try {
-        await removeSchedulerMember(formData.scheduler_id!, git_id);
+        await removeSchedulerMember(formData.scheduler_id!, account_id);
       } catch (error) {
         showMessage("오류", <div>{getApiErrorMessage(error)}</div>);
         break;
@@ -246,12 +254,12 @@ export default function SchedulerDetailForm({
                 title="참여 멤버 관리"
                 leftTitle="전체 계좌"
                 rightTitle="참여 멤버"
-                leftData={allUsers.filter((u) => !members.some((m) => m.git_id === u.account_id))}
+                leftData={allUsers.filter((u) => !members.some((m) => m.account_id === u.account_id))}
                 rightData={members}
                 leftColumns={userColumns}
                 rightColumns={memberColumns}
                 leftKeyExpr="account_id"
-                rightKeyExpr="git_id"
+                rightKeyExpr="account_id"
                 loading={loading}
                 fillHeight
                 onAdd={handleAddMember}

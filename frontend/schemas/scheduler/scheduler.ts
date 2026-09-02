@@ -24,10 +24,12 @@ export interface SchedulersOut {
   total_count: number;
 }
 
+// 정본은 백엔드 `SchedulerMemberOut` 이다 — `account_id`·`email` 은 응답에 항상 있다.
+// 종전에는 `git_id` 라 불러 **화면이 읽는 값이 늘 undefined** 였다 (#439 F21).
 export interface SchedulerMember {
   scheduler_id: string;
-  git_id: string;
-  email?: string;
+  account_id: string;
+  email: string;
   name?: string;
 }
 export interface SchedulerMembersOut {
