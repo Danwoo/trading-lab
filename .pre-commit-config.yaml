@@ -1,3 +1,11 @@
+# `pre-commit install` 이 걸 훅 종류. pre-push 를 빼면 main 직접 push 방어(#420 P1)가
+# 파일로만 존재하고 실제로는 안 돈다 — 이미 설치한 클론은 `pre-commit install` 을 다시 돌린다.
+default_install_hook_types: [pre-commit, pre-push]
+# 훅의 기본 스테이지는 **커밋뿐**이다. 이걸 안 적으면 pre-commit 3.x 기본값(모든 스테이지)이
+# 걸려, push 할 때마다 eslint·tsc·vitest 가 통째로 한 번 더 돈다 (실측). push 에서 도는 것은
+# `stages: [pre-push]` 를 스스로 적은 훅뿐이어야 한다.
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -23,6 +31,17 @@ repos:
 
   - repo: local
     hooks:
+      # main 으로의 직접 push 를 막는다 (#420 P1). `no-commit-to-branch` 는 main **위 커밋**만
+      # 막아서 `git push HEAD:main` 이 그대로 지나갔다. private 전환 뒤에는 서버 ruleset 이
+      # 사라지므로(GitHub Free) 이 층이 그 자리를 일부 받는다. 우회는 `--no-verify` 뿐이다.
+      - id: reject-push-to-main
+        name: main 직접 push 거부
+        language: system
+        entry: python3 scripts/reject_push_to_main.py
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
+
       - id: eslint
         name: eslint
         language: system

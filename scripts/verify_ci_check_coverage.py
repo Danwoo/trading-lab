@@ -131,6 +131,12 @@ PRECOMMIT_PARITY: dict[str, tuple[str, str]] = {
         LOCAL_ONLY,
         "main 직접 커밋 차단은 서버 ruleset `main protection` 이 한다 — CI 는 이미 PR 만 본다.",
     ),
+    "reject-push-to-main": (
+        LOCAL_ONLY,
+        "push 를 막는 일은 미는 쪽에서만 할 수 있다 — CI 는 이미 착륙한 뒤에 돈다. "
+        "이 훅이 놓친 것(`--no-verify`·훅 미설치 클론)은 ci.yml 의 `audit: main 착륙` 잡이 "
+        "사후에 잡는다 — 예방은 로컬, 발각은 CI 다 (#420, `.docs/4-아키텍처/main-보호-위협모델.md`).",
+    ),
     "gitleaks": (
         "detect --no-git --redact --source .",
         "ci.yml `test: repo` 이 훅과 같은 버전으로 트리 전수를 스캔한다.",
