@@ -132,7 +132,7 @@ LLM 은 **내가 원할 때** 옆에서 돕는다 — 전략을 만들어주고,
 
 <!-- 운영 규약(2026-08-19 리드 프롬프트, Cycle 0~10)의 상태 커서. 매 단계 종료 시 갱신 · 세션이 끊겨도 여기서 복구한다. -->
 
-현재: **Cycle 6 완료 (이슈 4건 전부 닫힘)** — 다음은 Cycle 7 발굴(숫자 검산 렌즈) (2026-09-02)
+현재: **Cycle 7 발굴·판정 완료 — 수정 단계 착수** (2026-09-02). 발굴 71건 → 이슈 13건(#433~#443·#445·#446), 리드 결정 4건
 
 **Cycle 5 결과**: 이슈 11건 중 **4건 닫힘**(#397·#398·#399·#407). 남은 7건은 M4/M5 소속이라 굳히기 뒤 차례다.
 
@@ -154,6 +154,7 @@ Cycle 5 의 #397(#410)·#399(#409).
 | 4 | **19건** (#341~#356 · #359~#361) | 닫힘 17건 · 남은 2건(#356 PR 판정 중, #359 결정 C → 마이그레이션 계획 중) |
 | 5 | **25건** (W4 백테스트 16 · W5 4 · S2×W1 3 · 회귀 2) | 이슈 11건 발행(#397~#407) → **닫힘 4**(#397·#398·#399·#407) · 남은 7건은 M4/M5 소속. 통과 확인 17건은 findings 에 별도 기록 |
 | 6 | **9건** (W2 종목·W6 봇 대화·W7 리서치·S4 390px·S1 첫 진입·게스트 403·회귀) | 이슈 **4건**으로 묶어 발행 → **4건 전부 닫힘** — [#422](https://github.com/Danwoo/trading-lab/issues/422) 종목 검색 정렬 · [#423](https://github.com/Danwoo/trading-lab/issues/423) 스트리밍 실패 사유 3건 · [#424](https://github.com/Danwoo/trading-lab/issues/424) 화면 상태 불일치 2건 · [#425](https://github.com/Danwoo/trading-lab/issues/425) 390px 차트. F2 는 #402 에 원인 근거 첨부, F3 는 오독으로 정정. **통과 확인 6건**(게스트 403·operator 첫 진입·390px CLS 0·격자 실주행 25칸·봇 서비스 부재 배너·/admin MDI) |
+| 7 | **71건** (포트폴리오·NAV·호가/종목정보·관심목록·스케줄러 + 파일·리서치문서·설정키·마이페이지·접근성·경계값·동시성) | **[사용자] 19건 · [개발자] 20건** — 리드 지시로 체감 시간(초 단위)과 개발자 렌즈(기능 부재·레거시·코드 패턴)를 오더에 넣은 결과다. 이슈 **13건**: [#433](https://github.com/Danwoo/trading-lab/issues/433) 보안 경계(critical) · [#434](https://github.com/Danwoo/trading-lab/issues/434) 조용한 데이터 변형 · [#435](https://github.com/Danwoo/trading-lab/issues/435) 틀린 처방 · [#436](https://github.com/Danwoo/trading-lab/issues/436) 파일 모듈 · [#437](https://github.com/Danwoo/trading-lab/issues/437) NAV · [#438](https://github.com/Danwoo/trading-lab/issues/438) 체감 시간 · [#439](https://github.com/Danwoo/trading-lab/issues/439) 스케줄러 · [#440](https://github.com/Danwoo/trading-lab/issues/440) 실패가 성공처럼 · [#441](https://github.com/Danwoo/trading-lab/issues/441) 기능 부재 · [#442](https://github.com/Danwoo/trading-lab/issues/442) 템플릿 잔재 · [#443](https://github.com/Danwoo/trading-lab/issues/443) 접근성 · [#445](https://github.com/Danwoo/trading-lab/issues/445) 오해시키는 화면 · [#446](https://github.com/Danwoo/trading-lab/issues/446) 동시성. **리드 결정 4건**은 결정 로그 2026-09-02 |
 
 **Cycle 4 부터 실 DB 로 검증한다.** 도커가 죽어(dockerd 미기동) 세 사이클 내내 「검증 없음」이
 쌓였는데, 유저스페이스 wheel(`pgserver`)로 우회했다 — PostgreSQL 16.2 를 root·도커 없이
