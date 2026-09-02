@@ -47,8 +47,15 @@ class SftpClient:
         try:
             return await retry(_connect, base_delay=0.5, retryable=_is_sftp_retryable)
         except Exception as e:
-            # 연결 실패 시 명확한 메시지로 래핑
-            raise ServiceUnavailableError(f"SFTP 연결 실패: {str(e)}") from e
+            # **원문을 봉투에 싣지 않는다.** asyncssh 의 실패 문구에는 계정명·호스트가 그대로 들어
+            # 있고(`Permission denied for user … on host …`), 그것이 503 본문으로 나가 로그인한
+            # 누구에게나 개발자도구로 보였다 (#433).
+            #
+            # `exception_handler` 는 「한글이 없는 메시지는 기본 문구로 갈아친다」로 라이브러리
+            # 원문을 막는데, 여기서 한글 접두사를 붙이는 순간 그 검사를 통과해 원문이 함께 나갔다.
+            # 사유는 서버 로그에만 남기고, 봉투에는 우리가 쓴 기본 문구만 보낸다.
+            logger.error(f"SFTP 연결 실패: {e}", exc_info=True)
+            raise ServiceUnavailableError() from e
 
     async def close_client(self, conn, sftp):
         """
