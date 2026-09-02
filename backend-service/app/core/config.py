@@ -1,3 +1,4 @@
+import logging
 import os
 
 from pydantic import BaseModel, Field, model_validator
@@ -143,6 +144,44 @@ class Settings(BaseSettings):
         # AUTH_DEV_BYPASS 는 development 에서만 — 비-dev 기동 시 fail-fast (인증 우회가 프로덕션에 서는 것 방지)
         if self.AUTH_DEV_BYPASS and self.APP_ENV != "development":
             raise ValueError("AUTH_DEV_BYPASS 는 development 환경에서만 허용됩니다.")
+        return self
+
+    # `.env.example` 의 자리표시자. `scripts/bootstrap_local_env.py` 가 「직접 채워야 하는 키」로
+    # 보고하는 값과 같은 토큰이다 — 그쪽은 부트스트랩 시점에 말하고, 여기는 기동 시점에 잡는다.
+    _PLACEHOLDER = "CHANGE_ME"
+
+    @model_validator(mode="after")
+    def _forbid_placeholder_credentials(self) -> "Settings":
+        """자리표시자 자격증명으로 서지 않는다 — 「검사 0건은 통과가 아니다」의 자격증명판.
+
+        `SFTP_USERNAME: str` 은 **존재만** 요구해서 `CHANGE_ME` 가 그대로 통과했고, 앱은 모든
+        화면이 뜨는 정상 상태로 보였다. 새로 받은 사람은 파일을 올릴 때가 되어서야 막히고,
+        진짜 원인은 두 계층 아래 503 본문에만 있었다 (#433).
+
+        운영에서는 기동을 거부한다 — 자리표시자 자격증명이 서 있는 것 자체가 결함이다.
+        개발에서는 기동은 시키되 **경고를 남긴다** — 파일 기능을 안 쓰는 사람의 길을 막지 않으려고.
+        """
+        placeholders = [
+            name
+            for name in ("SFTP_USERNAME", "SFTP_PASSWORD")
+            if str(getattr(self, name, "")).strip() == self._PLACEHOLDER
+        ]
+        if not placeholders:
+            return self
+
+        joined = ", ".join(placeholders)
+        if self.APP_ENV != "development":
+            raise ValueError(
+                f"자리표시자 자격증명으로 기동할 수 없습니다: {joined} 이(가) "
+                f"{self._PLACEHOLDER} 입니다. 실제 값을 채우세요."
+            )
+
+        # 개발 — 막지는 않되 조용히 넘어가지 않는다.
+        logging.getLogger("uvicorn.error").warning(
+            "자리표시자 자격증명이 남아 있습니다: %s — 파일(SFTP) 기능은 실패합니다. "
+            "backend-service/app/.env.development 를 채우세요.",
+            joined,
+        )
         return self
 
 
