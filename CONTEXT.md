@@ -132,7 +132,10 @@ LLM 은 **내가 원할 때** 옆에서 돕는다 — 전략을 만들어주고,
 
 <!-- 운영 규약(2026-08-19 리드 프롬프트, Cycle 0~10)의 상태 커서. 매 단계 종료 시 갱신 · 세션이 끊겨도 여기서 복구한다. -->
 
-현재: **Cycle 7 발굴·판정 완료 — 수정 단계 착수** (2026-09-02). 발굴 71건 → 이슈 13건(#433~#443·#445·#446), 리드 결정 4건
+현재: **Cycle 8 완료 · 코드 PR 4건이 머지 불가로 쌓여 있다** (2026-09-03). Cycle 7 의 #434 를 닫는 PR 을 포함해
+#448·#449·#450·#451 이 전부 `review: unable` 로 BLOCKED — cross-review 가 **Orca 런타임 없이는** 리뷰 워커를
+못 세우고, 승인 리뷰가 없으면 ruleset 이 머지를 막는다. **리드가 Windows Orca 앱을 띄우는 것 외에 에이전트가
+풀 수 있는 경로가 없다.**
 
 **Cycle 5 결과**: 이슈 11건 중 **4건 닫힘**(#397·#398·#399·#407). 남은 7건은 M4/M5 소속이라 굳히기 뒤 차례다.
 
@@ -155,6 +158,7 @@ Cycle 5 의 #397(#410)·#399(#409).
 | 5 | **25건** (W4 백테스트 16 · W5 4 · S2×W1 3 · 회귀 2) | 이슈 11건 발행(#397~#407) → **닫힘 4**(#397·#398·#399·#407) · 남은 7건은 M4/M5 소속. 통과 확인 17건은 findings 에 별도 기록 |
 | 6 | **9건** (W2 종목·W6 봇 대화·W7 리서치·S4 390px·S1 첫 진입·게스트 403·회귀) | 이슈 **4건**으로 묶어 발행 → **4건 전부 닫힘** — [#422](https://github.com/Danwoo/trading-lab/issues/422) 종목 검색 정렬 · [#423](https://github.com/Danwoo/trading-lab/issues/423) 스트리밍 실패 사유 3건 · [#424](https://github.com/Danwoo/trading-lab/issues/424) 화면 상태 불일치 2건 · [#425](https://github.com/Danwoo/trading-lab/issues/425) 390px 차트. F2 는 #402 에 원인 근거 첨부, F3 는 오독으로 정정. **통과 확인 6건**(게스트 403·operator 첫 진입·390px CLS 0·격자 실주행 25칸·봇 서비스 부재 배너·/admin MDI) |
 | 7 | **71건** (포트폴리오·NAV·호가/종목정보·관심목록·스케줄러 + 파일·리서치문서·설정키·마이페이지·접근성·경계값·동시성) | **[사용자] 19건 · [개발자] 20건** — 리드 지시로 체감 시간(초 단위)과 개발자 렌즈(기능 부재·레거시·코드 패턴)를 오더에 넣은 결과다. 이슈 **13건**: [#433](https://github.com/Danwoo/trading-lab/issues/433) 보안 경계(critical) · [#434](https://github.com/Danwoo/trading-lab/issues/434) 조용한 데이터 변형 · [#435](https://github.com/Danwoo/trading-lab/issues/435) 틀린 처방 · [#436](https://github.com/Danwoo/trading-lab/issues/436) 파일 모듈 · [#437](https://github.com/Danwoo/trading-lab/issues/437) NAV · [#438](https://github.com/Danwoo/trading-lab/issues/438) 체감 시간 · [#439](https://github.com/Danwoo/trading-lab/issues/439) 스케줄러 · [#440](https://github.com/Danwoo/trading-lab/issues/440) 실패가 성공처럼 · [#441](https://github.com/Danwoo/trading-lab/issues/441) 기능 부재 · [#442](https://github.com/Danwoo/trading-lab/issues/442) 템플릿 잔재 · [#443](https://github.com/Danwoo/trading-lab/issues/443) 접근성 · [#445](https://github.com/Danwoo/trading-lab/issues/445) 오해시키는 화면 · [#446](https://github.com/Danwoo/trading-lab/issues/446) 동시성. **리드 결정 4건**은 결정 로그 2026-09-02 |
+| 8 | **12건** (띄우기 7 · 화면 5) | 이슈 **2건**: [#452](https://github.com/Danwoo/trading-lab/issues/452) 띄우기 7건 · [#453](https://github.com/Danwoo/trading-lab/issues/453) 화면 3건. **오탐 6건을 확인으로 취소**한 것이 이 사이클의 주된 산출이다. #404 로 보낸 것 1건 |
 
 **Cycle 4 부터 실 DB 로 검증한다.** 도커가 죽어(dockerd 미기동) 세 사이클 내내 「검증 없음」이
 쌓였는데, 유저스페이스 wheel(`pgserver`)로 우회했다 — PostgreSQL 16.2 를 root·도커 없이
@@ -177,7 +181,20 @@ Orca 가 모르는 자식이라 자원 회수가 안 되고, 커널이 dbus 를 
 Projects 패널 가시성과 Orca 의 자원 계정·정리를 취함). #364·#370 라운드2 를 그 경로로 띄워 검증 중.
 오더는 결함 등급(보안·정합 / UX)에 맞춰 무게를 가른다.
 
-다음: Orca 루프로 남은 14건 완주(손실률·토큰 실측 보고) → Cycle 5
+**Cycle 8 의 결론 — 마찰이 화면에서 기동으로 옮겨갔다 (2026-09-03).** 실험대를 시드 계정으로 실제로 눌러 본
+결과 결함이 거의 없었다: 격자 폼의 거부 경로 다섯 가지가 **전부 사유를 말하고**(「시작 자금을 0보다 크게
+적으세요 — 성과를 재는 분모입니다」·「종목 마스터에 없는 종목입니다: KOSPI ZZZZZZ」), 실행 중 버튼은
+「돌리는 중…」으로 잠기고(실행 747ms), 적재 버튼은 비활성 라벨로 안내하고(`종목을 고르면 적재합니다`),
+폭 1440→600px 전 구간에서 가로 스크롤이 0이고, 콘솔 오류는 0건이다. 반면 **제품을 띄우는 데 세 번을 다시
+띄워야 했다** — 2주 전 죽은 컨테이너 하나가 스택 전체를 막았고(#452 A-1), 실패 문구는 그 문제를 아는 레포
+자체 도구(`scripts/bootstrap_local_env.py`)를 가리키지 않았다(A-3).
+
+**같은 사이클에서 오탐 6건을 만들었다가 확인으로 전부 취소했다.** 원인은 하나다 — 출력을 자른 채
+(`.slice(0,12)` · `head` · `force:true` · 823ms 첫 표본) 「없다」고 적었다. 부재는 전수 주장이라 자른 표본으로는
+성립하지 않는데, **자른 사실이 출력에 안 남아 스스로도 못 알아챈다.** 발굴량을 늘리라는 지시가 있을 때 특히
+위험한 자리다.
+
+다음: Orca 복구 → PR 4건 머지 → Cycle 9
 
 ## 교훈
 
