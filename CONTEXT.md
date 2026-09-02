@@ -132,10 +132,27 @@ LLM 은 **내가 원할 때** 옆에서 돕는다 — 전략을 만들어주고,
 
 <!-- 운영 규약(2026-08-19 리드 프롬프트, Cycle 0~10)의 상태 커서. 매 단계 종료 시 갱신 · 세션이 끊겨도 여기서 복구한다. -->
 
-현재: **Cycle 8 완료 · 코드 PR 4건이 머지 불가로 쌓여 있다** (2026-09-03). Cycle 7 의 #434 를 닫는 PR 을 포함해
-#448·#449·#450·#451 이 전부 `review: unable` 로 BLOCKED — cross-review 가 **Orca 런타임 없이는** 리뷰 워커를
-못 세우고, 승인 리뷰가 없으면 ruleset 이 머지를 막는다. **리드가 Windows Orca 앱을 띄우는 것 외에 에이전트가
-풀 수 있는 경로가 없다.**
+현재: **PR 9건이 리뷰 승인만 기다린다** (2026-09-03). CI 는 전부 초록이거나 도는 중이고, 막힌 것은
+`review: unable` 하나다 — cross-review 가 **Orca 런타임 없이는** 리뷰 워커를 못 세우고, 승인 리뷰가
+없으면 ruleset 이 머지를 막는다. **리드가 Windows Orca 앱을 띄우는 것 외에 에이전트가 풀 수 있는
+경로가 없다.**
+
+| PR | 이슈 | 담은 것 |
+|---|---|---|
+| [#460](https://github.com/Danwoo/trading-lab/pull/460) | #446 | 안 바뀐 저장이 「변경됨」이라 하지 않는다 (+ `form.name` 이 입력을 가리던 진짜 버그) |
+| [#459](https://github.com/Danwoo/trading-lab/pull/459) | #420 | **private 전환 P1·P2·P3** — main 직접 push 차단·착륙 사후 감사·위협 모델 |
+| [#458](https://github.com/Danwoo/trading-lab/pull/458) | #442 | 옛 제품 낱말 (전수 1건) |
+| [#457](https://github.com/Danwoo/trading-lab/pull/457) | #445 | 지어낸 시세를 못 읽게·설정됨≠유효함·확인은 등록이 아니다 (4건) |
+| [#456](https://github.com/Danwoo/trading-lab/pull/456) | #435 | 틀린 처방 (5건) |
+| [#451](https://github.com/Danwoo/trading-lab/pull/451) | #434 | 조용한 데이터 변형 (8건) |
+| [#450](https://github.com/Danwoo/trading-lab/pull/450)·[#449](https://github.com/Danwoo/trading-lab/pull/449)·[#448](https://github.com/Danwoo/trading-lab/pull/448) | #440·#433·#443 | Cycle 7 의 앞선 셋 |
+
+**#449·#450 은 Orca 문제만이 아니었다** — `test: backend` 가 실제로 빨갰다. `.env` 편집을 지시하는
+문구(레포 규약 `verify_no_env_edit_guidance.py` 위반)와, 새 테스트 셋이 `.env.development` 없는
+러너에서 **import 단계에** 죽던 것이다. 둘 다 고쳐 초록이 됐다.
+
+**리드 판단 대기 3건**: ① P4 전환 리허설(`CI_RUNNER=ci` 는 CI 를 리드의 WSL 로 끌어온다) ②
+낙관적 잠금(#446 F32 — 요청 계약 변경이라 고위험) ③ #437 NAV 합성 데이터(Q2)·#434 F15 관심목록(Q4).
 
 **Cycle 5 결과**: 이슈 11건 중 **4건 닫힘**(#397·#398·#399·#407). 남은 7건은 M4/M5 소속이라 굳히기 뒤 차례다.
 
