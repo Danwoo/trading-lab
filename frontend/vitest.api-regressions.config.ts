@@ -36,6 +36,7 @@ export const API_REGRESSION_TESTS = [
   "tests/regressions/354-stale-authorization.test.ts",
   "tests/regressions/423-stream-failure-reason.test.ts",
   "tests/regressions/424-otp-delivery-mode.test.ts",
+  "tests/regressions/445-probe-is-not-a-registration.test.ts",
 ];
 
 export default defineConfig({
