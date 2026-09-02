@@ -278,10 +278,20 @@ class DataKeyService:
 
         target_setting = self._writable_setting(source, setting)  # 표에 없는 소스·항목을 먼저 거부한다
         cleaned = value.strip()
-        if not cleaned:
-            raise BadRequestError("확인할 값이 없습니다")
 
-        if source in COMPOSITE_KEY_SETTINGS:
+        # **빈 값은 「저장된 키를 확인해 달라」는 뜻이다** (#445 B-16·F30). 종전에는 값을 다시 쳐야만
+        # 확인할 수 있어, 이미 저장된 키가 실제로 통하는지 알 길이 없었다 — 화면이 「설정됨」이라고만
+        # 말하고 「유효함」은 아무도 답하지 못했다. 값은 여기서도 응답·로그에 안 나간다.
+        using_stored = False
+        if not cleaned:
+            stored = self.get_key(None, source)
+            if not stored:
+                raise BadRequestError("확인할 값이 없습니다 — 저장된 키도 없습니다")
+            cleaned = stored
+            using_stored = True
+
+        # 저장된 자격은 `get_key` 가 이미 합성까지 끝낸 한 줄이다 — 다시 잇지 않는다.
+        if not using_stored and source in COMPOSITE_KEY_SETTINGS:
             # 값이 둘인 자격은 한쪽만으로 물어볼 수 없다. 나머지는 이미 저장된 것을 쓰고,
             # 그것마저 없으면 「확인 못 함」을 사유와 함께 낸다 — 통했다고 하지 않는다.
             paired = self._composite_value(source, override={target_setting: cleaned})
