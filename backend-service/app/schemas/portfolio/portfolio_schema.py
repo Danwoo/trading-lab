@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from schemas.common_schema import CommonEntity, TrimmedBaseModel
+from pydantic import BaseModel, ConfigDict, Field
+from schemas.common_schema import MONEY_MAX, QUANTITY_MAX, CommonEntity, Money, TrimmedBaseModel
 
 
 # ── Portfolio (master) ─────────────────────────────────────────────────
@@ -26,13 +26,16 @@ class PortfoliosOut(BaseModel):
 
 
 class PortfolioCreateIn(Portfolio):
+    # 모르는 필드를 조용히 버리지 않는다 — 오타 하나로 값이 사라지고도 저장은 성공했다고 뜬다.
+    model_config = ConfigDict(extra="forbid")
+
     portfolio_id: str = Field(
         ..., max_length=20, description="포트폴리오 id — 직접 정하는 값입니다. 20자까지, 이미 있는 id 면 거부됩니다."
     )
 
 
 class PortfolioUpdateIn(Portfolio):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 # ── Holding (detail) ───────────────────────────────────────────────────
@@ -40,8 +43,10 @@ class Holding(TrimmedBaseModel):
     """보유종목(디테일). 입력·출력이 이 베이스를 함께 쓴다."""
 
     holding_nm: str = Field(..., max_length=200, description="종목명 — 200자까지.")
-    quantity: int = Field(default=0, description="보유 수량 (정수).")
-    avg_price: float = Field(default=0, ge=0, description="평균 매입 단가 — 0 이상.")
+    quantity: int = Field(default=0, ge=0, le=QUANTITY_MAX, description="보유 수량 — 0 이상의 정수. 21억 주까지.")
+    avg_price: Money = Field(
+        default=0, ge=0, le=MONEY_MAX, description="평균 매입 단가 — 0 이상, 소수점 둘째 자리까지."
+    )
     # Watchlist.market 과 대칭(#328) — 기존 행은 백필하지 않아 비어 있을 수 있다.
     market: str | None = Field(
         None,
@@ -65,6 +70,8 @@ class HoldingsOut(BaseModel):
 
 
 class HoldingCreateIn(Holding):
+    model_config = ConfigDict(extra="forbid")
+
     ticker: str = Field(
         ...,
         max_length=20,
@@ -74,4 +81,4 @@ class HoldingCreateIn(Holding):
 
 
 class HoldingUpdateIn(Holding):
-    pass
+    model_config = ConfigDict(extra="forbid")

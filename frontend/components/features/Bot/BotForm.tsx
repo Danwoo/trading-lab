@@ -145,7 +145,6 @@ export function BotForm({
               fieldName="bot_desc"
               value={draft.bot_desc}
               height="4.5rem"
-              maxLength={500}
               onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
             />
           )}
