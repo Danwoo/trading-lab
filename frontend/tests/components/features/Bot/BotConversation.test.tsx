@@ -45,6 +45,15 @@ function sseResponse(lines: string[]): Response {
   return new Response(stream, { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }
 
+/** 턴마다 다른 본문을 내려 주는 서버 — 두 턴을 이어 볼 때 쓴다. */
+function givenServerPerTurn(turns: string[][]) {
+  const queue = [...turns];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => sseResponse(queue.shift() ?? [])),
+  );
+}
+
 function givenServer(streamLines: string[]) {
   // 준비 조회는 위에서 모킹했다 — 여기 `fetch` 는 스트림 경로 전용이다.
   vi.stubGlobal(
@@ -105,5 +114,91 @@ describe("BotConversation — 스트림 중 실패가 사라지지 않는다 (�
     await waitFor(() => {
       expect(screen.getByText(/이렇게 만들어 봤습니다/).className).not.toContain("text-danger");
     });
+  });
+
+  // ── #423 F5 — 무효 키 ──────────────────────────────────────────────────────
+  //
+  // CLI 는 인증 실패를 **일반 `text` 이벤트**로 흘리고 `result.subtype` 은 `success` 로 끝낸다
+  // (실측 SSE, Cycle 6 F5). 그 뒤 `error` 하나가 온다. 종전에는 그 `error` 를 받은 catch 가
+  // 턴 텍스트를 통째로 갈아치워, **받은 원인을 띄웠다가 지웠다.**
+  it("무효 키 — 스트리밍된 원인이 지워지지 않고, 처방이 「키 교체」로 남는다", async () => {
+    givenServer([
+      JSON.stringify({ type: "text", text: "Invalid API key · Fix external API key" }),
+      JSON.stringify({ type: "result", subtype: "success" }),
+      JSON.stringify({
+        type: "error",
+        code: "botAgent.invalid_api_key",
+        message: "봇 대화의 API 키 인증이 거부됐습니다.",
+      }),
+    ]);
+
+    render(<BotConversation formState={{ strategy_key: null, params: {} }} />);
+    await send("눌림목 봇 만들어줘");
+
+    await waitFor(() => {
+      // ① 처방이 재시도가 아니라 키 교체다 — 실패 턴이 그 말을 한다.
+      expect(screen.getByRole("alert").textContent).toMatch(/키를 교체/);
+    });
+
+    // ② 받은 원인이 화면에 남는다 — 덮어쓰기가 없어졌다는 것이 이 줄의 뜻이다.
+    expect(screen.getByText(/Invalid API key · Fix external API key/)).toBeTruthy();
+
+    // ③ 배너가 「설정됨」과 「유효함」의 차이를 말한다 — readiness 는 설정 여부만 본다.
+    expect(screen.getByRole("status").textContent).toMatch(/설정돼 있지만/);
+  });
+
+  it("서비스가 안 떠 있으면 실패 턴이 「띄우라」고 말한다 — 재시도가 아니다", async () => {
+    givenServer([
+      JSON.stringify({
+        type: "error",
+        code: "botAgent.service_unreachable",
+        message: "대화 서비스에 닿지 못했습니다.",
+      }),
+    ]);
+
+    render(<BotConversation formState={{ strategy_key: null, params: {} }} />);
+    await send("안녕");
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toMatch(/띄운 뒤 다시 보내세요/);
+    });
+
+    // 배너도 같은 말을 한다 — 종전에는 배너만 「기동하라」를 알고 실패 턴은 딴말을 했다.
+    expect(screen.getByRole("status").textContent).toMatch(/떠 있지 않습니다/);
+  });
+
+  // ── 배너는 되돌아온다 ──────────────────────────────────────────────────────
+  //
+  // 실패가 세운 배너를 내리는 자리가 없으면, 서비스를 띄우고 재전송이 성공해도 「떠 있지
+  // 않습니다」가 그대로 남는다 — 준비 상태 재조회는 마운트뿐이라 새로고침 전까지 안 풀린다.
+  it("성공한 다음 턴이 오면 배너가 풀린다", async () => {
+    givenServerPerTurn([
+      [
+        JSON.stringify({
+          type: "error",
+          code: "botAgent.service_unreachable",
+          message: "대화 서비스에 닿지 못했습니다.",
+        }),
+      ],
+      [JSON.stringify({ type: "text", text: "이제 붙었습니다" })],
+    ]);
+
+    render(<BotConversation formState={{ strategy_key: null, params: {} }} />);
+    await send("안녕");
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/떠 있지 않습니다/));
+
+    await send("다시 해줘");
+
+    await waitFor(() => expect(screen.getByText(/이제 붙었습니다/)).toBeTruthy());
+    expect(screen.queryByRole("status"), "성공한 턴 뒤에도 배너가 남아 있다").toBeNull();
+  });
+
+  it("`unavailable` 로 끝난 턴은 배너를 풀지 않는다 — 그건 성공이 아니다", async () => {
+    givenServer([JSON.stringify({ type: "unavailable", reasons: ["ANTHROPIC_API_KEY 가 설정되지 않았습니다."] })]);
+
+    render(<BotConversation formState={{ strategy_key: null, params: {} }} />);
+    await send("안녕");
+
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/ANTHROPIC_API_KEY/));
   });
 });
