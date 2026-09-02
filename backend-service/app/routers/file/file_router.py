@@ -217,10 +217,11 @@ async def stream_file_download(
             "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
         }
 
-        # 파일 스트리밍 응답 반환
-        return StreamingResponse(
-            file_service.stream_file_download(args), headers=headers, media_type="application/octet-stream"
-        )
+        # 스트림을 **먼저 연다** — 여기서 터지면 아직 200 을 안 냈으므로 정직한 오류로 나간다.
+        # `StreamingResponse` 에 제너레이터를 그냥 넘기면 첫 조각을 당길 때 세션이 열리는데,
+        # 그때는 헤더가 이미 나가 되돌릴 수 없어 0바이트 파일이 성공처럼 저장됐다 (#433·B-7).
+        body = await file_service.open_file_download(args)
+        return StreamingResponse(body, headers=headers, media_type="application/octet-stream")
     except asyncio.CancelledError as e:
         raise HTTPException(status_code=status.HTTP_499_CLIENT_CLOSED_REQUEST, detail="Request cancelled") from e
 
