@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from schemas.common_schema import CommonEntity, TrimmedBaseModel
+from schemas.common_schema import MONEY_MAX, QUANTITY_MAX, CommonEntity, Money, TrimmedBaseModel
 
 
 # ── Portfolio (master) ─────────────────────────────────────────────────
@@ -40,8 +40,10 @@ class Holding(TrimmedBaseModel):
     """보유종목(디테일). 입력·출력이 이 베이스를 함께 쓴다."""
 
     holding_nm: str = Field(..., max_length=200, description="종목명 — 200자까지.")
-    quantity: int = Field(default=0, description="보유 수량 (정수).")
-    avg_price: float = Field(default=0, ge=0, description="평균 매입 단가 — 0 이상.")
+    quantity: int = Field(default=0, ge=0, le=QUANTITY_MAX, description="보유 수량 — 0 이상의 정수. 21억 주까지.")
+    avg_price: Money = Field(
+        default=0, ge=0, le=MONEY_MAX, description="평균 매입 단가 — 0 이상, 소수점 둘째 자리까지."
+    )
     # Watchlist.market 과 대칭(#328) — 기존 행은 백필하지 않아 비어 있을 수 있다.
     market: str | None = Field(
         None,

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from schemas.common_schema import CommonEntity, TrimmedBaseModel
+from schemas.common_schema import MONEY_MAX, CommonEntity, Money, TrimmedBaseModel
 
 
 class Watchlist(TrimmedBaseModel):
@@ -25,8 +25,12 @@ class Watchlist(TrimmedBaseModel):
         description="통화 코드 — 공통코드 「관심종목 통화」(KRW · USD)의 코드값. 5자까지.",
         examples=["KRW"],
     )
-    target_price: float | None = Field(None, ge=0, description="목표가 — 0 이상. 단위는 currency 의 통화입니다.")
-    alert_price: float | None = Field(None, ge=0, description="알림가 — 0 이상. 단위는 currency 의 통화입니다.")
+    target_price: Money | None = Field(
+        None, ge=0, le=MONEY_MAX, description="목표가 — 0 이상, 소수점 둘째 자리까지. 단위는 currency 의 통화입니다."
+    )
+    alert_price: Money | None = Field(
+        None, ge=0, le=MONEY_MAX, description="알림가 — 0 이상, 소수점 둘째 자리까지. 단위는 currency 의 통화입니다."
+    )
     priority: str | None = Field(
         None,
         max_length=5,

@@ -1,7 +1,7 @@
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-from schemas.common_schema import CommonEntity, TrimmedBaseModel
+from schemas.common_schema import WEIGHT_MAX, CommonEntity, Money, TrimmedBaseModel
 
 CombineRule = Literal["AND", "OR", "SCORE"]
 UniverseKind = Literal["POOL", "WATCHLIST", "LIST"]
@@ -26,8 +26,11 @@ class BotStrategyIn(BaseModel):
         default_factory=dict,
         description="설정별 출처 — 설정 이름 → 'USER' 또는 'AI_SUGGESTED'.",
     )
-    weight: float | None = Field(
-        None, ge=0, description="combine_rule 이 SCORE 일 때의 가중치 (0 이상). 나머지 결합에서는 안 씁니다."
+    weight: Money | None = Field(
+        None,
+        ge=0,
+        le=WEIGHT_MAX,
+        description="combine_rule 이 SCORE 일 때의 가중치 — 0 이상 9999.99 까지, 소수점 둘째 자리까지.",
     )
 
 
