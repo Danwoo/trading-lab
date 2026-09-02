@@ -12,7 +12,8 @@ interface Props {
 }
 
 const MEMBER_COLUMNS = [
-  { dataField: "git_id", caption: "Git ID", width: 160 },
+  // 같은 필드를 형제 화면(`SchedulerDetailForm`)이 부르는 이름과 맞춘다 — 옛 제품의 낱말이었다.
+  { dataField: "git_id", caption: "계좌주 ID", width: 160 },
   { dataField: "name", caption: "이름", width: 140 },
   { dataField: "email", caption: "이메일", minWidth: 180 },
 ];
