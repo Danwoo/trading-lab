@@ -2671,8 +2671,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@img/colour` | 1.1.0 | MIT |
 | `@jridgewell/sourcemap-codec` | 1.5.5 | MIT |
 | `@kurkle/color` | 0.3.4 | MIT |
-| `@next/env` | 16.3.3 | MIT |
-| `@next/swc-linux-x64-gnu` | 16.3.3 | MIT |
+| `@next/env` | 16.3.4 | MIT |
+| `@next/swc-linux-x64-gnu` | 16.3.4 | MIT |
 | `@noble/ciphers` | 2.1.1 | MIT |
 | `@noble/hashes` | 2.2.0 | MIT |
 | `@oxc-project/types` | 0.147.0 | MIT |
@@ -2762,9 +2762,9 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@types/katex` | 0.16.8 | MIT |
 | `@types/mdast` | 4.0.4 | MIT |
 | `@types/ms` | 2.1.0 | MIT |
-| `@types/node` | 26.4.0 | MIT |
+| `@types/node` | 26.4.1 | MIT |
 | `@types/pg` | 8.20.0 | MIT |
-| `@types/react-dom` | 19.2.5 | MIT |
+| `@types/react-dom` | 19.2.7 | MIT |
 | `@types/react` | 19.2.18 | MIT |
 | `@types/unist` | 2.0.11 | MIT |
 | `@types/unist` | 3.0.3 | MIT |
@@ -2993,9 +2993,9 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `named-placeholders` | 1.1.6 | MIT |
 | `nanoid` | 3.3.18 | MIT |
 | `nanostores` | 1.5.2 | MIT |
-| `next` | 16.3.3 | MIT |
+| `next` | 16.3.4 | MIT |
 | `node-int64` | 0.4.0 | MIT |
-| `nodemailer` | 9.0.6 | MIT-0 |
+| `nodemailer` | 9.1.1 | MIT-0 |
 | `normalize-path` | 3.0.0 | MIT |
 | `obug` | 2.1.4 | MIT |
 | `ohash` | 2.0.11 | MIT |
@@ -3019,7 +3019,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `picomatch` | 4.0.7 | MIT |
 | `pkg-types` | 2.3.1 | MIT |
 | `postcss` | 8.5.23 | MIT |
-| `postcss` | 8.5.26 | MIT |
+| `postcss` | 8.5.28 | MIT |
 | `postgres-array` | 2.0.0 | MIT |
 | `postgres-array` | 3.0.4 | MIT |
 | `postgres-bytea` | 1.0.1 | MIT |
@@ -3136,7 +3136,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `yaml` | 2.8.3 | ISC |
 | `zeptomatch` | 2.1.0 | MIT |
 | `zip-stream` | 7.0.5 | MIT |
-| `zod` | 4.4.3 | MIT |
+| `zod` | 4.5.4 | MIT |
 | `zustand` | 5.0.15 | MIT |
 | `zwitch` | 2.0.4 | MIT |
 
