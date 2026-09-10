@@ -2888,7 +2888,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `hast-util-to-text` | 4.0.2 | MIT |
 | `hast-util-whitespace` | 3.0.0 | MIT |
 | `hastscript` | 9.0.1 | MIT |
-| `hono` | 4.13.1 | MIT |
+| `hono` | 4.13.7 | MIT |
 | `html-encoding-sniffer` | 6.0.0 | MIT |
 | `html-url-attributes` | 3.0.1 | MIT |
 | `http-status-codes` | 2.3.0 | MIT |
