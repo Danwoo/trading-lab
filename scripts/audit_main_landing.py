@@ -55,9 +55,15 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from review_notice import decide as judge_docs_only  # noqa: E402
 from review_record import _FULL_SHA, _MARKER, is_trusted_author  # noqa: E402
+from verify_upstream_gate import CHECK_NAME_PREFIX, latest_by_name  # noqa: E402
 
 #: ruleset 이 required 로 걸고 있던 것과 같은 이름 — 사라져도 여기서 계속 요구한다.
 REQUIRED_CHECKS = ("test: backend", "test: frontend", "test: repo")
+# 최신값 판정(`latest_by_name`)은 이 접두로 체크런을 거른다. 접두 밖 이름을 required 로 넣으면
+# 그 체크는 영영 「없다」로 읽히므로, 두 목록이 갈리는 순간 기동에서 막는다.
+assert all(name.startswith(CHECK_NAME_PREFIX) for name in REQUIRED_CHECKS), (
+    f"REQUIRED_CHECKS 가 '{CHECK_NAME_PREFIX}' 로 시작하지 않는다 — latest_by_name 이 그 체크를 거른다"
+)
 
 #: 리뷰 통과 마커 — 문법도 `review_record` 것을 그대로 쓴다.
 #: 종전에는 여기서 느슨한 정규식을 따로 짰는데, `model=` 도 닫는 `-->` 도 요구하지 않아
@@ -145,7 +151,13 @@ def judge_commit(evidence: dict[str, Any]) -> dict[str, Any]:
     if checks is None:
         verdict["violations"].append(f"PR #{pr.get('number')}: 체크 결과를 못 읽었다")
     else:
-        by_name = {c.get("name"): (c.get("conclusion") or "").lower() for c in checks}
+        # **같은 이름의 체크런이 여럿일 수 있다** — 재실행이 이 레포의 정규 운용이다
+        # (루트 CLAUDE.md 「쓸어담기」의 `gh run rerun --failed`). 그냥 딕셔너리로 접으면
+        # API 가 준 순서에서 나중 것이 이기는데, 그 순서는 어디에서도 보장되지 않는다.
+        # 재실행으로 통과한 착륙이 영영 빨갛게 남거나, 반대로 실패가 초록으로 읽힌다.
+        # 판정은 `verify_upstream_gate.latest_by_name` — 같은 엔드포인트를 같은 목적으로 읽는
+        # 정본이고, 주석이 「재실행 대비」를 명시한다.
+        by_name = {name: (record.get("conclusion") or "").lower() for name, record in latest_by_name(checks).items()}
         for name in REQUIRED_CHECKS:
             got = by_name.get(name)
             if got is None:

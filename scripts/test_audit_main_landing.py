@@ -25,7 +25,12 @@ from audit_main_landing import judge_all, judge_commit  # noqa: E402
 # 실제 마커는 **40자 sha** 를 싣는다(리뷰 프롬프트 계약). 짧은 값을 픽스처로 쓰면 그물이
 # 검사하는 세계가 현실과 달라지고, 접두 비교 같은 느슨함이 초록으로 통과한다.
 HEAD = "abc1234def5678" + "0" * 26
-GREEN = [{"name": n, "conclusion": "success"} for n in ("test: backend", "test: frontend", "test: repo")]
+# 실제 체크런은 `id` 를 달고 오고, **같은 이름이 여럿일 수 있다**(재실행). id 없는 픽스처를
+# 쓰면 그물이 검사하는 세계가 현실과 달라져 「최신값 판정」 축이 통째로 안 보인다.
+GREEN = [
+    {"id": i, "name": n, "conclusion": "success"}
+    for i, n in enumerate(("test: backend", "test: frontend", "test: repo"), start=1)
+]
 
 
 def marker(sha: str = HEAD, verdict: str = "merge_ok", **author) -> dict:
@@ -179,6 +184,24 @@ def main() -> int:
         violated(ev(pulls=[pr(comments=[app, marker(verdict="needs_changes", user={"login": "x", "type": "User"})])])),
         False,
     )
+
+    # ── 재실행된 체크런은 최신 것으로 판정한다 ──────────────────────
+    # 재실행은 이 레포의 정규 운용이다(루트 CLAUDE.md 「쓸어담기」). 그냥 딕셔너리로 접으면
+    # API 가 준 순서에서 나중 것이 이기는데 그 순서는 보장되지 않는다 — 재실행으로 통과한
+    # 착륙이 영영 빨갛게 남거나, 반대로 실패가 초록으로 읽힌다.
+    others = GREEN[:2]
+    healed = [
+        {"id": 1, "name": "test: repo", "conclusion": "failure"},
+        {"id": 9, "name": "test: repo", "conclusion": "success"},
+    ]
+    check("재실행으로 고쳐졌으면 통과 — 새것이 뒤에", violated(ev(pulls=[pr(checks=others + healed)])), False)
+    check("재실행으로 고쳐졌으면 통과 — 새것이 앞에", violated(ev(pulls=[pr(checks=others + healed[::-1])])), False)
+    broke = [
+        {"id": 1, "name": "test: repo", "conclusion": "success"},
+        {"id": 9, "name": "test: repo", "conclusion": "failure"},
+    ]
+    check("재실행에서 깨졌으면 위반 — 새것이 뒤에", violated(ev(pulls=[pr(checks=others + broke)])), True)
+    check("재실행에서 깨졌으면 위반 — 새것이 앞에", violated(ev(pulls=[pr(checks=others + broke[::-1])])), True)
 
     # ── 잘린 목록을 완전한 것으로 쓰지 않는다 ──────────────────────
     # 한 페이지(100건)만 읽으면 앞 100개가 문서이고 101번째가 코드인 PR 이 「문서 전용」이 되어
