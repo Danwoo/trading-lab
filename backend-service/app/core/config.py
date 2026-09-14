@@ -1,3 +1,4 @@
+import logging
 import os
 
 from pydantic import BaseModel, Field, model_validator
@@ -143,6 +144,61 @@ class Settings(BaseSettings):
         # AUTH_DEV_BYPASS 는 development 에서만 — 비-dev 기동 시 fail-fast (인증 우회가 프로덕션에 서는 것 방지)
         if self.AUTH_DEV_BYPASS and self.APP_ENV != "development":
             raise ValueError("AUTH_DEV_BYPASS 는 development 환경에서만 허용됩니다.")
+        return self
+
+    # `.env.example` 의 자리표시자. `scripts/bootstrap_local_env.py` 가 「직접 채워야 하는 키」로
+    # 보고하는 값과 같은 토큰이다 — 그쪽은 부트스트랩 시점에 말하고, 여기는 기동 시점에 잡는다.
+    _PLACEHOLDER = "CHANGE_ME"
+
+    @model_validator(mode="after")
+    def _forbid_placeholder_credentials(self) -> "Settings":
+        """자리표시자 자격증명으로 서지 않는다 — 「검사 0건은 통과가 아니다」의 자격증명판.
+
+        `SFTP_USERNAME: str` 은 **존재만** 요구해서 `CHANGE_ME` 가 그대로 통과했고, 앱은 모든
+        화면이 뜨는 정상 상태로 보였다. 새로 받은 사람은 파일을 올릴 때가 되어서야 막히고,
+        진짜 원인은 두 계층 아래 503 본문에만 있었다 (#433).
+
+        운영에서는 기동을 거부한다 — 자리표시자 자격증명이 서 있는 것 자체가 결함이다.
+        개발에서는 기동은 시키되 **경고를 남긴다** — 파일 기능을 안 쓰는 사람의 길을 막지 않으려고.
+        """
+        # **키를 손으로 열거하지 않는다.** 두 개만 적어 두면 같은 `.env.example` 의
+        # `JWT_SECRET`·DB 비밀번호가 그대로 통과한다 — 시크릿 자리표시자로 서명한 JWT 는
+        # `.env.example` 을 읽은 누구나 만들 수 있으니 SFTP 보다 나쁘다. 설정 전체를 훑고,
+        # 부트스트랩이 같은 토큰을 쓰는 만큼 **대소문자·공백 변형도 자리표시자로 본다.**
+        #
+        # **예외 목록을 두지 않는다.** 이름을 하나 적는 순간 그 자리는 영영 열리고, 한 줄짜리
+        # 추가라 아무도 나중에 다시 보지 않는다 — fail-open 이다. 「이 키는 비밀이 아니다」를
+        # 판단할 필요도 없다: **「안 쓴다」를 말하는 방법이 이미 있기 때문이다.**
+        #
+        #   빈 값      「안 쓴다」 — 선택 설정은 정의부터 `str = ""` 라 비우면 그만이다
+        #   CHANGE_ME  「아직 안 했다」 — 복사해 놓고 마치지 않은 상태
+        #
+        # 이 레포가 다른 자리에서 「없다」와 「아직 안 받았다」를 가르는 것과 같은 축이다.
+        # 덧붙여 자격증명이 아닌 값도 자리표시자로 서면 해가 없지 않다 — `MARKET_DATA_CONTACT`
+        # 가 `CHANGE_ME` 면 이 서버는 외부 소스에 자기를 「CHANGE_ME」라고 소개한다.
+        target = self._PLACEHOLDER.casefold()
+        placeholders = sorted(
+            name
+            for name in type(self).model_fields
+            if isinstance(getattr(self, name, None), str) and getattr(self, name).strip().casefold() == target
+        )
+        if not placeholders:
+            return self
+
+        joined = ", ".join(placeholders)
+        if self.APP_ENV != "development":
+            raise ValueError(
+                f"자리표시자 자격증명으로 기동할 수 없습니다: {joined} 이(가) "
+                f"{self._PLACEHOLDER} 입니다. 실제 값을 채우거나, 안 쓰는 설정이면 비웁니다."
+            )
+
+        # 개발 — 막지는 않되 조용히 넘어가지 않는다.
+        # 어디를 어떻게 고치라고 말하지 않는다 — 무엇이 없는지까지다
+        # (`scripts/verify_no_env_edit_guidance.py`, #317). 변수 이름이 이미 자리를 가리킨다.
+        logging.getLogger("uvicorn.error").warning(
+            "자리표시자 자격증명이 남아 있습니다: %s — 실제 값이 들어오기 전까지 파일(SFTP) 기능은 실패합니다.",
+            joined,
+        )
         return self
 
 
