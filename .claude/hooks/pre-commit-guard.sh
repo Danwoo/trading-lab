@@ -21,9 +21,19 @@ deny() {
 command -v pre-commit >/dev/null 2>&1 \
   || deny "pre-commit 명령을 찾을 수 없습니다. 설치 후 다시 시도하세요 (uv tool install pre-commit 또는 pip install pre-commit)."
 
-# git hook 미설치면 자동 install
-hookfile=$(git rev-parse --git-path hooks/pre-commit)
-if [ ! -f "$hookfile" ] || ! grep -q pre-commit "$hookfile" 2>/dev/null; then
+# git hook 미설치면 자동 install — **pre-push 도 함께 본다.**
+# `default_install_hook_types` 에 pre-push 가 들어간 뒤(#420 P1)에도, 이 가드가 pre-commit 만
+# 보고 있으면 **이미 설치된 클론**은 영영 pre-push 훅이 안 걸린다 — main 직접 push 차단이
+# 파일로만 존재하고 실제로는 안 도는 상태가 된다. 둘 중 하나라도 없으면 다시 건다
+# (`pre-commit install` 은 멱등이다).
+needs_install=""
+for kind in pre-commit pre-push; do
+  hookfile=$(git rev-parse --git-path "hooks/$kind")
+  if [ ! -f "$hookfile" ] || ! grep -q pre-commit "$hookfile" 2>/dev/null; then
+    needs_install="yes"
+  fi
+done
+if [ -n "$needs_install" ]; then
   pre-commit install >/dev/null 2>&1 || deny "pre-commit install 실패 — 수동 확인이 필요합니다."
 fi
 
