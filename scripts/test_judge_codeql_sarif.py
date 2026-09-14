@@ -40,16 +40,23 @@ def sarif(results: list[dict], *, rules: list[dict] | None = None) -> dict:
     }
 
 
-def run(files: dict[str, dict] | None) -> tuple[int, str]:
-    """`files` 가 None 이면 디렉터리 자체를 만들지 않는다."""
+def run(files: dict[str, dict] | None, baseline: list[dict] | None = None) -> tuple[int, str]:
+    """`files` 가 None 이면 디렉터리 자체를 만들지 않는다.
+
+    베이스라인은 **테스트가 쥔다** — 레포의 실제 목록을 읽으면 그 파일이 바뀔 때마다 이 그물의
+    판정이 따라 흔들린다.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp) / "results"
         if files is not None:
             target.mkdir()
             for name, body in files.items():
                 (target / name).write_text(json.dumps(body), encoding="utf-8")
+        base_path = Path(tmp) / "baseline.json"
+        if baseline is not None:
+            base_path.write_text(json.dumps({"항목": baseline}, ensure_ascii=False), encoding="utf-8")
         done = subprocess.run(
-            [sys.executable, str(SCRIPT), "--dir", str(target), "--language", "python"],
+            [sys.executable, str(SCRIPT), "--dir", str(target), "--language", "python", "--baseline", str(base_path)],
             capture_output=True,
             text=True,
         )
@@ -85,6 +92,29 @@ def main() -> int:
         {"python.sarif": sarif([result(None)], rules=[{"id": "r1", "defaultConfiguration": {"level": "note"}}])}
     )
     check("규칙 기본값이 note 면 막지 않는다", code, 0)
+
+    # ── 베이스라인: 이미 받아들인 것만 넘긴다 ────────────────────────
+    # 이 게이트를 켜는 시점에 이미 발견이 17건 있었다(실측). 그대로 켜면 첫 push 부터 영영
+    # 빨갛고, 상시 빨간 잡은 아무도 안 본다 — 그래서 그날의 발견을 고정하고 **새것만** 막는다.
+    same = [{"rule": "r1", "path": "app/x.py"}]
+    code, out = run({"python.sarif": sarif([result("error")])}, baseline=same)
+    check("베이스라인에 있는 발견은 막지 않는다", code, 0)
+    check("그래도 화면에는 남는다", "베이스라인" in out, True)
+
+    code, _ = run({"python.sarif": sarif([result("error", rule="r2")])}, baseline=same)
+    check("같은 파일의 **다른 규칙**은 새 발견이다", code, 1)
+
+    other_file = {"ruleId": "r1", "locations": [{"physicalLocation": {"artifactLocation": {"uri": "app/y.py"}}}]}
+    other_file["level"] = "error"
+    code, _ = run({"python.sarif": sarif([other_file])}, baseline=same)
+    check("같은 규칙의 **다른 파일**은 새 발견이다", code, 1)
+
+    code, out = run({"python.sarif": sarif([result("error")])}, baseline=None)
+    check("베이스라인을 못 읽으면 전부 막는다", code, 1)
+    check("못 읽었다는 사실을 말한다", "베이스라인을 못 읽었다" in out, True)
+
+    code, _ = run({"python.sarif": sarif([result("note")])}, baseline=same)
+    check("note 는 베이스라인과 무관하게 막지 않는다", code, 0)
 
     # ── fail-closed ────────────────────────────────────────────────
     code, out = run({})

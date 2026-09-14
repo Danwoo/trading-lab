@@ -55,7 +55,22 @@ private 전환으로 없어지는 GitHub 기능은 `main protection` ruleset 하
 빨간불을 없애는 것과 위험을 없애는 것은 다르고, 전자는 §4.3 이 적은 「발각이 행동으로 이어지지
 않는」 상태를 스스로 만든다.
 
-### CodeQL — 오히려 강해진다
+### CodeQL — 오히려 강해진다, 다만 베이스라인 위에서
+
+**켜는 시점에 이미 발견이 17건 있었다** (2026-09-14 실측: `py/stack-trace-exposure` 13 ·
+`py/clear-text-logging-sensitive-data` 2 · `js/polynomial-redos` 1 · `js/request-forgery` 1,
+규칙·파일 기준). 그대로 게이트를 켜면 첫 push 부터 영영 빨갛고, **상시 빨간 잡은 아무도 안
+본다** — §4.3 이 적은 바로 그 상태를 만들면서 「탐지를 살렸다」고 말하게 된다.
+
+그래서 그날의 발견을 `.codeql-baseline.json` 에 고정하고 **거기 없는 것만** 막는다. 목록은
+줄어들기만 하고(고친 것은 지운다), 한 줄을 더하는 것은 「새 발견을 받아들인다」는 선언이라
+리뷰에서 보인다. 못 읽으면 목록이 없는 것으로 보고 **전부 막는다**.
+
+알갱이는 (규칙, 파일) 이다 — 줄 번호는 코드가 움직일 때마다 흔들려 쓰지 않았고, 그 대가로
+**같은 파일에서 같은 규칙 위반이 하나 더 늘어도 안 잡힌다.** 이 한계를 안고 켜는 이유는,
+「새 파일·새 규칙의 발견을 잡는 것」이 지금 없는 것보다 낫기 때문이다.
+
+
 
 업로드하던 시절 이 체크는 **12일 내내 실패 0**이었다. 발견은 Security 탭으로만 갔고 워크플로는
 언제나 초록이었다. 이제는 차단 수준(`error`·`warning`) 발견이 하나라도 있으면 잡이 빨개진다.
@@ -160,7 +175,75 @@ GitHub 의 되살리기로 복구된다. **없는 것을 없다고 적는 것까
 
 ## 5. 전환·되돌리기
 
-전환은 리드가 실행한다. 순서와 검증 항목은 이슈 [#420](https://github.com/Danwoo/trading-lab/issues/420)
-의 완료 조건에 있다. 되돌리기는 `gh repo edit --visibility public` 이고, **ruleset 이 삭제가
-아니라 비활성이라 즉시 복원된다는 가정은 전환 직후에 확인한다** — `gh api …/rulesets` 가 다시
-200 인지 보는 것이 그 확인이다.
+전환은 **리드가 실행한다.** 아래 순서를 그대로 따르면 되고, 각 줄의 명령은 그대로 쳐서 같은
+결과가 나와야 한다.
+
+### 전환 전 — 대체층이 다 서 있는가
+
+```bash
+# ① 예방·발각 (P1·P2·P3) 이 main 에 있는가
+git show origin/main:scripts/reject_push_to_main.py >/dev/null && echo "P1 있음"
+git show origin/main:scripts/audit_main_landing.py  >/dev/null && echo "P2 있음"
+
+# ② 탐지 대체 (CodeQL·secret scanning) 가 main 에 있는가
+git show origin/main:scripts/judge_codeql_sarif.py  >/dev/null && echo "CodeQL 대체 있음"
+git show origin/main:scripts/install_gitleaks.sh    >/dev/null && echo "히스토리 스캔 있음"
+
+# ③ 이 클론의 훅이 실제로 걸려 있는가 (설치한 클론에만 산다)
+ls "$(git rev-parse --git-path hooks)"/pre-commit "$(git rev-parse --git-path hooks)"/pre-push
+```
+
+셋 다 나와야 넘어간다. 하나라도 없으면 **그 층 없이 전환하는 것**이다.
+
+### 전환 — 네 걸음
+
+```bash
+# 1. CI 를 self-hosted 로 옮긴다. private 이 되면 GitHub-hosted 분이 과금되기 때문이다.
+#    **전환보다 먼저** 해서, 러너가 실제로 잡을 받는지 public 상태에서 확인한다.
+gh variable set CI_RUNNER --body ci
+#    확인: 아무 PR 이나 깨워 잡이 self-hosted 에서 도는지 본다
+gh run list --limit 3 --json databaseId,status
+
+# 2. 전환
+gh repo edit Danwoo/trading-lab --visibility private --accept-visibility-change-consequences
+
+# 3. 즉시 확인 — 무엇이 사라졌나
+gh api repos/Danwoo/trading-lab --jq '{visibility, security: .security_and_analysis}'
+gh api repos/Danwoo/trading-lab/rulesets            # 403 이면 ruleset 이 사라진 것 (예상대로)
+gh api repos/Danwoo/trading-lab/code-scanning/alerts # 403 이면 코드 스캐닝이 사라진 것 (예상대로)
+
+# 4. 대체층이 실제로 도는지 — main 에 한 번 착륙시켜 본다 (문서 한 줄이면 된다)
+#    `audit: main 착륙` · `CodeQL` · 히스토리 스캔 셋이 초록인지 확인
+gh run list --workflow ci.yml --limit 3
+gh run list --workflow codeql.yml --limit 2
+```
+
+**3번에서 403 이 안 나오면 그게 이상한 것이다** — 사라졌어야 할 것이 남아 있다는 뜻이고,
+그때는 요금제·설정을 다시 본다.
+
+### 되돌리기
+
+```bash
+gh repo edit Danwoo/trading-lab --visibility public --accept-visibility-change-consequences
+gh variable delete CI_RUNNER          # CI 를 다시 호스티드로 (public 은 무료)
+gh api repos/Danwoo/trading-lab/rulesets --jq '.[].name'   # `main protection` 이 돌아왔나
+```
+
+**ruleset 이 삭제가 아니라 비활성이라 즉시 복원된다는 것은 가정이다** — 전환 직후 3번에서
+403 을 확인했다면, 되돌린 뒤 이 명령이 `main protection` 을 다시 내는지까지 봐야 그 가정이
+확인된다. 안 나오면 ruleset 을 손으로 다시 만들어야 하므로, **전환 전에 현재 ruleset 정의를
+받아 둔다**:
+
+```bash
+gh api repos/Danwoo/trading-lab/rulesets --jq '.[0].id' \
+  | xargs -I{} gh api repos/Danwoo/trading-lab/rulesets/{} > /tmp/main-protection.json
+```
+
+### 전환 뒤에도 남는 구멍
+
+| 없어지는 것 | 대체 | 남는 구멍 |
+|---|---|---|
+| PR·승인 필수 | pre-push 훅(예방) + 착륙 감사(발각) | `--no-verify` 로 지나갈 수 있다 — 막지 못하고 발각만 한다 |
+| 코드 스캐닝 경보 | SARIF 를 CI 가 읽어 판정 | Security 탭의 이력·추세는 없다 |
+| secret scanning | 작업 트리·히스토리·push 직전 세 겹 | 서버가 push 를 **거부**하는 층이 없다. 파트너 토큰 유효성 검사도 대체가 없다 |
+| main 삭제 금지 | **없다** | §3 참고 |

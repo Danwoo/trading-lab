@@ -1,0 +1,84 @@
+{
+  "_읽는_사람에게": [
+    "CodeQL 이 **이미 찾아 둔** 발견이다. 새로 켜는 게이트가 이것 때문에 첫날부터 빨갛지 않도록",
+    "여기 고정하고, 이 목록에 **없는 것만** 잡을 빨갛게 만든다.",
+    "",
+    "이 파일은 **줄어들기만 해야 한다.** 한 줄을 더하는 것은 「새 발견을 받아들인다」는 뜻이고,",
+    "그것은 리뷰에서 보인다. 고친 항목은 여기서 지운다 — 안 지우면 그 자리가 다시 열린다.",
+    "",
+    "알갱이는 (규칙, 파일) 이다. 줄 번호는 코드가 움직일 때마다 흔들려서 쓰지 않았다 —",
+    "대신 **같은 파일의 같은 규칙 위반이 하나 더 늘어도 안 잡힌다**는 한계가 생긴다."
+  ],
+  "기록_시점": "2026-09-14",
+  "출처": "gh api repos/Danwoo/trading-lab/code-scanning/alerts?state=open (public 인 동안 받아 둔 것)",
+  "항목": [
+    {
+      "path": "frontend/app/api/common/signup/route.ts",
+      "rule": "js/polynomial-redos"
+    },
+    {
+      "path": "frontend/utils/common/api/client.ts",
+      "rule": "js/request-forgery"
+    },
+    {
+      "path": "multi-agent-service/scripts/verify_redaction.py",
+      "rule": "py/clear-text-logging-sensitive-data"
+    },
+    {
+      "path": "scripts/verify_public_release_tree.py",
+      "rule": "py/clear-text-logging-sensitive-data"
+    },
+    {
+      "path": "backend-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "backend-service/app/routers/chat/chat_router.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "bot-agent-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "disclosure-mcp-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "doc-search-mcp-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "market-data-mcp-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "multi-agent-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "multi-agent-service/app/routers/agent/agent_router.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "news-mcp-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "portfolio-mcp-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "single-agent-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "template-mcp-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    },
+    {
+      "path": "web-mcp-service/app/core/exception_handler.py",
+      "rule": "py/stack-trace-exposure"
+    }
+  ]
+}
