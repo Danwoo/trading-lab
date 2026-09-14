@@ -141,6 +141,12 @@ PRECOMMIT_PARITY: dict[str, tuple[str, str]] = {
         "detect --no-git --redact --source .",
         "ci.yml `test: repo` 이 훅과 같은 버전으로 트리 전수를 스캔한다.",
     ),
+    "scan-push-for-secrets": (
+        "scripts/test_scan_push_for_secrets.py",
+        "훅 자체는 push 하는 쪽에서만 돌 수 있다 — CI 는 이미 착륙한 뒤다. 대신 ci.yml "
+        "`test: repo` 가 **그 훅이 잡아야 할 것을 잡는지**를 임시 레포로 검사한다. "
+        "훅이 놓친 것(`--no-verify`)은 `audit: main 착륙` 의 히스토리 전량 스캔이 받는다.",
+    ),
     "ruff-check": (
         "scripts/verify_python_format.py",
         "ci.yml 의 `ruff check app/` 은 두 서비스만 본다 — 레포 전수는 이 스크립트가 본다.",
@@ -163,7 +169,7 @@ PRECOMMIT_PARITY: dict[str, tuple[str, str]] = {
 }
 
 # 훅을 0건 읽으면 대조가 통째로 사라진다 — 하한을 걸고 실측 수를 출력에 남긴다.
-PRECOMMIT_HOOK_MINIMUM = 9
+PRECOMMIT_HOOK_MINIMUM = 10
 
 # 대응 문자열이 「파일 경로」인지 「명령 조각」인지 가르는 기준. 파일시스템을 안 보므로
 # 테스트에서도 같은 판정이 나온다.
