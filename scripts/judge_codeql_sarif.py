@@ -58,14 +58,28 @@ def load_baseline(path: Path) -> set[tuple[str, str]] | None:
     return {(e.get("rule"), e.get("path")) for e in entries if isinstance(e, dict)}
 
 
+def rules_of(run: dict) -> list[dict]:
+    """그 run 이 실은 규칙 전부.
+
+    **`driver.rules` 만 보면 안 된다.** 실물 CodeQL 은 질의 묶음을 `tool.extensions[]`
+    (SARIF 의 `toolComponent`)에 싣고 `driver.rules` 는 비운다 — 실측: 첫 main 실행에서
+    「규칙 0개」로 읽혀 fail-closed 가 헛불을 냈다(발견 18건은 정상 파싱됐다).
+    """
+    tool = run.get("tool") or {}
+    out = list((tool.get("driver") or {}).get("rules") or [])
+    for extension in tool.get("extensions") or []:
+        if isinstance(extension, dict):
+            out.extend(extension.get("rules") or [])
+    return out
+
+
 def findings_of(sarif: dict) -> list[tuple[str, str, str, str]]:
     """(규칙, 수준, 위치, 파일) 목록. `level` 은 결과에 없으면 규칙 기본값에서 읽는다."""
     found: list[tuple[str, str, str, str]] = []
     for run in sarif.get("runs", []):
-        driver = (run.get("tool") or {}).get("driver") or {}
         default_level = {
             rule.get("id"): ((rule.get("defaultConfiguration") or {}).get("level") or "warning")
-            for rule in driver.get("rules", [])
+            for rule in rules_of(run)
         }
         for result in run.get("results", []):
             rule_id = result.get("ruleId") or "(규칙 미상)"
@@ -105,6 +119,7 @@ def main() -> int:
     baseline = load_baseline(Path(args.baseline))
     findings: list[tuple[str, str, str, str]] = []
     rules = 0
+    runs = 0
     for path in files:
         try:
             sarif = json.loads(path.read_text(encoding="utf-8"))
@@ -112,7 +127,8 @@ def main() -> int:
             print(f"::error::{path.name} 을 읽지 못했다 ({error}) — 판독 불가는 통과가 아니다.")
             return 1
         for run in sarif.get("runs", []):
-            rules += len(((run.get("tool") or {}).get("driver") or {}).get("rules", []))
+            rules += len(rules_of(run))
+            runs += 1
         findings.extend(findings_of(sarif))
 
     at_level = [f for f in findings if f[1] in BLOCKING_LEVELS]
@@ -127,9 +143,17 @@ def main() -> int:
         f"CodeQL({args.language}) — SARIF {len(files)}개 · 규칙 {rules}개 · "
         f"발견 {len(findings)}건 (차단 수준 {len(at_level)}건 · 기존 {len(known)}건 · 새 {len(blocking)}건)"
     )
-    if rules == 0:
-        print("::error::규칙 0개로 분석됐다 — 질의 묶음이 안 실린 것이다. 통과가 아니다.")
+    # **가드의 뜻은 「분석이 조용히 안 돌았다」이지 「규칙 목록이 비었다」가 아니다.**
+    # 규칙이 어디 실리는지는 CodeQL 판본이 정하므로(실측: extensions 쪽) 그것 하나로 판정하면
+    # 헛불이 난다. 규칙도 0이고 발견도 0이고 run 도 없을 때만 「아무것도 안 봤다」로 본다.
+    if runs == 0:
+        print("::error::SARIF 에 run 이 0개다 — 분석이 안 돈 것이다. 통과가 아니다.")
         return 1
+    if rules == 0 and not findings:
+        print("::error::규칙도 발견도 0이다 — 질의 묶음이 안 실렸을 수 있다. 통과가 아니다.")
+        return 1
+    if rules == 0:
+        print(f"::warning::규칙 목록이 비어 있다(발견 {len(findings)}건은 읽었다) — 판본이 규칙을 다른 자리에 싣는다")
 
     blocking_set = set(blocking)
     for finding in findings:

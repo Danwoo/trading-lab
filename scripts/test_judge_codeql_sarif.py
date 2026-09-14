@@ -129,6 +129,33 @@ def main() -> int:
     code, _ = run({"python.sarif": sarif([result("note")])}, baseline=same)
     check("note 는 베이스라인과 무관하게 막지 않는다", code, 0)
 
+    # ── 실물 CodeQL 의 모양 ──────────────────────────────────────────
+    # 규칙은 `driver.rules` 가 아니라 `tool.extensions[]` 에 실린다 — 합성 픽스처만 보고
+    # 「규칙 0개 = 분석 안 됨」으로 막았다가 첫 실물 실행에서 헛불이 났다(발견 18건은 정상
+    # 파싱됐다). 이 경계를 실물 모양으로 고정한다.
+    def real_shape(results):
+        return {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {
+                        "driver": {"name": "CodeQL", "rules": []},
+                        "extensions": [{"name": "codeql/python-queries", "rules": [{"id": "r1"}]}],
+                    },
+                    "results": results,
+                }
+            ],
+        }
+
+    code, out = run({"python.sarif": real_shape([result("error")])}, baseline=[{"rule": "r1", "path": "app/x.py"}])
+    check("규칙이 extensions 에 있어도 읽는다", code, 0)
+    check("규칙 수를 0으로 세지 않는다", "규칙 0개" in out, False)
+
+    code, _ = run(
+        {"python.sarif": real_shape([result("error", rule="r2")])}, baseline=[{"rule": "r1", "path": "app/x.py"}]
+    )
+    check("실물 모양에서도 새 발견은 막는다", code, 1)
+
     # ── fail-closed ────────────────────────────────────────────────
     code, out = run({})
     check("SARIF 0건은 통과가 아니다", code, 1)
@@ -138,8 +165,11 @@ def main() -> int:
     check("디렉터리가 없어도 통과가 아니다", code, 1)
 
     code, out = run({"python.sarif": sarif([], rules=[])})
-    check("규칙 0개로 분석된 것은 통과가 아니다", code, 1)
-    check("규칙 0개의 사유를 말한다", "질의 묶음이 안 실린" in out, True)
+    check("규칙도 발견도 0이면 통과가 아니다", code, 1)
+    check("그 사유를 말한다", "질의 묶음이 안 실렸을 수 있다" in out, True)
+    code, out = run({"python.sarif": {"version": "2.1.0", "runs": []}})
+    check("run 이 0개면 통과가 아니다", code, 1)
+    check("run 0개의 사유를 말한다", "run 이 0개다" in out, True)
 
     with tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp) / "results"
