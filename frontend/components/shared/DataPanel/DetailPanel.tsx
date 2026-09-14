@@ -9,6 +9,7 @@ import { Loading } from "@/components/shared/Feedback/Loading";
 import { useUploadProgressStore } from "@/stores/shared/uploadProgressStore";
 import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
 import { WRITE_DENIED_SHORT } from "@/constants/writeAccess";
+import { isUnchanged, NOTHING_CHANGED } from "@/utils/common/form/unchanged";
 
 type ModeType = "view" | "edit" | "create";
 
@@ -150,6 +151,18 @@ export function DetailPanel<T, F>({
         setMode("view");
         return true;
       } else if (mode === "edit" && apiService.update) {
+        // 안 바뀐 저장에 「수정이 완료되었습니다」라고 하지 않는다 (#446 F33). 여기가 거의 모든
+        // CRUD 화면이 지나는 자리라, 화면마다 따로 거르면 빠지는 곳이 남는다.
+        //
+        // **기준선은 `currentData` 다 — 폼이 실제로 보여준 값**이지 목록에서 받은 prop 이
+        // 아니다. `handleEdit` 이 `apiService.select` 로 최신을 다시 불러 폼을 채우는데
+        // (그 select 가 있는 이유 자체가 prop 이 낡을 수 있어서다), prop 과 비교하면 남의
+        // 탭이 바꾼 값을 **원래대로 되돌리는 진짜 편집**이 「안 바뀜」으로 삼켜진다 —
+        // 이 판정이 한쪽으로만 틀려야 하는 그 방향으로 틀린다.
+        if (isUnchanged(submitData, currentData)) {
+          showToast(NOTHING_CHANGED, "info");
+          return false;
+        }
         result = await apiService.update(submitData);
         const latest = await apiService.select(data as any);
         showToast(result?.message || "수정이 완료되었습니다.", "success");
