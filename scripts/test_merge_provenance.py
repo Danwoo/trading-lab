@@ -174,6 +174,20 @@ LINE_CASES = [
 ]
 
 
+#: 지우는 것 / 남기는 것 — 이 경계가 규약의 전부다.
+STRIP_CASES = [
+    ("Claude 공동저자 트레일러", "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>", False),
+    ("대소문자가 달라도", "co-authored-by: Claude <noreply@anthropic.com>", False),
+    ("세션 링크", "Claude-Session: https://claude.ai/code/session_abc", False),
+    ("맨 claude.ai 링크", "https://claude.ai/code/session_abc", False),
+    ("생성 배지", "\U0001f916 Generated with [Claude Code](https://claude.com/claude-code)", False),
+    ("에이전트 신원은 남는다", "Co-authored-by: claude-opus-agent <claude-opus-agent@noreply.local>", True),
+    ("사람 신원은 남는다", "Co-authored-by: Danwoo <tjeksdn173@gmail.com>", True),
+    ("dependabot 서명은 남는다", "Signed-off-by: dependabot[bot] <support@github.com>", True),
+    ("본문 문장은 남는다", "claude 로 만든 봇이 아니라 사용자가 만든 봇이다", True),
+]
+
+
 def load_fixtures():
     if not FIXTURES.is_file():
         return []
@@ -188,14 +202,51 @@ def main() -> int:
     if not fixtures:
         print(f"::error::실물 픽스처를 0건 읽었습니다: {FIXTURES} (fail-closed)")
         return 1
+    # **기대값을 검사 대상 함수로 만들지 않는다.** 종전에는 `want` 를
+    # `strip_ai_self_reference(실물)` 로 만들었는데, 그러면 그 함수가 과하게 지워도 `want` 가
+    # 똑같이 과하게 줄어 **항상 통과한다** — 검사할 수 없는 구조였다 (#489 리뷰 지적).
+    #
+    # 이제 필터가 닿는 픽스처는 **필터 후 본문을 픽스처 파일에 글자 그대로 고정**해 두고
+    # (`expected_after_filter`, 지워진 줄을 사람이 읽고 확인했다), 나머지는 실물과 **바이트
+    # 동일**을 요구한다 — AI 언급이 없는 커밋이 한 글자라도 바뀌면 여기서 걸린다.
+    stripped_any = 0
     for fx in fixtures:
         got = mp.reproduce_squash_body(fx["commits"]).rstrip("\n")
-        if got != fx["expected_body"]:
+        if "expected_after_filter" in fx:
+            stripped_any += 1
+            want = fx["expected_after_filter"].rstrip("\n")
+        else:
+            want = fx["expected_body"].rstrip("\n")
+        if got != want:
             failures.append(
-                f"PR #{fx['pr']} ({fx['desc']}) 재현본이 실물과 다르다\n"
-                f"    기대 끝: {fx['expected_body'][-160:]!r}\n"
+                f"PR #{fx['pr']} ({fx['desc']}) 재현본이 실물(자기 광고 제외)과 다르다\n"
+                f"    기대 끝: {want[-160:]!r}\n"
                 f"    실제 끝: {got[-160:]!r}"
             )
+        if mp._AI_SELF_REFERENCE.search(got) or "anthropic.com" in got or "Claude-Session" in got:
+            failures.append(f"PR #{fx['pr']}: 재현본에 AI 자기 광고가 남았다")
+
+    # 필터가 살아 있는지 **실물로** 증명한다 — 아무 데서도 아무것도 안 지우면 그 필터는 죽은
+    # 것이고, 죽은 필터는 다음 커밋에서 조용히 통과시킨다.
+    if stripped_any == 0:
+        failures.append(
+            "AI 자기 광고를 지우는 픽스처가 0건이다 — 필터가 죽었거나 픽스처가 그 경로를 안 덮는다 (fail-closed)"
+        )
+    else:
+        print(f"AI 자기 광고를 지운 픽스처: {stripped_any}/{len(fixtures)}건 (나머지는 실물과 바이트 동일 요구)")
+
+    # **AI 언급이 없으면 한 글자도 바뀌지 않는다.** 이 모듈의 계약이 「재현」이므로, 필터가
+    # 있다는 이유로 무관한 커밋의 문단 경계가 달라지면 그 계약이 깨진다.
+    untouched = "fix: 원장 조정\n\n재현 로그:\n```\nERROR\n```\n\n\n위 로그가 원인이다."
+    if mp.strip_ai_self_reference(untouched) != untouched:
+        failures.append(
+            "AI 언급이 없는 메시지가 바뀌었다 — 연속 빈 줄을 무조건 접으면 재현 계약이 깨진다\n"
+            f"    기대: {untouched!r}\n    실제: {mp.strip_ai_self_reference(untouched)!r}"
+        )
+    # 이음매는 접는다 — 지운 자리에 빈 줄이 겹친 채로 두면 문단이 벌어진다.
+    seam = "제목\n\n본문\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n꼬리"
+    if mp.strip_ai_self_reference(seam) != "제목\n\n본문\n\n꼬리":
+        failures.append(f"제거 이음매의 겹친 빈 줄이 안 접혔다 — 실제: {mp.strip_ai_self_reference(seam)!r}")
 
     # ── ② provenance 줄이 본문을 훼손하지 않는가 ───────────────────────────────
     for fx in fixtures:
@@ -237,19 +288,32 @@ def main() -> int:
                     f"{missing} (트레일러 판독이 깨진다)"
                 )
 
+    # ── ②-2 무엇을 지우고 무엇을 남기는가 ──────────────────────────────────────
+    if not STRIP_CASES:
+        print("::error::자기 광고 경계 케이스를 0건 모았습니다 (fail-closed)")
+        return 1
+    for desc, line, keep in STRIP_CASES:
+        body = f"제목\n\n본문\n{line}\n"
+        survived = line in mp.strip_ai_self_reference(body)
+        if survived != keep:
+            failures.append(
+                f"자기 광고 경계 — {desc}: 기대 {'남김' if keep else '지움'} · 실제 {'남김' if survived else '지움'}"
+            )
+
     # ── ③ 어휘 ────────────────────────────────────────────────────────────────
     for desc, payload, expected in LINE_CASES:
         got = mp.provenance_line(payload)
         if got != expected:
             failures.append(f"{desc}\n    기대: {expected}\n    실제: {got}")
 
-    total = len(fixtures) * 2 + len(LINE_CASES)
+    total = len(fixtures) * 3 + len(STRIP_CASES) + len(LINE_CASES) + 2
     if not LINE_CASES:
         print("::error::어휘 케이스를 0건 모았습니다 (fail-closed)")
         return 1
     print(
         f"merge_provenance 케이스 {total}건 검사 "
-        f"(실물 재현 {len(fixtures)}건 · 무손실 {len(fixtures)}건 · 어휘 {len(LINE_CASES)}건)"
+        f"(실물 재현 {len(fixtures)}건 · 자기 광고 잔류 {len(fixtures)}건 · 무손실 {len(fixtures)}건 · "
+        f"자기 광고 경계 {len(STRIP_CASES)}건 · 무관 커밋 보존 2건 · 어휘 {len(LINE_CASES)}건)"
     )
     if failures:
         for f in failures:
