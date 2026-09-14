@@ -19,14 +19,34 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import audit_main_landing as audit
 from audit_main_landing import judge_all, judge_commit  # noqa: E402
 
-HEAD = "abc1234def5678"
-GREEN = [{"name": n, "conclusion": "success"} for n in ("test: backend", "test: frontend", "test: repo")]
+# 실제 마커는 **40자 sha** 를 싣는다(리뷰 프롬프트 계약). 짧은 값을 픽스처로 쓰면 그물이
+# 검사하는 세계가 현실과 달라지고, 접두 비교 같은 느슨함이 초록으로 통과한다.
+HEAD = "abc1234def5678" + "0" * 26
+# 실제 체크런은 `id` 를 달고 오고, **같은 이름이 여럿일 수 있다**(재실행). id 없는 픽스처를
+# 쓰면 그물이 검사하는 세계가 현실과 달라져 「최신값 판정」 축이 통째로 안 보인다.
+GREEN = [
+    {"id": i, "name": n, "conclusion": "success"}
+    for i, n in enumerate(("test: backend", "test: frontend", "test: repo"), start=1)
+]
 
 
-def marker(sha: str = HEAD, verdict: str = "merge_ok") -> dict:
-    return {"body": f"판정 코멘트\n\n<!-- cross-review v1 model=kimi verdict={verdict} sha={sha} -->"}
+def marker(sha: str = HEAD, verdict: str = "merge_ok", **author) -> dict:
+    """판정 코멘트 — **저자가 붙는다.** 기본은 이 레포의 워크플로가 게시한 실제 모양이다.
+
+    마커는 텍스트일 뿐이고 head sha 는 공개 정보라, 저자를 안 가르면 아무나 코멘트 하나로
+    「리뷰 통과」를 만들 수 있다. 그래서 이 픽스처의 기본값도 **저자가 있는** 모양이어야 한다 —
+    저자 없는 모양을 기본으로 두면 그물이 검사하는 세계가 현실과 달라진다.
+    """
+    base = {
+        "body": f"판정 코멘트\n\n<!-- cross-review v1 model=kimi verdict={verdict} sha={sha} -->",
+        "user": {"login": "github-actions", "type": "Bot"},
+        "author_association": "NONE",
+    }
+    base.update(author)
+    return base
 
 
 def pr(**over) -> dict:
@@ -77,11 +97,42 @@ def main() -> int:
     check("판정이 merge_ok 아님 → 위반", violated(ev(pulls=[pr(comments=[marker(verdict="unable")])])), True)
     check(
         "리뷰가 본 커밋과 머지된 커밋이 다름 → 위반",
-        violated(ev(pulls=[pr(comments=[marker(sha="9999999")])])),
+        violated(ev(pulls=[pr(comments=[marker(sha="9" * 40)])])),
+        True,
+    )
+    # **sha 는 40자 동등 비교다.** 종전에는 접두 매치를 허용했는데, 그러면 앞자리만 같은 다른
+    # 커밋의 판정이 통과한다 — 같은 마커를 읽는 `review_record` 는 처음부터 동등 비교였다.
+    check(
+        "짧은 sha 로 적힌 마커는 읽지 않는다 — 실제 마커는 늘 40자다",
+        violated(ev(pulls=[pr(comments=[marker(sha=HEAD[:7])])])),
         True,
     )
     check(
-        "짧은 sha 로 적힌 마커도 같은 커밋이면 통과", violated(ev(pulls=[pr(comments=[marker(sha=HEAD[:7])])])), False
+        "앞 7자만 같은 다른 커밋의 판정은 통과하지 못한다",
+        violated(ev(pulls=[pr(comments=[marker(sha=HEAD[:7] + "f" * 33)])])),
+        True,
+    )
+    # 마커 문법도 정본을 쓴다 — 앞 층이 거부하는 모양을 마지막 방어선이 통과시키면 안 된다.
+    loose = {
+        **marker(),
+        "body": f"<!-- cross-review v1 verdict=merge_ok sha={HEAD} -->",
+    }
+    check("model 이 없는 마커는 읽지 않는다", violated(ev(pulls=[pr(comments=[loose])])), True)
+    unclosed = {**marker(), "body": f"<!-- cross-review v1 model=kimi verdict=merge_ok sha={HEAD}"}
+    check("닫히지 않은 마커는 읽지 않는다", violated(ev(pulls=[pr(comments=[unclosed])])), True)
+    upper = {**marker(), "body": f"<!-- cross-review v1 model=kimi verdict=merge_ok sha={HEAD.upper()} -->"}
+    check("대문자 sha 마커는 읽지 않는다", violated(ev(pulls=[pr(comments=[upper])])), True)
+
+    # 수동 마커는 리뷰가 **있었던** 것이므로 통과시키되, 기록에 남긴다 (#285 규약 — 자동 머지
+    # 권한은 얻지 못한다). 「사람이 손으로 붙였다」와 「CI 가 판정했다」를 같은 줄로 적으면
+    # 나중에 구분할 근거가 사라진다.
+    manual = {**marker(), "body": f"<!-- cross-review v1 model=codex verdict=merge_ok sha={HEAD} source=manual -->"}
+    manual_verdict = judge_commit(ev(pulls=[pr(comments=[manual])]))
+    check("수동 마커는 위반이 아니다", bool(manual_verdict["violations"]), False)
+    check(
+        "수동 마커는 기록에 남는다",
+        any("source=manual" in note for note in manual_verdict["notes"]),
+        True,
     )
 
     # ── 양성: 게이트 축 ────────────────────────────────────────
@@ -110,6 +161,98 @@ def main() -> int:
     mixed = pr(files=["CONTEXT.md", "frontend/app/page.tsx"], comments=[{"body": "마커 없음"}])
     check("문서에 코드가 섞이면 면제가 사라진다", violated(ev(pulls=[mixed])), True)
 
+    # ── 마커를 아무나 쓰지 못한다 ────────────────────────────────
+    # 이 감사는 private 전환으로 사라지는 승인 규칙을 대신하는 **마지막 방어선**이다. 저자를
+    # 안 가르면 아무 GitHub 사용자나 코멘트 하나로 그 방어선을 통과한다 — 레포가 public 인
+    # 동안에는 지금 당장 살아 있는 표면이다.
+    outsider = marker(user={"login": "random-outside-commenter", "type": "User"}, author_association="NONE")
+    check("제3자가 쓴 마커는 읽지 않는다", violated(ev(pulls=[pr(comments=[outsider])])), True)
+    fake_bot = marker(user={"login": "not-our-bot", "type": "Bot"}, author_association="NONE")
+    check("봇처럼 보이는 낯선 신원도 읽지 않는다", violated(ev(pulls=[pr(comments=[fake_bot])])), True)
+    half_bot = marker(user={"login": "github-actions", "type": "User"}, author_association="NONE")
+    check("로그인만 맞고 타입이 다르면 읽지 않는다", violated(ev(pulls=[pr(comments=[half_bot])])), True)
+    no_author = {"body": marker()["body"]}
+    check("저자를 모르면 읽지 않는다", violated(ev(pulls=[pr(comments=[no_author])])), True)
+
+    owner = marker(user={"login": "Danwoo", "type": "User"}, author_association="OWNER")
+    check("레포 주인이 쓴 마커는 읽는다", violated(ev(pulls=[pr(comments=[owner])])), False)
+    app = marker(user={"login": "trading-lab-ci", "type": "Bot"}, author_association="NONE")
+    check("승인 App 이 쓴 마커는 읽는다", violated(ev(pulls=[pr(comments=[app])])), False)
+    # 위조가 진짜 뒤에 와도 진짜를 덮지 못한다 — 마지막 매치가 이기는 규칙의 사각지대.
+    check(
+        "제3자 마커가 뒤에 와도 앞의 진짜 판정을 덮지 못한다",
+        violated(ev(pulls=[pr(comments=[app, marker(verdict="needs_changes", user={"login": "x", "type": "User"})])])),
+        False,
+    )
+
+    # ── 재실행된 체크런은 최신 것으로 판정한다 ──────────────────────
+    # 재실행은 이 레포의 정규 운용이다(루트 CLAUDE.md 「쓸어담기」). 그냥 딕셔너리로 접으면
+    # API 가 준 순서에서 나중 것이 이기는데 그 순서는 보장되지 않는다 — 재실행으로 통과한
+    # 착륙이 영영 빨갛게 남거나, 반대로 실패가 초록으로 읽힌다.
+    others = GREEN[:2]
+    healed = [
+        {"id": 1, "name": "test: repo", "conclusion": "failure"},
+        {"id": 9, "name": "test: repo", "conclusion": "success"},
+    ]
+    check("재실행으로 고쳐졌으면 통과 — 새것이 뒤에", violated(ev(pulls=[pr(checks=others + healed)])), False)
+    check("재실행으로 고쳐졌으면 통과 — 새것이 앞에", violated(ev(pulls=[pr(checks=others + healed[::-1])])), False)
+    broke = [
+        {"id": 1, "name": "test: repo", "conclusion": "success"},
+        {"id": 9, "name": "test: repo", "conclusion": "failure"},
+    ]
+    check("재실행에서 깨졌으면 위반 — 새것이 뒤에", violated(ev(pulls=[pr(checks=others + broke)])), True)
+    check("재실행에서 깨졌으면 위반 — 새것이 앞에", violated(ev(pulls=[pr(checks=others + broke[::-1])])), True)
+
+    # ── 잘린 목록을 완전한 것으로 쓰지 않는다 ──────────────────────
+    # 한 페이지(100건)만 읽으면 앞 100개가 문서이고 101번째가 코드인 PR 이 「문서 전용」이 되어
+    # 리뷰 마커를 면제받는다. 체크런도 같다 — 2페이지의 빨간 체크를 못 보면 초록으로 읽힌다.
+    docs_100 = [f"docs/d{i}.md" for i in range(100)]
+    check("100개가 전부 문서면 면제한다", violated(ev(pulls=[pr(files=docs_100, comments=[])])), False)
+    check(
+        "101번째가 코드면 면제가 사라진다",
+        violated(ev(pulls=[pr(files=docs_100 + ["app/main.py"], comments=[])])),
+        True,
+    )
+    check("파일 목록을 못 읽으면 면제하지 않는다", violated(ev(pulls=[pr(files=None, comments=[])])), True)
+
+    # 수집부가 실제로 모든 페이지를 따라가는가 — 판정부만 고치면 잘린 목록이 그대로 들어온다.
+    calls: list[str] = []
+
+    def fake_gh(path: str):
+        calls.append(path)
+        page = int(path.split("page=")[-1]) if "page=" in path else 1
+        if "/files" in path:
+            return [{"filename": f"docs/p{page}-{i}.md"} for i in range(100 if page < 3 else 7)]
+        if "/comments" in path:
+            return [] if page > 1 else [marker()]
+        if "check-runs" in path:
+            return {"check_runs": GREEN if page == 1 else []}
+        return [{"number": 1, "merged_at": "now", "head": {"sha": HEAD}}]
+
+    original = audit._gh
+    audit._gh = fake_gh
+    try:
+        collected = audit.collect("o/r", "0" * 40)
+    finally:
+        audit._gh = original
+    files = collected["pulls"][0]["files"]
+    check("파일을 마지막 페이지까지 모은다", len(files), 207)
+    check("페이지를 실제로 넘겼다", sum(1 for c in calls if "/files" in c), 3)
+
+    # 한 페이지라도 못 읽으면 목록이 아니라 `None` 이다 — 빈 목록으로 뭉개면 「볼 것이
+    # 없었다」가 「위반이 없었다」로 읽힌다.
+    def broken_gh(path: str):
+        if "/files" in path and "page=2" in path:
+            return None
+        return fake_gh(path)
+
+    audit._gh = broken_gh
+    try:
+        broken = audit.collect("o/r", "0" * 40)
+    finally:
+        audit._gh = original
+    check("한 페이지라도 못 읽으면 목록이 None 이다", broken["pulls"][0]["files"], None)
+
     # ── fail-closed ──────────────────────────────────────────
     check("조회 실패(None)를 통과로 읽지 않는다", violated(ev(pulls=None)), True)
     check("체크 조회 실패를 통과로 읽지 않는다", violated(ev(pulls=[pr(checks=None)])), True)
@@ -121,8 +264,12 @@ def main() -> int:
     for line in FAILURES:
         print(f"FAIL {line}")
     print(f"\n검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과")
+    # 실패한 판에 성공 문구를 찍으면 로그를 읽는 사람이 정반대 사실을 읽는다.
+    if FAILURES:
+        print("판정: 착륙 감사가 기대와 다르게 동작한다 — 위 FAIL 을 보라")
+        return 1
     print("판정: 사후 감사가 양성(PR 미경유·리뷰 없음·게이트 실패)을 잡고, 정상 착륙은 통과시킨다")
-    return 1 if FAILURES else 0
+    return 0
 
 
 if __name__ == "__main__":

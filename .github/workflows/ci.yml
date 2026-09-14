@@ -1422,7 +1422,7 @@ jobs:
   # 남겨 사람이 보게 하는 것이고, 그것이 이 층의 전부다.
   #
   # 판정부는 `scripts/audit_main_landing.py` 의 순수 함수이고 합성 증거로 전수 검증된다
-  # (`scripts/test_audit_main_landing.py` — 양성·음성·fail-closed 17건). 여기서는 조회만 한다.
+  # (`scripts/test_audit_main_landing.py` — 양성·음성·저자 위조·잘린 목록·fail-closed). 여기서는 조회만 한다.
   main-landing-audit:
     name: "audit: main 착륙 (비게이트)"
     if: ${{ github.event_name == 'push' }}
