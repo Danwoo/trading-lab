@@ -16,7 +16,7 @@ import {
 
 // 백엔드 계약: backend-service/app/schemas/bot/bot_schema.py
 //   Bot{bot_desc?(500), combine_rule(AND|OR|SCORE), universe_kind(POOL|WATCHLIST|LIST),
-//       universe_ref?, alloc_per_symbol?(ge0), max_positions?(gt0), stop_loss_pct?(0~100),
+//       universe_ref?, alloc_per_symbol?(0~100), max_positions?(gt0), stop_loss_pct?(0~100),
 //       take_profit_pct?(ge0), max_trades_per_day?(gt0), bot_role(READONLY|PROPOSE|EXECUTE),
 //       use_at(1), param_sources}
 //   BotCreateIn = Bot + bot_nm(1~100) + strategies[]
@@ -54,7 +54,7 @@ export const BotSchema = object({
   combine_rule: enums(COMBINE_RULES),
   universe_kind: enums(UNIVERSE_KINDS),
   universe_ref: Optional(record(z.any())),
-  alloc_per_symbol: Optional(PositiveFloat()),
+  alloc_per_symbol: Optional(FloatRange(0, 100)),
   max_positions: Optional(PositiveInt()),
   stop_loss_pct: Optional(FloatRange(0, 100)),
   take_profit_pct: Optional(PositiveFloat()),

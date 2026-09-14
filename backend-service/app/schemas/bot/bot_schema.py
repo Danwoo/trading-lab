@@ -1,7 +1,7 @@
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from schemas.common_schema import WEIGHT_MAX, CommonEntity, Money, TrimmedBaseModel
+from schemas.common_schema import PERCENT_MAX, WEIGHT_MAX, CommonEntity, Money, TrimmedBaseModel
 
 CombineRule = Literal["AND", "OR", "SCORE"]
 UniverseKind = Literal["POOL", "WATCHLIST", "LIST"]
@@ -71,8 +71,11 @@ class Bot(TrimmedBaseModel):
         default=None,
         description="universe_kind 가 LIST 일 때 볼 종목 목록을 담는 객체. 나머지 종류에서는 비웁니다.",
     )
-    alloc_per_symbol: float | None = Field(
-        None, ge=0, description="종목당 비중 (%, 0 이상). 비우면 배분을 정하지 않은 것으로 둡니다."
+    alloc_per_symbol: Money | None = Field(
+        None,
+        ge=0,
+        le=PERCENT_MAX,
+        description="종목당 비중 (%, 0~100). 소수점 둘째 자리까지. 비우면 배분을 정하지 않은 것으로 둡니다.",
     )
     max_positions: int | None = Field(None, gt=0, description="동시에 들고 갈 최대 종목 수 (1 이상). 비우면 제한 없음.")
     stop_loss_pct: float | None = Field(None, ge=0, le=100, description="손절선 (%, 0~100). 비우면 손절하지 않습니다.")

@@ -7,6 +7,7 @@ from pydantic import AfterValidator, BaseModel, Field, field_validator
 QUANTITY_MAX = 2_147_483_647  # integer
 MONEY_MAX = 1e15  # Numeric(18,2) 안쪽의 보수적인 상한
 WEIGHT_MAX = 9999.99  # Numeric(6,2)
+PERCENT_MAX = 100.0  # 비중·비율은 전체의 몫이라 100% 를 넘을 수 없다
 
 
 def _reject_subunit(v: float | None) -> float | None:

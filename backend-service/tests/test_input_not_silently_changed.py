@@ -23,7 +23,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND / "app"))
 
 from pydantic import ValidationError  # noqa: E402
-from schemas.bot.bot_schema import BotStrategyIn  # noqa: E402
+from schemas.bot.bot_schema import BotCreateIn, BotStrategyIn  # noqa: E402
 from schemas.portfolio.portfolio_schema import Holding, HoldingCreateIn  # noqa: E402
 from schemas.watchlist.watchlist_schema import WatchlistCreateIn  # noqa: E402
 
@@ -85,6 +85,30 @@ def test_컬럼_안의_가중치는_통과한다() -> str:
     return "컬럼 안의 가중치는 통과한다"
 
 
+def _bot(**kwargs) -> BotCreateIn:
+    """비중 말고는 전부 기본값인 최소 봇 — 이 파일이 재는 것은 비중 한 칸이다."""
+    return BotCreateIn(bot_nm="테스트봇", strategies=[{"strategy_key": "sma_cross"}], **kwargs)
+
+
+# 「종목당 비중」은 전체의 몫이라 100% 를 넘을 수 없고, 저장 컬럼은 Numeric(18,2) 다.
+# 이 두 줄이 없던 동안 100,000 이 그대로 통과했고(보드에 100,000%% 가 남는다),
+# 0.0000001 은 INSERT 시 조용히 0.00 으로 반올림됐다 — 사용자가 넣지 않은 값이 된다.
+def test_비중은_100퍼센트를_넘지_못한다() -> str:
+    _rejects(lambda: _bot(alloc_per_symbol=100_000), expect_in="less than or equal to 100")
+    return "비중은 100% 를 넘지 못한다"
+
+
+def test_비중의_셋째_자리_아래는_거부된다() -> str:
+    _rejects(lambda: _bot(alloc_per_symbol=0.0000001), expect_in="소수점 둘째 자리")
+    return "비중의 셋째 자리 아래는 거부된다"
+
+
+def test_범위_안의_비중은_그대로_통과한다() -> str:
+    assert _bot(alloc_per_symbol=12.34).alloc_per_symbol == 12.34
+    assert _bot(alloc_per_symbol=100).alloc_per_symbol == 100.0
+    return "범위 안의 비중은 그대로 통과한다"
+
+
 def test_오타_필드는_조용히_사라지지_않는다() -> str:
     # `quantity` 를 `quantiy` 로 잘못 쓰면 종전에는 그 값이 통째로 버려지고 저장은 성공했다.
     # 사용자는 0주가 저장된 것을 나중에 보드에서 발견한다.
@@ -110,6 +134,9 @@ def _main() -> int:
         test_저장_한도를_넘는_평단은_거부된다,
         test_가중치는_컬럼_상한을_넘지_못한다,
         test_컬럼_안의_가중치는_통과한다,
+        test_비중은_100퍼센트를_넘지_못한다,
+        test_비중의_셋째_자리_아래는_거부된다,
+        test_범위_안의_비중은_그대로_통과한다,
         test_오타_필드는_조용히_사라지지_않는다,
         test_아는_필드만_있으면_종전대로_통과한다,
     ]
