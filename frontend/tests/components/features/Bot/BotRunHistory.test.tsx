@@ -27,11 +27,12 @@ afterEach(() => {
   selectRuns.mockReset();
 });
 
-function aRun(runId: number) {
+function aRun(runId: number, params: Record<string, unknown> = { period: 20 }) {
   return {
     run_id: runId,
     status: "succeeded",
     strategy_key: "pullback",
+    params,
     universe_def: {},
     period_from: "2026-01-01",
     period_to: "2026-06-30",
@@ -100,5 +101,45 @@ describe("#232 봇 상세의 검증 이력", () => {
 
     await waitFor(() => expect(screen.getByText(/이력을 불러오지 못했습니다/)).toBeTruthy());
     expect(screen.queryByText(/아직 검증한 적이 없습니다/)).toBeNull();
+  });
+});
+
+// F13 — 같은 조합을 다시 돌리면 새 행이 생긴다(실측: 한 조합이 25행). 목록이 조합을 보이고
+// 반복임을 말해야 「이 봇을 500번 검증했다」가 무엇을 뜻하는지 읽힌다.
+describe("F13 이력에서 조합이 보이고 반복이 드러난다", () => {
+  it("각 줄이 돌린 조합을 격자와 같은 어휘로 보인다", async () => {
+    selectRuns.mockResolvedValue({ items: [aRun(11, { ma_period: 120, pullback_pct: 15 })], total_count: 1 });
+
+    render(<BotRunHistory botId={7} />);
+
+    await waitFor(() => expect(screen.getByText(/ma_period=120 · pullback_pct=15/)).toBeTruthy());
+  });
+
+  it("같은 조합의 뒤 실행은 먼저 돌린 번호를 가리킨다 — 더 오래된 쪽이 원본이다", async () => {
+    // 목록은 최신순으로 온다.
+    selectRuns.mockResolvedValue({
+      items: [aRun(686, { ma_period: 120, pullback_pct: 15 }), aRun(661, { ma_period: 120, pullback_pct: 15 })],
+      total_count: 2,
+    });
+
+    render(<BotRunHistory botId={7} />);
+
+    await waitFor(() => expect(screen.getByText("#686")).toBeTruthy());
+    // 줄은 번호로 시작한다 — `includes("#661")` 로 찾으면 #686 줄의 안내문이 먼저 잡힌다.
+    const rows = screen.getAllByRole("listitem").map((li) => li.textContent ?? "");
+    expect(rows.find((r) => r.startsWith("#686"))).toContain("같은 조합을 #661 에서 이미 돌렸습니다");
+    expect(rows.find((r) => r.startsWith("#661"))).not.toContain("이미 돌렸습니다");
+  });
+
+  it("조합이 다르면 반복이라 하지 않는다", async () => {
+    selectRuns.mockResolvedValue({
+      items: [aRun(12, { ma_period: 20 }), aRun(11, { ma_period: 5 })],
+      total_count: 2,
+    });
+
+    render(<BotRunHistory botId={7} />);
+
+    await waitFor(() => expect(screen.getByText("#12")).toBeTruthy());
+    expect(screen.queryByText(/이미 돌렸습니다/)).toBeNull();
   });
 });

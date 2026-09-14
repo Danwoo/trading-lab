@@ -10,6 +10,7 @@
 
 import datetime as dt
 
+from repositories.common.sql_format import DT_ISO_TZ
 from sqlalchemy import text
 from utils.common.devextreme_utils import build_filter_params, parse_sort
 
@@ -24,7 +25,7 @@ class IngestRepository:
 
     # ── 잡 레코드 ────────────────────────────────────────────────────────────
     def query_select_ingest_run(self) -> str:
-        return """
+        return f"""
             SELECT *
               FROM (
                 SELECT run_id
@@ -39,11 +40,11 @@ class IngestRepository:
                      , skipped_rows
                      , failed_reason
                      , workspace_id
-                     , to_char(started_dt, 'YYYY-MM-DD HH24:MI:SS')  AS started_dt
-                     , to_char(finished_dt, 'YYYY-MM-DD HH24:MI:SS') AS finished_dt
-                     , to_char(reg_dt, 'YYYY-MM-DD HH24:MI:SS')      AS reg_dt
+                     , to_char(started_dt, '{DT_ISO_TZ}')  AS started_dt
+                     , to_char(finished_dt, '{DT_ISO_TZ}') AS finished_dt
+                     , to_char(reg_dt, '{DT_ISO_TZ}')      AS reg_dt
                      , reg_id
-                     , to_char(mod_dt, 'YYYY-MM-DD HH24:MI:SS')      AS mod_dt
+                     , to_char(mod_dt, '{DT_ISO_TZ}')      AS mod_dt
                      , mod_id
                   FROM tn_ingest_run
                 ) A

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 
 import { RunReportView } from "@/components/features/Bench/RunReportView";
-import type { MetricOut, OpenPositionOut, RunReportOut } from "@/schemas/backtest/backtest";
+import type { MetricOut, OpenPositionOut, RunReportOut, TradeOut } from "@/schemas/backtest/backtest";
 
 // jsdom 에는 캔버스가 없다 — 차트 팩토리는 브라우저 실측이 정본이고, 여기서는 데이터·문구만 본다.
 vi.mock("@/lib/bench/equityChart", () => ({
@@ -90,6 +90,26 @@ function report(overrides: Partial<RunReportOut> = {}): RunReportOut {
   };
 }
 
+function trade(overrides: Partial<TradeOut> = {}): TradeOut {
+  return {
+    trade_id: 1,
+    instrument_id: 10,
+    side: "BUY",
+    entry_ts: "2026-01-02",
+    exit_ts: "2026-01-10",
+    qty: 3,
+    fill_price: 100,
+    exit_price: 110,
+    fee: 0.1,
+    slippage: 0.1,
+    tax: 0.2,
+    realized_pnl: 30,
+    mae: null,
+    mfe: null,
+    ...overrides,
+  };
+}
+
 describe("RunReportView", () => {
   it("지표 순서는 서버(D-Q2)의 것이다 — 최장 미회복 기간이 맨 위, 샤프가 맨 뒤", () => {
     render(<RunReportView report={report()} />);
@@ -148,6 +168,72 @@ describe("RunReportView", () => {
 
     const section = screen.getByRole("region", { name: "거래 목록" });
     expect(section.textContent).toContain("+30");
+  });
+
+  it("원화 실현손익은 정수로 찍는다 — 같은 표 안에서 소수 자릿수가 갈리지 않는다 (F7)", () => {
+    // 실측(리포트 → 거래 목록): 비용이 비율이라 원 단위 정수 체결에도 소수가 남아
+    // `+1,810,707.32` 와 `+281,622` 가 한 표 안에 섞였다. 원화는 `won()` 과 같은 규칙(반올림)이다.
+    const mixed = report({
+      trades: [
+        trade({ trade_id: 1, realized_pnl: 1810707.32 }),
+        trade({ trade_id: 2, realized_pnl: 281622 }),
+        trade({ trade_id: 3, realized_pnl: -4123.5 }),
+      ],
+    });
+    render(<RunReportView report={mixed} />);
+
+    const section = screen.getByRole("region", { name: "거래 목록" });
+    const pnl = within(section)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell").at(-1)?.textContent?.trim());
+    expect(pnl).toEqual(["+1,810,707", "+281,622", "−4,124"]);
+  });
+
+  it("1원이 안 되는 손실도 손실로 그린다 — 반올림해서 0 이 되어도 부호와 색은 원값의 것이다 (F7)", () => {
+    // 백엔드가 실현손익을 소수 6자리 그대로 내리므로(`quantize(t.realized_pnl, 6)`), 수수료·슬리피지가
+    // 가격차를 거의 상쇄한 거래는 (−0.5, 0) 구간에 앉는다. 반올림한 값으로 부호를 가르면 `-0` 이라
+    // `-0 < 0` 이 거짓 — 손실인데 손실로 안 보인다.
+    const tiny = report({
+      trades: [
+        trade({ trade_id: 1, realized_pnl: -0.3 }),
+        trade({ trade_id: 2, realized_pnl: -0.49 }),
+        trade({ trade_id: 3, realized_pnl: -0.0001 }),
+        trade({ trade_id: 4, realized_pnl: 0.3 }),
+        trade({ trade_id: 5, realized_pnl: 0 }),
+      ],
+    });
+    render(<RunReportView report={tiny} />);
+
+    const cells = within(screen.getByRole("region", { name: "거래 목록" }))
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell").at(-1));
+    expect(cells.map((cell) => cell?.textContent?.trim())).toEqual(["−0", "−0", "−0", "+0", "+0"]);
+    expect(cells.map((cell) => cell?.querySelector("span")?.className.includes("text-market-down"))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it("자산·낙폭 곡선이 그림으로 서고 요지를 이름으로 갖는다 — 캔버스만 있으면 보조기술에 곡선이 없다 (F9)", () => {
+    render(<RunReportView report={report()} />);
+
+    const figure = screen.getByRole("img", { name: /자산곡선과 낙폭 곡선/ });
+    const name = figure.getAttribute("aria-label") ?? "";
+    expect(name).toContain("2026-01-02 ~ 2026-01-03");
+    expect(name).toContain("시작 1,000,000원 → 끝 1,010,000원");
+    expect(name).toContain("최대 낙폭 0%");
+  });
+
+  it("자산곡선이 없으면 빈 이름의 그림을 만들지 않는다", () => {
+    render(<RunReportView report={report({ equity: [] })} />);
+
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(document.body.textContent).toContain("자산곡선이 없습니다");
   });
 
   it("비용 가정 3종을 그대로 읽어 준다 — 이 숫자들이 무엇 위에 서 있는지", () => {
@@ -291,7 +377,40 @@ describe("RunReportView", () => {
     expect(section.textContent).toContain("구간 끝에 열린 자리 1건");
     expect(section.textContent).toContain("2025-08-05 진입");
     expect(section.textContent).toContain("36,814,411");
-    expect(section.textContent).toContain("이 성과의 100% 가 아직 안 판 자리의 평가액입니다");
+    expect(section.textContent).toContain("이 성과의 100% 가 아직 안 판 자리의 미실현 이익입니다");
+  });
+
+  it("미실현 비중이 음수면 「성과의 −5.7% 가 평가액」이라 하지 않고 깎고 있다고 말한다 (F8)", () => {
+    // 실측(run 843, ma=5·pullback=0.5) — 평가액 12,420,000 < 진입 원금 12,566,163 인 열린 자리.
+    const losing = openPosition({ value: 12420000, unrealized_pnl: -146163, unrealized_share_pct: -5.7 });
+    render(<RunReportView report={report({ open_position: losing })} />);
+
+    const section = screen.getByRole("region", { name: "구간 끝에 열린 자리" });
+    expect(section.textContent).toContain("열린 자리가 이 성과를 5.7% 깎고 있습니다(미실현 손실)");
+    expect(section.textContent).not.toContain("-5.7%");
+    expect(section.textContent).not.toContain("−5.7%");
+  });
+
+  it("총손익도 손실이면 「이 손실의 N%」로 — 미실현 손실이 손실의 일부다 (F8)", () => {
+    render(
+      <RunReportView
+        report={report({ open_position: openPosition({ unrealized_pnl: -100000, unrealized_share_pct: 40 }) })}
+      />,
+    );
+
+    const section = screen.getByRole("region", { name: "구간 끝에 열린 자리" });
+    expect(section.textContent).toContain("이 손실의 40% 가 아직 안 판 자리의 미실현 손실입니다");
+  });
+
+  it("손실 실행에서 열린 자리가 평가이익이면 「메우고 있다」로 (F8)", () => {
+    render(
+      <RunReportView
+        report={report({ open_position: openPosition({ unrealized_pnl: 30000, unrealized_share_pct: -12.5 }) })}
+      />,
+    );
+
+    const section = screen.getByRole("region", { name: "구간 끝에 열린 자리" });
+    expect(section.textContent).toContain("열린 자리가 이 손실을 12.5% 메우고 있습니다(미실현 이익)");
   });
 
   it("열린 자리가 없으면 그 자리를 만들지 않는다", () => {

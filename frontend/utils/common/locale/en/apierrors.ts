@@ -2,6 +2,8 @@
 // API 에러 클라이언트 폴백 메시지 (English). 로직은 errors/apierrors.ts, ko 는 ../ko/apierrors.ts.
 
 import type { EmailFailureCode } from "@/utils/common/errors/emailFailure";
+import type { StreamFailureCode } from "@/utils/common/errors/streamFailure";
+import type { ProxyFailureCode } from "@/utils/common/errors/proxyFailure";
 
 export const STATUS_MESSAGES: Record<number, string> = {
   400: "Bad request.",
@@ -37,6 +39,25 @@ export const EMAIL_FAILURE_MESSAGES: Record<EmailFailureCode, string> = {
   "email.smtp_unreachable": "The mail server could not be reached.\nTry again shortly or contact an administrator.",
   "email.smtp_auth_failed": "The mail server rejected our sign-in.\nPlease contact an administrator.",
   "email.send_failed": "The email could not be sent.\nCheck the address or try again shortly.",
+};
+
+// Streaming-chat failure reasons — key = StreamFailureCode from errors/streamFailure.ts.
+// These say what to do: retrying does not help for any of them (#423).
+export const STREAM_FAILURE_MESSAGES: Record<StreamFailureCode, string> = {
+  "botAgent.service_unreachable":
+    "The bot conversation service (:8011) is not running.\nRetrying will not connect — start the service, then send again.",
+  "botAgent.invalid_api_key":
+    "The bot conversation API key was rejected.\nA key that is set is not necessarily valid — replace the key, then send again.",
+  "botAgent.turn_failed":
+    "The conversation did not finish.\nWhat arrived above is kept. If this keeps happening, check the server log.",
+  "research.service_unreachable":
+    "The research service (:8003) is not running.\nRetrying will not connect — start the service, then ask again.",
+};
+
+// Proxy-to-upstream connection failures — key = ProxyFailureCode in errors/proxyFailure.ts.
+export const PROXY_FAILURE_MESSAGES: Record<ProxyFailureCode, string> = {
+  "proxy.upstream_unreachable":
+    "The service we called did not respond.\nRetrying will not connect — check that the service is running and that the address and port in the settings are correct.",
 };
 
 // Prisma error translations — key = type emitted by lib/prisma/error.ts (real code P#### / prisma_*)

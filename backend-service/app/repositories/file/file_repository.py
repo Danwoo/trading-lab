@@ -1,3 +1,4 @@
+from repositories.common.sql_format import DT_ISO_TZ
 from sqlalchemy import text
 from utils.common.devextreme_utils import build_filter_params, parse_sort
 
@@ -8,13 +9,13 @@ class FileRepository:
 
     def query_select_file(self) -> str:
         """파일 기본 정보 조회 쿼리"""
-        return """
+        return f"""
             SELECT *
               FROM (
                 SELECT atch_file_id
-                     , to_char(reg_dt, 'YYYY-MM-DD HH24:MI:SS') AS reg_dt
+                     , to_char(reg_dt, '{DT_ISO_TZ}') AS reg_dt
                      , reg_id
-                     , to_char(mod_dt, 'YYYY-MM-DD HH24:MI:SS') AS mod_dt
+                     , to_char(mod_dt, '{DT_ISO_TZ}') AS mod_dt
                      , mod_id
                   FROM tn_file
               ) A
@@ -129,7 +130,7 @@ class FileRepository:
 
     def query_select_file_detail(self) -> str:
         """파일 상세 정보 조회 쿼리"""
-        return """
+        return f"""
             SELECT *
             FROM (
                 SELECT atch_file_id
@@ -140,9 +141,9 @@ class FileRepository:
                     , file_extsn
                     , file_mg
                     , file_ty
-                    , to_char(reg_dt, 'YYYY-MM-DD HH24:MI:SS') AS reg_dt
+                    , to_char(reg_dt, '{DT_ISO_TZ}') AS reg_dt
                     , reg_id
-                    , to_char(mod_dt, 'YYYY-MM-DD HH24:MI:SS') AS mod_dt
+                    , to_char(mod_dt, '{DT_ISO_TZ}') AS mod_dt
                     , mod_id
                 FROM tn_file_detail
             ) A

@@ -11,6 +11,7 @@ import { BotForm } from "./BotForm";
 import { deleteBotWithConfirm } from "./deleteBotWithConfirm";
 import {
   NEW_BOT_DRAFT,
+  fieldNameFromServerError,
   newStrategyDraft,
   toCreatePayload,
   toDraft,
@@ -60,6 +61,12 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  /**
+   * 서버가 칸을 짚어 돌려보낸 저장 오류. 토스트는 몇 초 뒤 사라지는데 폼은 열 칸이 넘어,
+   * 어느 칸을 고쳐야 하는지 화면에 남는 것이 없었다 — 그 칸에 `aria-invalid` 와 문장으로 남긴다.
+   * 그 칸을 다시 손대거나 전략을 바꾸면 지운다(옛 오류가 새 값 위에 남으면 그것도 거짓이다).
+   */
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const writeAccess = useWriteAccess();
 
   useEffect(() => {
@@ -120,11 +127,17 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
     (key: string) => {
       const form = strategyForms.find((candidate) => candidate.key === key);
       if (form) setStrategy(newStrategyDraft(form));
+      setFieldErrors({});
     },
     [strategyForms],
   );
 
   const handleParamChange = useCallback((name: string, value: unknown) => {
+    setFieldErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const { [name]: _cleared, ...rest } = prev;
+      return rest;
+    });
     // 손댄 설정에 출처를 남긴다 — §8.6.3 「출처가 남는다」. 안 건드린 값은 선언 기본값 그대로다.
     setStrategy((prev) =>
       prev === null
@@ -191,7 +204,11 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
       showToast("봇을 저장했습니다.", "success");
       router.push("/bench/bot");
     } catch (error) {
-      showToast(getApiErrorMessage(error), "error");
+      const message = getApiErrorMessage(error);
+      const form = strategyForms.find((candidate) => candidate.key === strategy.strategyKey);
+      const name = fieldNameFromServerError(message, form?.fields ?? []);
+      setFieldErrors(name === null ? {} : { [name]: message });
+      showToast(message, "error");
     } finally {
       setIsSaving(false);
     }
@@ -287,6 +304,7 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
             catalogErrors={catalogErrors}
             onStrategyChange={handleStrategyChange}
             onParamChange={handleParamChange}
+            fieldErrors={fieldErrors}
           />
         </div>
       )}

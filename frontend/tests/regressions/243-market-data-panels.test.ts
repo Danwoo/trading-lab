@@ -8,7 +8,7 @@
 //   ② **빈 응답의 사유 전달** — 200 + 빈 배열 + `unavailable_reason` 이 왔는데 서비스 계층이
 //      사유를 떨어뜨리면, 화면은 "데이터 없음"만 남는다. 그 순간 FR-021("왜 비었는지 말한다")이
 //      사라진다.
-//   ③ **샘플 데이터 규율** (룰 17) — `SAMPLE_CANDLES` 가 `placeholder` 분기 밖에서 쓰이면
+//   ③ **지어낸 값 금지** (룰 17) — 임시 상태에서 그럴듯한 캔들을 그리면
 //      키가 없어 빈 차트에 그럴싸한 가짜 캔들이 그려진다. 그건 "데이터가 들어왔다"로 읽힌다.
 //
 // **fail-closed**: ①·③은 검사 대상을 파일시스템에서 매번 다시 찾고, 0건이면 실패한다.
@@ -155,14 +155,46 @@ describe("#2 ② 빈 응답이 사유를 들고 온다", () => {
   });
 });
 
-describe("#2 ③ 샘플 캔들은 placeholder 분기에서만 쓰인다 (룰 17)", () => {
-  it("ChartPanel 이 unavailable 사유를 임시 캔들로 덮지 않는다", () => {
+// 종전 룰 17 은 「샘플 캔들은 placeholder 분기에서만 쓴다」였다. 지금은 **아예 그리지 않는다**
+// (리드 결정 2026-09-14) — 그럴듯한 값이 남아 있는 한 해칭과 배지가 붙어도 오독은 가능하고,
+// 종목이 달라도 같은 모양이라 하나만 보면 가릴 단서가 없다. 규칙이 「분기 안에서만」에서
+// 「그릴 값을 두지 않는다」로 세졌으므로 그물도 그렇게 바꾼다.
+describe("#2 ③ 지어낸 캔들을 그리지 않는다 (룰 17)", () => {
+  it("샘플 캔들 모듈이 레포에 없다 — 그릴 값이 없으면 그릴 수 없다", () => {
+    expect(fs.existsSync(path.join(FRONTEND_ROOT, "lib/terminal/sampleCandles.ts"))).toBe(false);
+  });
+
+  it("어느 화면도 샘플 캔들을 부르지 않는다", () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name === "node_modules" || entry.name === ".next") continue;
+          walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry.name)) continue;
+        const source = fs.readFileSync(full, "utf8");
+        if (/SAMPLE_CANDLES|sampleCandles/.test(source) && !full.endsWith("243-market-data-panels.test.ts")) {
+          offenders.push(path.relative(FRONTEND_ROOT, full));
+        }
+      }
+    };
+    walk(path.join(FRONTEND_ROOT, "components"));
+    walk(path.join(FRONTEND_ROOT, "lib"));
+    walk(path.join(FRONTEND_ROOT, "hooks"));
+    expect(offenders, "샘플 캔들을 부르는 자리가 남아 있다").toEqual([]);
+  });
+
+  it("임시일 때 캔들을 비우고 왜 비었는지 말한다", () => {
     const source = fs.readFileSync(path.join(FRONTEND_ROOT, "components/features/ChartPanel/ChartPanel.tsx"), "utf8");
-    expect(source, "SAMPLE_CANDLES 를 쓰지 않게 바뀌었다면 이 그물의 전제가 사라진 것이다").toContain("SAMPLE_CANDLES");
-    // 사유가 있는 unavailable 을 분리해 뽑아내고, 임시 캔들은 placeholder 쪽에만 붙는다.
+    expect(source, "임시 분기가 빈 배열을 그리지 않는다").toMatch(/isPlaceholder \? \[\]/);
+    // 사유가 있는 unavailable 을 분리해 뽑아내고, 임시 상태에서도 사유를 덮어 보여준다.
     expect(source).toContain("unavailableReason");
     expect(source).toContain("PanelUnavailable");
     expect(source, "isPlaceholder 가 unavailable 전체를 삼키면 사유가 사라진다").toContain("isNoContextYet");
+    expect(source, "빈 격자만 두면 「고장」으로 읽힌다 — 무엇을 기다리는지 말해야 한다").toContain("NOTHING_TO_DRAW");
   });
 });
 

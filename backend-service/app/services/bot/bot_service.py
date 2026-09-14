@@ -96,7 +96,10 @@ class BotService:
 
             spec = catalog.by_key(key)
             if spec is None:
-                raise BadRequestError(f"'{key}' 전략을 찾을 수 없습니다. 전략 파일이 있는지 확인하십시오.")
+                # 이 제품의 사용자는 개인 투자자다 — 「전략 파일」은 서버의 소스라 볼 수도 고칠 수도 없다.
+                raise BadRequestError(
+                    f"'{key}' 전략을 찾을 수 없습니다. 고를 수 있는 전략은 봇 만들기 화면의 전략 목록에 있습니다."
+                )
 
             try:
                 params = validate_param_values(spec, row.get("params") or {})

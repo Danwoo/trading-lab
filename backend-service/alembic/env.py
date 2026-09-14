@@ -41,6 +41,10 @@ if config.config_file_name:
 target_metadata = Base.metadata
 
 
+# 어느 DB 를 향하고 있는지 + 그 좌표가 어디서 왔는지. 연결이 실패했을 때 이것을 함께 낸다 (#399).
+db_target: dict[str, str] = {}
+
+
 def get_db_url() -> str:
     """마이그레이션 대상 DB URL 을 해석한다.
 
@@ -51,14 +55,23 @@ def get_db_url() -> str:
     URL 은 configparser 보간을 거치므로 `%` 는 `%%` 로 이스케이프해야 한다.
     """
     if db_url := os.getenv("ALEMBIC_DB_URL"):
+        db_target.update(where="(URL 은 찍지 않는다 — 비밀번호가 들어 있다)", origin="ALEMBIC_DB_URL 환경변수")
         return db_url
 
     app_env = os.getenv("APP_ENV", "development")
-    load_dotenv(os.path.join(app_dir, f".env.{app_env}"))
+    env_file = os.path.join(app_dir, f".env.{app_env}")
+    load_dotenv(env_file)
 
     from core.config import settings
     from utils.common.database_utils import get_sql_db_url
 
+    db_target.update(
+        where=f"{settings.BACKEND_SQL_DB_HOST}:{settings.BACKEND_SQL_DB_PORT}/{settings.BACKEND_SQL_DB_NAME}",
+        origin=(
+            f"{os.path.relpath(env_file, os.path.dirname(current_dir))} 의 "
+            "BACKEND_SQL_DB_HOST·BACKEND_SQL_DB_PORT (프로세스 환경변수가 있으면 그쪽이 이긴다)"
+        ),
+    )
     url = get_sql_db_url(
         driver=settings.BACKEND_SQL_DB_DRIVER,
         odbc_driver=settings.BACKEND_SQL_DB_ODBC_DRIVER,
@@ -69,6 +82,24 @@ def get_db_url() -> str:
         password=settings.BACKEND_SQL_DB_PASSWORD,
     )
     return url.replace("%", "%%")
+
+
+def unreachable_message(exc: Exception) -> str:
+    """연결 실패를 「어디로 갔고, 그 좌표는 누가 정했나」로 바꿔 준다 (#399).
+
+    드라이버가 내는 것은 `connection to server at "127.0.1.1", port 5432 failed` 뿐이라,
+    그 5432 가 어느 파일에서 왔는지는 읽는 사람이 스스로 찾아야 했다 — 낡은
+    `.env.development` 를 그대로 들고 있으면 그 추적이 매번 반복된다(리드 실측).
+    """
+    return (
+        f"마이그레이션 대상 DB 에 연결하지 못했다 — {db_target.get('where', '(좌표 미상)')}\n"
+        f"  · 이 좌표의 출처: {db_target.get('origin', '(미상)')}\n"
+        "  · 로컬 기본값은 process-compose 의 postgres 포트 5442 다. 그 파일이 낡았는지는 "
+        "`python3 scripts/bootstrap_local_env.py` 를 다시 돌리면 알려 준다(덮어쓰지 않는다).\n"
+        "  · 다른 DB 로 한 번만 보내려면 좌표를 명령에 직접 준다: "
+        "`BACKEND_SQL_DB_HOST=… BACKEND_SQL_DB_PORT=… uv run python -m alembic upgrade head`\n"
+        f"  · 드라이버 원문: {exc}"
+    )
 
 
 config.set_main_option("sqlalchemy.url", get_db_url())
@@ -185,7 +216,12 @@ def run_migrations_online():
         hide_parameters=True,
     )
 
-    with connectable.connect() as connection:
+    try:
+        connection_ctx = connectable.connect()
+    except Exception as exc:
+        raise ConnectionError(unreachable_message(exc)) from exc
+
+    with connection_ctx as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

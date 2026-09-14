@@ -75,9 +75,14 @@ export default function ResearchChatContainer() {
         );
         dispatch({ type: "END_ASSISTANT_MSG", gid: targetGid });
       } catch (error) {
-        dispatch({ type: "ABORT_ASSISTANT_MSG", gid: targetGid });
-        if (!controller.signal.aborted) {
-          showToast(getApiErrorMessage(error), "error");
+        // 사용자가 멈춘 것과 실패한 것은 다르다. 멈춘 것은 흔적을 남길 이유가 없지만, 실패는
+        // **대화에 남아야** 한다 — 2초짜리 토스트는 흔적이 아니다 (#423 F7).
+        if (controller.signal.aborted) {
+          dispatch({ type: "ABORT_ASSISTANT_MSG", gid: targetGid });
+        } else {
+          const failure = getApiErrorMessage(error);
+          dispatch({ type: "FAIL_ASSISTANT_MSG", gid: targetGid, failure });
+          showToast(failure, "error");
         }
       } finally {
         setStreaming(false);

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createEquityChart, type EquityChartHandle, type EquityChartPoint } from "@/lib/bench/equityChart";
-import { downsampleLttb, drawdownRatios } from "@/lib/bench/equityMath";
+import { downsampleLttb, drawdownRatios, equityCurveSummary } from "@/lib/bench/equityMath";
 import type {
   ExecutionAssumptionsOut,
   MetricOut,
@@ -14,14 +14,32 @@ import type {
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { redactReason } from "@/utils/common/errors/redactReason";
 
-/** 등락 숫자 하나 — 부호를 항상 함께 그린다 (디자인 시스템 §2.3). */
-function SignedPct({ value, unit }: { value: number; unit: string }) {
+/**
+ * 원 단위 정수로 반올림 — 0.5 는 0 에서 먼 쪽으로(−4,123.5 → −4,124). `Math.round` 는 음수의
+ * 반을 0 쪽으로 올려 부호에 따라 규칙이 갈린다.
+ *
+ * 반올림해서 0 이 되면 `-0` 이 아니라 `0` 을 낸다 — `-0 < 0` 은 거짓이라, 이 값으로 부호를 가르면
+ * 1원이 안 되는 손실이 손실이 아닌 것이 된다. 크기만 내는 함수이고 부호 판정은 원값의 몫이다.
+ */
+function roundWon(value: number): number {
+  const magnitude = Math.round(Math.abs(value));
+  return value < 0 && magnitude > 0 ? -magnitude : magnitude;
+}
+
+/**
+ * 부호 붙은 원화 — 부호를 항상 함께 그린다 (디자인 시스템 §2.3).
+ *
+ * 정수다. 체결은 1주 단위인데 비용이 비율이라 실현손익에 소수가 남고, 그대로 찍으면 한 표 안에서
+ * `+1,810,707.32` 와 `+281,622` 가 섞인다 — 평가액(`won`)과 같은 규칙으로 맞춘다.
+ */
+function SignedWon({ value }: { value: number }) {
+  // 부호는 반올림 **전** 원값으로 가른다 — 백엔드가 소수 6자리를 그대로 내리므로 (−0.5, 0) 구간의
+  // 손실이 들어오는데, 반올림한 0 으로 가르면 그게 이익 쪽 색과 `+` 를 달고 앉는다.
   const negative = value < 0;
   return (
     <span className={cn("tabular-nums", negative ? "text-market-down" : "text-market-up")}>
       {negative ? "−" : "+"}
-      {Math.abs(value).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}
-      {unit}
+      {Math.abs(roundWon(value)).toLocaleString("ko-KR")}
     </span>
   );
 }
@@ -68,7 +86,7 @@ function MetricsList({ metrics }: { metrics: MetricOut[] }) {
 
 /** 원 단위 정수 표기 — 소수점은 평가액에서 읽을 것이 없다. */
 function won(value: number): string {
-  return Math.round(value).toLocaleString("ko-KR");
+  return roundWon(value).toLocaleString("ko-KR");
 }
 
 /**
@@ -78,6 +96,27 @@ function won(value: number): string {
  * 거래 목록·승률은 「없음」이라 답하는데 자산곡선의 마지막 점은 그 자리의 평가액을 담는다.
  * 두 사실을 나란히 놓고 아무 말도 안 하면 어느 쪽이 거짓인지 화면 안에서 가릴 수 없다.
  */
+/**
+ * 미실현 비중을 문장으로 — **부호에 따라 네 갈래**다.
+ *
+ * 비중은 `미실현 ÷ 총손익` 이라 둘의 부호가 다르면 음수로 온다. 그걸 「이 성과의 −5.7% 가
+ * 평가액입니다」로 찍으면 양수 전제의 문장이 무너진다(실측: 평가손실을 안은 열린 자리).
+ * 비중 부호는 「둘이 같은 방향인가」만 말하므로, 어느 쪽이 손실인지는 미실현손익의 부호로 가른다.
+ */
+function unrealizedShareSentence(sharePct: number, unrealizedPnl: number): string {
+  const share = Math.abs(sharePct).toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+  const losing = unrealizedPnl < 0;
+  const opposite = sharePct < 0;
+  const head = opposite
+    ? losing
+      ? `열린 자리가 이 성과를 ${share}% 깎고 있습니다(미실현 손실)`
+      : `열린 자리가 이 손실을 ${share}% 메우고 있습니다(미실현 이익)`
+    : losing
+      ? `이 손실의 ${share}% 가 아직 안 판 자리의 미실현 손실입니다`
+      : `이 성과의 ${share}% 가 아직 안 판 자리의 미실현 이익입니다`;
+  return `${head} — 매도 비용은 아직 안 물렸습니다.`;
+}
+
 function OpenPositionNotice({ position }: { position: OpenPositionOut }) {
   return (
     <section
@@ -92,7 +131,11 @@ function OpenPositionNotice({ position }: { position: OpenPositionOut }) {
       <p className="mt-1 break-keep text-2xs text-ink-muted">
         {position.unrealized_share_pct === null
           ? (redactReason(position.absent_reason) ?? "미실현 비중을 낼 수 없습니다.")
-          : `이 성과의 ${position.unrealized_share_pct.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}% 가 아직 안 판 자리의 평가액입니다 — 매도 비용은 아직 안 물렸습니다.`}
+          : // 백엔드는 비중과 미실현손익을 함께 낸다 — 손익이 빠진 응답은 계약 밖이라 비중 부호로 대신 읽는다.
+            unrealizedShareSentence(
+              position.unrealized_share_pct,
+              position.unrealized_pnl ?? position.unrealized_share_pct,
+            )}
       </p>
       <p className="mt-0.5 break-keep text-2xs text-ink-muted">유도: {position.derived_from}</p>
     </section>
@@ -153,7 +196,7 @@ function TradeList({ trades, openPosition }: { trades: TradeOut[]; openPosition:
                 {trade.realized_pnl === null ? (
                   <span className="text-ink-muted">미청산</span>
                 ) : (
-                  <SignedPct value={trade.realized_pnl} unit="" />
+                  <SignedWon value={trade.realized_pnl} />
                 )}
               </td>
             </tr>
@@ -211,7 +254,15 @@ function EquityCurve({ report }: { report: RunReportOut }) {
     return () => observer.disconnect();
   }, []);
 
-  return <div ref={containerRef} className="h-[30svh] w-full min-w-0" />;
+  // 캔버스는 보조기술에 비어 있다 — 컨테이너가 그림 하나로 서고 요지를 이름으로 갖는다.
+  return (
+    <div
+      ref={containerRef}
+      role="img"
+      aria-label={equityCurveSummary(report.equity)}
+      className="h-[30svh] w-full min-w-0"
+    />
+  );
 }
 
 /** 비용 항목의 사람 말 — 값 자체는 백엔드가 준 키다. */

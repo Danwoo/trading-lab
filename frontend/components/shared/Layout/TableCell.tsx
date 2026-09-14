@@ -63,11 +63,15 @@ export function TableCell({
   format,
 }: Props) {
   const getDisplayValue = () => {
-    if (!items || typeof children !== "string") return children;
+    // **숫자 코드도 옮긴다** (#439 F26). 종전에는 문자열만 봤고, 그래서 같은 화면에서
+    // `day_of_week`("mon")는 「월」이 되고 `period_weeks`(1)는 `1` 로 남았다 — 값의 타입이
+    // 화면의 말투를 가르는 것은 사용자가 알 수 없는 규칙이다. React 노드 등 나머지는 그대로 둔다.
+    if (!items || (typeof children !== "string" && typeof children !== "number")) return children;
 
+    const code = String(children);
     const matchedItem = items.find((item) => {
-      const itemValue = item[valueExpr] || item.code || item.value;
-      return itemValue === children || String(itemValue) === children;
+      const itemValue = item[valueExpr] ?? item.code ?? item.value;
+      return itemValue === children || String(itemValue) === code;
     });
 
     if (!matchedItem) return children;

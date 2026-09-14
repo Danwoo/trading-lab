@@ -134,6 +134,18 @@ export function Popup({
     const scroller = scrollAreaRef.current;
     if (!scroller) return;
     e.preventDefault();
+
+    // **표식이 있으면 그것이 이긴다.** 파괴적 버튼이 DOM 에서 먼저 오는 확인창에서는 첫 후보를
+    // 잡는 규칙이 곧 「삭제에 포커스를 두고 연다」가 된다 — 포커스된 네이티브 버튼 위의 Enter 는
+    // 브라우저 기본 활성화라 한 번에 실행된다 (#443 B-23). 표식은 raw `autofocus` 속성이다:
+    // React 의 `autoFocus` prop 과 달리 아무도 focus() 를 불러 주지 않으므로, 여기서 읽지 않으면
+    // 그 표식은 아무 일도 하지 않는다.
+    const marked = scroller.querySelector<HTMLElement>("[autofocus]");
+    if (marked) {
+      marked.focus({ preventScroll: true });
+      if (document.activeElement === marked) return;
+    }
+
     const candidates = scroller.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
     );

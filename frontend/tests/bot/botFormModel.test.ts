@@ -13,6 +13,7 @@ import {
   COMBINE_RULE_ITEMS,
   NEW_BOT_DRAFT,
   UNIVERSE_KIND_ITEMS,
+  fieldNameFromServerError,
   newStrategyDraft,
   toCreatePayload,
   toDraft,
@@ -104,5 +105,23 @@ describe("봇 폼 — 다시 열기", () => {
       max_trades_per_day: 3,
     });
     expect(Object.keys(draft).sort()).toEqual(Object.keys(NEW_BOT_DRAFT).sort());
+  });
+});
+
+// F18 — 서버(#345)가 「라벨」로 짚어 준 오류를 그 칸으로 되돌린다.
+describe("fieldNameFromServerError", () => {
+  const fields = FORM.fields.map((field) => ({ name: field.name, label: field.label }));
+
+  it("「라벨」: … 꼴이면 그 라벨의 칸 이름이다 — 실측 문장 그대로", () => {
+    expect(fieldNameFromServerError("「평균선 기간」: 5일~120일 범위여야 합니다 (받은 값 3일)", fields)).toBe("period");
+  });
+
+  it("폼에 없는 라벨이면 null — 엉뚱한 칸을 빨갛게 하지 않는다", () => {
+    expect(fieldNameFromServerError("「없는 칸」: 숫자여야 합니다", fields)).toBeNull();
+  });
+
+  it("라벨 없이 온 문장은 null — 토스트만 남는다", () => {
+    expect(fieldNameFromServerError("봇 이름이 겹칩니다", fields)).toBeNull();
+    expect(fieldNameFromServerError("", fields)).toBeNull();
   });
 });

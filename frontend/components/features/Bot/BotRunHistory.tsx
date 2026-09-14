@@ -7,6 +7,31 @@ import { selectBacktestRunsByBot } from "@/services/backtest/backtestService";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import type { BotRunOut } from "@/schemas/backtest/backtest";
 
+/** 조합 한 줄 — 격자 칸과 같은 어휘(`ma_period=120 · pullback_pct=15`). */
+function paramsLine(params: Record<string, unknown>): string {
+  return Object.entries(params)
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join(" · ");
+}
+
+/**
+ * 같은 조합(전략·파라미터·종목·구간)을 먼저 돌린 실행 번호. 같은 봇을 격자로 되돌리면 run 은
+ * 불변이라 **매번 새 행**이 생기고(실측: 한 조합이 25행), 목록만 봐서는 그게 반복인지 모른다.
+ * 목록은 최신순이라 **더 오래된 쪽**이 원본이다. 보이는 페이지 안에서만 가린다 — 안 보이는
+ * 옛 실행과의 중복은 여기서 알 수 없다.
+ */
+export function firstRunOfSameCombo(runs: BotRunOut[]): Map<number, number> {
+  const firstByCombo = new Map<string, number>();
+  const sameAs = new Map<number, number>();
+  for (const run of [...runs].sort((a, b) => a.run_id - b.run_id)) {
+    const combo = JSON.stringify([run.strategy_key, run.params, run.universe_def, run.period_from, run.period_to]);
+    const first = firstByCombo.get(combo);
+    if (first === undefined) firstByCombo.set(combo, run.run_id);
+    else sameAs.set(run.run_id, first);
+  }
+  return sameAs;
+}
+
 /** 검증 이력이 있으면 그 목록을, 없으면 검증하러 가는 길을 낸다. */
 export function BotRunHistory({ botId }: { botId: number }) {
   const [runs, setRuns] = useState<BotRunOut[] | null>(null);
@@ -29,6 +54,8 @@ export function BotRunHistory({ botId }: { botId: number }) {
       cancelled = true;
     };
   }, [botId]);
+
+  const sameAs = firstRunOfSameCombo(runs ?? []);
 
   return (
     <section className="border border-line px-3 py-2">
@@ -55,14 +82,21 @@ export function BotRunHistory({ botId }: { botId: number }) {
             </p>
           )}
           <ul className="mt-1 flex flex-col gap-0.5">
-            {runs.map((run) => (
-              <li key={run.run_id} className="font-mono text-2xs text-ink-muted">
-                <Link href={`/bench?run=${run.run_id}`} className="underline underline-offset-2">
-                  #{run.run_id}
-                </Link>{" "}
-                {run.status} · {run.period_from}~{run.period_to} · 시도 {run.attempt_no}
-              </li>
-            ))}
+            {runs.map((run) => {
+              const first = sameAs.get(run.run_id);
+              return (
+                <li key={run.run_id} className="font-mono text-2xs text-ink-muted">
+                  <Link href={`/bench?run=${run.run_id}`} className="underline underline-offset-2">
+                    #{run.run_id}
+                  </Link>{" "}
+                  {run.status} · {run.period_from}~{run.period_to} · 시도 {run.attempt_no}
+                  <span className="block break-all pl-3 text-ink-muted">
+                    {paramsLine(run.params)}
+                    {first !== undefined && ` · 같은 조합을 #${first} 에서 이미 돌렸습니다`}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}

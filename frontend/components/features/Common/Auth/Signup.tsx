@@ -40,16 +40,26 @@ export const Signup: FC<Props> = () => {
   // 이메일 발송 처리 API
   const emailSendApi = async (email: string) => {
     try {
-      await sendEmail(email);
+      const data = await sendEmail(email);
 
       setSendError("");
+      // 코드가 어디로 갔는지는 **서버가 말해 준다** — SMTP 미설정 개발 설치에서 메일을 보냈다고
+      // 말하면 처음 쓰는 사람이 오지 않는 메일을 기다린다 (#424).
       showMessage(
         "알림",
-        <div>
-          [{email}] 로
-          <br />
-          인증 코드를 발송 하였습니다.
-        </div>,
+        data?.delivery === "console" ? (
+          <div>
+            메일 서버가 설정되지 않아(EMAIL_HOST 없음) 메일이 나가지 않았습니다.
+            <br />
+            인증 코드는 이 앱을 띄운 서버 콘솔에 찍혀 있습니다.
+          </div>
+        ) : (
+          <div>
+            [{email}] 로
+            <br />
+            인증 코드를 발송 하였습니다.
+          </div>
+        ),
       );
       setEmailToggle("");
     } catch (error: any) {

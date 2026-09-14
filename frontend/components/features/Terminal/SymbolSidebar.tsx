@@ -42,7 +42,10 @@ export function SymbolSidebar() {
   };
 
   return (
-    <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r border-line bg-bg-panel font-mono text-xs">
+    // 좁은 폭에서는 화면 폭을 다 쓰고 패널 열 **위**에 눕는다(#425) — `w-64` 를 가로로 두면
+    // 390 폭에서 차트가 설 자리가 88px 밖에 안 남는다. 누운 높이는 서 있을 때 쓰던 폭과 같은
+    // 값을 준다: 목록은 그 안에서 스크롤하고 아래 패널이 밀려나지 않는다.
+    <aside className="flex h-64 w-full flex-shrink-0 flex-col border-b border-line bg-bg-panel font-mono text-xs lg:h-full lg:w-64 lg:border-b-0 lg:border-r">
       <div role="tablist" aria-label="종목 목록" className="flex flex-shrink-0 border-b border-line">
         {TABS.map((tab, index) => (
           <button

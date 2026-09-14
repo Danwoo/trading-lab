@@ -38,10 +38,8 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(BACKEND / "app"))
 
-#: 태울 마이그레이션 — **backtest 테이블을 건드리는 것 전부**를 소스에서 찾는다.
-#: 한 파일을 핀으로 박아 두면 뒤에 붙는 것이 영원히 이 그물 밖으로 남는다 — 실제로 0016 의
-#: `tax` 컬럼이 그렇게 빠졌고, 아래 `EXPECTED` 도 함께 낡았다.
-MIGRATION_MARKER = "tn_backtest"
+#: 대상 리비전 선택은 `backtest_migration_set.py` 한 벌이다 — 이 파일과
+#: `verify_backtest_run_persists.py` 가 같은 목록을 봐야 한다(면제를 한쪽에만 적으면 갈린다).
 
 # 스펙 §6 표의 사본. 표를 고치면 여기도 고친다.
 EXPECTED: dict[str, set[str]] = {
@@ -103,34 +101,9 @@ EXPECTED_INDEXES: dict[str, set[str]] = {
 
 def load_migration():
     """backtest 테이블을 건드리는 마이그레이션들 — **체인 순서대로**. 없으면 `None`."""
-    import importlib.util
+    from backtest_migration_set import ordered_migrations_or_exit
 
-    versions = BACKEND / "alembic" / "versions"
-    modules, parents = {}, {}
-    for path in sorted(versions.glob("[0-9]*.py")):
-        if MIGRATION_MARKER not in path.read_text(encoding="utf-8"):
-            continue
-        spec = importlib.util.spec_from_file_location(f"_bt_schema_{path.stem}", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        modules[module.revision] = module
-        parent = getattr(module, "down_revision", None)
-        # merge 리비전의 `down_revision` 은 **튜플**이다 (부모가 둘).
-        parents[module.revision] = () if parent is None else (parent,) if isinstance(parent, str) else tuple(parent)
-    if not modules:
-        print(f"::error::backtest 테이블을 다루는 마이그레이션을 0건 찾았다: {versions}", file=sys.stderr)
-        return None
-
-    order, remaining = [], dict(modules)
-    while remaining:
-        ready = [rev for rev in remaining if all(p not in remaining for p in parents[rev])]
-        if not ready:
-            print(f"::error::마이그레이션 순서를 정할 수 없다 (순환?): {sorted(remaining)}", file=sys.stderr)
-            return None
-        for rev in sorted(ready):
-            order.append(rev)
-            del remaining[rev]
-    return [modules[rev] for rev in order]
+    return ordered_migrations_or_exit()
 
 
 def main() -> int:

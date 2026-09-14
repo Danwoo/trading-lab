@@ -118,7 +118,7 @@ class BacktestRepository:
     def select_runs_by_bot(self, bot_id: int, workspace_id: int, limit: int) -> list[dict]:
         """한 봇의 실행 이력. 워크스페이스를 SQL 에서 함께 좁힌다 — 남의 봇 번호를 넣어도 빈 목록이다."""
         sql = """
-            SELECT run_id, status, strategy_key, universe_def, period_from, period_to
+            SELECT run_id, status, strategy_key, params, universe_def, period_from, period_to
                  , attempt_no, parent_run_id, finished_dt
               FROM tn_backtest_run
              WHERE bot_id = :bot_id

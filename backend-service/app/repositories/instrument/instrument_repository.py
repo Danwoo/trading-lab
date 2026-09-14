@@ -40,8 +40,9 @@ class InstrumentRepository:
 
     @staticmethod
     def _order_by(args: dict) -> tuple[str, dict]:
-        """정확히 친 코드 → 코드 앞자리 → 종목명 앞자리 → 나머지 순. 「삼성」을 치면 「삼성전자」가
-        「대덕삼성」보다 위에 온다."""
+        """정확히 친 코드 → 코드 앞자리 → 종목명 앞자리 → 나머지 순. 같은 등급 안에서는 이름이
+        짧은 쪽이 먼저다 — 본종목(「삼성전자」)이 긴 이름의 파생상품(「삼성 KRX 금현물 ETN」)이나
+        「대덕삼성」보다 위에 온다. market 은 동점을 못 가른다 — ETN 도 KOSPI 로 온다 (#422)."""
         query = (args.get("q") or "").strip().upper()
         if not query:
             return "issuer_nm ASC, market ASC, symbol ASC", {}
@@ -53,7 +54,7 @@ class InstrumentRepository:
             " WHEN UPPER(issuer_nm) LIKE :prefix ESCAPE '\\' THEN 2"
             " ELSE 3 END"
         )
-        return f"{rank}, issuer_nm ASC, market ASC, symbol ASC", params
+        return f"{rank}, LENGTH(issuer_nm) ASC, issuer_nm ASC, market ASC, symbol ASC", params
 
     def select_instrument_list(self, args: dict) -> tuple[list[dict], int]:
         sql_where, sql_params = self._where(args)

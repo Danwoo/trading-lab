@@ -18,6 +18,11 @@ export default defineConfig({
     alias: { "@": rootDir },
   },
   test: {
+    // 이 스위트는 **직렬**이다. dbtest 6개 파일이 Postgres 하나를 나눠 쓰며 같은 author_id 를 upsert/create 로 심는다
+    // (`tests/regressions/*.dbtest.ts`) — 파일이 동시에 돌면 유니크 위반이 난다. 22코어 병렬로 통과하던 것은 스케줄 운이었고,
+    // 상한 4 로 스케줄이 바뀌자 #362 테스트가 `Unique constraint failed on (author_id)` 로 드러났다 (2026-08-28, run 33145733926).
+    fileParallelism: false,
+    maxWorkers: 1,
     include: ["tests/**/*.dbtest.?(c|m)[jt]s?(x)"],
     environment: "node",
     // 검사 대상이 0건이면 실패한다 — vitest.config.ts 와 같은 원칙(#252).

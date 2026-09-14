@@ -46,11 +46,11 @@ CREATE TABLE "tn_user" (
     "emailVerified" BOOLEAN NOT NULL DEFAULT FALSE,
     "image" VARCHAR(500) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_ip" VARCHAR(45) NULL,
     "reg_pid" VARCHAR(30) NULL,
     "mod_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_ip" VARCHAR(45) NULL,
     "mod_pid" VARCHAR(30) NULL,
     CONSTRAINT "pk_tn_user" PRIMARY KEY ("id")
@@ -63,9 +63,9 @@ CREATE TABLE "tn_workspace" (
     "workspace_nm" VARCHAR(200) NOT NULL,
     "use_at" VARCHAR(5) NOT NULL DEFAULT 'Y',
     "is_personal" BOOLEAN NOT NULL DEFAULT FALSE,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tn_workspace" PRIMARY KEY ("id")
 );
@@ -76,9 +76,9 @@ CREATE TABLE "tn_workspace_member" (
     "user_id" VARCHAR(36) NOT NULL,
     "role" VARCHAR(20) NOT NULL DEFAULT 'member',
     "is_default" BOOLEAN NOT NULL DEFAULT FALSE,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tn_workspace_member" PRIMARY KEY ("workspace_id", "user_id")
 );
@@ -87,9 +87,9 @@ CREATE TABLE "tn_workspace_member" (
 CREATE TABLE "tn_workspace_menu" (
     "workspace_id" INTEGER NOT NULL,
     "menu_id" VARCHAR(20) NOT NULL,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tn_workspace_menu" PRIMARY KEY ("workspace_id", "menu_id")
 );
@@ -98,9 +98,9 @@ CREATE TABLE "tn_workspace_menu" (
 CREATE TABLE "tn_workspace_domain" (
     "domain" VARCHAR(100) NOT NULL,
     "workspace_id" INTEGER NOT NULL,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tn_workspace_domain" PRIMARY KEY ("domain")
 );
@@ -108,10 +108,10 @@ CREATE TABLE "tn_workspace_domain" (
 -- Create table ba_session
 CREATE TABLE "ba_session" (
     "id" VARCHAR(36) NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "expiresAt" TIMESTAMPTZ(3) NOT NULL,
     "token" VARCHAR(500) NOT NULL UNIQUE,
-    "createdAt" TIMESTAMP(3) NOT NULL,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
     "ipAddress" VARCHAR(45) NULL,
     "userAgent" VARCHAR(500) NULL,
     "userId" VARCHAR(36) NOT NULL,
@@ -129,12 +129,12 @@ CREATE TABLE "ba_account" (
     "accessToken" VARCHAR(500) NULL,
     "refreshToken" VARCHAR(500) NULL,
     "idToken" TEXT NULL,
-    "accessTokenExpiresAt" TIMESTAMP(3) NULL,
-    "refreshTokenExpiresAt" TIMESTAMP(3) NULL,
+    "accessTokenExpiresAt" TIMESTAMPTZ(3) NULL,
+    "refreshTokenExpiresAt" TIMESTAMPTZ(3) NULL,
     "scope" VARCHAR(500) NULL,
     "password" VARCHAR(255) NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
     CONSTRAINT "pk_ba_account" PRIMARY KEY ("id")
 );
 
@@ -143,9 +143,9 @@ CREATE TABLE "ba_verification" (
     "id" VARCHAR(36) NOT NULL,
     "identifier" VARCHAR(200) NOT NULL,
     "value" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NULL,
-    "updatedAt" TIMESTAMP(3) NULL,
+    "expiresAt" TIMESTAMPTZ(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NULL,
+    "updatedAt" TIMESTAMPTZ(3) NULL,
     CONSTRAINT "pk_ba_verification" PRIMARY KEY ("id")
 );
 
@@ -153,9 +153,9 @@ CREATE TABLE "ba_verification" (
 CREATE TABLE "tn_author" (
     "author_id" VARCHAR(20) NOT NULL,
     "author_nm" VARCHAR(200) NOT NULL,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tn_author" PRIMARY KEY ("author_id")
 );
@@ -164,9 +164,9 @@ CREATE TABLE "tn_author" (
 CREATE TABLE "tn_author_member" (
     "author_id" VARCHAR(20) NOT NULL,
     "user_id" VARCHAR(100) NOT NULL,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tn_author_member" PRIMARY KEY ("author_id", "user_id")
 );
@@ -181,9 +181,9 @@ CREATE TABLE "tn_menu" (
     "url" VARCHAR(400) NULL,
     "use_at" VARCHAR(5) NULL DEFAULT 'Y',
     "icon" VARCHAR(50) NULL,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tn_menu" PRIMARY KEY ("menu_id")
 );
@@ -192,9 +192,9 @@ CREATE TABLE "tn_menu" (
 CREATE TABLE "tn_author_menu" (
     "author_id" VARCHAR(20) NOT NULL,
     "menu_id" VARCHAR(20) NOT NULL,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tn_author_menu" PRIMARY KEY ("author_id", "menu_id")
 );
@@ -205,9 +205,9 @@ CREATE TABLE "tc_group_code" (
     "group_code_nm" VARCHAR(200) NOT NULL,
     "group_code_dc" VARCHAR(200) NULL,
     "use_at" VARCHAR(5) NOT NULL DEFAULT 'Y',
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tc_group_code" PRIMARY KEY ("group_code")
 );
@@ -221,9 +221,9 @@ CREATE TABLE "tc_code" (
     "code_dc" VARCHAR(200) NULL,
     "sort_ordr" INTEGER NULL DEFAULT 1,
     "use_at" VARCHAR(5) NOT NULL DEFAULT 'Y',
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_tc_code" PRIMARY KEY ("group_code", "code")
 );
@@ -237,9 +237,9 @@ CREATE TABLE "ai_chat_history" (
     "question" TEXT NOT NULL,
     "answer" TEXT NULL,
     "flag" INTEGER NOT NULL DEFAULT 1,
-    "reg_dt" TIMESTAMP(3) NULL,
+    "reg_dt" TIMESTAMPTZ(3) NULL,
     "reg_id" VARCHAR(100) NULL,
-    "mod_dt" TIMESTAMP(3) NULL,
+    "mod_dt" TIMESTAMPTZ(3) NULL,
     "mod_id" VARCHAR(100) NULL,
     CONSTRAINT "pk_ai_chat_history" PRIMARY KEY ("id")
 );
@@ -251,7 +251,7 @@ CREATE TABLE "th_email_log" (
     "subject" VARCHAR(200) NOT NULL,
     "status" VARCHAR(10) NOT NULL,
     "error_msg" VARCHAR(500) NULL,
-    "reg_dt" TIMESTAMP(3) NOT NULL,
+    "reg_dt" TIMESTAMPTZ(3) NOT NULL,
     CONSTRAINT "pk_th_email_log" PRIMARY KEY ("id")
 );
 

@@ -1,3 +1,4 @@
+from repositories.common.sql_format import DT_ISO_TZ
 from sqlalchemy import text
 from utils.common.devextreme_utils import build_filter_params, parse_sort
 
@@ -8,7 +9,7 @@ class SchedulerRepository:
 
     # ── Scheduler (master) ──────────────────────────────────────────────
     def query_select_scheduler(self) -> str:
-        return """
+        return f"""
             SELECT *
               FROM (
                 SELECT scheduler_id
@@ -20,9 +21,9 @@ class SchedulerRepository:
                      , period_weeks
                      , use_at
                      , description
-                     , to_char(reg_dt, 'YYYY-MM-DD HH24:MI:SS') AS reg_dt
+                     , to_char(reg_dt, '{DT_ISO_TZ}') AS reg_dt
                      , reg_id
-                     , to_char(mod_dt, 'YYYY-MM-DD HH24:MI:SS') AS mod_dt
+                     , to_char(mod_dt, '{DT_ISO_TZ}') AS mod_dt
                      , mod_id
                 FROM tn_scheduler
                 WHERE workspace_id = :workspace_id
@@ -133,14 +134,14 @@ class SchedulerRepository:
 
     # ── SchedulerMember (detail) ────────────────────────────────────────
     def select_member_list(self, args: dict) -> tuple[list[dict], int]:
-        base_sql = """
+        base_sql = f"""
             SELECT scheduler_id
                  , account_id
                  , email
                  , name
-                 , to_char(reg_dt, 'YYYY-MM-DD HH24:MI:SS') AS reg_dt
+                 , to_char(reg_dt, '{DT_ISO_TZ}') AS reg_dt
                  , reg_id
-                 , to_char(mod_dt, 'YYYY-MM-DD HH24:MI:SS') AS mod_dt
+                 , to_char(mod_dt, '{DT_ISO_TZ}') AS mod_dt
                  , mod_id
               FROM tn_scheduler_member
              WHERE scheduler_id = :scheduler_id

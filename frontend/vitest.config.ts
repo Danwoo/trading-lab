@@ -13,6 +13,9 @@ export default defineConfig({
     alias: { "@": rootDir },
   },
   test: {
+    // 병렬 상한 — 기본값은 CPU 코어 수(이 기계 22)만큼 프로세스를 띄워 한 번의 npm test 가 3GB 를 넘겼다.
+    // 워커·self-hosted 러너가 같은 16GB VM 을 나눠 쓰므로 4 로 고정한다 (2026-08-28 실측: 18 프로세스 3,201MB).
+    maxWorkers: 4,
     // include 는 vitest 기본값(`**/*.{test,spec}.?(c|m)[jt]s?(x)`)을 그대로 쓴다.
     // `tests/` 로 좁히면 그 밖에 놓인 테스트가 조용히 수집에서 빠진다 — 안 도는 테스트는
     // 없는 테스트보다 나쁘다. 배치 규약(tests/ 아래 소스 경로 미러링)은 CLAUDE.md 가 안내한다.

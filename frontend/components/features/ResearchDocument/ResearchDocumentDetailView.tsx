@@ -57,7 +57,9 @@ export default function ResearchDocumentDetailView({ data, onDelete }: Props) {
             </TableCell>
           </TableRow>
           <TableRow>
-            <TableCell label="생성일시">{data.reg_dt}</TableCell>
+            <TableCell label="생성일시" dataType="datetime">
+              {data.reg_dt}
+            </TableCell>
             <TableCell label="생성자">{data.reg_id}</TableCell>
           </TableRow>
         </TableGroup>

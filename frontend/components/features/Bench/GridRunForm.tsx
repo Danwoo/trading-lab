@@ -6,12 +6,15 @@ import { NumberBox } from "@/components/shared/ui/NumberBox";
 import { SelectBox } from "@/components/shared/ui/SelectBox";
 import { TextBox } from "@/components/shared/ui/TextBox";
 import type { GridRunFormController } from "@/hooks/bench/useGridRunForm";
+import { STEPS_MAX, STEPS_MIN } from "@/lib/bench/sweep";
 import type { BacktestGridIn } from "@/schemas/backtest/backtest";
 import type { BotOut } from "@/schemas/bot/bot";
 import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 
-// bar 라우터가 받는 시장 목록과 같다 (backend-service/app/routers/bar/bar_router.py)
-const MARKETS = ["KOSPI", "KOSDAQ", "KONEX", "NASDAQ", "NYSE", "AMEX"].map((value) => ({ value, label: value }));
+// bar 라우터가 받는 시장 목록과 같다 (backend-service/app/routers/bar/bar_router.py).
+// 문자열 배열로 넘긴다 — `SelectBox` 는 문자열 항목을 값이자 표시로 읽으므로 `displayExpr`/`valueExpr`
+// 가 항목 키와 어긋날 자리가 없다 (#397 — 객체로 감싸고 expr 을 안 줘 여섯 줄이 빈 채로 열렸다).
+const MARKETS = ["KOSPI", "KOSDAQ", "KONEX", "NASDAQ", "NYSE", "AMEX"];
 
 /**
  * 격자 실행 폼 (#203) — 봇 하나를 골라 그 전략의 파라미터 지형을 훑는다.
@@ -142,8 +145,8 @@ export function GridRunForm({
                       <NumberBox
                         fieldName="steps"
                         value={axis.steps}
-                        min={2}
-                        max={9}
+                        min={STEPS_MIN}
+                        max={STEPS_MAX}
                         width={72}
                         showSpinButtons
                         onValueChanged={(_name, value) => controller.changeAxisSteps(index, Number(value))}

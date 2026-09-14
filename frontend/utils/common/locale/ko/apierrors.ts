@@ -2,6 +2,8 @@
 // API 에러 클라이언트 폴백 메시지 (한국어). 로직은 errors/apierrors.ts, en 은 ../en/apierrors.ts.
 
 import type { EmailFailureCode } from "@/utils/common/errors/emailFailure";
+import type { StreamFailureCode } from "@/utils/common/errors/streamFailure";
+import type { ProxyFailureCode } from "@/utils/common/errors/proxyFailure";
 
 export const STATUS_MESSAGES: Record<number, string> = {
   400: "잘못된 요청입니다.",
@@ -38,6 +40,25 @@ export const EMAIL_FAILURE_MESSAGES: Record<EmailFailureCode, string> = {
   "email.smtp_unreachable": "메일 서버에 연결할 수 없습니다.\n잠시 후 다시 시도하거나 관리자에게 문의해주세요.",
   "email.smtp_auth_failed": "메일 서버 인증에 실패했습니다.\n관리자에게 문의해주세요.",
   "email.send_failed": "이메일 발송에 실패했습니다.\n주소를 확인하거나 잠시 후 다시 시도해주세요.",
+};
+
+// 스트리밍 대화 실패 사유 — key = errors/streamFailure.ts 의 StreamFailureCode.
+// 처방을 적는다: 이 갈래들은 **다시 시도해도 안 되는** 실패라 「잠시 후 다시 시도」가 거짓이다 (#423).
+export const STREAM_FAILURE_MESSAGES: Record<StreamFailureCode, string> = {
+  "botAgent.service_unreachable":
+    "봇 대화 서비스(:8011)가 떠 있지 않습니다.\n다시 보내도 붙지 않습니다 — 서비스를 띄운 뒤 다시 보내세요.",
+  "botAgent.invalid_api_key":
+    "봇 대화의 API 키 인증이 거부됐습니다.\n키가 설정돼 있어도 유효하지 않으면 대화가 돌지 않습니다 — 키를 교체한 뒤 다시 보내세요.",
+  "botAgent.turn_failed":
+    "대화가 끝까지 가지 못했습니다.\n위에 받은 내용까지는 그대로입니다. 같은 실패가 이어지면 서버 로그를 확인하세요.",
+  "research.service_unreachable":
+    "리서치 서비스(:8003)가 떠 있지 않습니다.\n다시 물어도 붙지 않습니다 — 서비스를 띄운 뒤 다시 물어보세요.",
+};
+
+// 프록시가 업스트림에 닿지 못한 실패 사유 — key = errors/proxyFailure.ts 의 ProxyFailureCode.
+export const PROXY_FAILURE_MESSAGES: Record<ProxyFailureCode, string> = {
+  "proxy.upstream_unreachable":
+    "부른 서비스가 응답하지 않았습니다.\n다시 시도해도 붙지 않습니다 — 그 서비스가 떠 있는지, 설정의 주소·포트가 맞는지 확인하세요.",
 };
 
 // Prisma 에러 번역 — key = lib/prisma/error.ts 가 emit 하는 type (실제 코드 P#### / prisma_*)

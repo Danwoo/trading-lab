@@ -96,11 +96,17 @@ export function TerminalContainer() {
           비어 **패널 안의 모든 조작부가 히트 테스트에서 사라진다** — 크기는 24×24 그대로이고
           `getBoundingClientRect()` 도 화면 안 좌표를 내는데 그 좌표를 찍으면 `MAIN` 이 잡힌다
           (#289 실측, 폭 390). 하한을 두면 대신 바깥(`main`)이 스크롤한다.
-          값은 격자 한 줄(`auto-rows-[minmax(20rem,1fr)]`)과 같은 20rem 이다. */}
-      <div className="flex min-h-[20rem] flex-1">
+          값은 격자 한 줄(`auto-rows-[minmax(20rem,1fr)]`)과 같은 20rem 이다.
+
+          좁은 폭에서는 **세로로 쌓는다**(#425). 사이드바가 256px 고정이라 가로로 두면 390 폭에서
+          패널 열에 88px 밖에 안 남아 차트가 가격축만 남는다(공용 스택 실측). 경계는 위 적재
+          콘솔이 한 열로 접히는 자리와 같은 `lg` 다 — 이 화면에 경계를 하나 더 들이지 않는다.
+          쌓인 뒤에는 패널 열도 자기 하한을 가져야 한다: 위 형제(사이드바)가 자리를 먹으면
+          `min-h-0 flex-1` 인 채로는 다시 0 으로 접힌다 — 축만 바뀐 같은 결함이다. */}
+      <div className="flex min-h-[20rem] flex-1 flex-col lg:flex-row">
         <SymbolSidebar />
 
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-[20rem] flex-1 flex-col lg:min-h-0">
           {hasClosedDefaultPanel && (
             <div className="flex flex-shrink-0 items-center justify-end border-b border-line px-2 py-1.5">
               {resetButton}
