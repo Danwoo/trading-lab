@@ -49,11 +49,20 @@ _SEEDED = _seed_env_from_example()
 
 from core.exceptions import BadRequestError  # noqa: E402
 from services.data_key import data_key_service as mod  # noqa: E402
-from services.data_key.data_key_service import SOURCE_KEY_SETTINGS, DataKeyService  # noqa: E402
+from services.data_key.data_key_service import (  # noqa: E402
+    COMPOSITE_KEY_SETTINGS,
+    SOURCE_KEY_SETTINGS,
+    DataKeyService,
+)
 
 SOURCE = "data_go_kr"
 SETTING = SOURCE_KEY_SETTINGS[SOURCE]
 STORED = "STORED-KEY-DO-NOT-USE"
+
+# 합성 자격 소스 — 설정 이름은 **코드에서 읽는다**. 여기에 실제 키 이름을 적으면
+# `verify_data_key_env_boundary.py` 가 막고, 소스가 바뀌면 그물이 낡는다.
+COMPOSITE_SOURCE = next(iter(COMPOSITE_KEY_SETTINGS))
+COMPOSITE_SETTINGS = COMPOSITE_KEY_SETTINGS[COMPOSITE_SOURCE]
 
 CHECKED = 0
 FAILURES: list[str] = []
@@ -71,6 +80,9 @@ class Config:
         self.APP_ENV = "development"
         for setting in SOURCE_KEY_SETTINGS.values():
             setattr(self, setting, "")
+        for pair in COMPOSITE_KEY_SETTINGS.values():
+            for setting in pair:
+                setattr(self, setting, "")
         for key, value in values.items():
             setattr(self, key, value)
 
@@ -133,14 +145,64 @@ def main() -> int:
             mod.get_provider = original  # type: ignore[assignment]
 
         check("친 값이 저장된 값을 이긴다", seen2, ["TYPED-KEY"])
+
+        # ④ **합성 자격**: 한쪽만 저장돼 있으면 화면은 그 행을 「설정됨」이라고 말한다.
+        #    그 상태에서 「저장된 키 확인」을 누르면 「저장된 키도 없습니다」가 아니라
+        #    **무엇이 비었는지**를 말해야 한다 — 아니면 화면과 정반대인 사유가 뜬다.
+        first, second = COMPOSITE_SETTINGS
+        svc = _service(**{first: STORED})
+        svc._last_probe_at.clear()
+        try:
+            result = asyncio.run(svc.probe_key(COMPOSITE_SOURCE, "", first))
+        except BadRequestError as e:
+            # 이것이 이 그물이 막는 회귀다 — 화면은 그 행을 「설정됨」이라고 말하는데
+            # 확인은 「저장된 키도 없습니다」라고 답한다.
+            result = {"checked": None, "detail": f"예외로 끝났다: {e}", "ok": None}
+        check("합성 자격의 한쪽만 있으면 예외가 아니라 사유를 낸다", result.get("checked"), False)
+        check("비어 있는 쪽의 이름을 말한다", second in (result.get("detail") or ""), True)
+        check("통했다고 하지 않는다", result.get("ok"), False)
+
+        # ⑤ 둘 다 저장돼 있으면 이어 붙인 한 줄이 실린다 — 다시 잇지 않는다.
+        svc = _service(**{first: "A-PART", second: "B-PART"})
+        svc._last_probe_at.clear()
+        seen3: list[str] = []
+
+        def fake3(source: str, credential: str):
+            seen3.append(credential)
+            raise RuntimeError("stop")
+
+        mod.get_provider = fake3  # type: ignore[assignment]
+        try:
+            asyncio.run(svc.probe_key(COMPOSITE_SOURCE, "", first))
+        except RuntimeError:
+            pass
+        finally:
+            mod.get_provider = original  # type: ignore[assignment]
+
+        check("둘 다 저장돼 있으면 이어 붙인 한 줄이 실린다", seen3, ["A-PART:B-PART"])
+
+        # ⑥ 정말 아무것도 없으면 종전대로 거절한다 — 그 말은 사실이다.
+        svc = _service()
+        svc._last_probe_at.clear()
+        try:
+            asyncio.run(svc.probe_key(COMPOSITE_SOURCE, "", first))
+            FAILURES.append("합성 자격이 통째로 비었는데 확인이 통과했다")
+            globals()["CHECKED"] += 1
+        except BadRequestError as e:
+            check("통째로 비면 저장된 키가 없다고 말한다", "저장된 키도 없습니다" in str(e), True)
     finally:
         os.chdir(origin)
 
     for line in FAILURES:
         print(f"FAIL {line}")
     print(f"\n검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과")
+    # 실패한 판에 성공 문구를 찍으면 로그를 읽는 사람이 정반대 사실을 읽는다 —
+    # 종료 코드만 맞는 것으로는 부족하다.
+    if FAILURES:
+        print("판정: 저장된 키 확인이 깨졌다 — 위 FAIL 을 보라")
+        return 1
     print("판정: 저장된 키도 확인할 수 있고, 친 값이 있으면 그쪽이 이긴다")
-    return 1 if FAILURES else 0
+    return 0
 
 
 if __name__ == "__main__":

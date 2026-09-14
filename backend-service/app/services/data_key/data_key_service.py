@@ -286,6 +286,22 @@ class DataKeyService:
         if not cleaned:
             stored = self.get_key(None, source)
             if not stored:
+                # 합성 자격은 **한쪽만 채워져 있어도 화면이 그 행을 「설정됨」이라고 말한다**
+                # (행이 설정별로 하나씩이라). 그 상태에서 「저장된 키도 없습니다」라고 답하면
+                # 화면과 정반대인 사유를 내는 것이고, 이 이슈가 없애려는 오해를 새로 만든다.
+                # 무엇이 비었는지 말하고, 친 값 경로와 같은 모양(`checked: False`)으로 낸다.
+                if source in COMPOSITE_KEY_SETTINGS:
+                    empty = [
+                        name
+                        for name in COMPOSITE_KEY_SETTINGS[source]
+                        if not (getattr(self.config, name, "") or "").strip()
+                    ]
+                    if len(empty) < len(COMPOSITE_KEY_SETTINGS[source]):
+                        return {
+                            "ok": False,
+                            "checked": False,
+                            "detail": f"{' · '.join(empty)} 이(가) 아직 없습니다 — 둘 다 채운 뒤 확인할 수 있습니다",
+                        }
                 raise BadRequestError("확인할 값이 없습니다 — 저장된 키도 없습니다")
             cleaned = stored
             using_stored = True
