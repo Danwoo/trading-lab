@@ -150,12 +150,6 @@ class Settings(BaseSettings):
     # 보고하는 값과 같은 토큰이다 — 그쪽은 부트스트랩 시점에 말하고, 여기는 기동 시점에 잡는다.
     _PLACEHOLDER = "CHANGE_ME"
 
-    #: 자리표시자로 남아도 기동을 막지 않는 설정 — **자격증명이 아닌 것만** 넣는다.
-    #: 늘리려면 왜 비밀이 아닌지를 함께 적는다 (fail-closed: 적지 않은 것은 전부 막힌다).
-    #: · `MARKET_DATA_CONTACT` — 소스에 보내는 연락처 문자열이다. 안 채우면 예의가 없을 뿐
-    #:   기동을 막을 일은 아니다.
-    _PLACEHOLDER_ALLOWED = frozenset({"MARKET_DATA_CONTACT"})
-
     @model_validator(mode="after")
     def _forbid_placeholder_credentials(self) -> "Settings":
         """자리표시자 자격증명으로 서지 않는다 — 「검사 0건은 통과가 아니다」의 자격증명판.
@@ -171,13 +165,22 @@ class Settings(BaseSettings):
         # `JWT_SECRET`·DB 비밀번호가 그대로 통과한다 — 시크릿 자리표시자로 서명한 JWT 는
         # `.env.example` 을 읽은 누구나 만들 수 있으니 SFTP 보다 나쁘다. 설정 전체를 훑고,
         # 부트스트랩이 같은 토큰을 쓰는 만큼 **대소문자·공백 변형도 자리표시자로 본다.**
+        #
+        # **예외 목록을 두지 않는다.** 이름을 하나 적는 순간 그 자리는 영영 열리고, 한 줄짜리
+        # 추가라 아무도 나중에 다시 보지 않는다 — fail-open 이다. 「이 키는 비밀이 아니다」를
+        # 판단할 필요도 없다: **「안 쓴다」를 말하는 방법이 이미 있기 때문이다.**
+        #
+        #   빈 값      「안 쓴다」 — 선택 설정은 정의부터 `str = ""` 라 비우면 그만이다
+        #   CHANGE_ME  「아직 안 했다」 — 복사해 놓고 마치지 않은 상태
+        #
+        # 이 레포가 다른 자리에서 「없다」와 「아직 안 받았다」를 가르는 것과 같은 축이다.
+        # 덧붙여 자격증명이 아닌 값도 자리표시자로 서면 해가 없지 않다 — `MARKET_DATA_CONTACT`
+        # 가 `CHANGE_ME` 면 이 서버는 외부 소스에 자기를 「CHANGE_ME」라고 소개한다.
         target = self._PLACEHOLDER.casefold()
         placeholders = sorted(
             name
             for name in type(self).model_fields
-            if name not in self._PLACEHOLDER_ALLOWED
-            and isinstance(getattr(self, name, None), str)
-            and getattr(self, name).strip().casefold() == target
+            if isinstance(getattr(self, name, None), str) and getattr(self, name).strip().casefold() == target
         )
         if not placeholders:
             return self
@@ -186,7 +189,7 @@ class Settings(BaseSettings):
         if self.APP_ENV != "development":
             raise ValueError(
                 f"자리표시자 자격증명으로 기동할 수 없습니다: {joined} 이(가) "
-                f"{self._PLACEHOLDER} 입니다. 실제 값을 채우세요."
+                f"{self._PLACEHOLDER} 입니다. 실제 값을 채우거나, 안 쓰는 설정이면 비웁니다."
             )
 
         # 개발 — 막지는 않되 조용히 넘어가지 않는다.

@@ -116,19 +116,42 @@ def run() -> None:
         except Exception as e:  # noqa: BLE001
             check(f"운영에서 JWT_SECRET={value!r} 를 거부한다", "JWT_SECRET" in str(e), f"어느 키인지 안 말한다: {e}")
 
-    # 2-2) 자격증명이 **아닌** 것은 막지 않는다 — 예외는 명시된 것만
+    # 2-2) **예외 목록이 없다.** 자격증명이 아닌 설정도 자리표시자로 서면 막는다 —
+    #      이름 하나를 면제 목록에 적는 순간 그 자리는 영영 열리고 아무도 다시 안 본다.
+    #      `MARKET_DATA_CONTACT=CHANGE_ME` 는 이 서버가 외부 소스에 자기를 「CHANGE_ME」라고
+    #      소개한다는 뜻이라 무해하지도 않다.
     try:
         build(MARKET_DATA_CONTACT="CHANGE_ME")
-        check("자격증명이 아닌 설정은 기동을 안 막는다 (MARKET_DATA_CONTACT)", True)
+        check("자격증명이 아닌 설정도 자리표시자면 막는다 (예외 목록 없음)", False, "기동이 성공했다")
     except Exception as e:  # noqa: BLE001
-        check("자격증명이 아닌 설정은 기동을 안 막는다 (MARKET_DATA_CONTACT)", False, f"막혔다: {e}")
+        check(
+            "자격증명이 아닌 설정도 자리표시자면 막는다 (예외 목록 없음)",
+            "MARKET_DATA_CONTACT" in str(e),
+            f"어느 키인지 안 말한다: {e}",
+        )
 
-    # 2-3) 빈 값은 「안 쓴다」는 뜻이다 — 자리표시자와 다르다
+    # 2-3) 「안 쓴다」를 말하는 길은 **빈 값**이다 — 그래서 예외 목록이 필요 없다.
+    #      선택 설정은 정의부터 `str = ""` 라 비우면 그만이고, 필수 설정은 애초에 채워야 한다.
     try:
-        build(EMAIL_USER="", EMAIL_PASSWORD="")
-        check("빈 값은 자리표시자가 아니다 (안 쓰는 기능)", True)
+        build(EMAIL_USER="", EMAIL_PASSWORD="", MARKET_DATA_CONTACT="")
+        check("빈 값은 자리표시자가 아니다 — 「안 쓴다」의 표현", True)
     except Exception as e:  # noqa: BLE001
-        check("빈 값은 자리표시자가 아니다 (안 쓰는 기능)", False, f"막혔다: {e}")
+        check("빈 값은 자리표시자가 아니다 — 「안 쓴다」의 표현", False, f"막혔다: {e}")
+
+    # 2-4) 설정 파일에서 **줄을 지우면** 기본값(빈 값)으로 선다.
+    #      kwargs 에서 빼는 것만으로는 안 된다 — 환경변수에 CHANGE_ME 가 남아 있으면
+    #      그쪽이 읽힌다(그리고 그것이 옳다: `.env` 에 자리표시자가 서 있는 상태 그대로다).
+    saved = {k: os.environ.pop(k, None) for k in ("EMAIL_USER", "EMAIL_PASSWORD")}
+    try:
+        kwargs = {k: v for k, v in BASE.items() if k not in saved}
+        Settings(**{k: v for k, v in kwargs.items() if k in set(Settings.model_fields)})
+        check("설정에서 줄을 지우면 기본값(빈 값)으로 선다", True)
+    except Exception as e:  # noqa: BLE001
+        check("설정에서 줄을 지우면 기본값(빈 값)으로 선다", False, f"막혔다: {e}")
+    finally:
+        for k, v in saved.items():
+            if v is not None:
+                os.environ[k] = v
 
     # 3) 개발에서는 막지 않는다 (경고만) — 파일 기능을 안 쓰는 사람의 길을 막지 않는다
     try:
