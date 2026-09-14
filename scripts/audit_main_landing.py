@@ -25,7 +25,9 @@ PR 필수·승인 1건·게이트 3종이 통째로 없어진다. 리드 결정�
    그 head 에서 전부 성공인가.
 
 문서 전용 PR 은 면제 규약(루트 `CLAUDE.md`)대로 리뷰 마커 대신 App 승인으로 선다 — 그 경우
-`docs_exempt` 로 표시하고 리뷰 마커를 요구하지 않되, **게이트는 그대로 요구한다.**
+리뷰 마커를 요구하지 않되, **게이트는 그대로 요구한다.** 「문서 전용」이 무엇인지는 여기서
+정하지 않고 `review_notice.py` 를 부른다 — 그 판정이 실제로 App 승인·리뷰 건너뜀을 만드는
+자리이고, 감사가 자기 정의를 두면 정당한 착륙이 영영 위반으로 적힌다.
 
 ## fail-closed
 
@@ -48,16 +50,17 @@ import json
 import re
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from review_notice import decide as judge_docs_only  # noqa: E402
 
 #: ruleset 이 required 로 걸고 있던 것과 같은 이름 — 사라져도 여기서 계속 요구한다.
 REQUIRED_CHECKS = ("test: backend", "test: frontend", "test: repo")
 
 #: 리뷰 통과 마커. `sha=` 가 리뷰가 실제로 본 커밋이다.
 MARKER = re.compile(r"<!--\s*cross-review\s+v1\b[^>]*\bverdict=(?P<verdict>\w+)\b[^>]*\bsha=(?P<sha>[0-9a-f]{7,40})")
-
-#: 목표층 문서 — 이것만 바뀐 PR 은 면제 규약 대상이다 (루트 `CLAUDE.md`).
-DOCS_ONLY_PATHS = ("CONTEXT.md", "CLAUDE.md")
 
 
 def _marker_of(comments: list[dict[str, Any]]) -> tuple[str, str] | None:
@@ -70,7 +73,18 @@ def _marker_of(comments: list[dict[str, Any]]) -> tuple[str, str] | None:
 
 
 def _is_docs_only(files: list[str]) -> bool:
-    return bool(files) and all(f in DOCS_ONLY_PATHS for f in files)
+    """문서 전용인가 — **정의를 여기 두지 않는다.**
+
+    면제를 실제로 만들어 내는 것은 `review_notice.py` 다: `ci.yml` 의 docs-notice 잡이 그
+    판정으로 App 승인 + 자동 머지 arm 을 걸고, `cross-review.yml` 의 `paths-ignore` 가 같은
+    목록으로 리뷰를 건너뛴다. 감사가 자기 정의를 따로 가지면 **셋째 정의**가 되어, 정당하게
+    착륙한 md-only PR 을 영구히 위반으로 적는다 — 그리고 고칠 방법이 없다(그 PR 들에는 리뷰
+    마커를 달 경로가 애초에 안 돈다). 상시 빨간 감사는 위협 모델 §4.3 이 적은 「발각이 행동으로
+    이어지지 않는」 상태 그 자체다.
+
+    fail-closed 극성도 그쪽 것을 그대로 쓴다 — 목록을 못 읽었으면 문서 전용이 아니다.
+    """
+    return bool(judge_docs_only({"files": files}).get("docs_only"))
 
 
 def judge_commit(evidence: dict[str, Any]) -> dict[str, Any]:
@@ -111,7 +125,7 @@ def judge_commit(evidence: dict[str, Any]) -> dict[str, Any]:
 
     # ── 리뷰 — 문서 전용이면 면제 (App 승인이 그 자리를 받는다) ──────
     if _is_docs_only(pr.get("files") or []):
-        verdict["notes"].append("목표층 문서 전용 — 리뷰 마커 면제 (게이트는 요구함)")
+        verdict["notes"].append("문서 전용 — 리뷰 마커 면제 (게이트는 요구함)")
         return verdict
 
     comments = pr.get("comments")

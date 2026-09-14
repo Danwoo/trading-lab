@@ -95,6 +95,16 @@ def main() -> int:
     # ── 문서 면제: 리뷰는 면제, 게이트는 그대로 ──────────────────
     docs = pr(files=["CONTEXT.md"], comments=[{"body": "마커 없음"}])
     check("목표층 문서 전용은 리뷰 마커 면제", violated(ev(pulls=[docs])), False)
+    # 면제의 범위는 `review_notice.py` 가 정한다 — 감사가 자기 목록을 들면 이 둘이 위반으로
+    # 적힌다. 둘 다 docs-notice 잡이 App 승인 + 자동 머지를 걸어 **정당하게** 착륙하는 모양이다.
+    readme = pr(files=["README.md"], comments=[{"body": "마커 없음"}])
+    check("md 전용 PR 도 면제다 — 운용 정의와 같은 줄에 선다", violated(ev(pulls=[readme])), False)
+    docs_tree = pr(files=[".docs/4-아키텍처/x.md"], comments=[{"body": "마커 없음"}])
+    check(".docs 밑 md 도 면제다", violated(ev(pulls=[docs_tree])), False)
+    docs_asset = pr(files=[".docs/4-아키텍처/x.png"], comments=[{"body": "마커 없음"}])
+    check("문서 트리라도 md 가 아니면 면제가 아니다", violated(ev(pulls=[docs_asset])), True)
+    upper = pr(files=["README.MD"], comments=[{"body": "마커 없음"}])
+    check("대소문자를 접지 않는다 — README.MD 는 리뷰가 도는 쪽이다", violated(ev(pulls=[upper])), True)
     docs_bad_gate = pr(files=["CONTEXT.md"], comments=[], checks=GREEN[:1])
     check("문서 전용이어도 게이트는 요구한다", violated(ev(pulls=[docs_bad_gate])), True)
     mixed = pr(files=["CONTEXT.md", "frontend/app/page.tsx"], comments=[{"body": "마커 없음"}])
@@ -105,6 +115,8 @@ def main() -> int:
     check("체크 조회 실패를 통과로 읽지 않는다", violated(ev(pulls=[pr(checks=None)])), True)
     check("코멘트 조회 실패를 통과로 읽지 않는다", violated(ev(pulls=[pr(comments=None)])), True)
     check("검사 대상 0건은 실패다", judge_all([])[1], 1)
+    empty_files = pr(files=[], comments=[{"body": "마커 없음"}])
+    check("파일 목록이 비면 면제로 접지 않는다", violated(ev(pulls=[empty_files])), True)
 
     for line in FAILURES:
         print(f"FAIL {line}")

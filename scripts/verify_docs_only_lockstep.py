@@ -22,6 +22,9 @@ PR — 영구 차단)이, 다른 쪽엔 겹침(리뷰가 돌면서 App 도 승�
    (고지 스텝 + 승인 스텝) — 승인 스텝이 판정부를 안 거치고 자기 정의로 승인하면 1 이 무의미해진다.
 4. 승인 스텝은 판정부를 **기본 브랜치에서 내려받아** 쓴다 (`?ref=` + `DEFAULT_BRANCH`) — PR 트리의
    판정부로 자기 승인을 판정하면 PR 이 그 판정을 고칠 수 있다.
+5. 착륙 감사(`audit_main_landing.py`)가 **자기 정의를 두지 않는다** — 판정부를 import 하고 자체
+   경로 목록을 갖지 않는다. 감사는 면제를 *소비*하는 쪽이라, 정의가 하나 더 생기면 정당하게
+   착륙한 문서 PR 이 영구히 위반으로 적힌다(#420 리뷰 F1 실측). 앞의 넷과 같은 클래스다.
 
 ## fail-closed
 
@@ -43,6 +46,9 @@ CROSS_REVIEW = WORKFLOW_DIR / "cross-review.yml"
 CI = WORKFLOW_DIR / "ci.yml"
 DOCS_JOB_ID = "docs-notice"
 JUDGE_FILE = "review_notice.py"
+AUDIT_FILE = REPO_ROOT / "scripts" / "audit_main_landing.py"
+#: 「경로 목록을 자기 상수로 들고 있다」의 모양 — 감사가 다시 정의를 두면 여기 걸린다.
+_OWN_PATTERN_LIST = re.compile(r"^\s*[A-Z_]*(?:DOCS|DOC|MD)[A-Z_]*\s*(?::[^=]*)?=\s*[\(\[]", re.M)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import review_notice  # noqa: E402
@@ -179,6 +185,25 @@ def main() -> int:
                     f"{CI.name} `{DOCS_JOB_ID}`: 승인 스텝이 `{JUDGE_FILE}` 를 기본 브랜치에서 내려받지 않는다 — "
                     "PR 트리의 판정부로 자기 승인을 판정하면 PR 이 그 판정을 고칠 수 있다"
                 )
+
+    # ⑤ 착륙 감사는 정의를 갖지 않고 판정부를 부른다
+    if not AUDIT_FILE.exists():
+        problems.append(f"{AUDIT_FILE.name}: 파일이 없다 — 감사가 사라졌거나 경로가 바뀌었다")
+    else:
+        audit_text = AUDIT_FILE.read_text(encoding="utf-8")
+        checked += 1
+        if "review_notice" not in audit_text:
+            problems.append(
+                f"{AUDIT_FILE.name}: `review_notice` 를 부르지 않는다 — 문서 전용 정의가 하나 더 생기면 "
+                "정당하게 착륙한 문서 PR 이 영구히 위반으로 적힌다"
+            )
+        checked += 1
+        own = _OWN_PATTERN_LIST.search(audit_text)
+        if own:
+            problems.append(
+                f"{AUDIT_FILE.name}: 자체 문서 경로 목록으로 보이는 선언이 있다 — `{own.group(0).strip()}`. "
+                "정의는 review_notice.py 한 곳이다"
+            )
 
     print(
         f"문서 전용 lockstep {checked}건 대조 · paths-ignore {sorted(declared)} · "
