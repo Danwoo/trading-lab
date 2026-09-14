@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -180,8 +181,50 @@ class FileService:
                 pass
             raise
 
+    async def open_file_download(self, args: dict) -> AsyncGenerator[bytes, None]:
+        """다운로드 스트림을 **응답 헤더가 나가기 전에** 연다.
+
+        종전 `stream_file_download` 는 async generator 라, `StreamingResponse` 가 첫 조각을 당길
+        때까지 아무것도 실행되지 않았다 — 그때는 이미 200 이 나간 뒤라 SFTP 가 죽어 있어도
+        되돌릴 수 없었고, 본문만 0바이트로 끝났다. 업로드는 같은 고장에 정직하게 503 을 내는데
+        다운로드만 200 을 냈다 (#433·B-7).
+
+        그래서 세션 열기와 **첫 조각 읽기까지를 여기서 미리 한다.** 여기서 터지면 아직 상태
+        코드를 안 정했으므로 평소의 예외 경로(503·404)로 나간다. 성공하면 첫 조각을 그대로
+        흘려보내는 제너레이터를 돌려준다 — 읽은 것을 버리지 않는다.
+        """
+        file_detail = await run_in_threadpool(self.file_repository.select_file_detail, args)
+        if not file_detail:
+            raise NotFoundError("파일을 찾을 수 없습니다.")
+
+        remote_path = file_detail["file_stre_cours"]
+        session_cm = self.file_store.open_session()
+        session = await session_cm.__aenter__()
+        try:
+            stream = session.read_stream(remote_path)
+            first_chunk = await anext(stream, None)
+        except BaseException:
+            await session_cm.__aexit__(*sys.exc_info())
+            raise
+
+        async def _remaining() -> AsyncGenerator[bytes, None]:
+            try:
+                if first_chunk:
+                    yield first_chunk
+                async for chunk in stream:
+                    yield chunk
+            finally:
+                await session_cm.__aexit__(None, None, None)
+
+        return _remaining()
+
     async def stream_file_download(self, args: dict) -> AsyncGenerator[bytes, None]:
-        """파일 스트리밍 다운로드 (비동기 Generator 리턴)"""
+        """파일 스트리밍 다운로드 (비동기 Generator 리턴)
+
+        **이 경로는 실패를 상태 코드로 못 낸다** — 첫 조각을 당길 때 세션이 열리므로 그 시점엔
+        이미 200 이 나갔다. 새 호출부는 `open_file_download` 를 쓴다. 남겨 둔 이유는 이 메서드를
+        부르는 다른 곳이 생기면 같은 함정에 빠지므로, 그때 이 주석이 보이게 하려는 것이다.
+        """
         file_detail = await run_in_threadpool(self.file_repository.select_file_detail, args)
         if not file_detail:
             raise NotFoundError("파일을 찾을 수 없습니다.")
