@@ -172,7 +172,9 @@ def describe_authorship(read, is_bot) -> str:
         return "미상(판독 불가한 신원 포함)"
     vendors = read["known_vendors"]
     if vendors and read["human_emails"]:
-        return f"{','.join(vendors)} + 사람"
+        # 「사람」이라 단정하지 않는다 — 어휘 밖 이메일은 사람일 수도, 신원 설정을 빠뜨린
+        # 에이전트일 수도 있다. `merge_provenance` 와 같은 낱말을 쓴다.
+        return f"{','.join(vendors)} + 미상(신원 없음)"
     if vendors:
         return ",".join(vendors)
     # 「사람」이라 단정하지 않는다 — 신원 설정을 빠뜨린 에이전트도 같은 모양이고 가를 수 없다

@@ -777,8 +777,8 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_ci_check_coverage.py
 
-      # main push 에는 대조할 브랜치 선언이 없다 — 종전 잡 레벨 `if:` 를 스텝으로 옮겼다.
-      - name: PR 커밋 저자 신원 ↔ 브랜치 선언 대조 (fail-closed)
+      # main push 에는 볼 PR 이 없다 — 종전 잡 레벨 `if:` 를 스텝으로 옮겼다.
+      - name: PR 커밋 저자 신원 판독 (fail-closed)
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -801,7 +801,7 @@ jobs:
             | python3 scripts/pr_authorship.py
           RC=$?
           if [ "$RC" -ne 0 ]; then
-            echo "::error::PR 의 커밋 저자 신원을 읽을 수 없거나 브랜치 선언과 어긋난다 — 위 사유를 보고 디스패치의 §6.1 신원 설정(git config --worktree user.email)을 확인하라"
+            echo "::error::PR 의 커밋 저자 신원을 읽을 수 없다 — 위 사유를 보고 디스패치의 §6.1 신원 설정(git config --worktree user.email)을 확인하라"
           fi
           exit "$RC"
 

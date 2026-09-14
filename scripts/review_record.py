@@ -610,8 +610,8 @@ def judge_author_identity(payload) -> dict:
     **어휘 밖 에이전트형 이메일은 「사람 저자」가 아니라 「판독 불가」다.** 어휘
     (`review_route` 의 티어·벤더 목록)는 새 모델이 붙을 때 사람이 갱신하므로, 디스패치가
     어휘보다 먼저 도는 창이 반드시 생긴다. 그 창에서 저자 벤더를 모른 채 통과시키면
-    자기리뷰가 조용히 arm 된다 — `review_route.decide()` 는 같은 입력에 `author_kind=human`
-    을 내어 리뷰어로 claude 를 배정한다.
+    자기리뷰가 조용히 arm 된다 — `review_route.decide()` 는 같은 입력에 `author_kind=unknown`
+    을 내고 리뷰어로 claude 를 배정한다.
 
     작성 티어는 현재 claude 신원에서만 판독된다 (`review_route` 가 `claude_tiers_seen` 만
     모은다). 그래서 차단 해제는 **리뷰어 벤더가 claude 일 때만** 성립한다 — 동일-벤더

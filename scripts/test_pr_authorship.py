@@ -149,7 +149,7 @@ CASES = [
         "에이전트 + 사람 혼재 커밋 → 통과 (둘 다 손댄 것은 정직한 provenance 다)",
         payload(head_ref="docs/ci-review-design", emails=(AGENT, LEAD)),
         0,
-        {"authorship": "claude + 사람"},
+        {"authorship": "claude + 미상(신원 없음)"},
     ),
     (
         "구형식 신원(claude-agent@, 티어 미상) → 통과 — 티어는 이 그물의 대상이 아니다",

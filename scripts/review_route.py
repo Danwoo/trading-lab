@@ -112,10 +112,15 @@ def _identity_note(
     return "; ".join(parts)
 
 
-def identify_author(emails, head_ref):
-    """커밋 author 이메일·브랜치명으로 저자 신원을 판별한다 — 신원 형식 판독의 단일 자리.
+def identify_author(emails, head_ref):  # noqa: ARG001 — head_ref 는 호출부 계약 유지용
+    """커밋 author 이메일로 저자 신원을 판별한다 — 신원 형식 판독의 단일 자리.
 
     `review_record` 의 자기리뷰 차단(동일-벤더 + 티어 미상 → arm 거부)도 이것을 부른다.
+
+    **`head_ref` 는 받지만 읽지 않는다.** 브랜치명으로 저자를 판별하던 폴백을 지웠기 때문이다
+    (2026-09-14 — 여는 쪽이 이름을 통제하므로 근거가 될 수 없다). 인자를 남긴 것은 호출부
+    (`decide`·워크플로)를 함께 고치지 않기 위해서다 — 지우려면 그 자리들을 같은 커밋에서
+    바꾼다.
     """
     vendors, claude_tiers_seen, unknown_agentish = set(), set(), []
     for raw in emails:
