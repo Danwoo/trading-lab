@@ -26,9 +26,9 @@
       (1)~(6) 은 판이 맞는 상태의 계약이므로 그 검사들에서는 이 대조를 no-op 으로 눌러 둔다.
 
 이 계약이 성립하려면 **각 매니저의 stop() 이 start() 실패 후에도 안전(idempotent 가드)** 해야 한다
-— `modules.BackgroundManager` 프로토콜이 이를 명시한다. 기존 3종(message_consumer·nav_producer·
-scheduler)은 전부 `self.task`/`self.scheduler.running` 등 자체 상태를 보고 정리하므로 이 전제를
-충족한다.
+— `modules.BackgroundManager` 프로토콜이 이를 명시한다. 현재 3종(message_consumer·scheduler·
+ingest_worker)은 전부 `self.task`/`self.scheduler.running` 등 자체 상태를 보고 정리하므로 이
+전제를 충족한다.
 
 main.py 는 core.container 를 import 하므로 필수 env 를 더미로 주입한 뒤 로드한다.
 `uv run python scripts/verify_lifespan_manager_rollback.py` (cwd=서비스 루트).
