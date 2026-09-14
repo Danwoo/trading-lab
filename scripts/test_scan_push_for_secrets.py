@@ -92,6 +92,13 @@ def main() -> int:
             run(tmp, {}, binary),
             1,
         )
+        # **실패와 「없음」을 가른다.** FROM 이 로컬에 없으면(force push·얕은 클론·객체 누락)
+        # `rev-list` 가 죽는데, 그것을 0 으로 접으면 비밀이 든 push 가 스캔 한 번 없이 지나간다.
+        check(
+            "범위를 셀 수 없으면 거부한다 — 0 으로 접지 않는다",
+            run(tmp, {"PRE_COMMIT_FROM_REF": "1" * 40, "PRE_COMMIT_TO_REF": tip}, binary),
+            1,
+        )
 
         (tmp / "clean.txt").write_text("nothing here\n")
         git(tmp, "add", "-A")

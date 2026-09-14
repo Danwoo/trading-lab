@@ -27,8 +27,18 @@ else
   RANGE="$FROM..$TO"
 fi
 
+# **실패와 0 을 가른다.** `|| echo 0` 으로 뭉개면 rev-list 가 죽었을 때(FROM 이 로컬에 없는
+# force push · 얕은 클론 · 객체 누락) 「새 커밋 없음」으로 읽혀 비밀이 든 push 가 스캔 한 번
+# 없이 지나간다 — 이 파일 머리말이 금지한 바로 그것이다.
 # shellcheck disable=SC2086
-COUNT=$(git rev-list --count $RANGE 2>/dev/null || echo 0)
+if ! COUNT=$(git rev-list --count $RANGE 2>&1); then
+  echo "push 범위를 셀 수 없습니다 ($RANGE) — 훑을 것을 모르므로 거부합니다: $COUNT" >&2
+  exit 1
+fi
+if ! [ "$COUNT" -eq "$COUNT" ] 2>/dev/null; then
+  echo "push 범위의 커밋 수를 숫자로 읽지 못했습니다 ($COUNT) — 거부합니다." >&2
+  exit 1
+fi
 if [ "$COUNT" -eq 0 ]; then
   echo "push 할 새 커밋이 없습니다 — 훑을 것이 없습니다."
   exit 0
