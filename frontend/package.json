@@ -55,7 +55,7 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "uuid": "^14.0.2",
-    "zod": "^4.6.1",
+    "zod": "^4.6.2",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
