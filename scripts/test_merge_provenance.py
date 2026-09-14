@@ -14,6 +14,7 @@
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -188,6 +189,19 @@ STRIP_CASES = [
 ]
 
 
+#: 재현본에 자기 광고가 남았는지 — **판정부의 정규식과 별개로** 한 겹 더 본다.
+#:
+#: 맨 부분 문자열(`"anthropic.com" in got`)로 보지 않는 이유: 그 모양은 URL 의 아무 자리에나
+#: 걸리는 불완전한 검사라 CodeQL 의 `py/incomplete-url-substring-sanitization` 이 잡는다
+#: (실측 — 이 줄이 경보 #49 였다). 여기서는 **줄 단위**로 보고 경계를 고정한다:
+#: 주소는 `@` 뒤에서 끝나야 하고, 세션 줄은 줄머리여야 한다.
+_RESIDUE = re.compile(r"@anthropic\.com\b|^Claude-Session:", re.M)
+
+
+def _has_self_reference(body: str) -> bool:
+    return bool(mp._AI_SELF_REFERENCE.search(body) or _RESIDUE.search(body))
+
+
 def load_fixtures():
     if not FIXTURES.is_file():
         return []
@@ -223,7 +237,7 @@ def main() -> int:
                 f"    기대 끝: {want[-160:]!r}\n"
                 f"    실제 끝: {got[-160:]!r}"
             )
-        if mp._AI_SELF_REFERENCE.search(got) or "anthropic.com" in got or "Claude-Session" in got:
+        if _has_self_reference(got):
             failures.append(f"PR #{fx['pr']}: 재현본에 AI 자기 광고가 남았다")
 
     # 필터가 살아 있는지 **실물로** 증명한다 — 아무 데서도 아무것도 안 지우면 그 필터는 죽은
@@ -288,6 +302,20 @@ def main() -> int:
                     f"{missing} (트레일러 판독이 깨진다)"
                 )
 
+    # ── ②-1 잔류 검사의 경계 ───────────────────────────────────────────────────
+    # 맨 부분 문자열로 보면 URL 아무 자리의 `anthropic.com` 에도 걸린다 — 경보가 아니라
+    # **오탐**이 되고, 이 검사가 무엇을 보는지 읽는 사람이 모르게 된다.
+    RESIDUE_CASES = [
+        ("진짜 트레일러", "Co-Authored-By: Claude <noreply@anthropic.com>", True),
+        ("세션 줄", "Claude-Session: https://claude.ai/code/session_x", True),
+        ("URL 안에 낀 비슷한 도메인", "참고: https://evil.example/?q=anthropic.com.attacker.net", False),
+        ("줄머리가 아닌 인용", "본문에 Claude-Session: 을 인용한 문장", False),
+        ("평범한 본문", "fix: 무언가 고친다", False),
+    ]
+    for desc, body, expected in RESIDUE_CASES:
+        if _has_self_reference(body) != expected:
+            failures.append(f"잔류 검사 경계 — {desc}: 기대 {expected}")
+
     # ── ②-2 무엇을 지우고 무엇을 남기는가 ──────────────────────────────────────
     if not STRIP_CASES:
         print("::error::자기 광고 경계 케이스를 0건 모았습니다 (fail-closed)")
@@ -306,14 +334,15 @@ def main() -> int:
         if got != expected:
             failures.append(f"{desc}\n    기대: {expected}\n    실제: {got}")
 
-    total = len(fixtures) * 3 + len(STRIP_CASES) + len(LINE_CASES) + 2
+    total = len(fixtures) * 3 + len(STRIP_CASES) + len(LINE_CASES) + 2 + len(RESIDUE_CASES)
     if not LINE_CASES:
         print("::error::어휘 케이스를 0건 모았습니다 (fail-closed)")
         return 1
     print(
         f"merge_provenance 케이스 {total}건 검사 "
         f"(실물 재현 {len(fixtures)}건 · 자기 광고 잔류 {len(fixtures)}건 · 무손실 {len(fixtures)}건 · "
-        f"자기 광고 경계 {len(STRIP_CASES)}건 · 무관 커밋 보존 2건 · 어휘 {len(LINE_CASES)}건)"
+        f"자기 광고 경계 {len(STRIP_CASES)}건 · 잔류 검사 경계 {len(RESIDUE_CASES)}건 · "
+        f"무관 커밋 보존 2건 · 어휘 {len(LINE_CASES)}건)"
     )
     if failures:
         for f in failures:
