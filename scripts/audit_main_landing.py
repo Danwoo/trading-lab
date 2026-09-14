@@ -55,6 +55,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from review_notice import decide as judge_docs_only  # noqa: E402
+from review_record import is_trusted_author  # noqa: E402
 
 #: ruleset 이 required 로 걸고 있던 것과 같은 이름 — 사라져도 여기서 계속 요구한다.
 REQUIRED_CHECKS = ("test: backend", "test: frontend", "test: repo")
@@ -64,12 +65,37 @@ MARKER = re.compile(r"<!--\s*cross-review\s+v1\b[^>]*\bverdict=(?P<verdict>\w+)\
 
 
 def _marker_of(comments: list[dict[str, Any]]) -> tuple[str, str] | None:
-    """가장 마지막 리뷰 마커의 (verdict, sha). 없으면 None."""
+    """가장 마지막 리뷰 마커의 (verdict, sha). 없으면 None.
+
+    **누가 썼는지를 본다.** 마커는 텍스트일 뿐이고 head sha 는 공개 정보라, 저자를 안 가르면
+    아무 GitHub 사용자나 코멘트 하나로 「리뷰 통과」를 만들어 낼 수 있다. 이 감사는 private
+    전환으로 사라지는 승인 규칙을 대신하는 마지막 방어선이므로, 그 자리가 뚫리면 이 층 전체가
+    뜻을 잃는다.
+
+    판정은 **여기서 새로 짜지 않고** `review_record.is_trusted_author` 를 그대로 쓴다 — 같은
+    마커를 읽는 자리가 둘이 되면 한쪽만 조여도 다른 쪽이 열려 있다.
+    """
     found: tuple[str, str] | None = None
     for comment in comments:
+        if not isinstance(comment, dict) or not is_trusted_author(_authorship_of(comment)):
+            continue
         for match in MARKER.finditer(comment.get("body") or ""):
             found = (match.group("verdict"), match.group("sha"))
     return found
+
+
+def _authorship_of(comment: dict[str, Any]) -> dict[str, Any]:
+    """`is_trusted_author` 가 읽는 평평한 모양으로 옮긴다 — GitHub 응답은 `user` 가 중첩이다.
+
+    없는 값은 없는 채로 넘긴다. 채워 넣으면 「저자를 몰랐다」가 「믿을 만한 저자였다」로 바뀐다.
+    """
+    user = comment.get("user")
+    user = user if isinstance(user, dict) else {}
+    return {
+        "author_association": comment.get("author_association"),
+        "user_login": comment.get("user_login", user.get("login")),
+        "user_type": comment.get("user_type", user.get("type")),
+    }
 
 
 def _is_docs_only(files: list[str]) -> bool:

@@ -25,8 +25,20 @@ HEAD = "abc1234def5678"
 GREEN = [{"name": n, "conclusion": "success"} for n in ("test: backend", "test: frontend", "test: repo")]
 
 
-def marker(sha: str = HEAD, verdict: str = "merge_ok") -> dict:
-    return {"body": f"판정 코멘트\n\n<!-- cross-review v1 model=kimi verdict={verdict} sha={sha} -->"}
+def marker(sha: str = HEAD, verdict: str = "merge_ok", **author) -> dict:
+    """판정 코멘트 — **저자가 붙는다.** 기본은 이 레포의 워크플로가 게시한 실제 모양이다.
+
+    마커는 텍스트일 뿐이고 head sha 는 공개 정보라, 저자를 안 가르면 아무나 코멘트 하나로
+    「리뷰 통과」를 만들 수 있다. 그래서 이 픽스처의 기본값도 **저자가 있는** 모양이어야 한다 —
+    저자 없는 모양을 기본으로 두면 그물이 검사하는 세계가 현실과 달라진다.
+    """
+    base = {
+        "body": f"판정 코멘트\n\n<!-- cross-review v1 model=kimi verdict={verdict} sha={sha} -->",
+        "user": {"login": "github-actions", "type": "Bot"},
+        "author_association": "NONE",
+    }
+    base.update(author)
+    return base
 
 
 def pr(**over) -> dict:
@@ -110,6 +122,30 @@ def main() -> int:
     mixed = pr(files=["CONTEXT.md", "frontend/app/page.tsx"], comments=[{"body": "마커 없음"}])
     check("문서에 코드가 섞이면 면제가 사라진다", violated(ev(pulls=[mixed])), True)
 
+    # ── 마커를 아무나 쓰지 못한다 ────────────────────────────────
+    # 이 감사는 private 전환으로 사라지는 승인 규칙을 대신하는 **마지막 방어선**이다. 저자를
+    # 안 가르면 아무 GitHub 사용자나 코멘트 하나로 그 방어선을 통과한다 — 레포가 public 인
+    # 동안에는 지금 당장 살아 있는 표면이다.
+    outsider = marker(user={"login": "random-outside-commenter", "type": "User"}, author_association="NONE")
+    check("제3자가 쓴 마커는 읽지 않는다", violated(ev(pulls=[pr(comments=[outsider])])), True)
+    fake_bot = marker(user={"login": "not-our-bot", "type": "Bot"}, author_association="NONE")
+    check("봇처럼 보이는 낯선 신원도 읽지 않는다", violated(ev(pulls=[pr(comments=[fake_bot])])), True)
+    half_bot = marker(user={"login": "github-actions", "type": "User"}, author_association="NONE")
+    check("로그인만 맞고 타입이 다르면 읽지 않는다", violated(ev(pulls=[pr(comments=[half_bot])])), True)
+    no_author = {"body": marker()["body"]}
+    check("저자를 모르면 읽지 않는다", violated(ev(pulls=[pr(comments=[no_author])])), True)
+
+    owner = marker(user={"login": "Danwoo", "type": "User"}, author_association="OWNER")
+    check("레포 주인이 쓴 마커는 읽는다", violated(ev(pulls=[pr(comments=[owner])])), False)
+    app = marker(user={"login": "trading-lab-ci", "type": "Bot"}, author_association="NONE")
+    check("승인 App 이 쓴 마커는 읽는다", violated(ev(pulls=[pr(comments=[app])])), False)
+    # 위조가 진짜 뒤에 와도 진짜를 덮지 못한다 — 마지막 매치가 이기는 규칙의 사각지대.
+    check(
+        "제3자 마커가 뒤에 와도 앞의 진짜 판정을 덮지 못한다",
+        violated(ev(pulls=[pr(comments=[app, marker(verdict="needs_changes", user={"login": "x", "type": "User"})])])),
+        False,
+    )
+
     # ── fail-closed ──────────────────────────────────────────
     check("조회 실패(None)를 통과로 읽지 않는다", violated(ev(pulls=None)), True)
     check("체크 조회 실패를 통과로 읽지 않는다", violated(ev(pulls=[pr(checks=None)])), True)
@@ -121,8 +157,12 @@ def main() -> int:
     for line in FAILURES:
         print(f"FAIL {line}")
     print(f"\n검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과")
+    # 실패한 판에 성공 문구를 찍으면 로그를 읽는 사람이 정반대 사실을 읽는다.
+    if FAILURES:
+        print("판정: 착륙 감사가 기대와 다르게 동작한다 — 위 FAIL 을 보라")
+        return 1
     print("판정: 사후 감사가 양성(PR 미경유·리뷰 없음·게이트 실패)을 잡고, 정상 착륙은 통과시킨다")
-    return 1 if FAILURES else 0
+    return 0
 
 
 if __name__ == "__main__":
