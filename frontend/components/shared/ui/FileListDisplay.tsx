@@ -9,6 +9,7 @@ import { selectFileDownloadUrl, selectFilePreviewUrl } from "@/services/common/f
 import { useFileGroups } from "@/hooks/shared/useFileGroups";
 import { formatFileSize } from "@/utils/common/fileUtils";
 import { showToast } from "@/components/shared/Feedback";
+import { getApiErrorMessage } from "@/utils/common/errors";
 import { FileTypeIcon } from "@/components/shared/ui/primitives/FileTypeIcon";
 import { Icon } from "@/components/shared/ui/primitives/icons";
 
@@ -113,6 +114,9 @@ export const FileListDisplay: React.FC<Props> = ({ atchFileId, compact = false, 
   // 파일 목록 조회
   const fileGroups = useFileGroups(atchFileId ? [{ key: "files", fileId: atchFileId }] : []);
   let files = fileGroups.files?.files || [];
+  // 「없다」와 「못 읽었다」를 가른다 — 조회 실패를 「없음」으로 그리면 사용자는 첨부가 유실됐다고
+  // 믿고 다시 올리려 든다 (#440·B-10).
+  const loadFailed = fileGroups.files?.error === true;
 
   if (fileSn !== undefined) {
     files = files.filter((file) => file.file_sn === fileSn);
@@ -124,7 +128,11 @@ export const FileListDisplay: React.FC<Props> = ({ atchFileId, compact = false, 
       const url = await selectFileDownloadUrl(atchFileId!, file.file_sn);
       window.open(url, "_blank");
     } catch (error) {
+      // 바로 아래 `handleDownloadAll` 은 같은 실패에 토스트를 띄운다. 한 파일이면 조용하고
+      // 여러 파일이면 말하는 것은 정책이 아니라 누락이었다 — 사용자에게는 아무 일도
+      // 안 일어난 것처럼 보였다 (#440·B-8). 형제 함수와 같은 층으로 올린다.
       console.error("파일 다운로드 실패:", error);
+      showToast(getApiErrorMessage(error), "error");
     }
   };
 
@@ -187,6 +195,14 @@ export const FileListDisplay: React.FC<Props> = ({ atchFileId, compact = false, 
   // 일반 모드
   if (!atchFileId?.trim()) {
     return <div className="text-gray-400">첨부된 파일이 없습니다.</div>;
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="text-amber-700" role="status">
+        첨부 목록을 불러오지 못했습니다 — 파일이 없다는 뜻은 아닙니다. 잠시 후 화면을 다시 열어 주세요.
+      </div>
+    );
   }
 
   if (files.length === 0) {
