@@ -62,11 +62,24 @@ def main() -> int:
     # (2) 파일 자체가 없다 — 등록만 빼면 다음 사람이 다시 꽂는다.
     check("nav_producer_manager.py 가 없다", (APP / "managers/nav/nav_producer_manager.py").is_file(), False)
 
-    # 난수로 시계열을 만드는 코드가 앱 어디에도 없다 (같은 것이 다른 이름으로 돌아오는 것을 막는다)
+    # 난수로 시계열을 만드는 코드가 앱 어디에도 없다 (같은 것이 다른 이름으로 돌아오는 것을 막는다).
+    # **난수 함수 하나만 보면 이름을 바꿔 지나간다** — `random.gauss` 로 쓴 부활본이 실제로 이
+    # 검사를 통과했다(#437 리뷰 공격 3). 그래서 난수를 내는 쪽을 목록으로 둔다. 목록이 비면
+    # 검사가 죽은 것이므로 실패시킨다.
+    RANDOM_SOURCES = (
+        "random.uniform",
+        "random.gauss",
+        "random.random",
+        "random.normalvariate",
+        "np.random",
+        "numpy.random",
+    )
+    check("난수 출처 목록이 비어 있지 않다", bool(RANDOM_SOURCES), True)
     offenders = []
     for path in APP.rglob("*.py"):
         text = path.read_text(encoding="utf-8", errors="ignore")
-        if "random.uniform" in text and ("nav" in text.lower() or "drawdown" in text.lower()):
+        lower = text.lower()
+        if any(src in text for src in RANDOM_SOURCES) and ("nav" in lower or "drawdown" in lower):
             offenders.append(str(path.relative_to(APP)))
     check("난수로 NAV 시계열을 만드는 코드가 없다", offenders, [])
 
@@ -78,8 +91,13 @@ def main() -> int:
     for line in FAILURES:
         print(f"FAIL {line}")
     print(f"\n검사한 단언 {CHECKED}건 중 {CHECKED - len(FAILURES)}건 통과 (매니저 등록 {len(entries)}건 확인)")
+    # 실패한 판에 성공 문구를 찍으면 로그를 읽는 사람이 정반대 사실을 읽는다 — 종료 코드만 맞는
+    # 것으로는 부족하다.
+    if FAILURES:
+        print("판정: 합성 NAV 가 남아 있거나 실제 값이 들어올 자리가 사라졌다 — 위 FAIL 을 보라")
+        return 1
     print("판정: 합성 NAV 는 걷어내졌고, 실제 값이 들어올 자리는 남아 있다")
-    return 1 if FAILURES else 0
+    return 0
 
 
 if __name__ == "__main__":
