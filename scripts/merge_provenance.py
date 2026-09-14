@@ -76,6 +76,38 @@ MERGED_BY = {
 UNKNOWN = "미상"
 COAUTHOR_PREFIX = "Co-authored-by: "
 
+# **AI 자기 언급은 main 에 남기지 않는다** (전역 규약). 누가 했는지는 브랜치명과 아래 provenance
+# 줄, 그리고 `Co-authored-by:` 의 에이전트 신원이 이미 남긴다 — 그 셋은 유지한다. 여기서 지우는
+# 것은 도구가 스스로를 광고하는 줄뿐이다.
+#
+# **왜 여기서 지우나**: 브랜치 커밋에 한 번 들어가면 force push 없이는 못 지운다(이 레포는 force
+# push 를 금지한다). squash 본문을 만드는 자리가 main 에 무엇이 남을지 정하는 마지막 지점이다.
+#
+# 지우지 않는 것: `Co-authored-by: <에이전트> <…@noreply.local>` — 그것은 자기 홍보가 아니라
+# 지금 유일하게 살아 있는 저자 provenance 다.
+_AI_SELF_REFERENCE = re.compile(
+    r"^\s*(?:"
+    r"Co-Authored-By:\s*.*<[^>]*@anthropic\.com>"
+    r"|Claude-Session:\s*\S+"
+    r"|.*\U0001F916\s*Generated with\b.*"
+    r"|https://claude\.ai/\S*"
+    r")\s*$",
+    re.IGNORECASE,
+)
+
+
+def strip_ai_self_reference(message: str) -> str:
+    """커밋 메시지에서 도구 자기 광고 줄을 뺀다 — 뺀 자리에 생긴 빈 줄 더미도 정리한다."""
+    kept: list[str] = []
+    for line in (message or "").split("\n"):
+        if _AI_SELF_REFERENCE.match(line):
+            continue
+        # 줄을 빼면 빈 줄이 겹친다 — 문단 경계는 빈 줄 하나다.
+        if not line.strip() and kept and not kept[-1].strip():
+            continue
+        kept.append(line)
+    return "\n".join(kept).rstrip()
+
 
 def _strip_subject(message: str) -> str:
     """커밋 메시지에서 제목 줄과 뒤따르는 빈 줄을 뗀다 (단일 커밋 squash 의 본문)."""
@@ -189,7 +221,12 @@ def reproduce_squash_body(commits) -> str:
 
 def _core_from(commits) -> str:
     """커밋 메시지 조립부 — **머지 커밋은 뺀다** (GitHub 이 그렇게 한다, PR #55 실측)."""
-    messages = [(c.get("message") or "").rstrip() for c in (commits or []) if isinstance(c, dict) and not _is_merge(c)]
+    messages = [
+        strip_ai_self_reference(c.get("message") or "")
+        for c in (commits or [])
+        if isinstance(c, dict) and not _is_merge(c)
+    ]
+    messages = [m for m in messages if m.strip()]
     if not messages:
         return ""
     if len(messages) == 1:
