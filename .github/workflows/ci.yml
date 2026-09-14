@@ -971,6 +971,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_gitleaks_ignore.py
 
+      # push 직전 층이 **잡아야 할 것을 잡는지** — 「통과했다」로는 정상과 회귀를 못 가른다.
+      - name: push 시크릿 스캔 자체 검사
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          bash scripts/install_gitleaks.sh
+          GITLEAKS_BIN="$RUNNER_TEMP/gitleaks" python3 scripts/test_scan_push_for_secrets.py
+
       # 머지 게이트 판정 (#23 Task 5) — 통과 집합(success·skipped)과 상류 0건 실패.
       # 게이트는 초록일 때 아무 일도 안 하는 검사라 죽어도 티가 안 난다.
       # 케이스를 0건 모으면 실패한다.

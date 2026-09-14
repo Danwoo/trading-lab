@@ -93,6 +93,19 @@ def main() -> int:
     )
     check("규칙 기본값이 note 면 막지 않는다", code, 0)
 
+    # ── 위치 없는 결과가 앞의 결과를 물려받지 않는다 ──────────────────
+    # `locations` 가 빈 result 는 실재한다. 그것이 직전 결과의 파일을 물려받으면, 베이스라인
+    # 대조가 (규칙, 파일) 키라서 **엉뚱한 새 발견이 「기존」으로 삼켜진다** (#488 리뷰 지적).
+    no_loc = {"ruleId": "r9", "level": "error"}
+    code, out = run({"python.sarif": sarif([no_loc])})
+    check("첫 결과에 위치가 없어도 죽지 않는다", code, 1)
+    check("위치를 모른다고 말한다", "(위치 미상)" in out, True)
+
+    mixed = sarif([result("error", rule="r1"), no_loc])
+    code, out = run({"python.sarif": mixed}, baseline=[{"rule": "r1", "path": "app/x.py"}])
+    check("위치 없는 결과가 앞의 파일을 물려받지 않는다 — 베이스라인에 안 삼켜진다", code, 1)
+    check("물려받았다면 나왔을 줄이 없다", "r9 — app/x.py" in out, False)
+
     # ── 베이스라인: 이미 받아들인 것만 넘긴다 ────────────────────────
     # 이 게이트를 켜는 시점에 이미 발견이 17건 있었다(실측). 그대로 켜면 첫 push 부터 영영
     # 빨갛고, 상시 빨간 잡은 아무도 안 본다 — 그래서 그날의 발견을 고정하고 **새것만** 막는다.

@@ -16,15 +16,6 @@ repos:
     rev: v8.21.2
     hooks:
       - id: gitleaks
-      # **push 에서 한 번 더 본다** — private 전환 뒤 GitHub 의 push protection 이 사라진다
-      # (public 에서만 무료). 커밋 훅은 `--no-verify` 한 번이나 훅이 없는 클론이면 지나가고,
-      # 그렇게 들어온 비밀은 CI 가 빨개져도 **이미 히스토리에 박힌다.** push 직전이 이 레포가
-      # 남길 수 있는 마지막 자리다. 우회는 종전대로 `--no-verify` 이고, 그때는 히스토리 스캔이
-      # 받는다(`ci.yml` 의 「시크릿 스캔 (히스토리)」).
-      - id: gitleaks
-        alias: gitleaks-push
-        name: 시크릿 스캔 (push 직전)
-        stages: [pre-push]
 
   # rev 는 서비스들이 잠근 ruff 와 같은 판으로 맞춘다 (2026-08-25 실측: multi-agent·backend
   # 0.16.4 · bot-agent 0.16.3). 종전 0.15.13 은 **훅이 서비스보다 낡은** 상태였고 그 차이를
@@ -43,6 +34,21 @@ repos:
       # main 으로의 직접 push 를 막는다 (#420 P1). `no-commit-to-branch` 는 main **위 커밋**만
       # 막아서 `git push HEAD:main` 이 그대로 지나갔다. private 전환 뒤에는 서버 ruleset 이
       # 사라지므로(GitHub Free) 이 층이 그 자리를 일부 받는다. 우회는 `--no-verify` 뿐이다.
+      # **push 에서 한 번 더 본다** — private 전환 뒤 GitHub 의 push protection 이 사라진다
+      # (public 에서만 무료). 커밋 훅은 `--no-verify` 한 번이나 훅이 없는 클론이면 지나가고,
+      # 그렇게 들어온 비밀은 CI 가 빨개져도 **이미 히스토리에 박힌다.**
+      #
+      # gitleaks 의 공식 훅(`gitleaks protect --staged`)을 그대로 pre-push 에 걸면 안 된다 —
+      # 그것은 **git 인덱스**를 보는데 push 시점에는 인덱스가 비어 있는 것이 정상이라
+      # **아무것도 안 보고 늘 통과한다.** push 되는 커밋 구간을 직접 훑는다.
+      - id: scan-push-for-secrets
+        name: 시크릿 스캔 (push 되는 커밋)
+        language: system
+        entry: bash scripts/scan_push_for_secrets.sh
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
+
       - id: reject-push-to-main
         name: main 직접 push 거부
         language: system

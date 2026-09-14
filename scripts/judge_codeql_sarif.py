@@ -70,12 +70,20 @@ def findings_of(sarif: dict) -> list[tuple[str, str, str, str]]:
         for result in run.get("results", []):
             rule_id = result.get("ruleId") or "(규칙 미상)"
             level = result.get("level") or default_level.get(rule_id) or "warning"
+            # **위치 없는 결과가 앞의 결과를 물려받지 않게 한다.** `uri`·`line` 을 매 결과마다
+            # 새로 만든다 — 루프 밖에 두면 위치 없는 결과가 직전 파일에 귀속되고, 베이스라인
+            # 대조가 (규칙, 파일) 키라서 **엉뚱한 새 발견이 「기존」으로 삼켜진다.**
+            # 첫 결과가 위치 없으면 아예 죽는다(`UnboundLocalError`).
+            physical = {}
+            line = None
             locations = result.get("locations") or []
-            where = "(위치 미상)"
             if locations:
-                physical = (locations[0].get("physicalLocation") or {}).get("artifactLocation") or {}
-                line = ((locations[0].get("physicalLocation") or {}).get("region") or {}).get("startLine")
-                uri = str(physical.get("uri", "?"))
+                first = locations[0].get("physicalLocation") or {}
+                physical = first.get("artifactLocation") or {}
+                line = (first.get("region") or {}).get("startLine")
+            # 파일을 모르면 베이스라인에 맞을 수 없는 값을 쓴다 — 모르는 것이 조용히 면제되면
+            # 안 된다. 이 값은 어떤 베이스라인 항목과도 일치하지 않는다.
+            uri = str(physical.get("uri") or "(위치 미상)")
             where = f"{uri}:{line}" if line else uri
             found.append((rule_id, level, where, uri))
     return found
