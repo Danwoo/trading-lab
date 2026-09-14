@@ -38,6 +38,12 @@ def check(name: str, actual, expected) -> None:
 
 
 def find_gitleaks() -> str | None:
+    # **CI 가 넘겨주는 것을 가장 먼저 본다.** 러너에는 gitleaks 가 PATH 에도 pre-commit
+    # 캐시에도 없고, 워크플로가 `install_gitleaks.sh` 로 받아 `GITLEAKS_BIN` 으로 준다 —
+    # 그것을 안 읽어 이 그물이 CI 에서만 실패했다(실측).
+    given = os.environ.get("GITLEAKS_BIN")
+    if given and Path(given).is_file() and os.access(given, os.X_OK):
+        return given
     found = shutil.which("gitleaks")
     if found:
         return found
