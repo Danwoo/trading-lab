@@ -9,6 +9,7 @@ import { Loading } from "@/components/shared/Feedback/Loading";
 import { useUploadProgressStore } from "@/stores/shared/uploadProgressStore";
 import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
 import { WRITE_DENIED_SHORT } from "@/constants/writeAccess";
+import { isUnchanged, NOTHING_CHANGED } from "@/utils/common/form/unchanged";
 
 type ModeType = "view" | "edit" | "create";
 
@@ -150,6 +151,12 @@ export function DetailPanel<T, F>({
         setMode("view");
         return true;
       } else if (mode === "edit" && apiService.update) {
+        // 안 바뀐 저장에 「수정이 완료되었습니다」라고 하지 않는다 (#446 F33). 여기가 거의 모든
+        // CRUD 화면이 지나는 자리라, 화면마다 따로 거르면 빠지는 곳이 남는다.
+        if (isUnchanged(submitData, data)) {
+          showToast(NOTHING_CHANGED, "info");
+          return false;
+        }
         result = await apiService.update(submitData);
         const latest = await apiService.select(data as any);
         showToast(result?.message || "수정이 완료되었습니다.", "success");
