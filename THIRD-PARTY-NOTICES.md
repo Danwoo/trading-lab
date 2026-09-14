@@ -53,7 +53,7 @@ permissive 로 흘려보내지 않고 멈춘다(사람이 판단할 자리다).
 
 본문 텍스트 변형 14종(대체로 표준 Apache-2.0 원문, 일부 패키지가 자체 저작권 줄을 덧붙임)으로 묶는다.
 
-<details><summary>변형 1 — 26개 패키지: `@opentelemetry/semantic-conventions@1.43.0`, `@prisma/adapter-pg@7.10.0`, `@prisma/client-runtime-utils@7.10.0`, `@prisma/client@7.10.0`, `@prisma/config@7.8.0`, `@prisma/debug@7.10.0`, `@prisma/debug@7.2.0`, `@prisma/debug@7.8.0`, `@prisma/driver-adapter-utils@7.10.0`, `@prisma/engines-version@7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a`, `@prisma/engines@7.8.0`, `@prisma/fetch-engine@7.8.0`, `@prisma/get-platform@7.2.0`, `@prisma/get-platform@7.8.0`, `@prisma/query-plan-executor@7.2.0`, `b4a@1.8.1`, `bare-events@2.9.1`, `bare-fs@4.8.0`, `bare-path@3.1.1`, `bare-stream@2.13.3`, `bare-url@2.5.2`, `baseline-browser-mapping@2.11.14`, `events-universal@1.0.1`, `long@5.3.2`, `prisma@7.8.0`, `text-decoder@1.2.7`</summary>
+<details><summary>변형 1 — 26개 패키지: `@opentelemetry/semantic-conventions@1.43.0`, `@prisma/adapter-pg@7.10.0`, `@prisma/client-runtime-utils@7.10.0`, `@prisma/client@7.10.0`, `@prisma/config@7.8.0`, `@prisma/debug@7.10.0`, `@prisma/debug@7.2.0`, `@prisma/debug@7.8.0`, `@prisma/driver-adapter-utils@7.10.0`, `@prisma/engines-version@7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a`, `@prisma/engines@7.8.0`, `@prisma/fetch-engine@7.8.0`, `@prisma/get-platform@7.2.0`, `@prisma/get-platform@7.8.0`, `@prisma/query-plan-executor@7.2.0`, `b4a@1.8.1`, `bare-events@2.9.1`, `bare-fs@4.8.0`, `bare-path@3.1.1`, `bare-stream@2.13.3`, `bare-url@2.5.2`, `baseline-browser-mapping@2.11.22`, `events-universal@1.0.1`, `long@5.3.2`, `prisma@7.8.0`, `text-decoder@1.2.7`</summary>
 
 ```
 Apache License
@@ -2603,7 +2603,7 @@ MIT 조건으로 사용(추가 의무 없음). GPL 조건은 선택하지 않았
 
 | 패키지 | 버전 |
 |---|---|
-| `caniuse-lite` | 1.0.30001809 |
+| `caniuse-lite` | 1.0.30001810 |
 
 ### mdn-data — 퍼블릭 도메인 동등
 
@@ -2643,13 +2643,13 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 |---|---|---|
 | `@asamuzakjp/css-color` | 6.0.5 | MIT |
 | `@asamuzakjp/dom-selector` | 8.3.0 | MIT |
-| `@better-auth/core` | 1.6.30 | MIT |
-| `@better-auth/drizzle-adapter` | 1.6.30 | MIT |
-| `@better-auth/kysely-adapter` | 1.6.30 | MIT |
-| `@better-auth/memory-adapter` | 1.6.30 | MIT |
-| `@better-auth/mongo-adapter` | 1.6.30 | MIT |
-| `@better-auth/prisma-adapter` | 1.6.30 | MIT |
-| `@better-auth/telemetry` | 1.6.30 | MIT |
+| `@better-auth/core` | 1.6.31 | MIT |
+| `@better-auth/drizzle-adapter` | 1.6.31 | MIT |
+| `@better-auth/kysely-adapter` | 1.6.31 | MIT |
+| `@better-auth/memory-adapter` | 1.6.31 | MIT |
+| `@better-auth/mongo-adapter` | 1.6.31 | MIT |
+| `@better-auth/prisma-adapter` | 1.6.31 | MIT |
+| `@better-auth/telemetry` | 1.6.31 | MIT |
 | `@better-auth/utils` | 0.4.2 | MIT |
 | `@better-auth/utils` | 0.5.0 | MIT |
 | `@better-fetch/fetch` | 1.3.1 | MIT |
@@ -2671,8 +2671,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@img/colour` | 1.1.0 | MIT |
 | `@jridgewell/sourcemap-codec` | 1.5.5 | MIT |
 | `@kurkle/color` | 0.3.4 | MIT |
-| `@next/env` | 16.3.3 | MIT |
-| `@next/swc-linux-x64-gnu` | 16.3.3 | MIT |
+| `@next/env` | 16.3.4 | MIT |
+| `@next/swc-linux-x64-gnu` | 16.3.4 | MIT |
 | `@noble/ciphers` | 2.1.1 | MIT |
 | `@noble/hashes` | 2.2.0 | MIT |
 | `@oxc-project/types` | 0.147.0 | MIT |
@@ -2750,9 +2750,9 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@t3-oss/env-core` | 0.13.11 | MIT |
 | `@t3-oss/env-nextjs` | 0.13.11 | MIT |
 | `@tanstack/react-table` | 8.21.3 | MIT |
-| `@tanstack/react-virtual` | 3.14.10 | MIT |
+| `@tanstack/react-virtual` | 3.14.11 | MIT |
 | `@tanstack/table-core` | 8.21.3 | MIT |
-| `@tanstack/virtual-core` | 3.17.8 | MIT |
+| `@tanstack/virtual-core` | 3.17.9 | MIT |
 | `@types/chai` | 5.2.3 | MIT |
 | `@types/debug` | 4.1.13 | MIT |
 | `@types/deep-eql` | 4.0.2 | MIT |
@@ -2762,10 +2762,10 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@types/katex` | 0.16.8 | MIT |
 | `@types/mdast` | 4.0.4 | MIT |
 | `@types/ms` | 2.1.0 | MIT |
-| `@types/node` | 26.4.0 | MIT |
+| `@types/node` | 26.5.1 | MIT |
 | `@types/pg` | 8.20.0 | MIT |
-| `@types/react-dom` | 19.2.5 | MIT |
-| `@types/react` | 19.2.18 | MIT |
+| `@types/react-dom` | 19.3.0 | MIT |
+| `@types/react` | 19.3.0 | MIT |
 | `@types/unist` | 2.0.11 | MIT |
 | `@types/unist` | 3.0.3 | MIT |
 | `@ungap/structured-clone` | 1.3.1 | ISC |
@@ -2789,7 +2789,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `bail` | 2.0.2 | MIT |
 | `balanced-match` | 4.0.4 | MIT |
 | `base64-js` | 1.5.1 | MIT |
-| `better-auth` | 1.6.30 | MIT |
+| `better-auth` | 1.6.31 | MIT |
 | `better-call` | 1.4.0 | MIT |
 | `better-result` | 2.9.2 | MIT |
 | `bidi-js` | 1.0.3 | MIT |
@@ -2909,7 +2909,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `isarray` | 1.0.0 | MIT |
 | `isexe` | 2.0.0 | ISC |
 | `jiti` | 2.7.0 | MIT |
-| `jose` | 6.2.10 | MIT |
+| `jose` | 6.2.12 | MIT |
 | `jsdom` | 30.0.1 | MIT |
 | `json-schema-traverse` | 1.0.0 | MIT |
 | `jsonfile` | 6.2.0 | MIT |
@@ -2992,8 +2992,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `mysql2` | 3.15.3 | MIT |
 | `named-placeholders` | 1.1.6 | MIT |
 | `nanoid` | 3.3.18 | MIT |
-| `nanostores` | 1.5.2 | MIT |
-| `next` | 16.3.3 | MIT |
+| `nanostores` | 1.5.3 | MIT |
+| `next` | 16.3.4 | MIT |
 | `node-int64` | 0.4.0 | MIT |
 | `nodemailer` | 9.1.1 | MIT-0 |
 | `normalize-path` | 3.0.0 | MIT |
@@ -3019,7 +3019,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `picomatch` | 4.0.7 | MIT |
 | `pkg-types` | 2.3.1 | MIT |
 | `postcss` | 8.5.23 | MIT |
-| `postcss` | 8.5.26 | MIT |
+| `postcss` | 8.5.28 | MIT |
 | `postgres-array` | 2.0.0 | MIT |
 | `postgres-array` | 3.0.4 | MIT |
 | `postgres-bytea` | 1.0.1 | MIT |
@@ -3034,14 +3034,14 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `pure-rand` | 6.1.0 | MIT |
 | `radix-ui` | 1.6.7 | MIT |
 | `rc9` | 3.0.1 | MIT |
-| `react-dom` | 19.2.8 | MIT |
+| `react-dom` | 19.3.0 | MIT |
 | `react-icons` | 5.7.0 | MIT |
 | `react-markdown` | 10.1.0 | MIT |
 | `react-remove-scroll-bar` | 2.3.8 | MIT |
 | `react-remove-scroll` | 2.7.2 | MIT |
-| `react-resizable-panels` | 4.12.3 | MIT |
+| `react-resizable-panels` | 4.12.4 | MIT |
 | `react-style-singleton` | 2.2.3 | MIT |
-| `react` | 19.2.8 | MIT |
+| `react` | 19.3.0 | MIT |
 | `readable-stream` | 2.3.8 | MIT |
 | `readable-stream` | 3.6.2 | MIT |
 | `readable-stream` | 4.7.0 | MIT |
@@ -3062,7 +3062,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `safer-buffer` | 2.1.2 | MIT |
 | `saxes` | 5.0.1 | ISC |
 | `saxes` | 6.0.0 | ISC |
-| `scheduler` | 0.27.0 | MIT |
+| `scheduler` | 0.28.0 | MIT |
 | `semver` | 7.8.5 | ISC |
 | `seq-queue` | 0.0.5 | MIT* |
 | `set-cookie-parser` | 3.1.2 | MIT |
@@ -3101,7 +3101,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `trim-lines` | 3.0.1 | MIT |
 | `trough` | 2.2.0 | MIT |
 | `tslib` | 2.8.1 | 0BSD |
-| `undici-types` | 8.3.0 | MIT |
+| `undici-types` | 8.9.0 | MIT |
 | `undici` | 8.9.0 | MIT |
 | `unified` | 11.0.5 | MIT |
 | `unist-util-find-after` | 5.0.0 | MIT |
@@ -3136,7 +3136,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `yaml` | 2.8.3 | ISC |
 | `zeptomatch` | 2.1.0 | MIT |
 | `zip-stream` | 7.0.5 | MIT |
-| `zod` | 4.4.3 | MIT |
+| `zod` | 4.6.1 | MIT |
 | `zustand` | 5.0.15 | MIT |
 | `zwitch` | 2.0.4 | MIT |
 
