@@ -73,3 +73,18 @@ export function drawdownRatios(equity: number[]): number[] {
     return peak > 0 ? (value - peak) / peak : 0;
   });
 }
+
+/**
+ * 곡선의 대체 텍스트 — 곡선은 캔버스라 보조기술에는 아무것도 없다(실측: `role`·`aria-label`·
+ * `<title>` 전부 없음, `innerText` 공백). 구간·시작·끝·최대 낙폭을 한 문장으로 주어 「곡선이
+ * 있다」는 사실과 요지가 읽히게 한다. 값의 정본은 판정 지표 목록이고 이 문장은 곡선의 이름이다.
+ */
+export function equityCurveSummary(points: { dt: string; equity: number }[]): string {
+  if (points.length === 0) return "";
+  const first = points[0];
+  const last = points[points.length - 1];
+  const won = (value: number) => `${Math.round(value).toLocaleString("ko-KR")}원`;
+  const worst = drawdownRatios(points.map((point) => point.equity)).reduce((acc, ratio) => Math.min(acc, ratio), 0);
+  const drawdown = (Math.abs(worst) * 100).toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+  return `자산곡선과 낙폭 곡선 — ${first.dt} ~ ${last.dt} · 시작 ${won(first.equity)} → 끝 ${won(last.equity)} · 최대 낙폭 ${drawdown}%`;
+}

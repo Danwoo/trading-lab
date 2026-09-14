@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { sweepValues } from "@/lib/bench/sweep";
+import { clampSteps, sweepValues } from "@/lib/bench/sweep";
 import type { BacktestGridIn } from "@/schemas/backtest/backtest";
 import type { BotDetailOut, BotStrategyOut, StrategyField } from "@/schemas/bot/bot";
 import { selectBot } from "@/services/bot/botService";
@@ -114,8 +114,12 @@ export function useGridRunForm(): GridRunFormController {
     setAxes((prev) => prev.map((axis, i) => (i === index ? { ...axis, enabled } : axis)));
   };
 
+  // 비운 칸(0·NaN)은 기본값으로, 범위 밖은 범위 끝으로 — 상태가 폼이 선언한 범위 밖의 값을 갖는
+  // 순간 칸 수 약속과 제출 가능 여부가 갈린다 (#398).
   const changeAxisSteps = (index: number, steps: number) => {
-    setAxes((prev) => prev.map((axis, i) => (i === index ? { ...axis, steps: steps || DEFAULT_STEPS } : axis)));
+    setAxes((prev) =>
+      prev.map((axis, i) => (i === index ? { ...axis, steps: clampSteps(steps || DEFAULT_STEPS) } : axis)),
+    );
   };
 
   const enabledAxes = axes.filter((axis) => axis.enabled);

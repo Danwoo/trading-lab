@@ -68,6 +68,12 @@ export interface ResearchMessage {
   content: string;
   sources?: ResearchSource[]; // assistant 답변의 근거 카드 (media 이벤트)
   followUps?: string[]; // assistant 답변의 후속질문 (follow_up_question 이벤트)
+  /**
+   * 이 답변이 실패로 끝난 사유·처방 (#423 F7). 종전에는 2초짜리 토스트뿐이라 잠깐 눈을 떼면
+   * 「보냈는데 아무 일도 없는」 화면이 됐다 — 대화에 남는 흔적이 이 자리다. `content` 와 따로
+   * 두어 도중까지 받은 답변을 지우지 않는다.
+   */
+  failure?: string;
 }
 
 /**

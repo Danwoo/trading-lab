@@ -5,6 +5,11 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/prisma/generated/client";
 import { convertPrismaErrorToValidation } from "@/lib/prisma/error";
 import { OPERATION_SUCCESS_STATUS_CODES, OPERATION_SUCCESS_MESSAGES, OPERATION_ERROR_MESSAGES } from "./constants";
+import { STREAM_FAILURE_HTTP_STATUS, type HttpStreamFailureCode } from "@/utils/common/errors/streamFailure";
+import type { ProxyFailureCode } from "@/utils/common/errors/proxyFailure";
+
+/** 타입을 붙여 둬야 철자가 어긋나는 순간 컴파일이 잡는다 — 코드가 어긋나면 문구가 조용히 사라진다. */
+const UPSTREAM_UNREACHABLE: ProxyFailureCode = "proxy.upstream_unreachable";
 
 export function createErrorResponse(error: any, operation: string) {
   const message = OPERATION_ERROR_MESSAGES[operation] || "처리 중 오류가 발생했습니다.";
@@ -58,7 +63,28 @@ export function createErrorResponse(error: any, operation: string) {
     if (error.response) {
       return NextResponse.json(error.response.data, { status: error.response.status });
     }
-    return NextResponse.json({ detail: [{ type: "server_error", loc: ["server"], msg: message }] }, { status: 503 });
+    // `response` 가 없다는 것은 **연결 자체가 안 됐다**는 뜻이다 — 서버가 답했는데 실패한 것과
+    // 사용자가 할 일이 다르다. 이 사실을 일반 문구로 뭉개면 클라이언트가 분류할 근거를 잃고
+    // 마지막 폴백(「네트워크 연결을 확인해주세요」)으로 떨어져, **멀쩡한 자기 네트워크를**
+    // 고치러 간다 (#435 B-3). 아는 것만 말하고, 확인할 수 있는 곳을 가리킨다.
+    // 주소·포트는 싣지 않는다 — 내부 호스트는 화면에 낼 것이 아니다.
+    //
+    // **문구를 건네는 것은 `msg` 가 아니라 `code` 다.** 이 응답은 503 이고 `getApiErrorMessage`
+    // 의 5xx 차단은 서버가 쓴 문장을 통째로 버린다 — `msg` 만 고치면 화면에는 종전 문구가
+    // 그대로 남는다. 닫힌 집합의 코드로 건너가 받는 쪽이 자기 언어 표에서 고른다 (#342 · #423).
+    return NextResponse.json(
+      {
+        code: UPSTREAM_UNREACHABLE,
+        detail: [
+          {
+            type: "upstream_unreachable",
+            loc: ["server"],
+            msg: "서비스가 응답하지 않았습니다. 그 서비스가 떠 있는지, 설정의 주소·포트가 맞는지 확인하세요.",
+          },
+        ],
+      },
+      { status: 503 },
+    );
   }
 
   // 4. 커스텀 메시지 ({ message: "..." } plain object)
@@ -97,4 +123,17 @@ export function createSuccessResponse(data: any, operation?: string, customStatu
   }
 
   return NextResponse.json(responseData, { status });
+}
+
+/**
+ * **사유 코드만** 실은 응답 — 스트리밍 프록시가 「업스트림에 연결 자체가 안 됐다」를 화면에
+ * 건네는 자리다 (#423, #342 와 같은 구조).
+ *
+ * `createErrorResponse` 의 일반 5xx 로 보내면 화면은 「잠시 후 다시 시도해 주세요」만 받는다 —
+ * 다시 시도해도 안 되는 실패라 그 안내가 거짓이 된다. 봉투에 싣는 것은 닫힌 집합의 코드
+ * 하나뿐이고, 문구는 받는 쪽이 자기 언어 표에서 고른다: 업스트림 호스트·포트·소켓 오류
+ * 원문이 실릴 자리가 없다.
+ */
+export function createStreamFailureResponse(code: HttpStreamFailureCode) {
+  return NextResponse.json({ code }, { status: STREAM_FAILURE_HTTP_STATUS[code] });
 }

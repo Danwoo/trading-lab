@@ -49,6 +49,7 @@ PAIRS = (
     "RunReportOut",
     "ExecutionAssumptionsOut",
     "OpenPositionOut",
+    "BotRunOut",
 )
 #: 프론트 `GridCellMetrics` 의 백엔드 짝은 이름이 다르다 (Out 접미사 관례).
 ALIASES = {"GridCellMetrics": "GridCellMetricsOut"}

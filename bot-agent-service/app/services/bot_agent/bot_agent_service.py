@@ -11,6 +11,7 @@ from pathlib import Path
 from agents.bot_agent import build_options
 from core.exceptions import BadRequestError
 from core.logger import logger
+from services.bot_agent.failure_reasons import failure_event, looks_like_auth_failure
 
 
 class BotAgentService:
@@ -97,6 +98,9 @@ class BotAgentService:
             proposal_server=build_proposal_server(proposals.append),
             resume=self._sessions.get(key),
         )
+        # CLI 는 인증 실패를 일반 text 로 흘리고 subtype 은 `success` 로 끝낸다 — 그래서
+        # 「무엇이 지나갔는지」를 기억해 둬야 갈래를 가른다 (failure_reasons.py 의 근거).
+        auth_failure = False
         try:
             async for reply in query(prompt=message, options=options):
                 while proposals:
@@ -104,6 +108,7 @@ class BotAgentService:
                 if isinstance(reply, AssistantMessage):
                     for block in reply.content:
                         if isinstance(block, TextBlock):
+                            auth_failure = auth_failure or looks_like_auth_failure(block.text)
                             yield {"type": "text", "text": block.text}
                         elif getattr(block, "name", None):
                             # 무엇을 했는지 화면에 보인다 — 판단의 근거가 숨지 않게.
@@ -115,10 +120,17 @@ class BotAgentService:
                     if getattr(reply, "session_id", None):
                         self._sessions[key] = reply.session_id
                     yield {"type": "result", "subtype": reply.subtype}
-        except Exception:  # noqa: BLE001 — 남의 런타임이라 무엇이 터질지 모른다
+        except Exception as exc:  # noqa: BLE001 — 남의 런타임이라 무엇이 터질지 모른다
             # 이어가기가 실패의 원인일 수 있다(세션 파일이 사라졌거나 손상). 기억을 버려
             # 다음 턴이 새 대화로 되살아나게 한다 — 안 그러면 영영 같은 오류가 반복된다.
             self._sessions.pop(key, None)
-            # 원본은 서버 로그에만 — 클라이언트엔 마스킹한다 (내부 경로·키가 새지 않게)
+            # 원본은 서버 로그에만 — 클라이언트엔 사유 코드만 낸다 (내부 경로·키가 새지 않게)
             logger.exception("봇 만들기 대화가 실패했습니다")
-            yield {"type": "error", "message": "대화 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."}
+            # `str` 로 본다 — `repr` 은 클래스 이름 래퍼를 덧붙여, 「마커가 주된 내용인가」를
+            # 재는 판정(`looks_like_auth_failure`)에 없던 글자를 섞는다.
+            yield failure_event(auth_failure=auth_failure or looks_like_auth_failure(str(exc)))
+        else:
+            # 예외 없이 끝났어도 자격증명이 거부된 턴은 **실패**다. 이걸 안 내면 화면은 CLI 의
+            # 영문 한 줄을 봇의 말로 읽는다 — 무엇을 해야 하는지는 어디에도 안 남는다.
+            if auth_failure:
+                yield failure_event(auth_failure=True)

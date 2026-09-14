@@ -12,11 +12,24 @@ cd bot-agent-service/app && APP_ENV=development uv run uvicorn main:app --reload
 
 `ANTHROPIC_API_KEY` 는 **프로세스 환경변수**로 온다. SDK 는 `.env` 를 자동으로 읽지 않으므로 `.env.development` 에 넣고 기동 스크립트가 주입하거나, 셸에서 export 한다. `build_options` 가 이 값을 `env` 로 자식 프로세스에 명시해 넘긴다.
 
+`STRATEGIES_DIR` 은 **비워 둔다** — 비우면 레포 루트의 `strategies/` 를 쓴다(전략 규약 §1 의 기본값, `app/services/bot_agent/bot_agent_service.py` 의 `strategies_dir`). 전략 파일을 다른 곳에 둘 때만 그 절대 경로를 적는다. 워크트리·클론마다 루트가 다르므로 경로를 짐작해 넣으면 오히려 틀린다. `scripts/bootstrap_local_env.py` 도 이 키를 「비워 두어도 되는 키」로 따로 보고한다.
+
 ### 인증 경계 — 키 설정만으로 다른 경로가 닫히지는 않는다
 
 기계에 Claude Code 로그인(`~/.claude/.credentials.json`)이 있으면 CLI 가 **그 자격증명으로 인증할 수 있다.** SDK 는 `options.env` 를 부모 환경 **위에 병합**할 뿐 격리하지 않아 `HOME` 이 그대로 상속되고, 그래서 그 파일이 계속 보이는 자리에 있다 — 여기까지는 SDK 소스(`subprocess_cli.py` 의 `inherited_env`)로 확인한 사실이다.
 
-**확인하지 않은 것**: 키를 `env` 로 명시해 넘기는 지금 상태에서 CLI 가 (a) 유효한 키를 실제로 쓰는지, (b) 무효한 키일 때 정말 OAuth 로 넘어가는지. 가짜 키로 대화가 왕복한 관측은 **이 배선이 없던 시점**의 것이라 조건이 다르다. 다시 재려면 소유자의 실제 자격증명을 소모해야 해서 하지 않았다.
+**(b) 는 확인됐다 — 넘어가지 않는다** (2026-09-01 실측). `.env.development` 에 자리표시 키를 넣고 SSE 를 직접 관찰하니, 기계의 `~/.claude/.credentials.json` 이 보이는 자리에 있는데도 **폴백하지 않고 인증 오류로 끝났다**:
+
+```
+data: {"type": "text", "text": "Invalid API key · Fix external API key"}
+data: {"type": "result", "subtype": "success"}
+```
+
+즉 `env` 배선(PR #154) 이후로는 **명시한 키를 실제로 쓴다.** 「가짜 키여도 대화가 왕복한다」는 옛 관측은 그 배선 이전의 것이라 지금은 사실이 아니다.
+
+이때 **CLI 의 인증 오류가 일반 `text` 이벤트로 흐르고 `result.subtype` 은 `success` 다** — subtype 만 보고 성공을 판정하면 속는다.
+
+**아직 확인하지 않은 것**: (a) 유효한 키를 실제로 쓰는지. 재려면 소유자의 실제 자격증명을 소모해야 해서 하지 않았다.
 
 따라서 `readiness()` 의 `ready` 는 **「키가 설정돼 있다」이지 「그 키로 인증한다」가 아니다.** 이 서비스를 로컬 배포 모드에서만 띄우는 결정이 그 잔여 위험의 실질적 경계다 — 호스팅에서 띄우면 로그인한 누구든 기계 소유자의 자격증명을 소모시킬 수 있다.
 

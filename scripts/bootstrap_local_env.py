@@ -21,6 +21,11 @@
 끝에 "직접 채워야 하는 키" 목록으로 출력한다. 값이 없어도 필수 필드 "존재" 검증은 통과하므로
 서비스는 뜬다 — 그 기능을 실제로 쓸 때만 채우면 된다.
 
+**비워 두는 것이 정답인 키**는 그 목록에서 뺀다 (#407 F23). `.env.example` 에서 그 키 바로 위
+주석에 `비워도 된다` 가 있으면(예: `# … 비워도 된다 — 비우면 레포 루트의 strategies/ 를 쓴다`)
+"비워 두어도 되는 키" 로 따로 보고한다 — 채우라고 시키면 절대 경로를 짐작해 넣어 오히려 틀리고,
+워크트리·클론마다 값이 달라진다. 표식의 정본은 `.env.example` 의 주석이다(여기 목록을 두지 않는다).
+
 건너뛴 파일도 **읽어 보고 어긋남을 보고한다** (#399) — 값은 고치지 않는다. 한 번 만들어 둔
 `.env.development` 는 레포가 DB 좌표를 옮겨도(#294 의 5432 → 5442) 그대로 남는데, 종전에는
 그 사실을 아무도 말해 주지 않아 손으로 마이그레이션을 돌리는 사람이 매번 엉뚱한 DB 로 붙었다.
@@ -55,6 +60,10 @@ PLACEHOLDER = "CHANGE_ME"
 # "아직 값이 없다"로 보는 것 — 빈 값(`KEY=`)도 placeholder 와 같이 취급한다. 빈 값을 통과시키면
 # `JWT_SECRET=` 같은 줄이 채워지지도, 경고되지도 않은 채 남아 기동 후 401 로만 드러난다.
 UNSET_TOKENS = (PLACEHOLDER, "")
+
+# `.env.example` 에서 키 **바로 위** 주석 블록에 이 말이 있으면 "비워 두어도 되는 키" 다 — 빈 값이
+# 기본값을 뜻하는 키를 "직접 채워야 하는 키" 로 잘못 시키지 않는다. 사이에 빈 줄이 있으면 안 본다.
+OPTIONAL_BLANK_MARK = "비워도 된다"
 
 # 전 파일이 같은 값이어야 하는 키 / 파일별 독립 생성 키 (근거는 모듈 독스트링 (1)(2))
 SHARED_SECRET_KEYS = ("JWT_SECRET",)
@@ -136,23 +145,32 @@ def resolve_managed_value(key: str, shared: dict[str, str], per_file: dict[str, 
     return None
 
 
-def render(example_text: str, shared: dict[str, str]) -> tuple[str, list[str], list[str]]:
-    """`.env.example` 본문 → (`.env.development` 본문, 채운 키, 값 없이 남은 키).
+def render(example_text: str, shared: dict[str, str]) -> tuple[str, list[str], list[str], list[tuple[str, str]]]:
+    """`.env.example` 본문 → (`.env.development` 본문, 채운 키, 값 없이 남은 키, 비워 두어도 되는 키).
 
     값을 바꾸는 것은 **값이 없는 줄뿐**이다(`CHANGE_ME` 또는 빈 값). `.env.example` 이 이미 실제
     값을 담고 있으면 (예: frontend `DATABASE_URL`, DB host/port/name) 그 값을 존중해 그대로 둔다.
-    자동 생성 대상이 아닌 빈 자리는 그대로 두고 `leftover` 로 보고한다.
+    자동 생성 대상이 아닌 빈 자리는 그대로 두고 `leftover` 로 보고한다 — 단, 바로 위 주석이
+    `OPTIONAL_BLANK_MARK` 를 담으면 `optional` 로 보고한다 (키, 그 주석 문장).
     """
     per_file: dict[str, str] = {}
     filled: list[str] = []
     leftover: list[str] = []
+    optional: list[tuple[str, str]] = []
     lines: list[str] = []
+    # 지금 줄 바로 위에 붙어 있는 주석 — 빈 줄이나 다른 줄을 만나면 끊긴다.
+    comment_block: list[str] = []
 
     for line in example_text.splitlines():
         match = ASSIGN_RE.match(line)
         if not match:
             lines.append(line)
+            if line.startswith("#"):
+                comment_block.append(line.lstrip("#").strip())
+            else:
+                comment_block = []
             continue
+        comment, comment_block = comment_block, []
         key = match["key"]
         token, tail = split_value(match["rest"])
         if unquote(token) not in UNSET_TOKENS:
@@ -160,7 +178,11 @@ def render(example_text: str, shared: dict[str, str]) -> tuple[str, list[str], l
             continue
         value = resolve_managed_value(key, shared, per_file)
         if value is None:
-            leftover.append(key)
+            marked = next((text for text in comment if OPTIONAL_BLANK_MARK in text), None)
+            if marked is None:
+                leftover.append(key)
+            else:
+                optional.append((key, marked))
             lines.append(line)
             continue
         filled.append(key)
@@ -169,7 +191,7 @@ def render(example_text: str, shared: dict[str, str]) -> tuple[str, list[str], l
     text = "\n".join(lines)
     if example_text.endswith("\n") and not text.endswith("\n"):
         text += "\n"
-    return text, filled, leftover
+    return text, filled, leftover, optional
 
 
 def db_endpoint_warnings(shown: Path, text: str, source: str) -> list[str]:
@@ -302,6 +324,7 @@ def main() -> int:
     created = 0
     skipped = 0
     manual: list[tuple[Path, list[str], bool]] = []
+    blank_ok: list[tuple[Path, list[tuple[str, str]]]] = []
     warnings: list[str] = []
 
     for example in targets:
@@ -317,7 +340,7 @@ def main() -> int:
             print(f"  ↷ 건너뜀 {shown} (이미 있음 — 덮어쓰려면 --force){mark}")
             continue
 
-        text, filled, leftover = render(example.read_text(encoding="utf-8"), shared)
+        text, filled, leftover, optional = render(example.read_text(encoding="utf-8"), shared)
         backup = ""
         if target.is_file():
             backup_path = choose_backup_path(target)
@@ -332,6 +355,8 @@ def main() -> int:
         if leftover:
             mock_ok = parse_assignments(text).get("USE_REAL_API") == "false"
             manual.append((shown, leftover, mock_ok))
+        if optional:
+            blank_ok.append((shown, optional))
 
     if warnings:
         print("\n⚠ 확인 필요 — 로컬 기동 전제와 어긋나는 값이 있다 (이 스크립트는 고치지 않는다):")
@@ -348,6 +373,13 @@ def main() -> int:
             "  (값이 없어도 필수 키 '존재' 검증은 통과해 서비스는 기동한다 — "
             "해당 외부 기능을 실제로 쓸 때 채우면 된다.)"
         )
+
+    if blank_ok:
+        print(f"\n비워 두어도 되는 키 (빈 값이 곧 기본값 — {EXAMPLE_NAME} 의 주석이 근거, 채우지 않아도 된다):")
+        for shown, keys in blank_ok:
+            print(f"  - {shown}")
+            for key, reason in keys:
+                print(f"      {key} — {reason}")
 
     print(f"\n요약: 생성 {created}개 · 건너뜀 {skipped}개 · 수동 입력 필요 파일 {len(manual)}개")
     if created:

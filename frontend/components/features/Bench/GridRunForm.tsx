@@ -6,6 +6,7 @@ import { NumberBox } from "@/components/shared/ui/NumberBox";
 import { SelectBox } from "@/components/shared/ui/SelectBox";
 import { TextBox } from "@/components/shared/ui/TextBox";
 import type { GridRunFormController } from "@/hooks/bench/useGridRunForm";
+import { STEPS_MAX, STEPS_MIN } from "@/lib/bench/sweep";
 import type { BacktestGridIn } from "@/schemas/backtest/backtest";
 import type { BotOut } from "@/schemas/bot/bot";
 import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
@@ -144,8 +145,8 @@ export function GridRunForm({
                       <NumberBox
                         fieldName="steps"
                         value={axis.steps}
-                        min={2}
-                        max={9}
+                        min={STEPS_MIN}
+                        max={STEPS_MAX}
                         width={72}
                         showSpinButtons
                         onValueChanged={(_name, value) => controller.changeAxisSteps(index, Number(value))}

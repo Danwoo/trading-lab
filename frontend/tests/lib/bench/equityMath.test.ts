@@ -1,7 +1,7 @@
 // 곡선 렌더 전 순수 계산 — LTTB 다운샘플과 낙폭 시계열 (#203, 스펙 §5).
 import { describe, expect, it } from "vitest";
 
-import { downsampleLttb, drawdownRatios, type XyPoint } from "@/lib/bench/equityMath";
+import { downsampleLttb, drawdownRatios, equityCurveSummary, type XyPoint } from "@/lib/bench/equityMath";
 
 function line(n: number, fn: (i: number) => number): XyPoint[] {
   return Array.from({ length: n }, (_, i) => ({ x: i, y: fn(i) }));
@@ -65,5 +65,32 @@ describe("drawdownRatios", () => {
 
   it("빈 입력은 빈 출력이다", () => {
     expect(drawdownRatios([])).toEqual([]);
+  });
+});
+
+describe("equityCurveSummary", () => {
+  it("구간·시작·끝·최대 낙폭을 한 문장으로 — 곡선의 이름이 된다 (F9)", () => {
+    const summary = equityCurveSummary([
+      { dt: "2026-01-02", equity: 1000000 },
+      { dt: "2026-01-05", equity: 1200000 },
+      { dt: "2026-01-08", equity: 900000 },
+      { dt: "2026-01-12", equity: 1010000.4 },
+    ]);
+    expect(summary).toBe(
+      "자산곡선과 낙폭 곡선 — 2026-01-02 ~ 2026-01-12 · 시작 1,000,000원 → 끝 1,010,000원 · 최대 낙폭 25%",
+    );
+  });
+
+  it("낙폭이 없으면 0% 다 — 지어내지 않는다", () => {
+    expect(
+      equityCurveSummary([
+        { dt: "2026-01-02", equity: 100 },
+        { dt: "2026-01-03", equity: 110 },
+      ]),
+    ).toContain("최대 낙폭 0%");
+  });
+
+  it("점이 없으면 이름도 없다", () => {
+    expect(equityCurveSummary([])).toBe("");
   });
 });

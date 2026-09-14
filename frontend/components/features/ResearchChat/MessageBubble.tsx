@@ -45,6 +45,11 @@ export function MessageBubble({ message, streaming, statusText, onFollowUpClick 
                 </>
               )}
               {hasSources && <SourceCards sources={message.sources!} />}
+              {message.failure && (
+                <p role="alert" className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-red-600">
+                  {message.failure}
+                </p>
+              )}
             </>
           )}
         </div>

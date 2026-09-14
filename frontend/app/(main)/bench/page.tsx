@@ -26,6 +26,7 @@ import {
   rosterZoneProvenance,
   type RosterState,
 } from "@/lib/bench/boardProvenance";
+import { reportTimingLine } from "@/lib/bench/reportTiming";
 import { BOT_ROLE_LABEL } from "@/schemas/bot/bot";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import { ProductStages } from "@/components/features/Bench/ProductStages";
@@ -176,9 +177,7 @@ export default function Page() {
         <div className="flex min-w-0 flex-col gap-1">
           <RunReportView report={activeReport} />
           {board.lastReportMs !== null && (
-            <p className="break-keep text-2xs text-ink-muted">
-              칸 클릭 → 갱신 {board.lastReportMs}ms{board.lastReportMs === 0 ? " (캐시)" : ""} — 예산 500ms (스펙 §5)
-            </p>
+            <p className="break-keep text-2xs text-ink-muted">{reportTimingLine(board.lastReportMs)}</p>
           )}
         </div>
       )}

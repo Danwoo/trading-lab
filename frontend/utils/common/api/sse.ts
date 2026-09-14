@@ -20,11 +20,19 @@ export interface FetchSSEOptions<T extends SSEChunk = SSEChunk> {
  * HTTP 는 이미 200 으로 나갔다 — 그래서 상태를 지어내지 않는다. 종전에는 `status: 500` 을
  * 찍었는데, 그러면 「5xx 는 서버 원문을 화면에 내지 않는다」(#224)는 규칙에 걸려 서버가
  * 보낸 사유가 일반 문구로 뭉개진다. 사유를 그대로 보이는 것이 이 이벤트의 존재 이유다.
+ *
+ * **이벤트가 실어 온 `code` 도 함께 옮긴다** (#423). 종전에는 `message` 만 옮기고 코드를
+ * 버려서, 서버가 「키가 무효다」를 코드로 말해도 화면은 그것을 못 읽고 문장만 받았다 —
+ * 문장은 5xx 차단에 걸리는 자리라 결국 「잠시 후 다시 시도」로 뭉개졌다. 닫힌 집합 검사는
+ * 받는 쪽(`getStreamFailureCode`)이 한다.
  */
-function streamError(chunk: { error?: string; message?: string }): Error {
-  const err = new Error("stream error") as Error & { response: { data: { detail: string } } };
+function streamError(chunk: { error?: string; message?: string; code?: string }): Error {
+  const err = new Error("stream error") as Error & { response: { data: { detail: string; code?: string } } };
   err.response = {
-    data: { detail: chunk.error || chunk.message || "스트리밍 중 오류가 발생했습니다." },
+    data: {
+      detail: chunk.error || chunk.message || "스트리밍 중 오류가 발생했습니다.",
+      ...(chunk.code ? { code: chunk.code } : {}),
+    },
   };
   return err;
 }
@@ -163,7 +171,7 @@ export async function fetchNDJSON<T extends SSEChunk = SSEChunk>({
       throw e;
     }
     if (chunk.type === "error") {
-      throw streamError(chunk as { message?: string });
+      throw streamError(chunk as { message?: string; code?: string });
     }
     onChunk(chunk);
   };

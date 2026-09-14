@@ -12,6 +12,8 @@ interface Props {
   /** 라벨이 만든 id — 안 받으면 라벨과 안 이어져 보조기술에 이름 없는 칸이 된다 (#259). */
   id?: string;
   "aria-describedby"?: string;
+  /** 서버가 이 칸을 짚었을 때의 검증 상태 — 프리미티브의 `getFieldProps` 계약 그대로. */
+  getFieldProps?: (fieldName: string) => unknown;
 }
 
 /**
@@ -21,7 +23,9 @@ interface Props {
  * 규약의 약속이고(§3.4), 백엔드 `test_strategy_contract.py` 가 세 종 밖의 control 이 나오면
  * 실패한다. 즉 이 `switch` 가 규약의 화면 쪽 끝이다.
  */
-export function StrategyFieldControl({ field, value, onChange, ...control }: Props) {
+export function StrategyFieldControl({ field, value, onChange, getFieldProps, ...rest }: Props) {
+  // 프리미티브는 `keyof T` 로 받는다 — 이 화면의 칸 이름은 문자열뿐이다.
+  const control = { ...rest, getFieldProps: getFieldProps && ((name: keyof any) => getFieldProps(String(name))) };
   switch (field.control) {
     case "number":
       return (

@@ -97,7 +97,9 @@ export const selectSchedulerMembers = async (scheduler_id: string): Promise<Sche
  */
 export const addSchedulerMember = async (
   scheduler_id: string,
-  data: { git_id: string; email?: string; name?: string },
+  // 이름·필수 여부의 정본은 백엔드 `SchedulerMemberIn` 이다 (backend 가 SoT — 루트 `CLAUDE.md`).
+  // 종전에는 `git_id` 를 보내 **모든 멤버 추가가 422** 였다 (#439 F21).
+  data: { account_id: string; email: string; name?: string },
 ): Promise<CreateOut | null> => {
   return apiCall<CreateOut>(`${BASE_URL}/${scheduler_id}/member`, {
     method: "POST",
@@ -108,8 +110,8 @@ export const addSchedulerMember = async (
 /**
  * 스케줄러 참여 멤버 제거
  */
-export const removeSchedulerMember = async (scheduler_id: string, git_id: string): Promise<DeleteOut | null> => {
-  return apiCall<DeleteOut>(`${BASE_URL}/${scheduler_id}/member/${git_id}`, {
+export const removeSchedulerMember = async (scheduler_id: string, account_id: string): Promise<DeleteOut | null> => {
+  return apiCall<DeleteOut>(`${BASE_URL}/${scheduler_id}/member/${account_id}`, {
     method: "DELETE",
   });
 };

@@ -630,6 +630,10 @@ flowchart LR
 - `cd frontend && npx tsc --noEmit` 0 종료
 - `git grep -n "lightweight-charts" -- frontend/` 의 hit 가 `lib/terminal/candleChart.ts` 와 `package.json` 밖에 없다
 - `git grep -n "sampleCandles\|SAMPLE_CANDLES" -- frontend/` 의 hit 가 `ChartPanel.tsx` 의 placeholder 분기와 자기 파일 밖에 없다
+
+> **이 주문의 이 부분은 뒤집혔다** (리드 결정 2026-09-14). 임시 캔들은 더 이상 그리지 않고
+> `lib/terminal/sampleCandles.ts` 는 지웠다 — 그럴듯한 값이 남아 있는 한 해칭·배지가 붙어도
+> 오독이 가능하기 때문이다(#445 F11). 이 문서는 **그때 무엇을 주문했는지**의 기록으로 둔다.
 - 브라우저에서 터미널을 열어: 두 패널이 뜨고, 헤더에 임시 데이터 배지가 보이고, 주기 전환 버튼이 동작하고, 이동평균 토글이 선을 켜고 끈다
 
 **증명 의무**
