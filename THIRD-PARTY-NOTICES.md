@@ -1,6 +1,6 @@
 # 서드파티 라이선스 고지 (THIRD-PARTY-NOTICES)
 
-프론트엔드(`frontend/`) 프로덕션 의존성 552개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 552개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
+프론트엔드(`frontend/`) 프로덕션 의존성 546개(전이 의존성 포함, devDependencies 제외) 를 대상으로 한다. §1·§2 가 그 546개고, §3 은 npm 을 거치지 않고 저장소에 직접 커밋된 번들 정적 자산(폰트 등)을 손으로 추가한 절이다.
 
 **2026-08-06 갱신(#341 완주 — DevExtreme 제거 반영)** — 상용 6종과 그 전이 의존이 빠져 623→599개가 됐다. 사라진 24개: 상용 6종(`devextreme`·`devextreme-react`·`@devexpress/utils`·`devexpress-diagram`·`devexpress-gantt`·`@devextreme/runtime`)과 그것들만 쓰던 18개(`inferno` 계열 5 · `devextreme-quill`·`parchment`·`quill-delta`·`fast-diff`·`rrule`·`core-js`·`@babel/runtime`·`es6-object-assign`·`eventemitter3`·`lodash.clonedeep`·`lodash.isequal`·`lodash.merge`·`opencollective-postinstall`). 갱신은 손으로 지우지 않고 **아래 재현 명령의 새 출력을 정본으로 삼아 문서의 패키지 목록과 대조**했다 — 그 결과 「문서에 있는데 지금 없음」 24개 = 위 목록, 「지금 있는데 문서에 없음」 0개. 남은 599개에 DevExpress 계열은 `devextreme-exceljs-fork`(MIT 포크) 하나뿐이다.
 
@@ -2623,9 +2623,9 @@ MIT 조건으로 사용(추가 의무 없음). GPL 조건은 선택하지 않았
 
 ---
 
-## 2. 그 외 permissive 라이선스 (501개)
+## 2. 그 외 permissive 라이선스 (495개)
 
-MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 501개 중 498개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
+MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·허가 고지 보존 외 추가 의무가 없다. **전수 확인 결과(`licenseFile` 키 존재 + 해당 경로에 파일 실재, `os.path.isfile` 로 확인) 495개 중 492개는 npm 배포본에 자기 라이선스 파일을 직접 동봉하고, 3개는 `package.json` 의 `license` 필드 선언만 있고 원문 파일이 없다** — 이슈 #287 이 `clsx` 를 예로 들며 경고한 바로 그 부류다(현재 잠긴 `clsx@2.1.1` 자체는 `node_modules/clsx/license` 를 동봉해 예외가 아님을 개별 확인했다 — 부류는 실재하되 해당 개체는 다른 3개였다). 전문을 이 문서에 반복하지 않고 목록만 남긴다 — 개별 원문은 위 재현 명령의 산출물(`/tmp/licenses-prod.json`) 또는 각 패키지 저장소에서 확인 가능하다.
 
 ### 예외 — 원문 파일 없이 선언만 있는 패키지 (3개)
 
@@ -2637,7 +2637,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `client-only` | 0.0.1 | MIT |
 | `fancy-canvas` | 2.1.0 | MIT |
 
-<details><summary>펼치기 — 나머지 498개: 패키지 · 버전 · 라이선스</summary>
+<details><summary>펼치기 — 나머지 492개: 패키지 · 버전 · 라이선스</summary>
 
 | 패키지 | 버전 | 라이선스 |
 |---|---|---|
@@ -2669,13 +2669,15 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@floating-ui/utils` | 0.2.12 | MIT |
 | `@hono/node-server` | 1.19.11 | MIT |
 | `@img/colour` | 1.1.0 | MIT |
+| `@jridgewell/resolve-uri` | 3.1.2 | MIT |
 | `@jridgewell/sourcemap-codec` | 1.5.5 | MIT |
+| `@jridgewell/trace-mapping` | 0.3.31 | MIT |
 | `@kurkle/color` | 0.3.4 | MIT |
 | `@next/env` | 16.3.4 | MIT |
 | `@next/swc-linux-x64-gnu` | 16.3.4 | MIT |
 | `@noble/ciphers` | 2.1.1 | MIT |
 | `@noble/hashes` | 2.2.0 | MIT |
-| `@oxc-project/types` | 0.147.0 | MIT |
+| `@oxc-project/types` | 0.148.0 | MIT |
 | `@radix-ui/number` | 1.1.3 | MIT |
 | `@radix-ui/primitive` | 1.1.3 | MIT |
 | `@radix-ui/primitive` | 1.1.7 | MIT |
@@ -2744,7 +2746,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@radix-ui/react-use-size` | 1.1.4 | MIT |
 | `@radix-ui/react-visually-hidden` | 1.2.11 | MIT |
 | `@radix-ui/rect` | 1.1.3 | MIT |
-| `@rolldown/binding-linux-x64-gnu` | 1.2.6 | MIT |
+| `@rolldown/binding-linux-x64-gnu` | 1.2.7 | MIT |
 | `@rolldown/pluginutils` | 1.0.1 | MIT |
 | `@standard-schema/spec` | 1.1.0 | MIT |
 | `@t3-oss/env-core` | 0.13.11 | MIT |
@@ -2769,13 +2771,8 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `@types/unist` | 2.0.11 | MIT |
 | `@types/unist` | 3.0.3 | MIT |
 | `@ungap/structured-clone` | 1.3.1 | ISC |
-| `@vitest/expect` | 4.1.11 | MIT |
-| `@vitest/mocker` | 4.1.11 | MIT |
-| `@vitest/pretty-format` | 4.1.11 | MIT |
-| `@vitest/runner` | 4.1.11 | MIT |
-| `@vitest/snapshot` | 4.1.11 | MIT |
-| `@vitest/spy` | 4.1.11 | MIT |
-| `@vitest/utils` | 4.1.11 | MIT |
+| `@vitest/mocker` | 5.0.0 | MIT |
+| `@vitest/spy` | 5.0.0 | MIT |
 | `abort-controller` | 3.0.0 | MIT |
 | `agent-base` | 6.0.2 | MIT |
 | `ajv` | 8.20.0 | MIT |
@@ -2813,7 +2810,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `commander` | 8.3.0 | MIT |
 | `compress-commons` | 7.0.1 | MIT |
 | `confbox` | 0.2.4 | MIT |
-| `convert-source-map` | 2.0.0 | MIT |
 | `core-util-is` | 1.0.3 | MIT |
 | `crc32-stream` | 7.0.1 | MIT |
 | `cross-spawn` | 7.0.6 | MIT |
@@ -2843,7 +2839,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `env-paths` | 3.0.0 | MIT |
 | `es-define-property` | 1.0.1 | MIT |
 | `es-errors` | 1.3.0 | MIT |
-| `es-module-lexer` | 2.3.1 | MIT |
+| `es-module-lexer` | 2.3.2 | MIT |
 | `es-object-atoms` | 1.1.1 | MIT |
 | `es-set-tostringtag` | 2.1.0 | MIT |
 | `escape-string-regexp` | 5.0.0 | MIT |
@@ -2937,7 +2933,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `longest-streak` | 3.1.0 | MIT |
 | `lru-cache` | 11.5.2 | BlueOak-1.0.0 |
 | `lru.min` | 1.1.4 | MIT |
-| `magic-string` | 0.30.21 | MIT |
+| `magic-string` | 1.2.3 | MIT |
 | `markdown-table` | 3.0.4 | MIT |
 | `math-intrinsics` | 1.1.0 | MIT |
 | `mdast-util-find-and-replace` | 3.0.2 | MIT |
@@ -3015,7 +3011,6 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `pgpass` | 1.0.5 | MIT |
 | `picocolors` | 1.1.1 | ISC |
 | `picomatch` | 4.0.4 | MIT |
-| `picomatch` | 4.0.5 | MIT |
 | `picomatch` | 4.0.7 | MIT |
 | `pkg-types` | 2.3.1 | MIT |
 | `postcss` | 8.5.23 | MIT |
@@ -3055,7 +3050,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `remeda` | 2.33.4 | MIT |
 | `require-from-string` | 2.0.2 | MIT |
 | `retry` | 0.12.0 | MIT |
-| `rolldown` | 1.2.6 | MIT |
+| `rolldown` | 1.2.7 | MIT |
 | `rou3` | 0.9.2 | MIT |
 | `safe-buffer` | 5.1.2 | MIT |
 | `safe-buffer` | 5.2.1 | MIT |
@@ -3089,10 +3084,9 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `symbol-tree` | 3.2.4 | MIT |
 | `tar-stream` | 3.2.0 | MIT |
 | `teex` | 1.0.1 | MIT |
-| `tinybench` | 2.9.0 | MIT |
-| `tinyexec` | 1.2.4 | MIT |
+| `tinybench` | 6.1.4 | MIT |
+| `tinyexec` | 1.3.0 | MIT |
 | `tinyglobby` | 0.2.17 | MIT |
-| `tinyrainbow` | 3.1.1 | MIT |
 | `tldts-core` | 7.4.10 | MIT |
 | `tldts` | 7.4.10 | MIT |
 | `tmp` | 0.2.7 | MIT |
@@ -3122,7 +3116,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `vfile-message` | 4.0.3 | MIT |
 | `vfile` | 6.0.3 | MIT |
 | `vite` | 8.2.2 | MIT |
-| `vitest` | 4.1.11 | MIT |
+| `vitest` | 5.0.0 | MIT |
 | `w3c-xmlserializer` | 5.0.0 | MIT |
 | `web-namespaces` | 2.0.1 | MIT |
 | `webidl-conversions` | 8.0.1 | BSD-2-Clause |
