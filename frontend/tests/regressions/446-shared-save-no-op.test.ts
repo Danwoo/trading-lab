@@ -82,7 +82,43 @@ describe("공용 저장 경로가 이 판정을 실제로 쓴다", () => {
     }
   });
 
+  // **부르기만 하면 되는 것이 아니라 무엇과 비교하는지가 판정을 가른다.** 기준선이 폼이
+  // 보여준 값이 아니면, 남의 탭이 바꾼 값을 원래대로 되돌리는 **진짜 편집**이 「안 바뀜」으로
+  // 삼켜진다 — 이 판정이 틀려서는 안 되는 바로 그 방향이다. 종전 단언은 `isUnchanged(` 만
+  // 봐서 인자가 틀려도 초록이었다(실제로 그랬다).
+  it("비교 기준은 폼이 실제로 보여준 값이다 — 낡은 prop 이 아니다", () => {
+    const detail = read("components/shared/DataPanel/DetailPanel.tsx");
+    // 폼 초기값과 판정 기준선이 같은 것을 가리켜야 한다.
+    expect(detail, "폼이 currentData 로 초기화되지 않는다면 이 그물의 전제가 바뀐 것이다").toMatch(
+      /initialData=\{.*currentData/,
+    );
+    expect(detail, "판정 기준선이 폼 초기값(currentData)이 아니다").toContain("isUnchanged(submitData, currentData)");
+
+    const grid = read("components/shared/DataPanel/DetailGridPanel.tsx");
+    expect(grid, "수정 모달이 selectedData 로 초기화되지 않는다면 전제가 바뀐 것이다").toContain(
+      "useDetailModal(selectedData)",
+    );
+    expect(grid, "판정 기준선이 모달 초기값(selectedData)이 아니다").toContain("isUnchanged(data, selectedData)");
+  });
+
   it("안 바뀐 저장에 내는 말이 「완료」라고 하지 않는다", () => {
     expect(NOTHING_CHANGED).not.toMatch(/완료|변경되었습니다|저장되었습니다/);
+  });
+});
+
+// 남의 탭이 값을 바꾼 뒤(#446 B-27 상황) **원래대로 되돌리는 편집**이 삼켜지는지 —
+// 이 판정이 틀려서는 안 되는 유일한 방향이다. 헬퍼를 화면이 쓰는 두 기준선으로 각각 태워
+// 무엇이 갈리는지 눈으로 보인다.
+describe("남의 변경을 되돌리는 편집은 저장된다", () => {
+  const propSnapshot = { memo: "A", name: "삼성전자" }; // 목록이 받아 온 낡은 스냅샷
+  const freshlyLoaded = { memo: "B", name: "삼성전자" }; // 수정을 누를 때 다시 불러온 최신
+  const submitted = { memo: "A", name: "삼성전자" }; // 사용자가 B 를 A 로 되돌렸다
+
+  it("폼이 보여준 값과 다르므로 저장한다", () => {
+    expect(isUnchanged(submitted, freshlyLoaded)).toBe(false);
+  });
+
+  it("낡은 prop 을 기준으로 삼으면 진짜 편집이 삼켜진다 — 그래서 기준선이 중요하다", () => {
+    expect(isUnchanged(submitted, propSnapshot)).toBe(true);
   });
 });
