@@ -758,6 +758,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # `verify_gitleaks_ignore.py` 가 예외 지문의 **그 커밋 그 줄**을 꺼내 지금 트리와
+          # 대조한다 — 얕은 체크아웃이면 그 커밋을 못 읽어 fail-closed 로 실패한다.
+          fetch-depth: 0
 
       # 스크립트가 `uvx ruff@<rev>` 로 훅과 같은 ruff 를 받는다 — 버전은 스크립트가
       # `.pre-commit-config.yaml` 에서 읽으므로 여기에 적지 않는다 (lockstep).
@@ -970,6 +974,10 @@ jobs:
       - name: 히스토리 스캔 예외 대조
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_gitleaks_ignore.py
+
+      - name: 예외 검사 자체 검사 (다른 줄의 유출을 덮는 지문을 잡는가)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_verify_gitleaks_ignore.py
 
       # push 직전 층이 **잡아야 할 것을 잡는지** — 「통과했다」로는 정상과 회귀를 못 가른다.
       - name: push 시크릿 스캔 자체 검사
