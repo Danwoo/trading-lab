@@ -1,7 +1,15 @@
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from schemas.common_schema import PERCENT_MAX, WEIGHT_MAX, CommonEntity, Money, TrimmedBaseModel
+from schemas.common_schema import (
+    NUMERIC_6_2_MAX,
+    PERCENT_MAX,
+    QUANTITY_MAX,
+    WEIGHT_MAX,
+    CommonEntity,
+    Money,
+    TrimmedBaseModel,
+)
 
 CombineRule = Literal["AND", "OR", "SCORE"]
 UniverseKind = Literal["POOL", "WATCHLIST", "LIST"]
@@ -77,10 +85,23 @@ class Bot(TrimmedBaseModel):
         le=PERCENT_MAX,
         description="종목당 비중 (%, 0~100). 소수점 둘째 자리까지. 비우면 배분을 정하지 않은 것으로 둡니다.",
     )
-    max_positions: int | None = Field(None, gt=0, description="동시에 들고 갈 최대 종목 수 (1 이상). 비우면 제한 없음.")
-    stop_loss_pct: float | None = Field(None, ge=0, le=100, description="손절선 (%, 0~100). 비우면 손절하지 않습니다.")
-    take_profit_pct: float | None = Field(None, ge=0, description="익절선 (%, 0 이상). 비우면 익절하지 않습니다.")
-    max_trades_per_day: int | None = Field(None, gt=0, description="하루 최대 매매 횟수 (1 이상). 비우면 제한 없음.")
+    max_positions: int | None = Field(
+        None, gt=0, le=QUANTITY_MAX, description="동시에 들고 갈 최대 종목 수 (1 이상). 비우면 제한 없음."
+    )
+    stop_loss_pct: Money | None = Field(
+        None, ge=0, le=PERCENT_MAX, description="손절선 (%, 0~100). 소수점 둘째 자리까지. 비우면 손절하지 않습니다."
+    )
+    # 익절은 100% 를 넘을 수 있다(두 배가 되면 200%). 그래서 상한은 「비율의 뜻」이 아니라
+    # **저장 컬럼**이 정한다 — Numeric(6,2).
+    take_profit_pct: Money | None = Field(
+        None,
+        ge=0,
+        le=NUMERIC_6_2_MAX,
+        description="익절선 (%, 0 이상 9999.99 까지). 소수점 둘째 자리까지. 비우면 익절하지 않습니다.",
+    )
+    max_trades_per_day: int | None = Field(
+        None, gt=0, le=QUANTITY_MAX, description="하루 최대 매매 횟수 (1 이상). 비우면 제한 없음."
+    )
     bot_role: BotRole = Field(
         default="READONLY",
         description="봇이 하는 일 — READONLY(보기만) · PROPOSE(제안) · EXECUTE(실행) 중 하나. "

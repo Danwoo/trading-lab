@@ -9,7 +9,7 @@ IngestResultIn 만 클라이언트 계약이 아니라 doc-search 응답을 저�
 from typing import Literal
 
 from pydantic import BaseModel, Field
-from schemas.common_schema import CommonEntity, TrimmedBaseModel
+from schemas.common_schema import QUANTITY_MAX, CommonEntity, TrimmedBaseModel
 
 # mock-indexed 는 doc-search MOCK 모드 결과 — 파싱·청킹만 하고 pg 미색인이라 검색되지 않는다.
 ResearchDocStatus = Literal["uploaded", "indexed", "mock-indexed", "empty", "failed"]
@@ -17,7 +17,7 @@ ResearchDocStatus = Literal["uploaded", "indexed", "mock-indexed", "empty", "fai
 
 class ResearchDocumentCreateIn(TrimmedBaseModel):
     atch_file_id: str = Field(..., max_length=20, description="file 모듈 첨부 그룹 ID")
-    file_sn: int = Field(..., ge=0, description="첨부 그룹 내 파일 순번(file 모듈 0-기반 채번)")
+    file_sn: int = Field(..., ge=0, le=QUANTITY_MAX, description="첨부 그룹 내 파일 순번(file 모듈 0-기반 채번)")
     doc_title: str | None = Field(None, max_length=500, description="원본 파일명(근거 표시명)")
 
 
@@ -46,4 +46,6 @@ class IngestResultIn(BaseModel):
     """
 
     status: ResearchDocStatus
-    chunk_count: int | None = None
+    # 업스트림 값도 저장 컬럼 안쪽이어야 한다 — 이 모델의 존재 이유가 「원인에서 먼 곳에서
+    # 터지는 실패」를 여기서 막는 것이다.
+    chunk_count: int | None = Field(default=None, ge=0, le=QUANTITY_MAX)

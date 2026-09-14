@@ -5,8 +5,10 @@ from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 # 저장 컬럼이 정하는 한계 — 스키마가 이 선을 넘겨보내면 DB 에서 500 으로 터진다.
 QUANTITY_MAX = 2_147_483_647  # integer
+BIGINT_MAX = 9_223_372_036_854_775_807  # bigint
 MONEY_MAX = 1e15  # Numeric(18,2) 안쪽의 보수적인 상한
-WEIGHT_MAX = 9999.99  # Numeric(6,2)
+NUMERIC_6_2_MAX = 9999.99  # Numeric(6,2) 컬럼이 담는 최대 — 넘기면 저장에서 500 이다
+WEIGHT_MAX = NUMERIC_6_2_MAX
 PERCENT_MAX = 100.0  # 비중·비율은 전체의 몫이라 100% 를 넘을 수 없다
 
 

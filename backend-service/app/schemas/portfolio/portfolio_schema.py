@@ -11,7 +11,9 @@ class Portfolio(TrimmedBaseModel):
     """
 
     portfolio_nm: str = Field(..., max_length=200, description="포트폴리오 이름 — 200자까지.")
-    sort_ordr: int = Field(default=1, description="목록에서의 정렬 순서 (정수). 작을수록 앞에 옵니다.")
+    sort_ordr: int = Field(
+        default=1, ge=0, le=QUANTITY_MAX, description="목록에서의 정렬 순서 (0 이상의 정수). 작을수록 앞에 옵니다."
+    )
     use_at: str = Field(default="Y", max_length=1, description="사용 여부 — 'Y'(사용) 또는 'N'(미사용). 한 글자입니다.")
     description: str | None = Field(None, max_length=1000, description="설명 — 1000자까지. 비워도 됩니다.")
 
