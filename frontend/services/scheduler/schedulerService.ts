@@ -110,8 +110,8 @@ export const addSchedulerMember = async (
 /**
  * 스케줄러 참여 멤버 제거
  */
-export const removeSchedulerMember = async (scheduler_id: string, git_id: string): Promise<DeleteOut | null> => {
-  return apiCall<DeleteOut>(`${BASE_URL}/${scheduler_id}/member/${git_id}`, {
+export const removeSchedulerMember = async (scheduler_id: string, account_id: string): Promise<DeleteOut | null> => {
+  return apiCall<DeleteOut>(`${BASE_URL}/${scheduler_id}/member/${account_id}`, {
     method: "DELETE",
   });
 };

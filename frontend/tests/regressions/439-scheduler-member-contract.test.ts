@@ -18,6 +18,7 @@ import { resolve } from "node:path";
 
 const BACKEND_SCHEMA = "../backend-service/app/schemas/scheduler/scheduler_schema.py";
 const FRONTEND_SERVICE = "services/scheduler/schedulerService.ts";
+const FRONTEND_GRID = "components/features/Scheduler/SchedulerMemberGrid.tsx";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 
@@ -48,6 +49,27 @@ function frontendDeclared(): { name: string; optional: boolean }[] {
     });
 }
 
+/** 백엔드 `SchedulerMemberOut` 이 **응답에 싣는** 필드 이름 전부. */
+function backendResponseFields(): string[] {
+  const source = read(BACKEND_SCHEMA);
+  const start = source.indexOf("class SchedulerMemberOut");
+  expect(start, "SchedulerMemberOut 을 못 찾았다 — 스키마가 옮겨졌다면 이 그물을 고쳐라").toBeGreaterThan(-1);
+  const next = source.indexOf("\nclass ", start + 1);
+  const body = source.slice(start, next === -1 ? undefined : next);
+  // `CommonEntity` 상속분(감사 컬럼)도 화면이 읽을 수 있으므로 함께 센다.
+  const own = [...body.matchAll(/^\s{4}(\w+):/gm)].map((m) => m[1]);
+  return [...own, "rn", "reg_dt", "reg_id", "mod_dt", "mod_id"];
+}
+
+/** 조회 그리드가 **읽겠다고 선언한** 필드 이름 — 열의 `dataField` 와 행 키 `keyField`. */
+function gridReadFields(): { name: string; where: string }[] {
+  const source = read(FRONTEND_GRID);
+  const columns = [...source.matchAll(/dataField:\s*"([^"]+)"/g)].map((m) => ({ name: m[1], where: "dataField" }));
+  const key = source.match(/keyField="([^"]+)"/);
+  expect(key, "keyField 를 못 찾았다 — 그리드가 바뀌었다면 이 그물을 고쳐라").toBeTruthy();
+  return [...columns, { name: key![1], where: "keyField" }];
+}
+
 describe("멤버 추가 계약이 백엔드와 맞는다", () => {
   const required = backendRequired();
   const declared = frontendDeclared();
@@ -76,5 +98,30 @@ describe("멤버 추가 계약이 백엔드와 맞는다", () => {
     for (const field of declared) {
       expect(known, `프론트가 보내는 「${field.name}」 를 백엔드가 모른다`).toContain(field.name);
     }
+  });
+});
+
+// 쓰는 쪽만 맞춰도 **보는 쪽이 조용히 빈칸**이 된다. 이름이 어긋난 `dataField` 는 값이
+// `undefined` 라 빈칸으로 그려지고, 어긋난 `keyField` 는 모든 행이 같은 키 `"undefined"` 를
+// 받아 행 식별이 무너진다 — 둘 다 아무것도 빨개지지 않는다 (#439 리뷰 차단급).
+describe("멤버 조회 화면이 읽는 이름이 응답에 실제로 있다", () => {
+  const fields = backendResponseFields();
+  const reads = gridReadFields();
+
+  it("양쪽을 읽었다 — 0건이면 그물이 죽은 것이다", () => {
+    expect(fields.length).toBeGreaterThan(0);
+    expect(reads.length).toBeGreaterThan(0);
+    expect(fields).toContain("account_id");
+  });
+
+  it("그리드가 읽는 필드가 전부 응답에 있다", () => {
+    for (const read of reads) {
+      expect(fields, `그리드의 ${read.where} 「${read.name}」 를 백엔드 응답이 싣지 않는다`).toContain(read.name);
+    }
+  });
+
+  it("행 키는 멤버를 유일하게 가르는 필드다", () => {
+    const key = reads.find((r) => r.where === "keyField")!;
+    expect(["account_id", "email"], `행 키 「${key.name}」 는 멤버를 유일하게 가르지 못한다`).toContain(key.name);
   });
 });

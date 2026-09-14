@@ -131,7 +131,7 @@ vi.mock("@/services/common/menuService", () => ({
 
 vi.mock("@/services/scheduler/schedulerService", () => ({
   selectSchedulerMembers: vi.fn(async () => ({
-    items: labels().map((label) => ({ git_id: label, name: label, email: `${label}@example.com` })),
+    items: labels().map((label) => ({ account_id: label, name: label, email: `${label}@example.com` })),
   })),
 }));
 
@@ -225,7 +225,7 @@ describe("#417 — clientSidePaging + showPaging=false 그리드에서 16행째 
       vi.mocked(selectSchedulerMembers).mockResolvedValueOnce({
         items: labels()
           .slice(0, 10)
-          .map((label) => ({ git_id: label, name: label, email: `${label}@example.com` })),
+          .map((label) => ({ account_id: label, name: label, email: `${label}@example.com` })),
       } as never);
 
       const { default: SchedulerMemberGrid } = await import("@/components/features/Scheduler/SchedulerMemberGrid");
