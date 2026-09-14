@@ -15,7 +15,8 @@ $ gh api repos/Danwoo/ai-dev-harness/rulesets
 {"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","status":"403"}
 ```
 
-즉 전환하는 순간 `main protection` 이 강제하던 넷이 사라진다:
+즉 전환하는 순간 `main protection` 이 강제하던 넷이 사라진다 — 그리고 **ruleset 만 사라지는 것이
+아니다**(§2.5):
 
 | 규칙 | 내용 | 전환 뒤 |
 |---|---|---|
@@ -38,6 +39,51 @@ GitHub 계정**으로 민다. 그래서:
 
 적대자가 없고 되돌리기가 싼 상황에서는 **「막는 것」보다 「반드시 발각되는 것」이 값이 같거나
 낫다.** 막는 층은 우회 경로가 하나만 있어도 무너지지만, 발각은 우회한 사실 자체를 남긴다.
+
+## 2.5 사라지는 것은 셋이다 — 하나만 보고 넘기지 않는다
+
+private 전환으로 없어지는 GitHub 기능은 `main protection` ruleset 하나가 아니다. 셋 다
+**public 에서만 무료**이고, 결제하지 않기로 했으므로(리드 결정 2026-08-29) 전부 자리를 옮긴다.
+
+| 사라지는 것 | 근거 | 대체 |
+|---|---|---|
+| `main protection` ruleset | Free 의 ruleset 은 public 저장소에서만 선다 | 아래 §3 (예방 + 발각) |
+| **CodeQL 코드 스캐닝 경보** | *"If you want to use code scanning on private repositories, you need a GitHub Code Security license."* | 업로드를 빼고 **분석은 그대로** — `upload: never` 로 받은 SARIF 를 `scripts/judge_codeql_sarif.py` 가 읽어 잡을 빨갛게 만든다 |
+| **secret scanning · push protection** | public 에서만 *"runs automatically for free"* | PR 은 종전 gitleaks(작업 트리), main 착륙마다 **히스토리 전량**, push 직전에 훅 한 겹 |
+
+**끄지 않는다.** 세 자리 모두 「기능을 빼서 빨간불을 없애는」 길이 있었고 전부 택하지 않았다 —
+빨간불을 없애는 것과 위험을 없애는 것은 다르고, 전자는 §4.3 이 적은 「발각이 행동으로 이어지지
+않는」 상태를 스스로 만든다.
+
+### CodeQL — 오히려 강해진다
+
+업로드하던 시절 이 체크는 **12일 내내 실패 0**이었다. 발견은 Security 탭으로만 갔고 워크플로는
+언제나 초록이었다. 이제는 차단 수준(`error`·`warning`) 발견이 하나라도 있으면 잡이 빨개진다.
+SARIF 를 못 읽거나 규칙이 0개로 분석된 경우도 실패다 — 분석이 조용히 안 돈 상태를 통과로
+읽지 않는다.
+
+### secret scanning — 세 겹으로 나눠 받는다
+
+- **PR**: 작업 트리 스캔(`--no-git`). 종전 그대로.
+- **main 착륙**: 히스토리 전량(`--log-opts=--all`). 작업 트리 스캔이 **구조적으로 못 보는 것**이
+  여기 있다 — 한 커밋에 들어왔다가 다음 커밋에서 지워진 값은 트리에 없다. main 은 커밋이
+  붙기만 하므로 착륙마다 전량을 훑으면 빠지는 구간이 없다 (실측: 479커밋 3초).
+- **push 직전**: `gitleaks` 훅을 `pre-push` 단계에도 건다. 커밋 훅은 `--no-verify` 나 훅이 없는
+  클론이면 지나가고, 그렇게 들어온 값은 CI 가 빨개져도 **이미 히스토리에 박힌다.**
+
+**못 받는 것은 정직하게 적는다**: 서버가 push 를 **거부**하는 층은 사라진다. 위 셋은 전부
+이 레포 안에서 도는 층이라 `--no-verify` 로 지나갈 수 있고, 그때는 히스토리 스캔이 뒤에서
+잡는다 — 막지는 못하고 반드시 발각된다. 파트너 토큰 유효성 검사(GitHub 이 발급처에 물어보는
+것)도 대체가 없다.
+
+### 히스토리 예외는 지문으로만
+
+전량 스캔은 **과거 커밋**을 본다. 가림 기능을 시험하려고 넣은 합성 문자열 3건이 거기 남아 있고
+(현재 트리에는 셋 다 `gitleaks:allow` 표시가 붙어 깨끗하다), 과거는 고쳐 쓸 수 없다. 그래서
+`.gitleaksignore` 에 **`커밋:파일:규칙:줄` 지문**으로 그 세 자리만 고정했다 — 이름으로 거는
+예외와 달리 같은 값이 다른 자리에 다시 들어오면 그대로 걸린다. 그리고 그 목록이 문이 되지
+않게 `scripts/verify_gitleaks_ignore.py` 가 각 줄의 파일이 지금도 `gitleaks:allow` 로
+스스로를 밝히는지 대조한다.
 
 ## 3. 그래서 무엇으로 대체하나
 

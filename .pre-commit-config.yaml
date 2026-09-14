@@ -16,6 +16,15 @@ repos:
     rev: v8.21.2
     hooks:
       - id: gitleaks
+      # **push 에서 한 번 더 본다** — private 전환 뒤 GitHub 의 push protection 이 사라진다
+      # (public 에서만 무료). 커밋 훅은 `--no-verify` 한 번이나 훅이 없는 클론이면 지나가고,
+      # 그렇게 들어온 비밀은 CI 가 빨개져도 **이미 히스토리에 박힌다.** push 직전이 이 레포가
+      # 남길 수 있는 마지막 자리다. 우회는 종전대로 `--no-verify` 이고, 그때는 히스토리 스캔이
+      # 받는다(`ci.yml` 의 「시크릿 스캔 (히스토리)」).
+      - id: gitleaks
+        alias: gitleaks-push
+        name: 시크릿 스캔 (push 직전)
+        stages: [pre-push]
 
   # rev 는 서비스들이 잠근 ruff 와 같은 판으로 맞춘다 (2026-08-25 실측: multi-agent·backend
   # 0.16.4 · bot-agent 0.16.3). 종전 0.15.13 은 **훅이 서비스보다 낡은** 상태였고 그 차이를

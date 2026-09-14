@@ -809,40 +809,20 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_python_format.py
 
-      # 훅과 **같은 버전**을 릴리스 해시로 고정해 받는다. 버전을 여기에만 적으면 훅과 갈리므로
-      # `.pre-commit-config.yaml` 의 rev 와 대조해 어긋나면 실패한다.
-      # 바이너리는 `$RUNNER_TEMP` 에 푼다 — 작업 트리에 두면 스캔 대상에 자기 자신이 섞인다.
+      # 설치는 `scripts/install_gitleaks.sh` 한 곳이다 — 버전·해시를 스텝마다 적으면 한쪽만
+      # 올라가 「훅과 같은 버전」이라는 근거가 조용히 사라진다.
 
       - name: 시크릿 스캔 (gitleaks — 훅과 같은 버전, fail-closed)
         if: ${{ !cancelled() }}
-        env:
-          GITLEAKS_VERSION: "8.21.2"
-          GITLEAKS_SHA256: "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba"
         run: |
           set -euo pipefail
-          HOOK_REV=$(sed -n '/gitleaks\/gitleaks/,+3{s/^[[:space:]]*rev:[[:space:]]*v\{0,1\}//p;}' .pre-commit-config.yaml | head -1)
-          if [ -z "$HOOK_REV" ]; then
-            echo "::error::.pre-commit-config.yaml 에서 gitleaks rev 를 못 읽었습니다 — 훅과 같은 버전이라는 근거가 사라집니다"
-            exit 1
-          fi
-          if [ "$HOOK_REV" != "$GITLEAKS_VERSION" ]; then
-            echo "::error::훅의 gitleaks v${HOOK_REV} 와 이 잡의 ${GITLEAKS_VERSION} 이 어긋납니다 — 버전과 GITLEAKS_SHA256 을 함께 올리세요"
-            exit 1
-          fi
+          bash scripts/install_gitleaks.sh
           TRACKED=$(git ls-files | wc -l)
-          echo "gitleaks ${GITLEAKS_VERSION} (훅 rev 와 일치) · 추적 파일 ${TRACKED}건"
+          echo "추적 파일 ${TRACKED}건"
           if [ "$TRACKED" -eq 0 ]; then
             echo "::error::스캔 대상을 0건 수집했습니다 — 통과가 아닙니다"
             exit 1
           fi
-          # `--retry` — self-hosted 러너의 일시 네트워크 오류로 이 스텝이 죽었다
-          # (2026-08-25 실측: `curl: (35) Recv failure: Connection reset by peer`).
-          # 무결성은 아래 sha256 대조가 지키므로 재시도는 안전하다.
-          curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
-            -o "$RUNNER_TEMP/gitleaks.tar.gz" \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
-          tar xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
           "$RUNNER_TEMP/gitleaks" detect --no-git --redact --source .
 
       - name: 무결성 핸들러 exc_info 유출 검사
@@ -979,6 +959,17 @@ jobs:
       - name: main 착륙 감사 판정부 검사
         if: ${{ !cancelled() }}
         run: python3 scripts/test_audit_main_landing.py
+
+      # private 전환 뒤 코드 스캐닝의 **유일한 출구**가 되는 판정부 (#420). Security 탭이
+      # 경보를 안 받으므로 이것이 조용히 초록이면 탐지가 통째로 사라진 것과 같다.
+      - name: CodeQL SARIF 판정부 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_judge_codeql_sarif.py
+
+      # 히스토리 스캔의 예외가 「진짜 유출을 덮는 한 줄」로 쓰이지 않게 (#420).
+      - name: 히스토리 스캔 예외 대조
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_gitleaks_ignore.py
 
       # 머지 게이트 판정 (#23 Task 5) — 통과 집합(success·skipped)과 상류 0건 실패.
       # 게이트는 초록일 때 아무 일도 안 하는 검사라 죽어도 티가 안 난다.
@@ -1448,6 +1439,23 @@ jobs:
           # 기본값(1)이면 `git rev-list BEFORE..AFTER` 가 BEFORE 를 몰라 **매번** 폴백으로
           # 떨어져, 한 번에 밀린 중간 커밋이 영영 감사받지 않는다 (#420 리뷰 F3).
           fetch-depth: 0
+
+      # **히스토리를 통째로 훑는다** — private 전환 뒤 GitHub 의 secret scanning 이 사라진다
+      # (public 에서만 무료). PR 쪽 스캔은 `--no-git` 이라 **작업 트리만** 본다: 한 커밋에
+      # 들어왔다가 다음 커밋에서 지워진 비밀은 어느 쪽도 못 본다. main 은 커밋이 붙기만 하므로
+      # 착륙할 때마다 전량을 훑으면 빠지는 구간이 없다.
+      - name: 시크릿 스캔 (히스토리 전량 — fail-closed)
+        if: ${{ !cancelled() }}
+        run: |
+          set -uo pipefail
+          bash scripts/install_gitleaks.sh || exit 1
+          COMMITS=$(git rev-list --count HEAD)
+          echo "히스토리 커밋 ${COMMITS}건"
+          if [ "$COMMITS" -eq 0 ]; then
+            echo "::error::커밋 0건을 스캔했습니다 — 통과가 아닙니다 (얕은 체크아웃?)"
+            exit 1
+          fi
+          "$RUNNER_TEMP/gitleaks" detect --redact --source . --log-opts="--all"
 
       - name: 이 push 가 옮긴 커밋을 감사한다 (fail-closed)
         env:
