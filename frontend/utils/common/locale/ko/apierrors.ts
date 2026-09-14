@@ -3,6 +3,7 @@
 
 import type { EmailFailureCode } from "@/utils/common/errors/emailFailure";
 import type { StreamFailureCode } from "@/utils/common/errors/streamFailure";
+import type { ProxyFailureCode } from "@/utils/common/errors/proxyFailure";
 
 export const STATUS_MESSAGES: Record<number, string> = {
   400: "잘못된 요청입니다.",
@@ -52,6 +53,12 @@ export const STREAM_FAILURE_MESSAGES: Record<StreamFailureCode, string> = {
     "대화가 끝까지 가지 못했습니다.\n위에 받은 내용까지는 그대로입니다. 같은 실패가 이어지면 서버 로그를 확인하세요.",
   "research.service_unreachable":
     "리서치 서비스(:8003)가 떠 있지 않습니다.\n다시 물어도 붙지 않습니다 — 서비스를 띄운 뒤 다시 물어보세요.",
+};
+
+// 프록시가 업스트림에 닿지 못한 실패 사유 — key = errors/proxyFailure.ts 의 ProxyFailureCode.
+export const PROXY_FAILURE_MESSAGES: Record<ProxyFailureCode, string> = {
+  "proxy.upstream_unreachable":
+    "부른 서비스가 응답하지 않았습니다.\n다시 시도해도 붙지 않습니다 — 그 서비스가 떠 있는지, 설정의 주소·포트가 맞는지 확인하세요.",
 };
 
 // Prisma 에러 번역 — key = lib/prisma/error.ts 가 emit 하는 type (실제 코드 P#### / prisma_*)

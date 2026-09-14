@@ -184,6 +184,8 @@ export const StrRange = (min: number, max: number) => Field({ min_length: min, m
 export const IntRange = (min: number, max: number) => Field({ ge: min, le: max }).int();
 export const FloatRange = (min: number, max: number) => Field({ ge: min, le: max }).float();
 export const PositiveInt = () => Field({ gte: 0 }).int();
+/** 1 이상의 정수 — 「제한 횟수」처럼 0 이 뜻을 잃는 칸. 백엔드의 `gt=0` 과 같은 규칙이다. */
+export const CountInt = () => Field({ gt: 0 }).int();
 export const PositiveFloat = () => Field({ gte: 0 }).float();
 export const Numeric = (precision = 10, scale = 0) => Field({ precision, scale }).numeric();
 
