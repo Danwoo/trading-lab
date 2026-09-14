@@ -78,6 +78,8 @@ BASE = dict(
     SFTP_USERNAME="real-user",
     SFTP_PASSWORD="real-pass",
     JWT_SECRET="s",
+    EMAIL_USER="u@x",
+    EMAIL_PASSWORD="p",
 )
 
 
@@ -95,13 +97,38 @@ def run() -> None:
     except Exception as e:  # noqa: BLE001
         check("실제 자격증명이면 기동한다", False, f"예외: {e}")
 
-    # 2) 운영에서 자리표시자면 거부한다
-    for field in ("SFTP_USERNAME", "SFTP_PASSWORD"):
+    # 2) 운영에서 자리표시자면 거부한다.
+    #    **SFTP 두 개만이 아니다** — 같은 `.env.example` 에 `JWT_SECRET`·DB 비밀번호도 자리표시자로
+    #    있고, 그것들이 운영에서 서 있는 것이 더 나쁘다(시크릿 자리표시자로 서명한 JWT 는 누구나
+    #    만든다). 검사기 이름이 「자리표시자 자격증명」이면 자격증명 전부를 봐야 한다 (리뷰 지적).
+    for field in ("SFTP_USERNAME", "SFTP_PASSWORD", "JWT_SECRET", "BACKEND_SQL_DB_PASSWORD"):
         try:
             build(**{field: "CHANGE_ME"})
             check(f"운영에서 {field}=CHANGE_ME 를 거부한다", False, "기동이 성공했다")
         except Exception as e:  # noqa: BLE001
             check(f"운영에서 {field}=CHANGE_ME 를 거부한다", "CHANGE_ME" in str(e), f"사유에 값이 없다: {e}")
+
+    # 2-1) 대소문자 변형도 자리표시자다 — 부트스트랩이 같은 토큰을 쓰므로 실수로 나온다
+    for value in ("change_me", "Change_Me", "  CHANGE_ME  "):
+        try:
+            build(JWT_SECRET=value)
+            check(f"운영에서 JWT_SECRET={value!r} 를 거부한다", False, "기동이 성공했다")
+        except Exception as e:  # noqa: BLE001
+            check(f"운영에서 JWT_SECRET={value!r} 를 거부한다", "JWT_SECRET" in str(e), f"어느 키인지 안 말한다: {e}")
+
+    # 2-2) 자격증명이 **아닌** 것은 막지 않는다 — 예외는 명시된 것만
+    try:
+        build(MARKET_DATA_CONTACT="CHANGE_ME")
+        check("자격증명이 아닌 설정은 기동을 안 막는다 (MARKET_DATA_CONTACT)", True)
+    except Exception as e:  # noqa: BLE001
+        check("자격증명이 아닌 설정은 기동을 안 막는다 (MARKET_DATA_CONTACT)", False, f"막혔다: {e}")
+
+    # 2-3) 빈 값은 「안 쓴다」는 뜻이다 — 자리표시자와 다르다
+    try:
+        build(EMAIL_USER="", EMAIL_PASSWORD="")
+        check("빈 값은 자리표시자가 아니다 (안 쓰는 기능)", True)
+    except Exception as e:  # noqa: BLE001
+        check("빈 값은 자리표시자가 아니다 (안 쓰는 기능)", False, f"막혔다: {e}")
 
     # 3) 개발에서는 막지 않는다 (경고만) — 파일 기능을 안 쓰는 사람의 길을 막지 않는다
     try:

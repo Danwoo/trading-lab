@@ -150,6 +150,12 @@ class Settings(BaseSettings):
     # 보고하는 값과 같은 토큰이다 — 그쪽은 부트스트랩 시점에 말하고, 여기는 기동 시점에 잡는다.
     _PLACEHOLDER = "CHANGE_ME"
 
+    #: 자리표시자로 남아도 기동을 막지 않는 설정 — **자격증명이 아닌 것만** 넣는다.
+    #: 늘리려면 왜 비밀이 아닌지를 함께 적는다 (fail-closed: 적지 않은 것은 전부 막힌다).
+    #: · `MARKET_DATA_CONTACT` — 소스에 보내는 연락처 문자열이다. 안 채우면 예의가 없을 뿐
+    #:   기동을 막을 일은 아니다.
+    _PLACEHOLDER_ALLOWED = frozenset({"MARKET_DATA_CONTACT"})
+
     @model_validator(mode="after")
     def _forbid_placeholder_credentials(self) -> "Settings":
         """자리표시자 자격증명으로 서지 않는다 — 「검사 0건은 통과가 아니다」의 자격증명판.
@@ -161,11 +167,18 @@ class Settings(BaseSettings):
         운영에서는 기동을 거부한다 — 자리표시자 자격증명이 서 있는 것 자체가 결함이다.
         개발에서는 기동은 시키되 **경고를 남긴다** — 파일 기능을 안 쓰는 사람의 길을 막지 않으려고.
         """
-        placeholders = [
+        # **키를 손으로 열거하지 않는다.** 두 개만 적어 두면 같은 `.env.example` 의
+        # `JWT_SECRET`·DB 비밀번호가 그대로 통과한다 — 시크릿 자리표시자로 서명한 JWT 는
+        # `.env.example` 을 읽은 누구나 만들 수 있으니 SFTP 보다 나쁘다. 설정 전체를 훑고,
+        # 부트스트랩이 같은 토큰을 쓰는 만큼 **대소문자·공백 변형도 자리표시자로 본다.**
+        target = self._PLACEHOLDER.casefold()
+        placeholders = sorted(
             name
-            for name in ("SFTP_USERNAME", "SFTP_PASSWORD")
-            if str(getattr(self, name, "")).strip() == self._PLACEHOLDER
-        ]
+            for name in type(self).model_fields
+            if name not in self._PLACEHOLDER_ALLOWED
+            and isinstance(getattr(self, name, None), str)
+            and getattr(self, name).strip().casefold() == target
+        )
         if not placeholders:
             return self
 
