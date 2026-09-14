@@ -202,15 +202,21 @@ def main() -> int:
     if not fixtures:
         print(f"::error::실물 픽스처를 0건 읽었습니다: {FIXTURES} (fail-closed)")
         return 1
-    # **재현은 「AI 자기 광고를 뺀 것」과 대조한다.** 그 줄을 main 에 남기지 않기로 했으므로
-    # (전역 규약) 재현본은 실물과 딱 그만큼 다르다. 기대값에도 같은 필터를 걸어, 재현 불변식은
-    # 그대로 지키면서 제거만 예외로 둔다 — 다른 자리가 하나라도 달라지면 여전히 실패한다.
+    # **기대값을 검사 대상 함수로 만들지 않는다.** 종전에는 `want` 를
+    # `strip_ai_self_reference(실물)` 로 만들었는데, 그러면 그 함수가 과하게 지워도 `want` 가
+    # 똑같이 과하게 줄어 **항상 통과한다** — 검사할 수 없는 구조였다 (#489 리뷰 지적).
+    #
+    # 이제 필터가 닿는 픽스처는 **필터 후 본문을 픽스처 파일에 글자 그대로 고정**해 두고
+    # (`expected_after_filter`, 지워진 줄을 사람이 읽고 확인했다), 나머지는 실물과 **바이트
+    # 동일**을 요구한다 — AI 언급이 없는 커밋이 한 글자라도 바뀌면 여기서 걸린다.
     stripped_any = 0
     for fx in fixtures:
         got = mp.reproduce_squash_body(fx["commits"]).rstrip("\n")
-        want = mp.strip_ai_self_reference(fx["expected_body"]).rstrip("\n")
-        if want != fx["expected_body"].rstrip("\n"):
+        if "expected_after_filter" in fx:
             stripped_any += 1
+            want = fx["expected_after_filter"].rstrip("\n")
+        else:
+            want = fx["expected_body"].rstrip("\n")
         if got != want:
             failures.append(
                 f"PR #{fx['pr']} ({fx['desc']}) 재현본이 실물(자기 광고 제외)과 다르다\n"
@@ -224,11 +230,23 @@ def main() -> int:
     # 것이고, 죽은 필터는 다음 커밋에서 조용히 통과시킨다.
     if stripped_any == 0:
         failures.append(
-            "실물 픽스처 어디에서도 AI 자기 광고를 지우지 않았다 — 필터가 죽었거나 "
-            "픽스처가 그 경로를 안 덮는다 (fail-closed)"
+            "AI 자기 광고를 지우는 픽스처가 0건이다 — 필터가 죽었거나 픽스처가 그 경로를 안 덮는다 (fail-closed)"
         )
     else:
-        print(f"AI 자기 광고를 지운 픽스처: {stripped_any}/{len(fixtures)}건")
+        print(f"AI 자기 광고를 지운 픽스처: {stripped_any}/{len(fixtures)}건 (나머지는 실물과 바이트 동일 요구)")
+
+    # **AI 언급이 없으면 한 글자도 바뀌지 않는다.** 이 모듈의 계약이 「재현」이므로, 필터가
+    # 있다는 이유로 무관한 커밋의 문단 경계가 달라지면 그 계약이 깨진다.
+    untouched = "fix: 원장 조정\n\n재현 로그:\n```\nERROR\n```\n\n\n위 로그가 원인이다."
+    if mp.strip_ai_self_reference(untouched) != untouched:
+        failures.append(
+            "AI 언급이 없는 메시지가 바뀌었다 — 연속 빈 줄을 무조건 접으면 재현 계약이 깨진다\n"
+            f"    기대: {untouched!r}\n    실제: {mp.strip_ai_self_reference(untouched)!r}"
+        )
+    # 이음매는 접는다 — 지운 자리에 빈 줄이 겹친 채로 두면 문단이 벌어진다.
+    seam = "제목\n\n본문\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n꼬리"
+    if mp.strip_ai_self_reference(seam) != "제목\n\n본문\n\n꼬리":
+        failures.append(f"제거 이음매의 겹친 빈 줄이 안 접혔다 — 실제: {mp.strip_ai_self_reference(seam)!r}")
 
     # ── ② provenance 줄이 본문을 훼손하지 않는가 ───────────────────────────────
     for fx in fixtures:
@@ -288,14 +306,14 @@ def main() -> int:
         if got != expected:
             failures.append(f"{desc}\n    기대: {expected}\n    실제: {got}")
 
-    total = len(fixtures) * 3 + len(STRIP_CASES) + len(LINE_CASES)
+    total = len(fixtures) * 3 + len(STRIP_CASES) + len(LINE_CASES) + 2
     if not LINE_CASES:
         print("::error::어휘 케이스를 0건 모았습니다 (fail-closed)")
         return 1
     print(
         f"merge_provenance 케이스 {total}건 검사 "
         f"(실물 재현 {len(fixtures)}건 · 자기 광고 잔류 {len(fixtures)}건 · 무손실 {len(fixtures)}건 · "
-        f"자기 광고 경계 {len(STRIP_CASES)}건 · 어휘 {len(LINE_CASES)}건)"
+        f"자기 광고 경계 {len(STRIP_CASES)}건 · 무관 커밋 보존 2건 · 어휘 {len(LINE_CASES)}건)"
     )
     if failures:
         for f in failures:

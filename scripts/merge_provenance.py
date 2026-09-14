@@ -97,14 +97,29 @@ _AI_SELF_REFERENCE = re.compile(
 
 
 def strip_ai_self_reference(message: str) -> str:
-    """커밋 메시지에서 도구 자기 광고 줄을 뺀다 — 뺀 자리에 생긴 빈 줄 더미도 정리한다."""
+    """커밋 메시지에서 도구 자기 광고 줄을 뺀다.
+
+    **뺀 자리에서 생긴 빈 줄만 접는다.** 연속 빈 줄을 무조건 하나로 줄이면 self-ref 가 하나도
+    없는 커밋의 본문까지 바뀐다 — 코드 펜스 뒤에 빈 줄을 둘 둔 메시지가 실물과 달라지고,
+    그 순간 이 모듈의 존재 이유(「재현이 틀리면 커밋 메시지를 우리가 지운다」)가 깨진다.
+
+    그래서 접기는 **제거가 일어난 이음매**에서만 한다. 지운 것이 하나도 없으면 원문 그대로다.
+    """
+    lines = (message or "").split("\n")
+    if not any(_AI_SELF_REFERENCE.match(line) for line in lines):
+        return message.rstrip() if message else ""
+
     kept: list[str] = []
-    for line in (message or "").split("\n"):
+    removed_since_kept = False
+    for line in lines:
         if _AI_SELF_REFERENCE.match(line):
+            removed_since_kept = True
             continue
-        # 줄을 빼면 빈 줄이 겹친다 — 문단 경계는 빈 줄 하나다.
-        if not line.strip() and kept and not kept[-1].strip():
+        # 제거로 빈 줄이 겹쳤을 때만 접는다 — 원래 겹쳐 있던 빈 줄은 건드리지 않는다.
+        if not line.strip() and removed_since_kept and kept and not kept[-1].strip():
             continue
+        if line.strip():
+            removed_since_kept = False
         kept.append(line)
     return "\n".join(kept).rstrip()
 
