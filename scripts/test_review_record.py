@@ -626,13 +626,16 @@ ARM_CASES = [
         {"arm": False, "self_vendor": True, "author_tier": None},
     ),
     (
-        "동일-벤더 + 브랜치명 단독 판별(커밋 신원 없음) → arm 거부  (공격 ⑨)",
+        # 브랜치명 폴백을 지운 뒤로는 이 입력이 **미상**이다 (2026-09-14). arm 거부라는
+        # 결론은 같지만 **이유가 바뀌었다** — 종전에는 「같은 벤더인데 티어를 모른다」였고
+        # 지금은 「저자가 누군지 모른다」다.
+        "옛 이름 + 커밋 신원 없음 → 미상이라 arm 거부  (공격 ⑨)",
         {
             "marker_model": "claude",
             "commit_author_emails": ["dev@example.test"],
             "head_ref": "fix-23-claude",
         },
-        {"arm": False, "self_vendor": True, "identity_source": "branch-name"},
+        {"arm": False, "author_kind": "unknown", "identity_source": "none"},
     ),
     (
         "교차 벤더(claude 저자 · kimi 리뷰) → 티어 미상이어도 arm",
@@ -687,13 +690,16 @@ ARM_CASES = [
     (
         # 옛 형식은 전환기 동안 계속 읽힌다 — 브랜치명이 벤더를 실으면 미상이 아니다.
         # 그리고 그 값은 **자기리뷰 차단으로 이어진다** (공격 ⑨ 케이스와 같은 계약).
-        "옛 형식 브랜치 + 신원 없음 → 미상이 아니라 branch-name 판별 (전환기)",
+        # **이 케이스가 구멍 그 자체였다.** 브랜치명만 맞추면 `agent` 로 읽혀 `author: human`
+        # 게이트(미상에만 걸린다)를 타지 않고 `arm: True` 까지 갔다 — 여는 쪽이 브랜치명을
+        # 100% 통제하므로 아무나 그 이름을 지을 수 있다. 폴백을 지워 미상으로 떨어뜨린다.
+        "옛 형식 브랜치 + 신원 없음 → **미상**, arm 거부 (폴백 제거)",
         {
             "marker_model": "kimi",
             "commit_author_emails": ["dev@example.test"],
             "head_ref": "fix-42-claude",
         },
-        {"arm": True, "author_kind": "agent", "identity_source": "branch-name", "self_vendor": False},
+        {"arm": False, "author_kind": "unknown", "identity_source": "none"},
     ),
     # ── `author: human` 라벨 — 저자 미상 차단의 유일한 탈출구 (리드 결정 2026-08-28) ──
     # 라벨은 **게이트를 여는 표면**이라 존재만으로 열지 않는다: 마지막으로 붙인 액터가

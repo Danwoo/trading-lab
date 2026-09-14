@@ -3,7 +3,7 @@
 배정이 뒤집히기 쉬운 네 자리를 케이스로 못박는다:
   ① 고위험 codex 는 **claude 저자**일 때다 (kimi 저자가 아니다)
   ② 벤더 혼재 + codex 불가 → reviewer=none (후보 소진)
-  ③ 커밋 신원이 없어도 **옛 형식** 브랜치명(fix-N-<model>)으로 저자를 판별한다 (전환기 잔존)
+  ③ **브랜치명으로는 저자를 판별하지 않는다** — 옛 형식이어도 커밋 신원이 없으면 미상이다
   ④ **아무 신호도 없으면 `unknown`** — `human` 으로 접히지 않는다 (리드 결정 2026-08-28).
      이 한 글자가 `review_record` 의 arm 판정을 뒤집는다: `human` 이면 자기리뷰 축에
      해당 없음으로 통과하고, `unknown` 이면 fail-closed 로 막힌다.
@@ -101,23 +101,24 @@ CASES = [
         },
     ),
     (
-        "신원 없음 + 브랜치명 fix-42-claude → agent/claude  (③)",
+        # **브랜치명은 저자 근거가 아니다** (2026-09-14). 여는 쪽이 이름을 100% 통제하므로
+        # 이름만 맞추면 아무나 「에이전트 저자」로 읽혔고, 그 경로는 미상에만 걸리는
+        # `author: human` 게이트를 타지 않았다 — 「모르면 모른다」가 이름 하나로 우회됐다.
+        "옛 이름 fix-42-claude 여도 신원이 없으면 미상이다 (③ 폴백 제거)",
         [HUMAN],
         "fix-42-claude",
         ["low"],
         False,
         {
-            "reviewer": "kimi",
-            "author_kind": "agent",
-            "author_vendor": "claude",
-            "author_models": "claude",
-            "identity_source": "branch-name",
+            "reviewer": "claude",
+            "author_kind": "unknown",
+            "author_vendor": None,
+            "author_models": "",
+            "identity_source": "none",
             "label_allowed": False,
-            "identity_note": "커밋에 에이전트 신원 없음 — 브랜치명 단독 판별 "
-            "(§6.1 디스패치 계약 미이행, 실수 방지 점검 요망. "
-            "라우팅·표기 전용 — 판정 라벨 미부착); "
-            "브랜치명 단독 판별이라 작성 티어를 알 수 없다 "
-            "(커밋에 claude 신원 자체가 없다) — 폴백 리뷰 시 판정 라벨 미부착",
+            "identity_note": "저자 신원 미상 — 커밋에 에이전트 신원이 없고 브랜치도 벤더를 선언하지 않는다. "
+            "사람일 수도, `git config --worktree user.email` 을 빠뜨린 에이전트일 수도 있어 "
+            "**둘을 가를 방법이 없다** — 판정 라벨 미부착 · 자동 머지 arm 거부(사람이 머지한다)",
         },
     ),
     (
@@ -215,12 +216,13 @@ CASES = [
         {"author_kind": "unknown", "author_models": "", "label_allowed": False},
     ),
     (
-        "브랜치명과 커밋 신원 불일치 → 주의 문구를 남긴다",
+        # 브랜치명을 안 읽으므로 불일치라는 개념 자체가 없다 — 커밋 신원만 본다.
+        "옛 이름이 다른 벤더를 말해도 커밋 신원이 이긴다 — 주의 문구 없음",
         [C],
         "fix-42-kimi",
         ["low"],
         False,
-        {"identity_note": "브랜치명(kimi)과 커밋 신원(claude) 불일치 — §6.1 일관성 점검 실패, 커밋 신원 우선"},
+        {"author_kind": "agent", "author_vendor": "claude", "identity_source": "commit-email", "identity_note": ""},
     ),
     (
         "목록 밖 에이전트형 이메일 → 관측 문구를 남긴다",
@@ -277,15 +279,15 @@ CASES = [
     # 네 갈래를 전부 판다. ③ 과 ④ 를 가르는 것이 이 전환의 전부다 — 옛 이름은 벤더를
     # 실어 날랐고 새 이름은 안 싣는다. 새 이름에서 신원까지 없으면 **모르는 것**이다.
     (
-        "전환 ㉠ 옛 형식 + 신원 없음 → 브랜치명으로 판별 (전환기 동안 유지)",
+        "전환 ㉠ 옛 형식 + 신원 없음 → **미상** (폴백을 지웠다)",
         [HUMAN],
         "fix-42-claude",
         ["low"],
         False,
         {
-            "author_kind": "agent",
-            "author_vendor": "claude",
-            "identity_source": "branch-name",
+            "author_kind": "unknown",
+            "author_vendor": None,
+            "identity_source": "none",
             "label_allowed": False,
         },
     ),

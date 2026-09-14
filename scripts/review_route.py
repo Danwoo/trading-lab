@@ -12,7 +12,6 @@
 가른다:
 
   commit-email  어휘 안 신원 1종 → `agent` · 2종 이상 → `mixed`
-  branch-name   커밋 신원이 없고 옛 이름 `fix-N-<벤더>` 이면 → `agent` (전환기 잔존, 아래 참조)
   none          **아무 신호도 없으면 → `unknown`** — 사람일 수도, 신원 설정을 빠뜨린
                 에이전트일 수도 있고 **둘을 가를 방법이 없다** (리드와 에이전트가 같은
                 GitHub 계정·같은 git 신원을 쓴다). 종전에는 이 자리가 `human` 이었고,
@@ -42,6 +41,7 @@ CLAUDE_TIERS = ("opus", "sonnet", "fable", "haiku")
 KIMI_TIERS = ("k3", "k3-256k", "kimi-for-coding", "kimi-for-coding-highspeed")
 CODEX_TIERS = ("gpt-5.6-terra",)
 
+
 # 신원 판독(여기)과 마커의 `tier=` 판독(`review_record.read_marker_tier`)이 같은 어휘를
 # 봐야 한다 — 갈리면 한쪽이 인정한 티어를 다른 쪽이 미상으로 접는다. 그래서 공개 이름이다.
 VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS}
@@ -50,18 +50,12 @@ VENDOR_TIERS = {"claude": CLAUDE_TIERS, "kimi": KIMI_TIERS, "codex": CODEX_TIERS
 _IDENTITY = re.compile(r"^(?P<vendor>claude|kimi|codex)(?:-(?P<tier>[a-z0-9.\-]+))?-agent@noreply\.local\Z")
 # 미상 신원 관측은 접미만 본다 — 앞 공백은 통과하고 뒤 공백은 못 통과한다
 _AGENTISH = re.compile(r"-agent@noreply\.local\Z", re.I)
-# 옛 브랜치 규약 `fix-<이슈>-<벤더>` 의 벤더 슬러그 — **전환기 잔존물이다.**
-# 새 규약(`feature/<이슈>-<설명>` · `chore/<설명>` · `docs/<주제>`, 리드 결정 2026-08-27)에는
-# 벤더 신호가 없다. 그래서 이 폴백은 옛 이름으로 열린 PR 이 남아 있는 동안만 의미가 있고,
-# 그 뒤로는 아무것도 매칭하지 않는다 — **없앨 조건은 판정 가능하게 적어 둔다**:
-#
-#     gh pr list --state open --limit 200 --json headRefName \
-#       --jq '[.[] | select(.headRefName | test("^fix-[0-9]+-(claude|kimi|codex)$"))] | length'
-#
-# 이 값이 0 이고 원격에도 그런 이름의 브랜치가 없으면 `_BRANCH`·`branch-name` 경로를 통째로
-# 지운다. 지울 때 `identify_author` 의 세 갈래(commit-email · branch-name · none)가 둘로 줄고
-# `_identity_note` 의 branch-name 가지도 함께 없어진다.
-_BRANCH = re.compile(r"^fix-[0-9]+-(?P<vendor>claude|kimi|codex)\Z")
+
+# **브랜치명은 저자 근거가 아니다.** 옛 규약 `fix-<이슈>-<벤더>` 를 2순위 폴백으로 두던 자리는
+# 지웠다 (2026-09-14). PR 을 여는 쪽이 브랜치명을 100% 통제하므로 이름만 맞추면 아무나
+# 「에이전트 저자」로 읽혔고, 그 경로는 미상에만 걸리는 `author: human` 게이트를 타지 않았다 —
+# 즉 이 파일이 세운 「모르면 모른다」가 이름 하나로 우회됐다. 제거 시점에 옛 이름의 열린 PR·
+# 최근 머지 60건·원격 브랜치가 모두 0건인 것을 확인했다.
 
 
 def _read_risk(issue_risks):
@@ -83,7 +77,6 @@ def _identity_note(
     author_kind,
     author_models,
     identity_source,
-    branch_vendor,
     unknown_agentish,
     author_tier,
     claude_tiers_seen,
@@ -91,18 +84,9 @@ def _identity_note(
     """판정 코멘트에 `주의:` 로 실리는 사람 대상 신호 — 사실과 다르면 엉뚱한 곳을 고치러 간다."""
     parts = []
     if author_kind == "agent" and identity_source == "commit-email":
-        if branch_vendor and branch_vendor != author_models:
-            parts.append(
-                f"브랜치명({branch_vendor})과 커밋 신원({author_models}) 불일치 — §6.1 일관성 점검 실패, 커밋 신원 우선"
-            )
+        pass  # 신원이 읽혔고 어휘 안이다 — 사람에게 알릴 것이 없다
     elif author_kind == "mixed":
         parts.append("복수 에이전트 신원 혼재 — 리뷰어는 전 저자 모델 제외로 산출, 판정 라벨 미부착(사람 경로)")
-    elif identity_source == "branch-name":
-        parts.append(
-            "커밋에 에이전트 신원 없음 — 브랜치명 단독 판별 "
-            "(§6.1 디스패치 계약 미이행, 실수 방지 점검 요망. "
-            "라우팅·표기 전용 — 판정 라벨 미부착)"
-        )
     else:
         parts.append(
             "저자 신원 미상 — 커밋에 에이전트 신원이 없고 브랜치도 벤더를 선언하지 않는다. "
@@ -115,12 +99,7 @@ def _identity_note(
 
     # 티어 미상 주의는 claude 저자일 때만 의미가 있다 (폴백이 발동하면 라벨이 안 붙는다).
     if author_kind == "agent" and author_models == "claude" and not author_tier:
-        if identity_source == "branch-name":
-            parts.append(
-                "브랜치명 단독 판별이라 작성 티어를 알 수 없다 "
-                "(커밋에 claude 신원 자체가 없다) — 폴백 리뷰 시 판정 라벨 미부착"
-            )
-        elif len(claude_tiers_seen) > 1:
+        if len(claude_tiers_seen) > 1:
             parts.append(
                 f"claude 작성 티어 혼재({','.join(sorted(claude_tiers_seen))}) — "
                 "티어 미상 처리 (폴백 리뷰 시 판정 라벨 미부착)"
@@ -148,9 +127,6 @@ def identify_author(emails, head_ref):
         elif _AGENTISH.search(raw):
             unknown_agentish.append(raw)
 
-    bm = _BRANCH.match(head_ref or "")
-    branch_vendor = bm.group("vendor") if bm else None
-
     author_tier = None
     if len(claude_tiers_seen) == 1 and "unknown" not in claude_tiers_seen:
         author_tier = next(iter(claude_tiers_seen))
@@ -163,12 +139,6 @@ def identify_author(emails, head_ref):
         )
     elif len(vendors) > 1:
         author_kind, author_vendor, identity_source = "mixed", None, "commit-email"
-    elif branch_vendor:
-        author_kind, author_vendor, identity_source = (
-            "agent",
-            branch_vendor,
-            "branch-name",
-        )
     else:
         # **「모르면 사람」이 아니라 「모르면 모른다」** — 이 자리가 `human` 이던 동안,
         # 신원 설정을 빠뜨린 에이전트 PR 이 사람 저자로 읽혀 자기리뷰 차단을 통과했다.
@@ -178,11 +148,10 @@ def identify_author(emails, head_ref):
     return {
         "author_kind": author_kind,
         "author_vendor": author_vendor,
-        # 저자 표기 — 혼재는 벤더 목록, 브랜치명 단독 판별은 그 벤더 (커밋 신원이 없다)
+        # 저자 표기 — 혼재는 벤더 목록
         "author_models": ",".join(sorted(vendors)) or (author_vendor or ""),
         "author_tier": author_tier,
         "identity_source": identity_source,
-        "branch_vendor": branch_vendor,
         "unknown_agentish": unknown_agentish,
         "claude_tiers_seen": sorted(claude_tiers_seen),
         "vendors": sorted(vendors),
@@ -196,7 +165,6 @@ def decide(emails, head_ref, issue_risks, codex_on):
     author_models = identity["author_models"]
     author_tier = identity["author_tier"]
     identity_source = identity["identity_source"]
-    branch_vendor = identity["branch_vendor"]
     unknown_agentish = identity["unknown_agentish"]
     claude_tiers_seen = identity["claude_tiers_seen"]
     vendors = identity["vendors"]
@@ -243,7 +211,6 @@ def decide(emails, head_ref, issue_risks, codex_on):
             author_kind,
             author_models,
             identity_source,
-            branch_vendor,
             unknown_agentish,
             author_tier,
             claude_tiers_seen,
