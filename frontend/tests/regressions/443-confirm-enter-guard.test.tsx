@@ -9,8 +9,10 @@
 //
 // 증명하는 것: 확인창(type=confirm)에서 Enter 는 확인을 부르지 않는다. 알림창(type=alert)에서는
 // 종전대로 닫는다 — 편의를 잃지 않는다.
-// 증명하지 못하는 것: 실브라우저에서 초기 포커스가 취소에 놓이는지. jsdom 에는 `autofocus` 의
-// 브라우저 동작이 없어 **속성이 취소 버튼 쪽에 붙었는지**까지만 본다.
+//
+// **이 파일은 초기 포커스를 증명하지 못한다** — 포커스를 정하는 `Popup` 을 아래에서 스텁으로
+// 갈아끼우기 때문이다. 그 한계가 실제로 결함을 가렸다(독립 리뷰가 잡았다: 「그물은 초록인데
+// 결함은 살아 있는 상태다」). 포커스 축은 **스텁 없이** `443-confirm-initial-focus.test.tsx` 가 본다.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 
