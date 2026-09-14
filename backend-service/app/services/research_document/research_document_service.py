@@ -15,7 +15,7 @@ doc-search 로 넘겨 양쪽에서 fail-closed.
 """
 
 from core.auth_context import get_email, get_user_id, require_workspace_id
-from core.exceptions import BadGatewayError, NotFoundError
+from core.exceptions import BadGatewayError, HTTPError, NotFoundError
 from core.logger import logger
 from pydantic import ValidationError
 from schemas.research_document.research_document_schema import IngestResultIn
@@ -123,10 +123,35 @@ class ResearchDocumentService:
 
         # 외부 리소스를 먼저 회수하고 잡행은 마지막에 삭제한다 — 외부 삭제가 실패하면 예외가 전파돼
         # 잡행이 남으므로 재시도 가능(부분실패 안전). doc-search·file 삭제는 멱등에 가깝다.
-        await self.doc_search_client.delete_by_file(document["atch_file_id"], workspace_id)
-        await self.file_service.delete_file_detail(
-            {"atch_file_id": document["atch_file_id"], "file_sn": document["file_sn"]}
-        )
+        #
+        # **상류 실패를 도메인 예외로 바꾼다** (#441 B-24). `delete_by_file` 의 `raise_for_status()`
+        # 가 던지는 `httpx.HTTPStatusError` 는 도메인 예외가 아니라, 일반 핸들러가 「서버 내부
+        # 오류가 발생했습니다」 500 으로 뭉갠다 — 화면은 거기서 「잠시 후 다시 시도」로 떨어지는데
+        # 상류가 죽어 있으면 **다시 해도 안 된다**(실측: 세 번 다 500, 행은 그대로). 적재 경로는
+        # 이미 같은 자리를 `BadGatewayError` 로 바꾸고 있다 — 삭제 경로에만 그 층이 없었다.
+        try:
+            await self.doc_search_client.delete_by_file(document["atch_file_id"], workspace_id)
+        except HTTPError:
+            raise  # 우리가 만든 예외는 이미 한국어이고 다음 행동을 담고 있다
+        except Exception as exc:
+            logger.error("리서치 문서 색인 회수 실패 research_doc_id=%s: %r", args.get("research_doc_id"), exc)
+            raise BadGatewayError(
+                "문서 색인을 회수하지 못해 삭제를 멈췄습니다 — 문서는 그대로 남아 있습니다. "
+                "검색 서비스가 응답하면 다시 지울 수 있습니다."
+            ) from exc
+
+        try:
+            await self.file_service.delete_file_detail(
+                {"atch_file_id": document["atch_file_id"], "file_sn": document["file_sn"]}
+            )
+        except HTTPError:
+            raise
+        except Exception as exc:
+            logger.error("리서치 문서 파일 회수 실패 research_doc_id=%s: %r", args.get("research_doc_id"), exc)
+            raise BadGatewayError(
+                "문서 파일을 회수하지 못해 삭제를 멈췄습니다 — 문서는 그대로 남아 있습니다. "
+                "파일 저장소가 응답하면 다시 지울 수 있습니다."
+            ) from exc
         self.repository.delete_research_document(args)
 
     def _apply_status(
