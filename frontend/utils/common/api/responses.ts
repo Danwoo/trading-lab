@@ -6,6 +6,10 @@ import { Prisma } from "@/prisma/generated/client";
 import { convertPrismaErrorToValidation } from "@/lib/prisma/error";
 import { OPERATION_SUCCESS_STATUS_CODES, OPERATION_SUCCESS_MESSAGES, OPERATION_ERROR_MESSAGES } from "./constants";
 import { STREAM_FAILURE_HTTP_STATUS, type HttpStreamFailureCode } from "@/utils/common/errors/streamFailure";
+import type { ProxyFailureCode } from "@/utils/common/errors/proxyFailure";
+
+/** 타입을 붙여 둬야 철자가 어긋나는 순간 컴파일이 잡는다 — 코드가 어긋나면 문구가 조용히 사라진다. */
+const UPSTREAM_UNREACHABLE: ProxyFailureCode = "proxy.upstream_unreachable";
 
 export function createErrorResponse(error: any, operation: string) {
   const message = OPERATION_ERROR_MESSAGES[operation] || "처리 중 오류가 발생했습니다.";
@@ -64,8 +68,13 @@ export function createErrorResponse(error: any, operation: string) {
     // 마지막 폴백(「네트워크 연결을 확인해주세요」)으로 떨어져, **멀쩡한 자기 네트워크를**
     // 고치러 간다 (#435 B-3). 아는 것만 말하고, 확인할 수 있는 곳을 가리킨다.
     // 주소·포트는 싣지 않는다 — 내부 호스트는 화면에 낼 것이 아니다.
+    //
+    // **문구를 건네는 것은 `msg` 가 아니라 `code` 다.** 이 응답은 503 이고 `getApiErrorMessage`
+    // 의 5xx 차단은 서버가 쓴 문장을 통째로 버린다 — `msg` 만 고치면 화면에는 종전 문구가
+    // 그대로 남는다. 닫힌 집합의 코드로 건너가 받는 쪽이 자기 언어 표에서 고른다 (#342 · #423).
     return NextResponse.json(
       {
+        code: UPSTREAM_UNREACHABLE,
         detail: [
           {
             type: "upstream_unreachable",

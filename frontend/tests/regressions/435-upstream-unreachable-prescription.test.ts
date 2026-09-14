@@ -17,6 +17,8 @@ import { describe, expect, it } from "vitest";
 import { AxiosError, AxiosHeaders } from "axios";
 
 import { createErrorResponse } from "@/utils/common/api/responses";
+import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
+import { STATUS_MESSAGES } from "@/utils/common/locale/ko/apierrors";
 
 async function bodyOf(res: Response) {
   return (await res.json()) as { detail?: { msg?: string; type?: string }[]; message?: string };
@@ -27,6 +29,14 @@ function unreachable() {
   const err = new AxiosError("connect ECONNREFUSED 127.0.0.1:8100", "ECONNREFUSED");
   err.config = { headers: new AxiosHeaders() } as never;
   return err;
+}
+
+/**
+ * 응답을 **클라이언트가 받는 모양**으로 되돌린다 — 봉투를 만드는 쪽과 문구를 고르는 쪽 사이의
+ * 이음매를 실제로 건넌다. 봉투만 단언하면 그 이음매에서 문구가 버려져도 초록으로 남는다.
+ */
+async function asClientError(res: Response) {
+  return { response: { status: res.status, data: await res.json() } };
 }
 
 function answered(status: number) {
@@ -62,6 +72,28 @@ describe("연결이 안 된 것을 사용자 네트워크 탓으로 돌리지 �
 
   it("상태가 503 인 것은 그대로다 — 부른 쪽이 아니라 부름받은 쪽의 문제다", async () => {
     expect(createErrorResponse(unreachable(), "GET").status).toBe(503);
+  });
+
+  it("화면에 실제로 뜨는 문구가 서비스 상태·주소를 가리킨다", async () => {
+    const shown = getApiErrorMessage(await asClientError(createErrorResponse(unreachable(), "GET")));
+
+    expect(shown).toMatch(/떠 있는지|주소|포트/);
+    expect(shown).not.toBe(STATUS_MESSAGES[503]);
+    expect(shown).not.toMatch(/네트워크 연결을 확인/);
+  });
+
+  it("사유 코드가 빠지면 5xx 차단이 문구를 삼킨다 — 이 그물이 지키는 것이 그 코드다", async () => {
+    const res = createErrorResponse(unreachable(), "GET");
+    const { response } = await asClientError(res);
+    const { code: _dropped, ...withoutCode } = response.data as { code?: string };
+
+    expect(getApiErrorMessage({ response: { status: response.status, data: withoutCode } })).toBe(STATUS_MESSAGES[503]);
+  });
+
+  it("화면 문구에도 내부 호스트·포트가 실리지 않는다", async () => {
+    const shown = getApiErrorMessage(await asClientError(createErrorResponse(unreachable(), "GET")));
+
+    expect(shown).not.toMatch(/127\.0\.0\.1|localhost|:\d{4}|ECONNREFUSED/);
   });
 
   it("서버가 답한 오류는 종전대로 그 사유를 그대로 넘긴다 — 막는 범위가 넓어지지 않았다", async () => {
