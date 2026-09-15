@@ -38,6 +38,31 @@ Money = Annotated[float, AfterValidator(_reject_subunit)]
 _INPUT_BOUNDS = (Ge, Gt, Le, Lt)
 
 
+#: 이 함수가 출력용 쌍둥이로 옮기는 것 말고, 필드가 지고 다닐 수 있는 나머지. 하나라도 있으면
+#: 옮기지 못하므로 **만들다 멈춘다** — 조용히 떨어뜨리면 응답의 키 이름이나 문서가 달라진다.
+_UNCARRIED = (
+    "alias",
+    "validation_alias",
+    "serialization_alias",
+    "title",
+    "json_schema_extra",
+    "discriminator",
+    "deprecated",
+    "exclude",
+)
+
+
+def _reject_uncarried(model: type[BaseModel], field_name: str, info) -> None:
+    carried = {name: getattr(info, name, None) for name in _UNCARRIED}
+    present = sorted(name for name, value in carried.items() if value not in (None, False))
+    if present:
+        raise TypeError(
+            f"{model.__name__}.{field_name} 이 {', '.join(present)} 을 지고 있습니다 — "
+            "without_input_bounds 가 그것을 출력 모델로 옮기지 못합니다. "
+            "옮기는 목록(common_schema._UNCARRIED)을 넓히고 그물을 함께 고치세요."
+        )
+
+
 def without_input_bounds(model: type[BaseModel], name: str) -> type[BaseModel]:
     """상·하한을 뗀 출력용 베이스를 만든다.
 
@@ -49,6 +74,7 @@ def without_input_bounds(model: type[BaseModel], name: str) -> type[BaseModel]:
     """
     fields: dict[str, Any] = {}
     for field_name, info in model.model_fields.items():
+        _reject_uncarried(model, field_name, info)
         kept = [m for m in info.metadata if not isinstance(m, _INPUT_BOUNDS)]
         annotation = Annotated[tuple([info.annotation, *kept])] if kept else info.annotation
         options: dict[str, Any] = {"description": info.description, "examples": info.examples}

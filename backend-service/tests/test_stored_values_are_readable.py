@@ -103,9 +103,30 @@ def behavioral_check() -> list[str]:
     return failures
 
 
+def guard_check() -> list[str]:
+    """옮기지 못하는 속성을 만나면 **만들다 멈추는가.**
+
+    `without_input_bounds` 는 필드를 다시 만든다. 옮기는 목록 밖의 속성(alias·title·
+    json_schema_extra …)을 조용히 떨어뜨리면 응답의 키 이름이나 문서가 달라지는데, 그것은
+    어느 그물에도 안 걸린다 — 모델은 멀쩡히 만들어지기 때문이다.
+    """
+    from pydantic import Field  # noqa: PLC0415
+    from schemas.common_schema import TrimmedBaseModel, without_input_bounds  # noqa: PLC0415
+
+    class WithAlias(TrimmedBaseModel):
+        x: int | None = Field(None, le=10, alias="엑스")
+
+    try:
+        without_input_bounds(WithAlias, "WithAliasStored")
+    except TypeError:
+        print("옮기지 못하는 속성 1건 — 만들다 멈춘다")
+        return []
+    return ["alias 를 지고 있는 필드를 조용히 옮겼다 — 응답 키가 달라진다"]
+
+
 def main() -> int:
     checked, bounded = structural_check()
-    failures = behavioral_check() if checked else []
+    failures = (behavioral_check() + guard_check()) if checked else []
 
     if not checked:
         for line in bounded:
