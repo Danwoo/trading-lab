@@ -42,13 +42,22 @@ def how_to_fix() -> str:
     )
 
 
+#: DB 에 못 닿을 때 붙이는 처방 한 줄 — 레포가 이미 가진 진단기를 가리킨다 (#452 A-3).
+DB_UNREACHABLE_HINT = "로컬이면 DB 좌표가 낡았을 수 있다: python3 scripts/bootstrap_local_env.py"
+
+
 def read_session_timezone(engine: Engine) -> str:
     """세션 타임존 한 값. 읽지 못하면 통과가 아니라 실패다(fail-closed)."""
     try:
         with engine.connect() as connection:
             value = connection.execute(text("SELECT current_setting('TimeZone')")).scalar()
     except SQLAlchemyError as exc:
-        raise SessionTimezoneError(f"세션 타임존을 읽지 못했다 ({type(exc).__name__}) — DB 에 닿지 못한다") from exc
+        # 기동이 여기서 죽으면 사용자가 보는 것은 SQLAlchemy 트레이스백뿐이다 — 그 문제를
+        # 아는 도구를 가리킨다. `.env.development` 는 gitignored 라 레포가 포트를 옮겨도
+        # 낡은 채 남는다 (#452 A-3).
+        raise SessionTimezoneError(
+            f"세션 타임존을 읽지 못했다 ({type(exc).__name__}) — DB 에 닿지 못한다. " + DB_UNREACHABLE_HINT
+        ) from exc
     if not value:
         raise SessionTimezoneError("세션 타임존이 비어 있다 — 값을 읽지 못했다")
     return str(value)

@@ -32,6 +32,7 @@ import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import { ProductStages } from "@/components/features/Bench/ProductStages";
 import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
 import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
+import { omittedStrategyNotice } from "@/lib/bench/omittedStrategies";
 
 /** 좁은 화면에서 하나씩 보여주는 둘 (§21.6 「보드가 먼저 양보한다」) */
 const TABBED_ZONE_IDS = ["grid", "curve"] as const;
@@ -175,7 +176,10 @@ export default function Page() {
       <SelectionLine selection={selection} kind="curve-point" />
       {activeReport !== null && (
         <div className="flex min-w-0 flex-col gap-1">
-          <RunReportView report={activeReport} />
+          <RunReportView
+            report={activeReport}
+            omittedNotice={activeReport.run.bot_id === runForm.botId ? omittedStrategyNotice(runForm.botDetail) : null}
+          />
           {board.lastReportMs !== null && (
             <p className="break-keep text-2xs text-ink-muted">{reportTimingLine(board.lastReportMs)}</p>
           )}

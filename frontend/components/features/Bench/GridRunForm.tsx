@@ -10,6 +10,7 @@ import { STEPS_MAX, STEPS_MIN } from "@/lib/bench/sweep";
 import type { BacktestGridIn } from "@/schemas/backtest/backtest";
 import type { BotOut } from "@/schemas/bot/bot";
 import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
+import { omittedStrategyNotice } from "@/lib/bench/omittedStrategies";
 
 // bar 라우터가 받는 시장 목록과 같다 (backend-service/app/routers/bar/bar_router.py).
 // 문자열 배열로 넘긴다 — `SelectBox` 는 문자열 항목을 값이자 표시로 읽으므로 `displayExpr`/`valueExpr`
@@ -38,6 +39,7 @@ export function GridRunForm({
   onRun: (input: BacktestGridIn) => void;
 }) {
   const { strategy, axes, form, formError, botDetailError, comboCount } = controller;
+  const omittedNotice = omittedStrategyNotice(controller.botDetail);
   // 격자 실행도 `require_role` 이 걸린 쓰기다 (`POST /backtest-run/grid`) — 누르기 전에 막는다 (#341).
   const writeAccess = useWriteAccess();
 
@@ -113,6 +115,14 @@ export function GridRunForm({
       {botDetailError && (
         <p role="alert" className="break-keep text-sm text-ink">
           {botDetailError}
+        </p>
+      )}
+
+      {/* 격자는 첫 전략 하나만 훑는다. 그 사실을 **돌리기 전에** 말한다 — 돌린 뒤에 알면
+          이미 그 봇의 이름 아래 남의 성과가 놓인 뒤다 (#401). */}
+      {omittedNotice && (
+        <p role="alert" className="break-keep border border-caution p-2 text-sm text-ink">
+          {omittedNotice}
         </p>
       )}
 

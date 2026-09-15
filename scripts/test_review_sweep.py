@@ -20,6 +20,7 @@ run conclusion 에 둔 것이었다. 그래서 여기서 축을 못박는다:
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -57,6 +58,28 @@ def run(status="completed", conclusion="success", attempt=1, annotations=None, l
     return {"id": 1, "status": status, "conclusion": conclusion, "run_attempt": attempt, "jobs": [job]}
 
 
+def arm_in(**over):
+    """`review_record.decide_arm` 이 **arm 이라고 답하는** 입력. 기본값이 통과 케이스다."""
+    base = {
+        "head_sha": HEAD,
+        "marker_sha": HEAD,
+        "marker_model": "kimi",
+        "marker_tier": None,
+        "verdict": "merge_ok",
+        "manual": False,
+        "reviews": [{"user_login": "github-actions[bot]", "state": "APPROVED", "commit_id": HEAD}],
+        "pr_author_login": "Danwoo",
+        "pr_author_is_bot": False,
+        "pr_title": "fix: 무언가 고친다 — #1",
+        "head_ref": "fix-1-claude",
+        "issue_refs": [{"number": 1, "is_pr": False, "labels": ["risk: low"]}],
+        "dropped_refs": [],
+        "commit_author_emails": ["claude-opus-agent@noreply.local"],
+    }
+    base.update(over)
+    return base
+
+
 def pr(**over):
     base = {
         "number": 1,
@@ -67,15 +90,98 @@ def pr(**over):
         "labels": ["review: passed"],
         "comments": [comment(marker())],
         "review_runs": [run()],
+        "arm_input": arm_in(),
     }
     base.update(over)
     return base
 
 
+# ── arm 입력이 판정부가 요구하는 **전부**인가 ────────────────────────────────
+#
+# 일부만 모으면 판정부는 빠진 축을 「없음」으로 읽고 늘 같은 쪽으로 기운다. 실측(리뷰 지적):
+# `author: human` 라벨 입력 셋을 빠뜨렸더니 사람이 연 PR 은 라벨이 붙어 있어도 영영 `rearm` 이
+# 안 나고 사유는 「라벨 없음」이라는 거짓이었다. 케이스로는 안 잡힌다 — **키 집합**을 본다.
+WORKFLOW = Path(__file__).resolve().parents[1] / ".github/workflows/cross-review.yml"
+
+
+def workflow_arm_keys() -> set[str]:
+    """워크플로의 arm 스텝이 판정부에 넘기는 jq 객체의 키 — 그것이 계약이다."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    start = text.index("ARM=$(jq -n")
+    end = text.index('review_record.py" arm)', start)
+    return set(re.findall(r"(\w+):\s*[\$(]", text[start:end]))
+
+
+def fake_gh(args):
+    """`arm_input` 이 부르는 조회를 전부 성공으로 흉내 낸다 — 모양만 본다."""
+    path = args[1] if len(args) > 1 else ""
+    if "/reviews" in path:
+        return 0, "[]"
+    if "/commits" in path:
+        return 0, '["a@example.com"]'
+    if "/timeline" in path:
+        return 0, "[]"
+    if "/permission" in path:
+        return 0, "admin"
+    if "/issues/" in path:
+        return 0, '{"number": 1, "is_pr": false, "labels": []}'
+    return 1, ""
+
+
+def arm_input_keys() -> set[str]:
+    real_gh = sweep._gh
+    sweep._gh = fake_gh
+    try:
+        built = sweep.arm_input(
+            "owner/repo",
+            {
+                "number": 1,
+                "headRefOid": HEAD,
+                "title": "fix: x — #1",
+                "body": "closes #1",
+                "author": {"login": "someone", "is_bot": False},
+                "headRefName": "fix-1-claude",
+                "labels": [{"name": sweep.HUMAN_LABEL}],
+            },
+            [],
+            {"sha": HEAD, "verdict": "merge_ok", "model": "kimi", "tier": None, "manual": False},
+        )
+    finally:
+        sweep._gh = real_gh
+    return set(built)
+
+
 # (설명, PR, 기대 kind, 기대 frozen 또는 None)
 CASES: list[tuple[str, dict, str, bool | None]] = [
     ("마커 있음 + 라벨 맞음 + arm 됨 → 무행동", pr(auto_merge=True), "none", None),
-    ("마커 merge_ok 인데 arm 안 됨 → rearm", pr(), "rearm", None),
+    ("마커 merge_ok + 판정부도 arm 인데 안 걸림 → rearm", pr(), "rearm", None),
+    # 실물(PR #492 — dependabot 의 nodemailer major)에서 이 파일이 `rearm` 을 내고 있었다.
+    # 손으로 따르면 사람 대기열을 건너뛰고 major 가 자동 머지된다.
+    (
+        "판정부가 거부한다(봇 major 상승) → rearm 을 내지 않는다",
+        pr(
+            arm_input=arm_in(
+                pr_author_login="app/dependabot",
+                pr_author_is_bot=True,
+                pr_title="build(deps): bump nodemailer from 9.1.1 to 10.0.3 in /frontend",
+                issue_refs=[],
+            )
+        ),
+        "none",
+        None,
+    ),
+    (
+        "판정부가 거부한다(현재 head 봇 승인 없음) → rearm 을 내지 않는다",
+        pr(arm_input=arm_in(reviews=[])),
+        "none",
+        None,
+    ),
+    (
+        "arm 판정 입력을 못 모았다 → rearm 을 내지 않는다 (fail-closed)",
+        pr(arm_input=None),
+        "none",
+        None,
+    ),
     (
         "마커 needs_changes 인데 라벨이 passed → relabel",
         pr(comments=[comment(marker(verdict="needs_changes"))]),
@@ -251,6 +357,28 @@ def main() -> int:
     if batch["scanned"] != 2 or batch["counts"].get("rearm") != 1:
         failures.append(f"묶음 판정이 어긋난다: {batch['counts']}")
 
+    # arm 판정을 **정말 판정부에 묻는지** — 거부 사유가 그대로 실려 나와야 한다.
+    refused = sweep.decide_pr(
+        pr(
+            arm_input=arm_in(
+                pr_author_login="app/dependabot",
+                pr_author_is_bot=True,
+                pr_title="build(deps): bump nodemailer from 9.1.1 to 10.0.3 in /frontend",
+                issue_refs=[],
+            )
+        )
+    )
+    if "major" not in (refused.get("reason") or ""):
+        failures.append(f"거부 사유가 판정부의 말이 아니다: {refused.get('reason')!r}")
+
+    # arm 입력 키가 워크플로의 계약과 같아야 한다 — 빠진 키는 판정부에서 「없음」이 된다
+    wanted = workflow_arm_keys()
+    built = arm_input_keys()
+    if not wanted:
+        failures.append("워크플로에서 arm 입력 키를 못 읽었다 — 대조할 것이 없다 (fail-closed)")
+    elif not wanted <= built:
+        failures.append(f"arm 입력에 빠진 키: {sorted(wanted - built)}")
+
     # 라벨 표는 cross-review 의 라벨 스텝과 같아야 한다 — 갈리면 쓸어담기가 매번 relabel 한다
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/cross-review.yml").read_text(encoding="utf-8")
     for verdict, label in sweep.VERDICT_LABEL.items():
@@ -259,7 +387,7 @@ def main() -> int:
 
     print(
         f"쓸어담기 케이스 {len(CASES)}건 + 수집 {len(COLLECT_CASES)}건 + 이음 2건 "
-        f"+ 묶음 2건 + 라벨 표 {len(sweep.VERDICT_LABEL)}건 검사"
+        f"+ 묶음 3건 + arm 입력 키 {len(workflow_arm_keys())}건 + 라벨 표 {len(sweep.VERDICT_LABEL)}건 검사"
     )
     for line in failures:
         print(f"::error::{line}")

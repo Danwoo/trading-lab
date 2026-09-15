@@ -77,6 +77,10 @@ def code_head_revision(alembic_dir: Path = ALEMBIC_DIR) -> tuple[str, set[str]]:
     return heads[0], {revision.revision for revision in script.walk_revisions()}
 
 
+#: DB 에 못 닿을 때 붙이는 처방 한 줄 — 레포가 이미 가진 진단기를 가리킨다 (#452 A-3).
+DB_UNREACHABLE_HINT = "로컬이면 DB 좌표가 낡았을 수 있다: python3 scripts/bootstrap_local_env.py"
+
+
 def db_revision(engine: Engine, table: str) -> str | None:
     """DB 에 적용된 리비전. 한 번도 적용된 적이 없으면 None, 읽지 못하면 SchemaVersionError."""
     try:
@@ -86,7 +90,7 @@ def db_revision(engine: Engine, table: str) -> str | None:
     except SQLAlchemyError as exc:
         raise SchemaVersionError(
             f"DB 의 {table} 을 읽지 못했다 ({type(exc).__name__}) — 마이그레이션이 한 번도 적용되지 않았거나 "
-            "DB 에 닿지 못한다"
+            "DB 에 닿지 못한다. " + DB_UNREACHABLE_HINT
         ) from exc
     if not rows:
         return None

@@ -51,6 +51,9 @@ def main() -> int:
             present = connection.execute(sa.text("SELECT to_regclass('frontend.tn_user') IS NOT NULL")).scalar()
     except sa.exc.SQLAlchemyError as exc:
         print(f"frontend 스키마 유무를 확인하지 못했다 ({type(exc).__name__}) — DB 에 닿지 못한다", file=sys.stderr)
+        # 이 클론의 DB 좌표가 낡았을 때가 대부분이다 — `.env.development` 는 gitignored 라 레포가
+        # 포트를 옮겨도(#294 의 5432 → 5442) 그대로 남는다. 찾아 주는 도구를 가리킨다 (#452 A-3).
+        print("  로컬 DB 좌표가 낡았을 수 있습니다: python3 scripts/bootstrap_local_env.py", file=sys.stderr)
         return 2
     finally:
         engine.dispose()
