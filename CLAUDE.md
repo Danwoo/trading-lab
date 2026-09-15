@@ -95,7 +95,20 @@ cd <backend>/app && APP_ENV=development uv run uvicorn main:app --reload
 
 # dev 멀티서비스 일괄 기동 (각 backend working_dir=<svc>/app + APP_ENV=development 주입, 통합 앱 :8000)
 process-compose up        # staging+ 는 docker-compose (compose.staging.yaml + 환경별 prod compose)
+process-compose up -t=false          # TTY 가 없는 자리(에이전트 셸·CI)에서는 TUI 를 끈다
+process-compose up -p 8081           # 관리 API 기본 포트 8080 이 다른 프로젝트와 겹칠 때
 ```
+
+**기동이 한 번에 안 될 때** (#452):
+
+- 「`Conflict. The container name /fintech-pg is already in use`」 — 죽은 채 이름만 잡고 있는
+  컨테이너다. `postgres` 프로세스가 `scripts/reclaim_dead_container.sh` 로 **죽은 것만** 걷어낸다.
+  돌고 있는 것은 안 지운다(남의 것일 수 있다 — 아래 #308 규율과 같은 이유).
+- 「DB 에 닿지 못한다」 — 이 클론의 `.env.development` 가 낡았을 수 있다. gitignored 라 레포가
+  포트를 옮겨도 그대로 남는다: `python3 scripts/bootstrap_local_env.py` 가 어긋난 값을 찾아 준다
+  (찾기만 하고 고치지는 않는다).
+- **`Skipped` 는 원인을 고쳐도 자동으로 안 돌아온다.** 의존이 살아난 뒤 전체를 내렸다가 다시
+  올린다.
 
 ---
 
@@ -157,6 +170,10 @@ process-compose up        # staging+ 는 docker-compose (compose.staging.yaml + 
 - 사람의 로컬 체크아웃(이 저장소의 작업 트리)에 있는 파일을 main 의 현재 상태라고 가정하지 않는다 — 작업 트리는 자동으로 갱신되지 않아 origin 보다 뒤처져 있을 수 있다.
 - main 기준 판단·대조가 필요하면 `git fetch` 후 `git show origin/main:<경로>` 로 읽거나, origin/main 을 base 로 만든 전용 워크트리에서 읽는다. (`git fetch` 는 원격 참조만 갱신하므로 안전하다)
 - 사람의 작업 트리를 `pull`·`checkout` 등으로 임의 갱신하지 않는다 — 작업 중 상태는 사람의 것이다.
+- **레포 안에 남은 워크트리 사본이 `grep -rn` 을 오염시킨다.** `.claude/worktrees/` 에 끝난
+  작업의 워크트리가 남아 있으면 레포 전체 사본이 되어, 재귀 검색이 **낡은 사본을 먼저 잡는다**
+  (실측 2회: `.env.example` 이 옛 포트로 보였고, `origin/main` 에 있는 함수가 「0건」으로 보였다).
+  전수 검색으로 「없다」를 주장하기 전에 `git grep … origin/main` 처럼 **리비전을 명시해** 다시 센다.
 - 이유: 낡은 체크아웃(origin 대비 11 커밋 뒤)의 ci.yml 을 읽고 틀린 결론을 낼 뻔한 실사례가 있다. 에이전트가 읽는 코드의 기준 리비전은 항상 명시적이어야 한다.
 
 ---

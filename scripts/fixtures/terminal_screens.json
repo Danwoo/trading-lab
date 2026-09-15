@@ -322,6 +322,41 @@
    "tail": [
     "tjeksdn1@localhost:~/orca/workspaces/trading-lab/t2probe-kimi$"
    ]
+  },
+  {
+   "name": "codex-box-unrecognized",
+   "agent": "codex",
+   "captured_from": "orca terminal read (review-497-codex, 2026-09-15)",
+   "latestCursor": "47",
+   "needle": "이 파일을 읽고 그대로 완주하라",
+   "note": "codex v0.154.0 의 갓 뜬 화면 — **지금 판정부는 이 상자를 못 알아본다. 그 사실을 기록해 둔다(기대값이 곧 결함이다).** 상자 글리프가 `›`(U+203A)이고, Orca 터미널 API 는 그것을 바로 앞 경고 줄 **꼬리에 붙여서** 준다(사람 터미널에서는 따로 보인다). 판정부의 캐럿은 `❯`·`>` 이고 「줄 맨 앞」만 보므로 `ready=False` 가 되고, codex 홉은 매번 `TUI 준비 실패(60s)` 로 죽는다. **고치지 않은 이유**: 이 판정부는 준비뿐 아니라 접수·제출까지 가르는 공용 함수라, 「줄 중간의 캐럿」을 열면 레포 실제 문자열(`시스템관리 › 권한관리`, `DataTablePager` 의 단독 `›`)이 상자로 오인된다 — 실제로 그렇게 짰다가 리뷰가 차단급으로 잡았다. 고치려면 판정을 **에이전트별로** 갈라야 하고 그건 별개 변경이다. 덧붙여 codex 는 2026-09-17 까지 한도 소진이라 지금은 프로브가 9초에 걸러 낸다. 픽스처 11건이 claude·kimi·맨 셸뿐이라 이 화면을 아무도 못 봤다는 것이 뿌리다.",
+   "expect": {
+    "ready": false,
+    "pending": false,
+    "accepted": false
+   },
+   "tail": [
+    "⚠ Skipped loading 1 skill(s) due to invalid SKILL.md files.",
+    "",
+    "⚠ /home/tjeksdn1/.agents/skills/security-audit/SKILL.md: failed to read file: No such file or directory (os error 2)    › .............   gpt-5.6-terra default · ~/orca/workspaces/trading-lab/review-497-codex",
+    "╭────────────────────────────────────────────────────╮",
+    "│ >_ OpenAI Codex (v0.154.0)                         │",
+    "│                                                    │",
+    "│ model:       gpt-5.6-terra   /model to change      │",
+    "│ directory:   ~/orca/…/trading-lab/review-497-codex │",
+    "│ permissions: YOLO mode                             │",
+    "╰────────────────────────────────────────────────────╯",
+    "",
+    "  Tip: New For a limited time, Codex is included in your plan for free – let’s build together.",
+    "",
+    "⚠ 1 MCP startup issue (1 needs sign-in) · ctrl + t for details",
+    "",
+    "⚠ Heads up, you have less than 5% of your monthly limit left. Run /status for a breakdown.",
+    "",
+    "⚠ Skipped loading 1 skill(s) due to invalid SKILL.md files.",
+    "",
+    "⚠ /home/tjeksdn1/.agents/skills/security-audit/SKILL.md: failed to read file: No such file or directory (os error 2)  › .............   gpt-5.6-terra default · ~/orca/workspaces/trading-lab/review-497-codex"
+   ]
   }
  ],
  "cursor_sequences": [

@@ -1062,6 +1062,19 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_review_sweep.py
 
+      # 리뷰어 한도 판별 문구가 **지금 벤더가 쓰는 말**을 잡는가 — 이 판별이 조용히 낡으면
+      # 사전 프로브가 소진된 리뷰어를 못 걸러 리뷰 상한(수십 분)을 통째로 태운다 (실측: 40분
+      # 중 33분). 문구는 벤더가 바꾼다.
+      - name: 리뷰어 한도 문구 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_rate_limit_phrases.py
+      # 죽은 컨테이너만 걷어내는가 (#452 A-1) — 이름이 같다고 **돌고 있는 것을 지우면** 남의
+      # 스택을 죽인다. 종전 `fuser -k` 가 포트로 같은 실수를 해 다른 프로젝트 컨테이너를
+      # 죽인 적이 있다(#308). 도커 없이 판단만 본다 — 가짜 도커를 끼운다.
+      - name: 죽은 컨테이너 회수 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_reclaim_dead_container.py
+
       # 부트스트랩의 「직접 채워야 하는 키」 판정 (#407 F23) — 비워 두는 것이 정답인 키를
       # 채우라고 시키면 경로를 짐작해 넣어 오히려 틀린다. `.env.example` 주석 표식이 갈림이다.
       - name: 부트스트랩 수동 키 판정 검사

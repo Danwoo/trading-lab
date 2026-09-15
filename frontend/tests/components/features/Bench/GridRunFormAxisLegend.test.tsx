@@ -35,6 +35,7 @@ function renderForm(axes: GridRunFormController["axes"]) {
   const controller: GridRunFormController = {
     botId: 1,
     strategy: STRATEGY,
+    botDetail: null,
     botDetailError: null,
     form: {
       market: "KOSPI",
