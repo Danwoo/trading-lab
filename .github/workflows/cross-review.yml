@@ -842,12 +842,12 @@ jobs:
           # 한 후보에게 남겨야 하는 최소 시간 — **첫 판정 확인에 닿기까지의 최악 경로**를 더한다.
           # 이보다 적게 남았는데 디스패치하면 워크트리를 만들어 놓고 폴링을 한 바퀴도 못 돈 채
           # 타임아웃해 고아만 남는다 — 회수기가 없으므로 그 고아는 사람이 치워야 한다.
-          #   사전 프로브 PROBE_TIMEOUT · 에이전트 핸들 취득 READY_TIMEOUT · 워크트리 경로 폴링
+          #   사전 프로브 PROBE_TIMEOUT**×2**(딸꾹질 방어로 한 번 다시 묻는다) · 에이전트 핸들 취득 READY_TIMEOUT · 워크트리 경로 폴링
           #   WT_PATH_TIMEOUT · TUI 준비 READY_TIMEOUT · 지시 도착·제출 확인 SEND_VERIFY_TIMEOUT×2 ·
-          #   첫 폴링까지의 대기 ORCA_POLL_FIRST  (기본값 합 = 550초)
+          #   첫 폴링까지의 대기 ORCA_POLL_FIRST  (기본값 합 = 610초)
           # 이 문턱이 보장하는 것은 **첫 확인에 닿는 것까지**다 — 리뷰가 끝나는 것까지는 아니다
           # (관측된 리뷰 최소 312초). 그 위는 체인 예산과 ORCA_TIMEOUT 이 맡는다.
-          MIN_SLICE="${REVIEW_MIN_SLICE_SECS:-$(( PROBE_TIMEOUT + READY_TIMEOUT + WT_PATH_TIMEOUT + READY_TIMEOUT + 2 * SEND_VERIFY_TIMEOUT + ORCA_POLL_FIRST ))}"
+          MIN_SLICE="${REVIEW_MIN_SLICE_SECS:-$(( 2 * PROBE_TIMEOUT + READY_TIMEOUT + WT_PATH_TIMEOUT + READY_TIMEOUT + 2 * SEND_VERIFY_TIMEOUT + ORCA_POLL_FIRST ))}"
           # 체인 전체 예산 — 잡 timeout-minutes(100=6000s)보다 작게 잡아 스스로 끝낸다.
           # 러너가 잡을 죽이면 정규화·업로드가 스킵되어 확정 상태를 못 쓴다 (= pending 정체).
           CHAIN_BUDGET="${REVIEW_CHAIN_BUDGET_SECS:-5400}"
@@ -869,13 +869,24 @@ jobs:
           #        Error: [provider.api_error] 403 You've reached your usage limit for this billing cycle. Your quota will be refreshed
           #      in the next cycle. To continue now, purchase extra usage or upgrade your plan: ...
           #     TUI 는 403 뒤에도 살아 있다(status=running) — 그래서 폴링만으로는 못 잡는다.
+          #   kimi 0.36.1 `kimi -p`  exit 1 / stderr (2026-09-15 실측 — **문구가 바뀌었다**):
+          #     error: failed to run prompt: provider.auth_error: 403 You've reached your weekly
+          #     (7-day) usage limit. Your quota will reset when the current 7-day window ends. ...
+          #     ⚠ 종전 패턴 `you'?ve (reached|hit) your usage limit` 은 **이 문장을 놓친다** —
+          #     `your` 와 `usage limit` 사이에 `weekly (7-day) ` 가 끼었다. 그래서 사전 프로브가
+          #     한도를 확증하지 못하고, 소진된 리뷰어에 **상한 전부를 태웠다**(실측: PR #501
+          #     리뷰 40분 중 kimi 32분 — 실제로 판정을 낸 claude 는 6분 29초였다).
+          #     문구는 또 바뀐다. `scripts/test_rate_limit_phrases.py` 가 이 패턴을 여기서 읽어
+          #     기록된 원문들에 대 본다 — 벤더가 말을 바꾸면 그 그물이 먼저 빨개진다.
           #   아포스트로피는 ASCII 0x27 실측(hexdump) — 유니코드 U+2019 아님.
           #   대조군(한도 아님 → 미매치 실측): codex "Not inside a trusted directory ..." / 정상 exit 0.
           #
           # **stderr 만 본다** — stdout 은 모델이 쓴 본문이고 PR diff 인용이 들어간다.
           is_rate_limited() {
             [ "$1" -ne 0 ] || return 1   # 성공 종료(exit 0)는 한도가 아니다
-            grep -qiE "you'?ve (reached|hit) your usage limit|usage limit for this billing cycle" "$2"
+            # `your` 와 `usage limit` 사이에 벤더가 수식어를 끼운다 — 그 자리를 비워 둔다.
+            # 마침표를 못 넘게 해(`[^.]*`) 문장을 건너뛰며 엉뚱하게 걸리지 않는다.
+            grep -qiE "you'?ve (reached|hit) your [^.]*usage limit|usage limit for this billing cycle|quota will (be refreshed|reset)" "$2"
           }
           # 일시적 실패 — 재시도할 가치가 있는 것. 종료 코드가 1순위 근거다:
           #   124=timeout(1) · 137=SIGKILL · 143=SIGTERM · 125=timeout 자체 실패
@@ -906,16 +917,28 @@ jobs:
           # 깨끗한 채널(stderr)로 한도를 **확증**한다. 0=한도 확증 / 1=한도 아님.
           # 한도 이외의 실패(네트워크·인증 등)는 1 로 돌려준다 — 프로브가 폴백의 근거가 되는 것은
           # 오직 "한도 확증" 뿐이다 (fail-open: 프로브가 애매하면 정상 실행으로 넘어간다).
-          probe_limit() {   # $1=모델
-            local m="$1" rc=0
+          #: 그 후보가 **지금 일할 수 있는가** — 실제 CLI 한 번. rc 를 `PROBE_RC` 로 남긴다.
+          #: 한도인지 아닌지는 여기서 안 가른다 (그건 `is_rate_limited` 가 사유를 붙일 때 본다).
+          probe_ok() {   # $1=모델 → 0=쓸 수 있다
+            probe_run "$1"
+            [ "$PROBE_RC" -eq 0 ]
+          }
+
+          probe_run() {   # $1=모델 → PROBE_RC 설정 · probe.err 기록
+            local m="$1"
+            PROBE_RC=0
             : > probe.err
             case "$m" in
-              kimi)   timeout -k 5 "$PROBE_TIMEOUT" kimi   -p "ping" < /dev/null > /dev/null 2> probe.err || rc=$? ;;
-              claude) timeout -k 5 "$PROBE_TIMEOUT" claude -p "ping" --disallowedTools "Bash,Write,Edit,WebFetch,WebSearch" < /dev/null > /dev/null 2> probe.err || rc=$? ;;
-              codex)  timeout -k 5 "$PROBE_TIMEOUT" codex exec --skip-git-repo-check --sandbox read-only "ping" < /dev/null > /dev/null 2> probe.err || rc=$? ;;
-              *) return 1 ;;
+              kimi)   timeout -k 5 "$PROBE_TIMEOUT" kimi   -p "ping" < /dev/null > /dev/null 2> probe.err || PROBE_RC=$? ;;
+              claude) timeout -k 5 "$PROBE_TIMEOUT" claude -p "ping" --disallowedTools "Bash,Write,Edit,WebFetch,WebSearch" < /dev/null > /dev/null 2> probe.err || PROBE_RC=$? ;;
+              codex)  timeout -k 5 "$PROBE_TIMEOUT" codex exec --skip-git-repo-check --sandbox read-only "ping" < /dev/null > /dev/null 2> probe.err || PROBE_RC=$? ;;
+              *) PROBE_RC=127 ;;
             esac
-            is_rate_limited "$rc" probe.err
+          }
+
+          probe_limit() {   # $1=모델 → 0=한도로 확증됨 (폴링 중 확증용)
+            probe_run "$1"
+            is_rate_limited "$PROBE_RC" probe.err
           }
 
           # ── 리뷰 1회 상한: **입력 크기에 비례해 계산한다** (고정값 → 크기 비례, 2026-07-29) ──
@@ -1548,11 +1571,24 @@ jobs:
               echo "체인 예산(${CHAIN_BUDGET}s) 소진 — 남은 $(remaining)s < 한 홉 최소 ${MIN_SLICE}s" > err.txt
               echo "::warning::체인 예산(${CHAIN_BUDGET}s) 소진 — ${m} 시도 중단 (남은 $(remaining)s < 한 홉 최소 ${MIN_SLICE}s)"; return 30
             fi
-            # ③ 사전 프로브 — 이미 소진됐으면 디스패치 없이 즉시 다음 홉 (폴링 창 낭비 0)
-            if probe_limit "$m"; then
-              cp probe.err err.txt
-              echo "::warning::[사전 프로브/${m}] 한도 확증 — 디스패치 생략, 즉시 다음 홉 (stderr: $(head -c 200 probe.err | tr '\n' ' '))"
-              return 10
+            # ③ 사전 프로브 — **이 후보가 지금 일할 수 있는가**를 실제 CLI 한 번으로 묻는다.
+            #
+            # 종전에는 「한도 문구가 매치될 때만」 건너뛰었다. 그래서 벤더가 문구를 바꾸면
+            # (2026-09-15 kimi 0.36.1 이 그랬다) 소진된 리뷰어에 리뷰 상한 전부를 태웠다 —
+            # 40분 중 32분. **문구를 몰라도 판정은 서야 한다**: 프로브가 성공하지 못했다면
+            # 그 후보는 지금 못 쓴다. 문구는 이제 **사유를 이름 붙이는 데만** 쓴다.
+            #
+            # 한 번 실패는 일시적 딸꾹질일 수 있으므로 **한 번만 다시 묻는다**(각 2.5초).
+            if ! probe_ok "$m"; then
+              if ! probe_ok "$m"; then
+                cp probe.err err.txt
+                if is_rate_limited "$PROBE_RC" probe.err; then
+                  echo "::warning::[사전 프로브/${m}] 한도 확증 — 디스패치 생략, 즉시 다음 홉 (stderr: $(head -c 200 probe.err | tr '\n' ' '))"
+                  return 10
+                fi
+                echo "::warning::[사전 프로브/${m}] 지금 쓸 수 없다(rc=${PROBE_RC}, 2회 연속) — 디스패치 생략, 즉시 다음 홉. **한도 문구는 아니다** (stderr: $(head -c 200 probe.err | tr '\n' ' '))"
+                return 21
+              fi
             fi
             # 「배정」이라고 적는다 — 이 시점엔 아직 안 떴다. 실제로 뜬 티어는 기동 배너를 읽어
             # 아래에서 따로 남긴다 (`리뷰어 티어 확인:`).
