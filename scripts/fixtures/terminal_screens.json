@@ -322,6 +322,41 @@
    "tail": [
     "tjeksdn1@localhost:~/orca/workspaces/trading-lab/t2probe-kimi$"
    ]
+  },
+  {
+   "name": "codex-idle",
+   "agent": "codex",
+   "captured_from": "orca terminal read (review-497-codex, 2026-09-15)",
+   "latestCursor": "47",
+   "needle": "이 파일을 읽고 그대로 완주하라",
+   "note": "codex v0.154.0 의 갓 뜬 화면. **상자 글리프가 `›`(U+203A)이고, Orca API 는 그것을 바로 앞 경고 줄 꼬리에 붙여서 준다** — 사람 터미널에서는 따로 보인다. 종전 판정부는 `❯`·`>` 로 시작하는 줄만 상자로 봐서 이 화면을 「상자 없음」으로 읽었고, codex 홉이 매번 TUI 준비 실패(60s)로 죽었다. 픽스처 11건이 claude·kimi·맨 셸뿐이라 아무도 못 봤다.",
+   "expect": {
+    "ready": true,
+    "pending": false,
+    "accepted": true
+   },
+   "tail": [
+    "⚠ Skipped loading 1 skill(s) due to invalid SKILL.md files.",
+    "",
+    "⚠ /home/tjeksdn1/.agents/skills/security-audit/SKILL.md: failed to read file: No such file or directory (os error 2)    › .............   gpt-5.6-terra default · ~/orca/workspaces/trading-lab/review-497-codex",
+    "╭────────────────────────────────────────────────────╮",
+    "│ >_ OpenAI Codex (v0.154.0)                         │",
+    "│                                                    │",
+    "│ model:       gpt-5.6-terra   /model to change      │",
+    "│ directory:   ~/orca/…/trading-lab/review-497-codex │",
+    "│ permissions: YOLO mode                             │",
+    "╰────────────────────────────────────────────────────╯",
+    "",
+    "  Tip: New For a limited time, Codex is included in your plan for free – let’s build together.",
+    "",
+    "⚠ 1 MCP startup issue (1 needs sign-in) · ctrl + t for details",
+    "",
+    "⚠ Heads up, you have less than 5% of your monthly limit left. Run /status for a breakdown.",
+    "",
+    "⚠ Skipped loading 1 skill(s) due to invalid SKILL.md files.",
+    "",
+    "⚠ /home/tjeksdn1/.agents/skills/security-audit/SKILL.md: failed to read file: No such file or directory (os error 2)  › .............   gpt-5.6-terra default · ~/orca/workspaces/trading-lab/review-497-codex"
+   ]
   }
  ],
  "cursor_sequences": [
