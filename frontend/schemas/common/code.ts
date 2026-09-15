@@ -1,7 +1,8 @@
 // schemas/common/code.ts
 import { z } from "zod";
 import { CommonEntity } from "@/schemas/common/types";
-import { enums, Field, Optional, StrRange, PositiveInt, object } from "@/lib/zod/helpers";
+import { enums, Field, Optional, StrRange, IntRange, object } from "@/lib/zod/helpers";
+import { INT32_MAX } from "@/schemas/common/storageLimits";
 
 const NO_WHITESPACE = /^\S+$/;
 
@@ -34,7 +35,7 @@ export const CodeSchema = object({
   code_nm: StrRange(1, 200),
   code_nm_eng: Optional(Field({ max_length: 200 }).str()),
   code_dc: Optional(Field({ max_length: 200 }).str()),
-  sort_ordr: PositiveInt(),
+  sort_ordr: IntRange(0, INT32_MAX),
   use_at: enums(["Y", "N"]),
 });
 

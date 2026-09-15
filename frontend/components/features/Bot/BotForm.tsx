@@ -145,7 +145,6 @@ export function BotForm({
               fieldName="bot_desc"
               value={draft.bot_desc}
               height="4.5rem"
-              maxLength={500}
               onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}
             />
           )}
@@ -286,7 +285,7 @@ export function BotForm({
         </Row>
         <Row
           label="종목당 비중"
-          help="한 종목에 넣을 비중 (0% 이상). 무엇 대비인지는 봇을 굴리는 엔진이 정하는데 아직 없습니다. 비우면 배분을 정하지 않습니다."
+          help="한 종목에 넣을 비중 (0~100%). 무엇 대비인지는 봇을 굴리는 엔진이 정하는데 아직 없습니다. 비우면 배분을 정하지 않습니다."
         >
           {(control) => (
             <NumberBox
@@ -294,6 +293,7 @@ export function BotForm({
               fieldName="alloc_per_symbol"
               value={draft.alloc_per_symbol}
               min={0}
+              max={100}
               step={1}
               format="#,##0.##%"
               onValueChanged={(field, value) => onDraftChange(field as keyof BotDraft, value)}

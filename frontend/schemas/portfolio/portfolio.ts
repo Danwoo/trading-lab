@@ -1,13 +1,14 @@
 // schemas/portfolio/portfolio.ts
 import { z } from "zod";
 import { CommonEntity } from "@/schemas/common/types";
-import { StrRange, Field, Optional, PositiveInt, PositiveFloat, int, enums, object } from "@/lib/zod/helpers";
+import { StrRange, Field, Optional, IntRange, FloatRange, enums, object } from "@/lib/zod/helpers";
+import { INT32_MAX, MONEY_MAX } from "@/schemas/common/storageLimits";
 
 // ── Portfolio (master) ─────────────────────────────────────────────────
 export const PortfolioSchema = object({
   portfolio_id: StrRange(1, 20),
   portfolio_nm: StrRange(1, 200),
-  sort_ordr: PositiveInt(),
+  sort_ordr: IntRange(0, INT32_MAX),
   use_at: enums(["Y", "N"]),
   description: Optional(Field({ max_length: 1000 }).str()),
 });
@@ -27,8 +28,8 @@ export const HoldingSchema = object({
   portfolio_id: StrRange(1, 20),
   ticker: StrRange(1, 20),
   holding_nm: StrRange(1, 200),
-  quantity: int(),
-  avg_price: PositiveFloat(),
+  quantity: IntRange(0, INT32_MAX),
+  avg_price: FloatRange(0, MONEY_MAX),
   // Watchlist.market 과 대칭(#328) — 기존 행은 백필하지 않아 비어 있을 수 있다.
   market: Optional(Field({ max_length: 20 }).str()),
   use_at: enums(["Y", "N"]),

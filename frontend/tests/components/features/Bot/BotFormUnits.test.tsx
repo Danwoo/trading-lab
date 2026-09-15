@@ -21,7 +21,7 @@ import { NEW_BOT_DRAFT, type BotDraft } from "@/components/features/Bot/botFormM
 const UNITS: Record<string, string> = {
   손절: "%", // stop_loss_pct — 손절선 (%, 0~100)
   익절: "%", // take_profit_pct — 익절선 (%, 0 이상)
-  "종목당 비중": "%", // alloc_per_symbol — 종목당 비중 (%, 0 이상)
+  "종목당 비중": "%", // alloc_per_symbol — 종목당 비중 (%, 0~100)
   "최대 보유 종목": "종목", // max_positions — 동시에 들고 갈 최대 종목 수 (1 이상)
   "하루 최대 매매": "회", // max_trades_per_day — 하루 최대 매매 횟수 (1 이상)
 };
