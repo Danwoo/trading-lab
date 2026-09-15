@@ -24,6 +24,8 @@ if [ "$1" = "inspect" ]; then
   exit 0
 fi
 if [ "$1" = "rm" ]; then
+  # 실제 도커와 같은 규칙: 힘(-f)이 없으면 돌고 있는 것은 못 지운다.
+  if [ "$FAKE_STATE" = "true" ] && [ "$2" != "-f" ]; then exit 1; fi
   echo "$@" >> "$FAKE_RM_LOG"
   exit 0
 fi
@@ -58,8 +60,9 @@ def main() -> int:
             failures.append(label)
 
     rc, out, removed = run("false")
-    check("죽은 컨테이너는 걷어낸다", rc == 0 and "rm -f fintech-pg" in removed)
-    check("무엇을 왜 지웠는지 말한다", "걷어냅니다" in out and "named volume" in out)
+    check("죽은 컨테이너는 걷어낸다", rc == 0 and "rm fintech-pg" in removed)
+    check("무엇을 왜 지웠는지 말한다", "걷어냈습니다" in out and "named volume" in out)
+    check("힘으로 지우지 않는다 — 확인과 삭제 사이에 다시 떠도 살아남는다", "-f" not in removed)
 
     rc, out, removed = run("true")
     check("돌고 있는 것은 지우지 않는다", removed == "")

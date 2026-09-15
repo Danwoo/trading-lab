@@ -44,9 +44,17 @@ case "$STATE" in
     exit 1
     ;;
   false)
-    echo "죽은 채 이름을 잡고 있던 컨테이너를 걷어냅니다: $NAME (데이터는 named volume 에 남습니다)"
-    "$DOCKER" rm -f "$NAME" >/dev/null
-    exit 0
+    # **`-f` 를 쓰지 않는다.** `inspect` 로 「안 돌고 있다」를 본 시점과 지우는 시점 사이에 그
+    # 컨테이너가 다시 뜨면, `-f` 는 살아난 것을 그대로 죽인다(TOCTOU). 힘을 안 주면 도커가
+    # 그 판정을 원자적으로 대신해 준다 — 돌고 있으면 거부한다.
+    if "$DOCKER" rm "$NAME" >/dev/null 2>&1; then
+      echo "죽은 채 이름을 잡고 있던 컨테이너를 걷어냈습니다: $NAME (데이터는 named volume 에 남습니다)"
+      exit 0
+    fi
+    echo "컨테이너를 걷어내지 못했습니다: $NAME" >&2
+    echo "  확인한 뒤 다시 뜬 것일 수 있습니다 — 돌고 있는 것은 힘으로 지우지 않습니다 (#308)." >&2
+    echo "  지금 상태: $("$DOCKER" inspect --format "{{.State.Status}}" "$NAME" 2>/dev/null || echo "읽지 못함")" >&2
+    exit 1
     ;;
   *)
     echo "컨테이너 상태를 읽지 못했습니다: $NAME (docker inspect → [$STATE])" >&2
