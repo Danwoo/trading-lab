@@ -64,7 +64,7 @@ def _bot_args(name: str) -> dict:
         "combine_rule": "SCORE",
         "universe_kind": "LIST",
         "universe_ref": {"tickers": ["005930", "AAPL"]},
-        "alloc_per_symbol": 1000000.0,
+        "alloc_per_symbol": 12.5,
         "max_positions": 5,
         "stop_loss_pct": 7.5,
         "take_profit_pct": 20.0,

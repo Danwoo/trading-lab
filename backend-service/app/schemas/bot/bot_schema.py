@@ -1,7 +1,16 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
-from schemas.common_schema import CommonEntity, TrimmedBaseModel
+from pydantic import BaseModel, ConfigDict, Field
+from schemas.common_schema import (
+    NUMERIC_6_2_MAX,
+    PERCENT_MAX,
+    QUANTITY_MAX,
+    WEIGHT_MAX,
+    CommonEntity,
+    Money,
+    TrimmedBaseModel,
+    without_input_bounds,
+)
 
 CombineRule = Literal["AND", "OR", "SCORE"]
 UniverseKind = Literal["POOL", "WATCHLIST", "LIST"]
@@ -11,6 +20,9 @@ ParamSource = Literal["USER", "AI_SUGGESTED"]
 
 class BotStrategyIn(BaseModel):
     """봇에 싣는 전략 하나. `params` 는 전략 선언에 대해 서비스가 검증한다."""
+
+    # 모르는 필드를 조용히 버리지 않는다 — 오타 하나로 값이 사라지고도 저장은 성공했다고 뜬다.
+    model_config = ConfigDict(extra="forbid")
 
     strategy_key: str = Field(
         ...,
@@ -26,8 +38,11 @@ class BotStrategyIn(BaseModel):
         default_factory=dict,
         description="설정별 출처 — 설정 이름 → 'USER' 또는 'AI_SUGGESTED'.",
     )
-    weight: float | None = Field(
-        None, ge=0, description="combine_rule 이 SCORE 일 때의 가중치 (0 이상). 나머지 결합에서는 안 씁니다."
+    weight: Money | None = Field(
+        None,
+        ge=0,
+        le=WEIGHT_MAX,
+        description="combine_rule 이 SCORE 일 때의 가중치 — 0 이상 9999.99 까지, 소수점 둘째 자리까지.",
     )
 
 
@@ -65,13 +80,29 @@ class Bot(TrimmedBaseModel):
         default=None,
         description="universe_kind 가 LIST 일 때 볼 종목 목록을 담는 객체. 나머지 종류에서는 비웁니다.",
     )
-    alloc_per_symbol: float | None = Field(
-        None, ge=0, description="종목당 비중 (%, 0 이상). 비우면 배분을 정하지 않은 것으로 둡니다."
+    alloc_per_symbol: Money | None = Field(
+        None,
+        ge=0,
+        le=PERCENT_MAX,
+        description="종목당 비중 (%, 0~100). 소수점 둘째 자리까지. 비우면 배분을 정하지 않은 것으로 둡니다.",
     )
-    max_positions: int | None = Field(None, gt=0, description="동시에 들고 갈 최대 종목 수 (1 이상). 비우면 제한 없음.")
-    stop_loss_pct: float | None = Field(None, ge=0, le=100, description="손절선 (%, 0~100). 비우면 손절하지 않습니다.")
-    take_profit_pct: float | None = Field(None, ge=0, description="익절선 (%, 0 이상). 비우면 익절하지 않습니다.")
-    max_trades_per_day: int | None = Field(None, gt=0, description="하루 최대 매매 횟수 (1 이상). 비우면 제한 없음.")
+    max_positions: int | None = Field(
+        None, gt=0, le=QUANTITY_MAX, description="동시에 들고 갈 최대 종목 수 (1 이상). 비우면 제한 없음."
+    )
+    stop_loss_pct: Money | None = Field(
+        None, ge=0, le=PERCENT_MAX, description="손절선 (%, 0~100). 소수점 둘째 자리까지. 비우면 손절하지 않습니다."
+    )
+    # 익절은 100% 를 넘을 수 있다(두 배가 되면 200%). 그래서 상한은 「비율의 뜻」이 아니라
+    # **저장 컬럼**이 정한다 — Numeric(6,2).
+    take_profit_pct: Money | None = Field(
+        None,
+        ge=0,
+        le=NUMERIC_6_2_MAX,
+        description="익절선 (%, 0 이상 9999.99 까지). 소수점 둘째 자리까지. 비우면 익절하지 않습니다.",
+    )
+    max_trades_per_day: int | None = Field(
+        None, gt=0, le=QUANTITY_MAX, description="하루 최대 매매 횟수 (1 이상). 비우면 제한 없음."
+    )
     bot_role: BotRole = Field(
         default="READONLY",
         description="봇이 하는 일 — READONLY(보기만) · PROPOSE(제안) · EXECUTE(실행) 중 하나. "
@@ -85,7 +116,11 @@ class Bot(TrimmedBaseModel):
     )
 
 
-class BotOut(Bot, CommonEntity):
+# 출력은 저장된 것을 그대로 낸다 — 상·하한은 입력에서만 건다.
+BotStored = without_input_bounds(Bot, "BotStored")
+
+
+class BotOut(BotStored, CommonEntity):
     bot_id: int
     bot_nm: str
 
@@ -100,6 +135,8 @@ class BotsOut(BaseModel):
 
 
 class BotCreateIn(Bot):
+    model_config = ConfigDict(extra="forbid")
+
     bot_nm: str = Field(..., min_length=1, max_length=100, description="봇 이름 — 1~100자, 빈 문자열은 안 됩니다.")
     # 전략 없는 봇은 아무 판정도 못 한다 — 서비스가 빈 목록을 거부한다.
     strategies: list[BotStrategyIn] = Field(
@@ -110,6 +147,8 @@ class BotCreateIn(Bot):
 
 
 class BotUpdateIn(Bot):
+    model_config = ConfigDict(extra="forbid")
+
     bot_nm: str = Field(..., min_length=1, max_length=100, description="봇 이름 — 1~100자, 빈 문자열은 안 됩니다.")
     # None 이면 전략 목록을 건드리지 않는다. 목록이 오면 통째로 갈아 끼운다.
     strategies: list[BotStrategyIn] | None = Field(

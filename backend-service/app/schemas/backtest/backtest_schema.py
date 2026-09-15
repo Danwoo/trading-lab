@@ -1,6 +1,7 @@
 from typing import Any
 
 from pydantic import BaseModel, Field
+from schemas.common_schema import BIGINT_MAX, MONEY_MAX, QUANTITY_MAX
 
 
 class BacktestRunIn(BaseModel):
@@ -38,6 +39,7 @@ class BacktestRunIn(BaseModel):
     initial_cash: float = Field(
         ...,
         gt=0,
+        le=MONEY_MAX,
         description="시작 자금 (원). 0 보다 커야 합니다 — 성과율의 분모라 0 이면 아무 지표도 못 냅니다.",
         examples=[10000000],
     )
@@ -46,9 +48,14 @@ class BacktestRunIn(BaseModel):
         description="비용 가정 — fee_rate(수수료율) · slippage_rate(슬리피지율) · sell_tax_rate(매도세율) 중 "
         "덮어쓸 것만. 전부 비율이라 0.0015 가 0.15% 입니다. 비우면 기본 가정.",
     )
-    bot_id: int | None = Field(default=None, description="이 실행을 매달 봇 id. 비우면 어느 봇에도 안 달립니다.")
+    # id 도 저장 컬럼 안쪽이어야 한다 — 범위를 넘으면 「없는 봇」이 아니라 드라이버 오류가 난다.
+    bot_id: int | None = Field(
+        default=None, gt=0, le=QUANTITY_MAX, description="이 실행을 매달 봇 id. 비우면 어느 봇에도 안 달립니다."
+    )
     parent_run_id: int | None = Field(
         default=None,
+        gt=0,
+        le=BIGINT_MAX,
         description="다시 보는 실행이면 그 원본 run_id. 계보로 이어져 「몇 번째 시도인가」가 남습니다. "
         "새 탐색이면 비웁니다.",
     )

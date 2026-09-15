@@ -1,23 +1,13 @@
 // schemas/bot/bot.ts
 import { z } from "zod";
 import { CommonEntity } from "@/schemas/common/types";
-import {
-  Field,
-  FloatRange,
-  Optional,
-  PositiveFloat,
-  CountInt,
-  StrRange,
-  array,
-  enums,
-  object,
-  record,
-} from "@/lib/zod/helpers";
+import { INT32_MAX, NUMERIC_6_2_MAX, PERCENT_MAX } from "@/schemas/common/storageLimits";
+import { Field, FloatRange, IntRange, Optional, StrRange, array, enums, object, record } from "@/lib/zod/helpers";
 
 // 백엔드 계약: backend-service/app/schemas/bot/bot_schema.py
 //   Bot{bot_desc?(500), combine_rule(AND|OR|SCORE), universe_kind(POOL|WATCHLIST|LIST),
-//       universe_ref?, alloc_per_symbol?(ge0), max_positions?(gt0), stop_loss_pct?(0~100),
-//       take_profit_pct?(ge0), max_trades_per_day?(gt0), bot_role(READONLY|PROPOSE|EXECUTE),
+//       universe_ref?, alloc_per_symbol?(0~100), max_positions?(1~21억), stop_loss_pct?(0~100),
+//       take_profit_pct?(0~9999.99), max_trades_per_day?(1~21억), bot_role(READONLY|PROPOSE|EXECUTE),
 //       use_at(1), param_sources}
 //   BotCreateIn = Bot + bot_nm(1~100) + strategies[]
 // 어휘 셋(combine_rule·universe_kind·bot_role)은 alembic 0014 의 CHECK 제약과 같아야 한다 —
@@ -45,7 +35,8 @@ export const BotStrategyInSchema = object({
   // 값의 타입·범위는 전략 선언이 정하므로 여기서 좁히지 않는다 — 백엔드가 선언에 대해 검증한다.
   params: record(z.any()),
   param_sources: ParamSourceMap,
-  weight: Optional(PositiveFloat()),
+  // 가중치도 저장 컬럼이 Numeric(6,2) 다 — 백엔드 `WEIGHT_MAX` 와 같은 선.
+  weight: Optional(FloatRange(0, NUMERIC_6_2_MAX)),
 });
 
 export const BotSchema = object({
@@ -54,11 +45,14 @@ export const BotSchema = object({
   combine_rule: enums(COMBINE_RULES),
   universe_kind: enums(UNIVERSE_KINDS),
   universe_ref: Optional(record(z.any())),
-  alloc_per_symbol: Optional(PositiveFloat()),
-  max_positions: Optional(CountInt()),
-  stop_loss_pct: Optional(FloatRange(0, 100)),
-  take_profit_pct: Optional(PositiveFloat()),
-  max_trades_per_day: Optional(CountInt()),
+  alloc_per_symbol: Optional(FloatRange(0, PERCENT_MAX)),
+  // 상한의 정본은 **저장 컬럼**이다 — integer 는 21억, Numeric(6,2) 는 9999.99.
+  // 넘겨보내면 스키마를 지나 DB 에서 500 이 되고, 사용자가 받는 것은 사유가 아니라 빈 실패다.
+  max_positions: Optional(IntRange(1, INT32_MAX)),
+  stop_loss_pct: Optional(FloatRange(0, PERCENT_MAX)),
+  // 익절은 100% 를 넘을 수 있다(두 배가 되면 200%) — 상한은 뜻이 아니라 컬럼이 정한다.
+  take_profit_pct: Optional(FloatRange(0, NUMERIC_6_2_MAX)),
+  max_trades_per_day: Optional(IntRange(1, INT32_MAX)),
   bot_role: enums(BOT_ROLES),
   use_at: enums(["Y", "N"]),
   param_sources: ParamSourceMap,
