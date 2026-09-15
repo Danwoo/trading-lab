@@ -23,6 +23,7 @@ import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotic
 import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 import type { StrategyForm } from "@/schemas/bot/bot";
 import { BotRunHistory } from "@/components/features/Bot/BotRunHistory";
+import { blockingSaveReason } from "@/lib/bot/saveGuard";
 
 interface Props {
   /** 없으면 새 봇, 있으면 저장된 봇을 열어 고친다. */
@@ -67,6 +68,11 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
    * 그 칸을 다시 손대거나 전략을 바꾸면 지운다(옛 오류가 새 값 위에 남으면 그것도 거짓이다).
    */
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  /**
+   * 칸을 짚을 수 없는 저장 실패 — 폼 머리에 남는다. 토스트는 알리는 자리이지 남는 자리가
+   * 아니다: 1.6초 뒤 화면에 실패했다는 흔적이 없었다 (#453 F1).
+   */
+  const [saveError, setSaveError] = useState<string | null>(null);
   const writeAccess = useWriteAccess();
 
   useEffect(() => {
@@ -180,22 +186,18 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
   );
 
   const handleSave = async () => {
-    if (draft.bot_nm.trim() === "") {
-      showToast("봇 이름을 적어주세요.", "warning");
+    // 판정은 한 곳(`blockingSaveReason`)이고, 여기서는 **알리고 남긴다**.
+    const blocked = blockingSaveReason(draft, strategy !== null, loadedStrategyCount);
+    if (blocked !== null) {
+      setFieldErrors(blocked.field === null ? {} : { [blocked.field]: blocked.message });
+      setSaveError(blocked.field === null ? blocked.message : null);
+      showToast(blocked.message, "warning");
       return;
     }
-    if (strategy === null) {
-      showToast("전략을 하나 고르면 저장할 수 있습니다.", "warning");
-      return;
-    }
-    if (loadedStrategyCount > 1) {
-      showToast(
-        `이 봇에는 전략이 ${loadedStrategyCount}개 실려 있는데 이 화면은 하나만 다룹니다. ` +
-          "여기서 저장하면 나머지가 지워지므로 막았습니다.",
-        "warning",
-      );
-      return;
-    }
+    // 위 판정이 이미 막았다 — 타입에게도 그 사실을 말해 준다(판정을 두 번 하지 않는다).
+    if (strategy === null) return;
+    setFieldErrors({});
+    setSaveError(null);
     setIsSaving(true);
     try {
       const payload = toCreatePayload({ ...draft, bot_nm: draft.bot_nm.trim() }, [strategy]);
@@ -208,6 +210,8 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
       const form = strategyForms.find((candidate) => candidate.key === strategy.strategyKey);
       const name = fieldNameFromServerError(message, form?.fields ?? []);
       setFieldErrors(name === null ? {} : { [name]: message });
+      // 칸을 못 짚은 서버 오류도 남는다 — 종전에는 토스트가 사라지면 아무것도 안 남았다.
+      setSaveError(name === null ? message : null);
       showToast(message, "error");
     } finally {
       setIsSaving(false);
@@ -305,6 +309,7 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
             onStrategyChange={handleStrategyChange}
             onParamChange={handleParamChange}
             fieldErrors={fieldErrors}
+            formError={saveError}
           />
         </div>
       )}

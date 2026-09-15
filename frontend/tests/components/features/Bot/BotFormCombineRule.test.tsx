@@ -35,6 +35,26 @@ describe("F25 「조건 결합」 도움말", () => {
     );
 
     const help = describedText(screen.getByLabelText("조건 결합"));
-    expect(help).toContain("전략을 하나만 실으므로 지금은 쓰이지 않습니다");
+    expect(help).toContain("전략을 하나만 실으므로 지금은 쓰이지 않아 잠가 뒀습니다");
+  });
+
+  // #453 F3 — 「지금은 쓰이지 않는다」고 적어 두고도 **조작 가능한 컨트롤로 남아 있었다.**
+  // 만지면 아무 일도 안 일어나는 칸이 하나 더 느는 것이라, 말만 하지 말고 잠근다.
+  it("말만 하지 않고 잠근다 — 만져도 아무 일이 안 일어나는 칸을 열어 두지 않는다", () => {
+    render(
+      <BotForm
+        draft={NEW_BOT_DRAFT}
+        onDraftChange={vi.fn()}
+        strategy={null}
+        strategyForms={[]}
+        catalogErrors={[]}
+        onStrategyChange={vi.fn()}
+        onParamChange={vi.fn()}
+      />,
+    );
+
+    const control = screen.getByLabelText("조건 결합");
+    // jest-dom 매처가 없는 스위트다 — 속성으로 직접 본다(둘 중 하나면 브라우저가 잠근다).
+    expect(control.hasAttribute("disabled") || control.getAttribute("aria-disabled") === "true").toBe(true);
   });
 });
