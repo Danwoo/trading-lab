@@ -309,13 +309,13 @@ const CALL_SITES: CallSite[] = [
     buildUrl: (p: Record<string, string>) => `${SCHED}/${p.scheduler_id}/member`,
   })),
   {
-    file: "@/app/api/external/backend/scheduler/[scheduler_id]/member/[git_id]/route",
-    label: "scheduler/[scheduler_id]/member/[git_id] DELETE",
+    file: "@/app/api/external/backend/scheduler/[scheduler_id]/member/[account_id]/route",
+    label: "scheduler/[scheduler_id]/member/[account_id] DELETE",
     method: "DELETE",
     opName: "DELETE",
     needsBody: false,
-    paramKeys: ["scheduler_id", "git_id"],
-    buildUrl: (p: Record<string, string>) => `${SCHED}/${p.scheduler_id}/member/${p.git_id}`,
+    paramKeys: ["scheduler_id", "account_id"],
+    buildUrl: (p: Record<string, string>) => `${SCHED}/${p.scheduler_id}/member/${p.account_id}`,
   },
 ];
 
@@ -356,7 +356,7 @@ describe(`런타임 net — app/api/external 호출부 전수(${EXPECTED_CALL_SI
 
   describe.each(CALL_SITES)("$label", (site) => {
     // 공격 대상 param 은 매번 하나씩 돌아가며 오염시키고, 나머지는 정상 값을 넣는다 — 2-param
-    // 콜사이트(holding/[ticker], member/[git_id])도 두 축 모두 독립적으로 검사된다.
+    // 콜사이트(holding/[ticker], member/[account_id])도 두 축 모두 독립적으로 검사된다.
     it.each(site.paramKeys)(
       "%s 에 B1 페이로드('core/holding' 류 원문 '/')를 넣으면 프록시 호출 전에 차단된다",
       async (attackKey) => {
@@ -383,7 +383,7 @@ describe(`런타임 net — app/api/external 호출부 전수(${EXPECTED_CALL_SI
         ticker: "삼성전자",
         research_doc_id: "문서'1",
         scheduler_id: "일간수집",
-        git_id: "user@example.com",
+        account_id: "user@example.com",
       };
       const params: Record<string, string> = Object.fromEntries(
         site.paramKeys.map((k) => [k, rawValues[k] ?? `값-${k}`]),

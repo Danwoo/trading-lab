@@ -1,4 +1,4 @@
-// app/api/external/backend/scheduler/[scheduler_id]/member/[git_id]/route.ts
+// app/api/external/backend/scheduler/[scheduler_id]/member/[account_id]/route.ts
 import { env } from "@/env";
 import { withAuth } from "@/lib/auth/withAuth";
 import { NextRequest } from "next/server";
@@ -13,7 +13,7 @@ const deleteHandler = async (req: NextRequest, session: any, params?: any) => {
 
   try {
     const result = await proxyApiRequest(
-      `${BACKEND_URL}/${encodeURIComponent(params.scheduler_id)}/member/${encodeURIComponent(params.git_id)}`,
+      `${BACKEND_URL}/${encodeURIComponent(params.scheduler_id)}/member/${encodeURIComponent(params.account_id)}`,
       {
         method: operation,
         headers: {

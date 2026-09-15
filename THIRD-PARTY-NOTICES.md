@@ -2853,7 +2853,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `fast-csv` | 5.0.5 | MIT |
 | `fast-deep-equal` | 3.1.3 | MIT |
 | `fast-fifo` | 1.3.2 | MIT |
-| `fast-uri` | 3.1.5 | BSD-3-Clause |
+| `fast-uri` | 3.1.7 | BSD-3-Clause |
 | `fdir` | 6.5.0 | MIT |
 | `file-saver` | 2.0.5 | MIT |
 | `follow-redirects` | 1.16.0 | MIT |
@@ -3130,7 +3130,7 @@ MIT·ISC·BSD-2/3-Clause·0BSD·MIT-0·BlueOak-1.0.0·MIT\* 등 — 저작권·�
 | `yaml` | 2.8.3 | ISC |
 | `zeptomatch` | 2.1.0 | MIT |
 | `zip-stream` | 7.0.5 | MIT |
-| `zod` | 4.6.1 | MIT |
+| `zod` | 4.6.2 | MIT |
 | `zustand` | 5.0.15 | MIT |
 | `zwitch` | 2.0.4 | MIT |
 

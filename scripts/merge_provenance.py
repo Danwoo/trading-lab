@@ -74,7 +74,60 @@ MERGED_BY = {
     "delegate": "지휘자",  # 지휘자가 위임 머지 워크플로를 돌렸다
 }
 UNKNOWN = "미상"
+# 「에이전트 신원이 하나도 없다」는 **사람이라는 뜻이 아니다** — 신원 설정을 빠뜨린 에이전트도
+# 같은 모양이고 리드와 같은 git 신원을 쓰므로 가를 수 없다. 종전엔 이 자리를 「사람」으로
+# 적었는데, 그것은 없는 사실을 기록하는 것이다 (CONTEXT 2026-08-09: 「모르는 것은 미상으로
+# 적는다」). 바로 앞 `UNKNOWN` 과 구분되게 사유를 함께 싣는다 — 그쪽은 커밋을 아예 못 읽었거나
+# 신원이 판독 불가인 경우다.
+NO_IDENTITY = "미상(신원 없음)"
 COAUTHOR_PREFIX = "Co-authored-by: "
+
+# **AI 자기 언급은 main 에 남기지 않는다** (전역 규약). 누가 했는지는 브랜치명과 아래 provenance
+# 줄, 그리고 `Co-authored-by:` 의 에이전트 신원이 이미 남긴다 — 그 셋은 유지한다. 여기서 지우는
+# 것은 도구가 스스로를 광고하는 줄뿐이다.
+#
+# **왜 여기서 지우나**: 브랜치 커밋에 한 번 들어가면 force push 없이는 못 지운다(이 레포는 force
+# push 를 금지한다). squash 본문을 만드는 자리가 main 에 무엇이 남을지 정하는 마지막 지점이다.
+#
+# 지우지 않는 것: `Co-authored-by: <에이전트> <…@noreply.local>` — 그것은 자기 홍보가 아니라
+# 지금 유일하게 살아 있는 저자 provenance 다.
+_AI_SELF_REFERENCE = re.compile(
+    r"^\s*(?:"
+    r"Co-Authored-By:\s*.*<[^>]*@anthropic\.com>"
+    r"|Claude-Session:\s*\S+"
+    r"|.*\U0001F916\s*Generated with\b.*"
+    r"|https://claude\.ai/\S*"
+    r")\s*$",
+    re.IGNORECASE,
+)
+
+
+def strip_ai_self_reference(message: str) -> str:
+    """커밋 메시지에서 도구 자기 광고 줄을 뺀다.
+
+    **뺀 자리에서 생긴 빈 줄만 접는다.** 연속 빈 줄을 무조건 하나로 줄이면 self-ref 가 하나도
+    없는 커밋의 본문까지 바뀐다 — 코드 펜스 뒤에 빈 줄을 둘 둔 메시지가 실물과 달라지고,
+    그 순간 이 모듈의 존재 이유(「재현이 틀리면 커밋 메시지를 우리가 지운다」)가 깨진다.
+
+    그래서 접기는 **제거가 일어난 이음매**에서만 한다. 지운 것이 하나도 없으면 원문 그대로다.
+    """
+    lines = (message or "").split("\n")
+    if not any(_AI_SELF_REFERENCE.match(line) for line in lines):
+        return message.rstrip() if message else ""
+
+    kept: list[str] = []
+    removed_since_kept = False
+    for line in lines:
+        if _AI_SELF_REFERENCE.match(line):
+            removed_since_kept = True
+            continue
+        # 제거로 빈 줄이 겹쳤을 때만 접는다 — 원래 겹쳐 있던 빈 줄은 건드리지 않는다.
+        if not line.strip() and removed_since_kept and kept and not kept[-1].strip():
+            continue
+        if line.strip():
+            removed_since_kept = False
+        kept.append(line)
+    return "\n".join(kept).rstrip()
 
 
 def _strip_subject(message: str) -> str:
@@ -189,7 +242,12 @@ def reproduce_squash_body(commits) -> str:
 
 def _core_from(commits) -> str:
     """커밋 메시지 조립부 — **머지 커밋은 뺀다** (GitHub 이 그렇게 한다, PR #55 실측)."""
-    messages = [(c.get("message") or "").rstrip() for c in (commits or []) if isinstance(c, dict) and not _is_merge(c)]
+    messages = [
+        strip_ai_self_reference(c.get("message") or "")
+        for c in (commits or [])
+        if isinstance(c, dict) and not _is_merge(c)
+    ]
+    messages = [m for m in messages if m.strip()]
     if not messages:
         return ""
     if len(messages) == 1:
@@ -207,14 +265,14 @@ def describe_author(commits, head_ref) -> str:
         # 어휘 밖 에이전트형 신원은 사람이 아니라 판독 불가다 (review_record 와 같은 규율)
         return UNKNOWN
     vendors = identity["vendors"]
-    human = any(e and not e.endswith("@noreply.local") for e in emails)
+    no_identity = any(e and not e.endswith("@noreply.local") for e in emails)
     if not vendors:
-        return "사람" if human else UNKNOWN
+        return NO_IDENTITY if no_identity else UNKNOWN
     tier = identity["author_tier"]
     label = ",".join(vendors)
     if vendors == ["claude"]:
         label = f"claude({tier or '티어 미상'})"
-    return f"{label} + 사람" if human else label
+    return f"{label} + {NO_IDENTITY}" if no_identity else label
 
 
 def describe_reviewer(model, tier) -> str:

@@ -15,6 +15,7 @@ import { getApiErrorMessage } from "@/utils/common/errors";
 import { showToast, showMessage } from "@/components/shared/Feedback";
 import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotice";
 import { withWriteDeniedHint } from "@/constants/writeAccess";
+import { isUnchanged, NOTHING_CHANGED } from "@/utils/common/form/unchanged";
 
 const BUILTIN_CRUD_ICONS = new Set(["plus", "edit", "trash"]);
 
@@ -213,6 +214,11 @@ const DetailGridPanelComponent = <T,>(
           } else return false;
         } else {
           if (apiService.update) {
+            // 안 바뀐 저장에 「수정이 완료되었습니다」라고 하지 않는다 (#446 F33).
+            if (isUnchanged(data, selectedData)) {
+              showToast(NOTHING_CHANGED, "info");
+              return false;
+            }
             result = await apiService.update(data);
             showToast(result?.message || "수정이 완료되었습니다.", "success");
           } else return false;
@@ -226,7 +232,7 @@ const DetailGridPanelComponent = <T,>(
         return false;
       }
     });
-  }, [handleSubmit, modalMode, apiService, closeModal, handleComplete]);
+  }, [handleSubmit, modalMode, apiService, closeModal, handleComplete, selectedData]);
 
   const handleSelectionChanged = useCallback(
     (item: T | null) => {

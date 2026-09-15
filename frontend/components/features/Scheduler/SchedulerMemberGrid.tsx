@@ -12,8 +12,9 @@ interface Props {
 }
 
 const MEMBER_COLUMNS = [
-  // 같은 필드를 형제 화면(`SchedulerDetailForm`)이 부르는 이름과 맞춘다 — 옛 제품의 낱말이었다.
-  { dataField: "git_id", caption: "계좌주 ID", width: 160 },
+  // 정본은 백엔드 `SchedulerMemberOut` 이다 — 응답에 `git_id` 라는 필드는 없다. 이름이 어긋나면
+  // 열이 조용히 빈칸으로 그려질 뿐 아무도 안 알려준다.
+  { dataField: "account_id", caption: "계좌주 ID", width: 160 },
   { dataField: "name", caption: "이름", width: 140 },
   { dataField: "email", caption: "이메일", minWidth: 180 },
 ];
@@ -25,7 +26,7 @@ const SchedulerMemberGrid: React.FC<Props> = ({ schedulerId, height = "250px", e
       key={schedulerId + "_members"}
       fetchGrid={async () => selectSchedulerMembers(schedulerId)}
       columns={MEMBER_COLUMNS}
-      keyField="git_id"
+      keyField="account_id"
       showPaging={false}
       clientSidePaging={true}
       editable={editable}

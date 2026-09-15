@@ -37,6 +37,7 @@ export const API_REGRESSION_TESTS = [
   "tests/regressions/433-password-change-revokes-sessions.test.ts",
   "tests/regressions/423-stream-failure-reason.test.ts",
   "tests/regressions/424-otp-delivery-mode.test.ts",
+  "tests/regressions/435-upstream-unreachable-prescription.test.ts",
   "tests/regressions/445-probe-is-not-a-registration.test.ts",
 ];
 

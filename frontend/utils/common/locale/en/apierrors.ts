@@ -3,6 +3,7 @@
 
 import type { EmailFailureCode } from "@/utils/common/errors/emailFailure";
 import type { StreamFailureCode } from "@/utils/common/errors/streamFailure";
+import type { ProxyFailureCode } from "@/utils/common/errors/proxyFailure";
 
 export const STATUS_MESSAGES: Record<number, string> = {
   400: "Bad request.",
@@ -51,6 +52,12 @@ export const STREAM_FAILURE_MESSAGES: Record<StreamFailureCode, string> = {
     "The conversation did not finish.\nWhat arrived above is kept. If this keeps happening, check the server log.",
   "research.service_unreachable":
     "The research service (:8003) is not running.\nRetrying will not connect — start the service, then ask again.",
+};
+
+// Proxy-to-upstream connection failures — key = ProxyFailureCode in errors/proxyFailure.ts.
+export const PROXY_FAILURE_MESSAGES: Record<ProxyFailureCode, string> = {
+  "proxy.upstream_unreachable":
+    "The service we called did not respond.\nRetrying will not connect — check that the service is running and that the address and port in the settings are correct.",
 };
 
 // Prisma error translations — key = type emitted by lib/prisma/error.ts (real code P#### / prisma_*)

@@ -50,9 +50,15 @@ ROUTER_MODULES: list[str] = [
 ]
 
 # (모듈 경로, 매니저 인스턴스 이름) — 기동은 목록 순서, 종료는 역순
+#
+# **합성 NAV producer 는 여기 없다** (리드 결정 2026-09-03, #437). `nav`·`benchmark`·
+# `daily_return`·`drawdown` 이 서로 독립인 난수 walk 라 수익률에서 NAV 를 되짚을 수 없고
+# 낙폭이 곡선과 무관했다 — **검산이라는 개념이 성립하지 않는 값**이 10초마다 영원히 쌓였고,
+# 읽는 화면은 하나도 없었다. 합성 위에 M4「보드를 믿는다」를 지으면 그 화면은 처음부터
+# 믿을 수 없다. **실제 체결·평가가 `nav.snapshot` 토픽으로 들어오는 경로는 그대로 남아 있다**
+# — 소비자·서비스·저장소를 함께 지우지 않은 이유다.
 MANAGER_MODULES: list[tuple[str, str]] = [
     ("managers.message_queue.message_consumer_manager", "message_consumer_manager"),
-    ("managers.nav.nav_producer_manager", "nav_producer_manager"),
     ("managers.scheduler_manager", "scheduler_manager"),
     ("managers.ingest.ingest_worker_manager", "ingest_worker_manager"),
 ]
