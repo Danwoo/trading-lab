@@ -421,7 +421,7 @@ export function RunReportView({
       </p>
 
       {omittedNotice && (
-        <p role="alert" className="break-keep border border-warning p-2 text-sm text-ink">
+        <p role="alert" className="break-keep border border-caution p-2 text-sm text-ink">
           {omittedNotice}
         </p>
       )}

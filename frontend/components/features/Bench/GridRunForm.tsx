@@ -121,7 +121,7 @@ export function GridRunForm({
       {/* 격자는 첫 전략 하나만 훑는다. 그 사실을 **돌리기 전에** 말한다 — 돌린 뒤에 알면
           이미 그 봇의 이름 아래 남의 성과가 놓인 뒤다 (#401). */}
       {omittedNotice && (
-        <p role="alert" className="break-keep border border-warning p-2 text-sm text-ink">
+        <p role="alert" className="break-keep border border-caution p-2 text-sm text-ink">
           {omittedNotice}
         </p>
       )}
