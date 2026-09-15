@@ -64,13 +64,6 @@ import sys
 
 # 캐럿 문자 — claude 는 `❯`, kimi 는 `>`. 둘 다 뒤에 공백이 오거나 줄이 거기서 끝난다.
 CARET_CHARS = ("❯", ">")
-#: codex(v0.154+)의 상자 글리프. **줄 맨 앞이 아닐 수 있다** — Orca 터미널 API 는 codex 의
-#: 상자를 바로 앞 배너 줄 **꼬리에 붙여서** 준다(사람이 보는 화면에서는 따로 보인다).
-#: 실측 2026-09-15 (review-497-codex):
-#:   '⚠ /home/.../SKILL.md: failed to read file: ...  › .............   gpt-5.6-terra default · ~/...'
-#: `>` 는 셸·diff 에 흔해 줄 중간 매칭을 허용하면 되울림을 상자로 오인한다. `›`(U+203A)는
-#: 그 위험이 없어 이 글리프에만 중간 매칭을 연다.
-INLINE_CARET_CHARS = ("›",)
 # kimi 는 캐럿 줄을 상자 세로선으로 감싼다. 왼쪽 테두리를 벗겨야 캐럿이 드러난다.
 BOX_LEFT_BORDER = "│"
 
@@ -95,12 +88,6 @@ def is_caret_line(line: str) -> bool:
         if body == caret:
             return True
         if body.startswith(caret) and body[len(caret) :][:1].isspace():
-            return True
-    for caret in INLINE_CARET_CHARS:
-        if body == caret:
-            return True
-        at = body.find(caret)
-        if at != -1 and body[at + len(caret) :][:1].isspace():
             return True
     return False
 
