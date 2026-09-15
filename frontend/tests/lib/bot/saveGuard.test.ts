@@ -29,6 +29,13 @@ describe("저장을 막는 이유", () => {
     expect(blocked?.message).toContain("나머지가 지워지므로");
   });
 
+  // 다전략 문구는 **열자마자 이미 화면에 있다**(`BotWorkbench` 의 `loadError`). 저장할 때 또
+  // 얹으면 한 자리가 같은 말을 두 번 한다 — 그래서 「이미 보이는 말」이라고 표시해 보낸다.
+  it("다전략은 이미 화면에 있다고 표시한다 — 같은 말을 두 번 하지 않으려고", () => {
+    expect(blockingSaveReason(draft("봇"), true, 2)?.alreadyShown).toBe(true);
+    expect(blockingSaveReason(draft(""), true, 1)?.alreadyShown).toBeUndefined();
+  });
+
   it("이름이 먼저다 — 둘 다 어긋나도 고칠 수 있는 것을 먼저 말한다", () => {
     expect(blockingSaveReason(draft(""), false, 0)?.field).toBe("bot_nm");
   });

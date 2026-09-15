@@ -127,6 +127,13 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
 
   const handleDraftChange = useCallback((field: keyof BotDraft, value: unknown) => {
     setDraft((prev) => ({ ...prev, [field]: value }));
+    // **그 칸을 다시 손대면 그 칸의 오류는 지운다** — 남겨 두면 이름을 이미 채웠는데도 화면이
+    // 「비어 있다」고 말한다. 사라지는 흔적보다 나쁜 것이 **틀린 흔적**이다.
+    setFieldErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const { [field]: _cleared, ...rest } = prev;
+      return rest;
+    });
   }, []);
 
   const handleStrategyChange = useCallback(
@@ -134,6 +141,8 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
       const form = strategyForms.find((candidate) => candidate.key === key);
       if (form) setStrategy(newStrategyDraft(form));
       setFieldErrors({});
+      // 폼 머리 배너의 사유는 전략 쪽(미선택·다전략)이다 — 전략을 고쳤으면 그 말은 낡았다.
+      setSaveError(null);
     },
     [strategyForms],
   );
@@ -190,7 +199,8 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
     const blocked = blockingSaveReason(draft, strategy !== null, loadedStrategyCount);
     if (blocked !== null) {
       setFieldErrors(blocked.field === null ? {} : { [blocked.field]: blocked.message });
-      setSaveError(blocked.field === null ? blocked.message : null);
+      // 이미 화면에 있는 말은 다시 얹지 않는다 — 토스트로 「지금 막혔다」만 알린다.
+      setSaveError(blocked.field === null && !blocked.alreadyShown ? blocked.message : null);
       showToast(blocked.message, "warning");
       return;
     }

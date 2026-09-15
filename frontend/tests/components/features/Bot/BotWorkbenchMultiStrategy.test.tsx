@@ -101,3 +101,18 @@ describe("다전략 봇을 이 화면이 부수지 않는다", () => {
     expect(vi.mocked(updateBot).mock.calls[0][1].strategies).toHaveLength(1);
   });
 });
+
+// #453 F1 리뷰 지적의 이웃 — 저장 실패를 폼 안에 남기게 하면서 **다전략 문구를 두 번 말할**
+// 뻔했다. 그 문장은 열자마자 이미 떠 있다(`loadError`).
+describe("같은 말을 두 번 하지 않는다", () => {
+  it("다전략 봇에서 저장을 눌러도 그 문장은 화면에 하나뿐이다", async () => {
+    givenBot(["pullback", "breakout"]);
+
+    render(<BotWorkbench botId={7} />);
+    await screen.findByText(/전략이 2개 실려 있는데/);
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(screen.getAllByText(/전략이 2개 실려 있는데/)).toHaveLength(1));
+  });
+});
