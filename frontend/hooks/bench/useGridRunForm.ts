@@ -27,6 +27,8 @@ export interface GridRunFormState {
 export interface GridRunFormController {
   botId: number | null;
   strategy: BotStrategyOut | null;
+  /** 고른 봇 전체 — 검증이 **무엇을 빼고 도는지** 화면이 말하려면 첫 전략만으로는 부족하다 (#401). */
+  botDetail: BotDetailOut | null;
   botDetailError: string | null;
   form: GridRunFormState;
   axes: AxisChoice[];
@@ -180,6 +182,7 @@ export function useGridRunForm(): GridRunFormController {
   return {
     botId,
     strategy,
+    botDetail,
     botDetailError,
     form,
     axes,

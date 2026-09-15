@@ -397,7 +397,17 @@ function ExecutionAssumptions({
  * 격자에서 고른 한 조합의 리포트 (#203) — 곡선·낙폭, 판정 지표, 거래목록이 **그 조합으로**
  * 바뀌는 자리다 (전파 규칙 §2.3).
  */
-export function RunReportView({ report }: { report: RunReportOut }) {
+export function RunReportView({
+  report,
+  omittedNotice = null,
+}: {
+  report: RunReportOut;
+  /**
+   * 이 실행이 **빼고 돈** 전략 (#401). 고른 봇이 실행의 봇과 같을 때만 페이지가 넘겨준다 —
+   * 다른 봇을 고른 뒤라면 여기서 할 수 있는 말이 없고, 모르면서 말하지 않는다.
+   */
+  omittedNotice?: string | null;
+}) {
   const run = report.run;
 
   return (
@@ -409,6 +419,12 @@ export function RunReportView({ report }: { report: RunReportOut }) {
           .join(" · ")}{" "}
         · {run.period_from} ~ {run.period_to}
       </p>
+
+      {omittedNotice && (
+        <p role="alert" className="break-keep border border-warning p-2 text-sm text-ink">
+          {omittedNotice}
+        </p>
+      )}
 
       {/* **이 화면의 모든 숫자가 이 가정 위에 서 있다.** 가정을 안 보이면 수익률·Calmar·샤프가
           무엇을 전제한 값인지 알 수 없다 (제품 정의 counter-metric — 모든 숫자가 출처 표시를

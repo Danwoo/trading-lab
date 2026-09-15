@@ -44,6 +44,7 @@ function renderForm() {
     const controller: GridRunFormController = {
       botId: null,
       strategy: null,
+      botDetail: null,
       botDetailError: null,
       form,
       axes: [],

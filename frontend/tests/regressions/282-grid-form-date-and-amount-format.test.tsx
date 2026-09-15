@@ -42,6 +42,7 @@ function renderForm(overrides: Partial<GridRunFormState> = {}) {
     const controller: GridRunFormController = {
       botId: null,
       strategy: null,
+      botDetail: null,
       botDetailError: null,
       form,
       axes: [],
