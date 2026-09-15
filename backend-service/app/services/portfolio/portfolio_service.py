@@ -51,6 +51,9 @@ class PortfolioService:
 
     def insert_holding(self, args: dict) -> tuple:
         args["workspace_id"] = require_workspace_id()
+        # 저장소에 FK 가 없다 — 여기서 안 막으면 부모 없는 보유종목이 남고 API 로 지울 수도 없다.
+        if not self.portfolio_repository.select_portfolio(args):
+            raise NotFoundError("포트폴리오를 찾을 수 없습니다.")
         if self.portfolio_repository.select_holding(args):
             raise ConflictError("이미 존재하는 데이터입니다.")
         return self.portfolio_repository.insert_holding(args)

@@ -1,10 +1,13 @@
 // schemas/backtest/backtest.ts
 import { z } from "zod";
-import { Optional, PositiveFloat, StrRange, array, object, record } from "@/lib/zod/helpers";
+import { Field, IntRange, Optional, StrRange, array, object, record } from "@/lib/zod/helpers";
+import { BIGINT_MAX, INT32_MAX, MONEY_MAX } from "@/schemas/common/storageLimits";
+
+/** 백엔드 `schemas/common_schema.py` 의 상한 상수와 같은 값 — 정본은 저장 컬럼이다. */
 
 // 백엔드 계약: backend-service/app/schemas/backtest/backtest_schema.py
 //   BacktestRunIn{strategy_key(40), params, market(20), symbol(20), period_from, period_to,
-//                 initial_cash(>0), costs?, bot_id?, parent_run_id?}
+//                 initial_cash(0 초과 ~ 1e15), costs?, bot_id?, parent_run_id?}
 //   BacktestGridIn = BacktestRunIn + sweep{이름 → 훑을 값 목록}
 
 export const BacktestRunInSchema = object({
@@ -15,10 +18,11 @@ export const BacktestRunInSchema = object({
   symbol: StrRange(1, 20),
   period_from: StrRange(10, 10),
   period_to: StrRange(10, 10),
-  initial_cash: PositiveFloat(),
+  // 상한의 정본은 저장 컬럼이다 — 넘겨보내면 DB 에서 500 이 된다 (백엔드 `MONEY_MAX`).
+  initial_cash: Field({ gt: 0, le: MONEY_MAX }).float(),
   costs: Optional(record(z.number())),
-  bot_id: Optional(z.number().int()),
-  parent_run_id: Optional(z.number().int()),
+  bot_id: Optional(IntRange(1, INT32_MAX)),
+  parent_run_id: Optional(IntRange(1, BIGINT_MAX)),
 });
 
 export const BacktestGridInSchema = BacktestRunInSchema.extend({
