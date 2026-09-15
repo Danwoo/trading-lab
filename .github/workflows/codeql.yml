@@ -15,6 +15,13 @@ name: CodeQL
 # ⚠ **PR 에서는 안 돈다.** 그 대가는 「main 에 들어간 뒤에야 경보가 뜬다」이고, 받아들이는
 # 근거는 위 실측이다(12일간 이 체크가 PR 을 막은 적이 없다). 되돌리려면 아래 `on:` 에
 # `pull_request:` 를 더하면 된다.
+#
+# ── private 전환 대비 (2026-09-14) ───────────────────────────────────────
+# private 에서 코드 스캐닝 **업로드**는 Code Security 라이선스를 요구한다
+# (GitHub 문서: *"If you want to use code scanning on private repositories, you need a
+# GitHub Code Security license."*). 결제하지 않기로 했으므로(리드 결정 2026-08-29) 업로드를
+# 빼고 **분석 결과를 이 잡이 직접 읽어 판정**한다. 탐지는 그대로 남고, 종전과 달리 결과가
+# 실제로 잡을 빨갛게 만든다 — 끄는 것이 아니라 자리를 옮기는 것이다.
 on:
   push:
     branches: [main]
@@ -42,7 +49,7 @@ jobs:
     runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-latest' || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 60
     permissions:
-      security-events: write   # 경보 업로드
+      # 업로드하지 않으므로 `security-events: write` 가 필요 없다 — 권한은 쓰는 만큼만.
       contents: read
       actions: read
     strategy:
@@ -64,7 +71,24 @@ jobs:
           config: |
             threat-models: remote
 
-      - name: Analyze
+      # **업로드하지 않고 분석한다.** private 에서 코드 스캐닝 업로드는 Code Security 라이선스를
+      # 요구하는데 결제하지 않기로 했다(리드 결정 2026-08-29). 그렇다고 분석을 끄면 탐지가
+      # 통째로 사라지므로, 라이선스가 필요한 **업로드**만 빼고 결과를 파일로 받는다.
+      #
+      # 그리고 그 결과를 **이 잡이 직접 읽어 빨갛게 만든다** — 종전에는 경보가 Security 탭으로만
+      # 가고 이 체크는 12일 내내 실패 0이었다. 즉 private 전환이 탐지를 약하게 만드는 것이 아니라
+      # 오히려 잡이 결과를 책임지게 된다.
+      - name: Analyze (업로드 없이 — SARIF 를 파일로)
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+          upload: never
+          output: ${{ runner.temp }}/codeql-results
+          upload-database: false
+
+      - name: 결과 판정 (fail-closed — SARIF 를 못 읽으면 실패)
+        if: ${{ !cancelled() }}
+        env:
+          RESULTS_DIR: ${{ runner.temp }}/codeql-results
+          LANGUAGE: ${{ matrix.language }}
+        run: python3 scripts/judge_codeql_sarif.py --dir "$RESULTS_DIR" --language "$LANGUAGE"

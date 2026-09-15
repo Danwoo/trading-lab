@@ -1,11 +1,9 @@
 // schemas/backtest/backtest.ts
 import { z } from "zod";
 import { Field, IntRange, Optional, StrRange, array, object, record } from "@/lib/zod/helpers";
+import { BIGINT_MAX, INT32_MAX, MONEY_MAX } from "@/schemas/common/storageLimits";
 
 /** 백엔드 `schemas/common_schema.py` 의 상한 상수와 같은 값 — 정본은 저장 컬럼이다. */
-const MONEY_MAX = 1e15;
-const INT32_MAX = 2_147_483_647;
-const BIGINT_MAX = Number.MAX_SAFE_INTEGER;
 
 // 백엔드 계약: backend-service/app/schemas/backtest/backtest_schema.py
 //   BacktestRunIn{strategy_key(40), params, market(20), symbol(20), period_from, period_to,

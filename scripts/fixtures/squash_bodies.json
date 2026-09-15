@@ -140,5 +140,26 @@
       }
     ],
     "expected_body": "* build(deps): bump hono from 4.12.18 to 4.13.1 in /frontend\n\nBumps [hono](https://github.com/honojs/hono) from 4.12.18 to 4.13.1.\n- [Release notes](https://github.com/honojs/hono/releases)\n- [Commits](https://github.com/honojs/hono/compare/v4.12.18...v4.13.1)\n\n---\nupdated-dependencies:\n- dependency-name: hono\n  dependency-version: 4.13.1\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\n\n* docs: hono 4.13.1 을 고지 문서에 반영한다\n\n`test: frontend` 의 고지 대조가 hono 4.12.18 → 4.13.1 을 따라오지 못해 빨간불이었다.\n손으로 숫자를 고치는 대신 고지 문서 생성기의 출력을 그대로 커밋한다.\n\nhono 행 외에 §2 표 4행의 **순서**가 함께 바뀐다(집합은 그대로). 그 4행은 2026-08-04 에 손으로\n끼워 넣은 radix 계열이라 문서가 다른 곳에서 쓰던 정렬(`이름@버전` 문자열)과 어긋나 있었고,\n생성기가 그 정렬로 맞춘 것이다. 같은 4행을 생성기 PR\n(https://github.com/Danwoo/trading-lab/pull/31)도 똑같이 바꾸므로 어느 쪽이 먼저 머지돼도\n결과는 같다.\n\n검증 — 이 브랜치에서 `python3 scripts/verify_notice_counts.py` 가 exit 0\n(문서 열거 599개 ↔ 실측 599개 · 문서에만 0개 · 실측에만 0개).\n\n---------\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\nCo-authored-by: Danwoo <tjeksdn173@gmail.com>\nCo-authored-by: claude-opus-agent <claude-opus-agent@noreply.local>"
+  },
+  {
+    "pr": 462,
+    "desc": "커밋 둘(머지 커밋 포함) · AI 자기 광고가 섞인 실물",
+    "merge_sha": "3bfff6968b079ddcbdd4c73901008f32149bcf15",
+    "commits": [
+      {
+        "message": "fix: 문서 삭제 실패가 사유를 말하고, 레일이 무엇을 기다리는지 말한다 — #441\n\n**B-24 — 문서를 지울 수 없었다.** 세 번 다 500 이고 행은 그대로 남았으며, 화면은 「잠시 후\n다시 시도」라고 했다. 상류가 죽어 있으면 **다시 해도 안 된다** — 틀린 처방이다.\n\n뿌리는 `doc_search_client.delete_by_file` 의 `raise_for_status()` 가 던지는\n`httpx.HTTPStatusError` 가 도메인 예외가 아니라 일반 핸들러가 500 으로 뭉개는 것이다.\n**같은 서비스의 적재 경로는 이미 옳게 하고 있다** — `BadGatewayError` 로 바꾼다. 삭제 경로에만\n그 층이 없었다. 색인 회수와 파일 회수를 따로 감싸 **어느 단계에서 막혔는지** 말하고, 문서가\n그대로 남아 있다는 사실과 언제 다시 지울 수 있는지도 함께 낸다.\n\n부분실패 안전(외부 회수가 끝나야 잡행을 지운다)은 그대로다 — 그 설계를 바꾸는 것은 별개\n판단이라 손대지 않았다.\n\n**F7 — 같은 낱말을 쓰는 세 자리가 다른 말을 했다.** 레일은 「포트폴리오는 아직 없습니다」인데\n`/admin` 에는 3건이 있고 사이드바 보유 탭에도 뜬다. 레일이 기다리는 것은 **봇 체결로 만들어진\n포지션**이지 「포트폴리오」 일반이 아니다 — 방금 관리 화면에서 만든 사람에게는 「저장이 안 됐다」로\n읽힌다. 낱말이 뜻을 말하게 하고, 이미 등록한 보유는 어디서 보는지 가리킨다.\n\n기존 그물(#228 「모든 미완 문구가 언제 오는지 말한다」)이 첫 문안을 잡아 줬다 — 뜻을 유지한 채\n그 요구도 만족시켰다.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KmuCrUwjPezS1cg7ynYZ2X",
+        "author_name": "claude-opus-agent",
+        "author_email": "claude-opus-agent@noreply.local",
+        "parents": 1
+      },
+      {
+        "message": "Merge branch 'main' into feature/441-delete-speaks",
+        "author_name": "Danwoo",
+        "author_email": "tjeksdn173@gmail.com",
+        "parents": 2
+      }
+    ],
+    "expected_body": "**B-24 — 문서를 지울 수 없었다.** 세 번 다 500 이고 행은 그대로 남았으며, 화면은 「잠시 후\n다시 시도」라고 했다. 상류가 죽어 있으면 **다시 해도 안 된다** — 틀린 처방이다.\n\n뿌리는 `doc_search_client.delete_by_file` 의 `raise_for_status()` 가 던지는\n`httpx.HTTPStatusError` 가 도메인 예외가 아니라 일반 핸들러가 500 으로 뭉개는 것이다.\n**같은 서비스의 적재 경로는 이미 옳게 하고 있다** — `BadGatewayError` 로 바꾼다. 삭제 경로에만\n그 층이 없었다. 색인 회수와 파일 회수를 따로 감싸 **어느 단계에서 막혔는지** 말하고, 문서가\n그대로 남아 있다는 사실과 언제 다시 지울 수 있는지도 함께 낸다.\n\n부분실패 안전(외부 회수가 끝나야 잡행을 지운다)은 그대로다 — 그 설계를 바꾸는 것은 별개\n판단이라 손대지 않았다.\n\n**F7 — 같은 낱말을 쓰는 세 자리가 다른 말을 했다.** 레일은 「포트폴리오는 아직 없습니다」인데\n`/admin` 에는 3건이 있고 사이드바 보유 탭에도 뜬다. 레일이 기다리는 것은 **봇 체결로 만들어진\n포지션**이지 「포트폴리오」 일반이 아니다 — 방금 관리 화면에서 만든 사람에게는 「저장이 안 됐다」로\n읽힌다. 낱말이 뜻을 말하게 하고, 이미 등록한 보유는 어디서 보는지 가리킨다.\n\n기존 그물(#228 「모든 미완 문구가 언제 오는지 말한다」)이 첫 문안을 잡아 줬다 — 뜻을 유지한 채\n그 요구도 만족시켰다.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01KmuCrUwjPezS1cg7ynYZ2X\nCo-authored-by: claude-opus-agent <claude-opus-agent@noreply.local>\nCo-authored-by: Danwoo <tjeksdn173@gmail.com>",
+    "expected_after_filter": "**B-24 — 문서를 지울 수 없었다.** 세 번 다 500 이고 행은 그대로 남았으며, 화면은 「잠시 후\n다시 시도」라고 했다. 상류가 죽어 있으면 **다시 해도 안 된다** — 틀린 처방이다.\n\n뿌리는 `doc_search_client.delete_by_file` 의 `raise_for_status()` 가 던지는\n`httpx.HTTPStatusError` 가 도메인 예외가 아니라 일반 핸들러가 500 으로 뭉개는 것이다.\n**같은 서비스의 적재 경로는 이미 옳게 하고 있다** — `BadGatewayError` 로 바꾼다. 삭제 경로에만\n그 층이 없었다. 색인 회수와 파일 회수를 따로 감싸 **어느 단계에서 막혔는지** 말하고, 문서가\n그대로 남아 있다는 사실과 언제 다시 지울 수 있는지도 함께 낸다.\n\n부분실패 안전(외부 회수가 끝나야 잡행을 지운다)은 그대로다 — 그 설계를 바꾸는 것은 별개\n판단이라 손대지 않았다.\n\n**F7 — 같은 낱말을 쓰는 세 자리가 다른 말을 했다.** 레일은 「포트폴리오는 아직 없습니다」인데\n`/admin` 에는 3건이 있고 사이드바 보유 탭에도 뜬다. 레일이 기다리는 것은 **봇 체결로 만들어진\n포지션**이지 「포트폴리오」 일반이 아니다 — 방금 관리 화면에서 만든 사람에게는 「저장이 안 됐다」로\n읽힌다. 낱말이 뜻을 말하게 하고, 이미 등록한 보유는 어디서 보는지 가리킨다.\n\n기존 그물(#228 「모든 미완 문구가 언제 오는지 말한다」)이 첫 문안을 잡아 줬다 — 뜻을 유지한 채\n그 요구도 만족시켰다.\n\nCo-authored-by: claude-opus-agent <claude-opus-agent@noreply.local>\nCo-authored-by: Danwoo <tjeksdn173@gmail.com>"
   }
 ]

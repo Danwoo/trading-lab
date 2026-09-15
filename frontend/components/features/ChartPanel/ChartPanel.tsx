@@ -7,7 +7,6 @@ import { NO_CONTEXT_REASON, useLoadedSeries } from "@/hooks/terminal/useLoadedSe
 import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
 import { createCandleChart, type CandleChartHandle } from "@/lib/terminal/candleChart";
 import { simpleMovingAverage } from "@/lib/terminal/indicators";
-import { SAMPLE_CANDLES } from "@/lib/terminal/sampleCandles";
 import type { Candle } from "@/services/terminal/marketService";
 import type { Provenance } from "@/types/terminal/provenance";
 import type { PanelProps } from "@/types/terminal/panel";
@@ -32,15 +31,23 @@ function readMovingAverages(settings: Record<string, unknown>): number[] {
  * | 상태 | 그리는 것 |
  * |---|---|
  * | 적재본이 있다 | 실캔들 + `loaded` 출처(소스·수정주가 정책·기준시각) |
- * | 종목/기간을 아직 안 골랐다 (`NO_CONTEXT_REASON`) | `SAMPLE_CANDLES` + `placeholder` 배지 |
- * | 키가 아직 없다 (`credential_missing`) | `SAMPLE_CANDLES` + 해칭 + **사유를 실은** `placeholder` 배지 |
- * | 그 밖의 `unavailable` (소스 없음·제공 범위 밖·상류 장애) | **사유 문장** — 임시 캔들을 그리지 않는다 |
+ * | 종목/기간을 아직 안 골랐다 (`NO_CONTEXT_REASON`) | **빈 격자** + 무엇을 기다리는지 |
+ * | 키가 아직 없다 (`credential_missing`) | **빈 격자** + 해칭 + **사유를 실은** `placeholder` 배지 |
+ * | 그 밖의 `unavailable` (소스 없음·제공 범위 밖·상류 장애) | **사유 문장** |
  *
- * 마지막 두 줄의 경계가 요점이다. 임시 캔들은 **골조를 보여주려고** 그리는 것이고(결정 로그
- * 2026-07-28), 그래서 「키가 아직 없다」일 때만 그린다 — 그 판정은 화면이 문구를 보고 하지 않고
- * 백엔드가 준 `unavailable_code` 로 한다. 그리고 그릴 때는 해칭과 **사유**를 함께 낸다. 사유를
- * 떨어뜨리면 "데이터가 들어왔다"로 읽히고, 그것이 NFR-001 이 막으려는 상태다.
+ * **임시 캔들은 그리지 않는다** (리드 결정 2026-09-14). 종전에는 골조를 보여주려고 시드 난수
+ * 120영업일을 그렸는데(결정 로그 2026-07-28), 그것은 **종목이 달라도 같은 모양**이라 하나만
+ * 보고 있으면 진짜인지 가릴 단서가 화면에 없다 — 정보 패널에서 74,200원을 지운 것과 같은
+ * 이유다(#445 F11). 해칭과 배지가 붙어 있어도 「그럴듯한 값」이 남아 있는 한 오독은 가능하다.
+ * 리드 결정(2026-09-02 Q1)은 **오독이 원리적으로 불가능한 표시**이고, 캔들에서 그것은
+ * 「아무 캔들도 없음」이다.
+ *
+ * 자리는 지킨다 — 캔버스는 마운트된 채로 두고 위에 사유를 덮는다. 값이 실제로 오면 차트를
+ * 처음부터 다시 만들지 않아도 된다.
  */
+/** 그릴 값이 없을 때 하는 말 — 지어낸 캔들 대신 이 문장이 선다. */
+const NOTHING_TO_DRAW = "아직 그릴 값이 없습니다. 종목과 기간을 고르면 적재된 캔들이 여기 그려집니다.";
+
 export default function ChartPanel({ instanceId, settings, onSettingsChange }: PanelProps) {
   const symbol = useTerminalSymbol();
   const series = useLoadedSeries();
@@ -58,7 +65,9 @@ export default function ChartPanel({ instanceId, settings, onSettingsChange }: P
   const isPlaceholder = series.provenance.kind === "placeholder" || isNoContextYet;
   const unavailableReason =
     series.provenance.kind === "unavailable" && !isNoContextYet ? series.provenance.reason : null;
-  const candles: Candle[] = isPlaceholder ? SAMPLE_CANDLES : (series.data ?? []);
+  // 임시일 때 그릴 것은 **없다.** 그릴 값이 없으면 지어낸 값이 화면에 남을 자리도 없다.
+  const candles: Candle[] = isPlaceholder ? [] : (series.data ?? []);
+  const placeholderHint = series.provenance.kind === "placeholder" ? series.provenance.hint : undefined;
 
   useEffect(() => {
     // 실려 온 사유(키가 아직 없다)는 `hint` 로 그대로 넘긴다 — 떨어뜨리면
@@ -135,6 +144,13 @@ export default function ChartPanel({ instanceId, settings, onSettingsChange }: P
         {unavailableReason !== null && (
           <div className="absolute inset-0 bg-bg-panel">
             <PanelUnavailable reason={unavailableReason} />
+          </div>
+        )}
+        {/* 임시 상태에서도 **왜** 비어 있는지 말한다 — 빈 격자만 두면 「고장」으로 읽힌다.
+            배경을 덮지 않아 `PanelFrame` 의 해칭이 그대로 비친다. */}
+        {unavailableReason === null && isPlaceholder && (
+          <div className="pointer-events-none absolute inset-0">
+            <PanelUnavailable reason={placeholderHint ?? NOTHING_TO_DRAW} />
           </div>
         )}
       </div>

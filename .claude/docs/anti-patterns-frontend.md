@@ -574,26 +574,24 @@ hit = `PanelData<` 문자열이 없는 파일(후보 — hit 자체는 정상, R
 - **`useTerminalContext.ts`** (및 그 안의 `useTerminalSymbol`/`useTerminalInterval`/`useTerminalRange`/`useTerminalRegion`) — 데이터를 취득하는 훅이 아니라 문맥 스토어를 읽는 셀렉터라 `provenance` 개념 자체가 적용되지 않는다.
 - **`useQuoteBatch.ts`** — 다종목 일괄 시세(FR-048)라 단일 슬롯 `PanelData<T>` 형태는 아니지만, 반환 객체(`{ quotes, provenance }`)에 `provenance: Provenance` 필드를 별도로 포함한다. 룰의 실질(출처 정보 부재)에 해당하지 않으므로 위반 아님.
 
-### 17. 샘플 데이터가 실데이터 경로에서 쓰임
+### 17. 지어낸 값을 화면에 그림
 
 ```tsx
-// ❌ 분기 없이 상시 사용
-import { SAMPLE_CANDLES } from "@/lib/terminal/sampleCandles";
-candleChart.setCandles(SAMPLE_CANDLES);
+// ❌ 값이 없을 때 그럴듯한 값을 그린다 — 배지·해칭이 붙어 있어도 위반이다
+const candles = isPlaceholder ? SAMPLE_CANDLES : data;
 
-// ✅ placeholder 분기에서만 사용
-candleChart.setCandles(
-  provenance.kind === "placeholder" ? SAMPLE_CANDLES : data
-);
+// ✅ 그릴 값이 없으면 그리지 않는다 — 대신 무엇을 기다리는지 말한다
+const candles = isPlaceholder ? [] : data;
 ```
 
-**룰**: `sample*`/`Sample*` 데이터 모듈(예: `lib/terminal/sampleCandles.ts`)은 `provenance.kind === "placeholder"` 분기에서만 쓴다. 분기 밖(항상 실행되는 경로)에서 쓰면 임시 데이터가 실데이터로 오인될 수 있어 위반.
+**룰**: 실데이터가 없는 상태에서 **읽을 수 있는 값**을 지어내 그리지 않는다. 숫자·캔들·방향 기호·색 전부 해당한다. 「임시 데이터」 배지나 해칭이 붙어 있어도 마찬가지다 — 배지는 **여러 화면을 훑어 비교한 사람에게만** 쓸모 있는 단서이고, 하나만 보고 있는 사람에게는 진짜와 구별할 방법이 없다. 값 자리는 **읽을 수 없는 표시**(`—` · 빈 격자)로 두고 무엇을 기다리는지 말한다.
+
+근거는 리드 결정 둘이다 — 2026-09-02 Q1(「임시 시세는 못 읽을 값으로 낸다. 그럴듯한 값 유지와 종목마다 다른 합성값은 기각」)과 2026-09-14(차트도 같게). 종전 룰은 「샘플 모듈을 `placeholder` 분기에서만 쓴다」였는데, 그 분기 **안**에서도 오독이 가능하다는 것이 #445 F11 로 드러났다.
 
 **Detection** (positive-grep, hit=판정 대상):
 ```bash
-git grep -nE "from ['\"].*[sS]ample[A-Z]" -- ':(glob)frontend/**/*.ts' ':(glob)frontend/**/*.tsx'
+git grep -nE "from ['\"].*[sS]ample[A-Z]|SAMPLE_[A-Z]+" -- ':(glob)frontend/**/*.ts' ':(glob)frontend/**/*.tsx'
 ```
-**이 룰은 hit 가 정상적으로 나올 수 있다** — 샘플 모듈을 import 하는 것 자체는 위반이 아니다. 0 hit 를 기대하지 않는다. 각 hit 파일을 Read 해 `provenance.kind === "placeholder"` 분기 **안**에서만 쓰는지 판정 — 분기 밖(무조건 실행되는 경로)에서 쓰면 위반.
+**0 hit 를 기대한다.** hit 가 있으면 그 모듈이 무엇을 그리는지 Read 해 판정한다 — 화면에 읽을 수 있는 값으로 나가면 위반이다. 테스트 픽스처(`tests/**`)는 화면에 안 나가므로 대상이 아니다.
 
-**예외**: 이름 붙은 예외 컴포넌트 목록은 없다 — **판정 기준 자체가 예외를 가른다**: `placeholder` 분기 안의 사용은 정상이고 위반이 아니다.
-**알려진 정상 사례**: `components/features/ChartPanel/ChartPanel.tsx`(O6) — `SAMPLE_CANDLES` 를 import 하지만 `isPlaceholder ? SAMPLE_CANDLES : series.data` 삼항으로 placeholder(및 동등한 benign-gap) 분기에서만 쓴다(1 hit, 위반 아님). 분기 밖에서 무조건 쓰는 경우만 위반이다.
+**예외**: 없다. 값이 아니라 **골격**(빈 격자·자리 표시 상자)을 그리는 것은 애초에 지어낸 값이 아니라 이 룰에 해당하지 않는다.

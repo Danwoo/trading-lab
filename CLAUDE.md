@@ -17,7 +17,7 @@
 
 > 스타터 템플릿 성격(신규 엔티티 스캐폴드·MCP 서비스 템플릿)은 **유지**하되, 그게 제품 정체성은 아니다.
 
-- `backend-service` (:8000) — **통합 앱**. 비즈니스 API 를 모듈(도메인 폴더)로 담는다 — `app/modules.py` 에 등록된 **15개가 전부**다: `watchlist` · `portfolio`(보유종목 마스터-디테일) · `nav`(시계열 대시보드) · `research_document` · `file`(업로드/다운로드 + SFTP + 파일 메타) · `chat`·`scheduler`(주간 활동요약 메일 스케줄러 + 포트폴리오 활동 조회 챗) · `ingest`(시세/체결 틱 메시지 큐 producer/consumer) · `bar`(적재본 캔들 조회) · `quote`(일괄 시세) · `capability`(소스별 「무엇이 왜 막혔나」) · `data_key`(소스 키 상태 — 읽기 전용, 값은 안 낸다) · **`bot`**(봇 정의 CRUD) · **`backtest`**(격자 실행·칸 조회) · **`instrument`**(종목 마스터 검색 — 「없다」와 「아직 안 받았다」를 가른다). 라우터·매니저 등록은 `app/modules.py` 한 곳. 백그라운드 매니저 3종이 앱 안에서 돌아 `--workers=1`. 신규 엔티티 스캐폴드 템플릿
+- `backend-service` (:8000) — **통합 앱**. 비즈니스 API 를 모듈(도메인 폴더)로 담는다 — `app/modules.py` 에 등록된 **15개가 전부**다: `watchlist` · `portfolio`(보유종목 마스터-디테일) · `nav`(시계열 대시보드) · `research_document` · `file`(업로드/다운로드 + SFTP + 파일 메타) · `chat`·`scheduler`(주간 활동요약 메일 스케줄러 + 포트폴리오 활동 조회 챗) · `ingest`(시세/체결 틱 메시지 큐 producer/consumer) · `bar`(적재본 캔들 조회) · `quote`(일괄 시세) · `capability`(소스별 「무엇이 왜 막혔나」) · `data_key`(소스 키 상태 — 읽기 전용, 값은 안 낸다) · **`bot`**(봇 정의 CRUD) · **`backtest`**(격자 실행·칸 조회) · **`instrument`**(종목 마스터 검색 — 「없다」와 「아직 안 받았다」를 가른다). 라우터·매니저 등록은 `app/modules.py` 한 곳. 백그라운드 매니저 **3종**(메시지 큐 소비 · 스케줄러 · 적재 워커)이 앱 안에서 돌아 `--workers=1`. 신규 엔티티 스캐폴드 템플릿
 - `portfolio-mcp-service` (:8002) — 계좌/포트폴리오 데이터 전용 MCP 서버 (FastMCP `from_fastapi` 가 REST 라우터를 `/mcp` MCP tool 로 노출 — 같은 앱이 REST 도 그대로 서빙, DB·LLM 없음). 포트폴리오 데이터 접근 단일 소유 — 타 서비스는 직접 호출 금지, **MCP tool 로만** 접근 (에이전트=`MultiServerMCPClient`, 단발 조회·목록 위젯=`PortfolioMcpClient`). 서비스 간 호출은 `create_access_token` 서비스 토큰
 - `multi-agent-service` (:8003) — MCP **소비자** (순수 FastAPI, MCP 서버 아님). 투자 리서치 도메인 Plan-Execute 멀티 에이전트 (4 도메인 · 총 12 sub-agent StateGraph — 종목·시세/재무·공시/리스크·밸류/시장·뉴스·매크로) 가 아래 6개 MCP 서버 tool 을 `MultiServerMCPClient`+`ServiceJwtAuth` 로 오케스트레이션. sub-agent ↔ tool 은 `agents/domains/*` 의 `mcp_tools` 가 각 라우터 **operation_id 와 이름 결합** (lockstep). 엔드포인트: `POST /agent` (네이티브 SSE, `enabled_mcps` 로 MCP 게이팅) · `POST /agent/example-ai` (ai-chatbot 프론트 호환 newline-JSON SSE, `switch1-5`→enabled_mcps, 토큰 스트리밍). switch off = 그 MCP tool 미바인딩(요청별 `_build_graph`). 검색 근거 유무는 tool_calls trace 에서 결정론적 `grounding` 정직 라벨. **멀티턴은 공통 DB `ai_chat_history` 를 `(email, gid)` 로 조회**해 주입하고 매 턴 종료 시 insert 도 한다 (테이블 정의 소유는 frontend Prisma, checkpointer 없음 — `MULTI_AGENT_SQL_DB_*`). `--workers=1`
 - `market-data-mcp-service` (:8004) / `disclosure-mcp-service` (:8005) / `news-mcp-service` (:8006) / `web-mcp-service` (:8007) / `doc-search-mcp-service` (:8008) — portfolio-mcp-service 와 동일 패턴의 도메인별 MCP 서버 (시세·지수·환율 market-data 5 tool · DART/EDGAR 공시·재무 6 tool · 금융 뉴스·감성 5 tool · Tavily 웹검색 1 tool · 사내 투자 리서치 지식 Milvus 하이브리드 검색 28 tool[14 분야 × topic/image]). 모든 MCP 는 기본 MOCK 금융 데이터 반환(API 키 없이 즉시 기동), 실데이터는 env 토글(`USE_REAL_API`). DB·LLM 없음 (doc-search 만 Milvus/Redis store)
@@ -116,13 +116,29 @@ process-compose up        # staging+ 는 docker-compose (compose.staging.yaml + 
 
 ---
 
+## 브랜치 이름 (리드 결정 2026-08-27)
+
+| 작업 | 이름 | 예 |
+|---|---|---|
+| 이슈가 있는 코드 변경 | `feature/<이슈번호>-<짧은-설명>` | `feature/359-timestamptz-columns` |
+| 이슈 없는 코드·설정 변경 | `chore/<짧은-설명>` | `chore/ci-npm-cache` |
+| 목표층 문서만 (아래 절) | `docs/<주제>` | `docs/decision-log-0827` |
+
+소문자, 단어는 하이픈으로, 설명은 3~5 단어. 워크트리를 받으면 **첫 일로** 규약 이름의 브랜치를 직접 판다 — `git fetch origin && git checkout -b <이름> origin/main`. Orca 가 붙이는 기본 이름(`<git 사용자명>/…`)을 그대로 쓰지 않는다.
+
+- **PR 을 연 뒤에 이름을 바꾸지 마라 — 그 PR 이 닫힌다.** GitHub 의 브랜치 rename 은 열린 PR 을 따라오지 않는다 (2026-08-27 실측: PR #395 가 닫혀 #396 으로 다시 열어야 했다). 처음에 맞게 판다.
+- **이름에 벤더 슬러그를 싣지 않는다.** 옛 형식은 `fix-<이슈>-<에이전트>` 였고 그 끝의 `-claude`·`-kimi`·`-codex` 를 자동화가 읽어 저자를 판별했다. 이제 **커밋 신원이 유일한 저자 근거**다 — 워크트리를 받으면 `git config --worktree user.email <벤더>[-<티어>]-agent@noreply.local` 을 반드시 설정하라. 안 하면 저자가 「미상」으로 읽혀 **자동 머지가 막힌다**(`scripts/review_record.py` 조건 ③). 사람이 직접 쓴 PR 도 같은 모양이라 같이 막히는데, 그 탈출구는 **`author: human` 라벨** 하나다 — 레포에 쓰기 권한이 있는 사람이 붙여야 유효하고(봇이 붙인 것은 무효), 저자 미상 차단 하나만 연다. 자기리뷰·승인·위험도 차단은 그대로 남는다.
+- **이 절이 정본이다.** 오더용 상세본이 `.work/orders/BRANCH-RULE.md` 에 있지만 `.work/` 는 gitignored 라 clone 을 따라가지 않는다 — 다른 기계에서 받으면 이 절만 남는다. 둘이 어긋나면 이 절을 따른다.
+
+---
+
 ## 목표층 문서 변경 — 통행료를 걷지 않는다
 
 **대상은 셋뿐이다**: `CONTEXT.md` · 루트 `CLAUDE.md` · GitHub 마일스톤 description. 목표·베팅·결정 로그가 사는 자리이고, **결정은 리드가 이미 내린 뒤** 그것을 받아적는 작업이다. 깨질 코드가 없고 리뷰어가 결정한 사람 자신이라, 코드용 절차를 그대로 씌우면 비용만 남는다.
 
 | 항목 | 코드 변경 | **목표층 문서 변경** |
 |---|---|---|
-| 브랜치 | `fix-<이슈>-<에이전트>` | `goal-<주제>`(사람) · `goal-<주제>-<에이전트>`(에이전트) |
+| 브랜치 | `feature/<이슈>-<설명>` · `chore/<설명>` | `docs/<주제>` |
 | PR 본문 | 템플릿 전 절 | **3줄** — 무엇을·왜·무엇으로 확인했나 |
 | `gate declare` | 한다 | **안 한다** |
 | 독립 리뷰 | 기다린다 | **안 기다린다** — App(`trading-lab-ci`)이 면제 규약대로 승인하고 자동 머지를 건다 (`ci.yml` docs-notice 잡, 2026-08-28) |

@@ -1,7 +1,8 @@
 // schemas/watchlist/watchlist.ts
 import { z } from "zod";
 import { CommonEntity } from "@/schemas/common/types";
-import { StrRange, Field, Optional, PositiveFloat, enums, object, files } from "@/lib/zod/helpers";
+import { StrRange, Field, Optional, FloatRange, enums, object, files } from "@/lib/zod/helpers";
+import { MONEY_MAX } from "@/schemas/common/storageLimits";
 
 // 백엔드 계약: backend-service/app/schemas/watchlist/watchlist_schema.py
 //   Watchlist{issuer_nm?(200), market?(20), sector?(100), currency?(5),
@@ -14,8 +15,8 @@ export const WatchlistSchema = object({
   market: Optional(Field({ max_length: 20 }).str()),
   sector: Optional(Field({ max_length: 100 }).str()),
   currency: Optional(Field({ max_length: 5 }).str()),
-  target_price: Optional(PositiveFloat()),
-  alert_price: Optional(PositiveFloat()),
+  target_price: Optional(FloatRange(0, MONEY_MAX)),
+  alert_price: Optional(FloatRange(0, MONEY_MAX)),
   priority: Optional(Field({ max_length: 5 }).str()),
   use_at: enums(["Y", "N"]),
   memo: Optional(Field({ max_length: 1300 }).str()),

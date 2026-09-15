@@ -50,7 +50,7 @@ AI 투자 리서치 플랫폼의 서비스 구성 (프론트 + 비즈니스 백�
 | 서비스 | 포트 | 역할 | 백그라운드 매니저 |
 | --- | --- | --- | --- |
 | `frontend` | 3000 | Next.js UI + 인증/인가 + API Route 프록시 | — |
-| `backend-service` | 8000 | **통합 앱** — 비즈니스 API (관심종목·포트폴리오·보유종목·NAV 시계열·리서치 문서) + file(업로드/SFTP) + scheduler/chat/report | 있음 3종 (`--workers=1`) |
+| `backend-service` | 8000 | **통합 앱** — 비즈니스 API (관심종목·포트폴리오·보유종목·NAV 시계열·리서치 문서) + file(업로드/SFTP) + scheduler/chat/report | 있음 3종 — 메시지 큐 소비·스케줄러·적재 워커 (`--workers=1`) |
 | `multi-agent-service` | 8003 | 투자 리서치 Plan-Execute 멀티 에이전트 (4 도메인 × 12 sub-agent) — 금융 MCP 스위트 소비 | 있음 (`--workers=1`) |
 | `market-data-mcp-service` | 8004 | 시세·지수·환율 MCP (REST + `/mcp`) | — |
 | `disclosure-mcp-service` | 8005 | DART/EDGAR 공시·재무 MCP | — |
