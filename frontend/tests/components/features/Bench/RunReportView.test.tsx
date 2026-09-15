@@ -535,3 +535,20 @@ describe("머리줄이 요청 구간과 실제로 훑은 구간을 나란히 적
     expect(head()).not.toContain("데이터 ");
   });
 });
+
+// #401 — 리포트 머리가 「ma_pullback」만 말하고, 그 봇에 실린 다른 전략은 화면 어디에도 없었다.
+describe("리포트가 빼고 돈 전략을 말한다", () => {
+  const NOTICE =
+    "이 봇에는 전략이 2개 실려 있는데 검증은 「이동평균 눌림목」 하나만 돌립니다 — 급등 제외 필터은(는) 빠집니다.";
+
+  it("넘겨받은 사실을 경고로 낸다", () => {
+    const { container } = render(<RunReportView report={report()} omittedNotice={NOTICE} />);
+    const alerts = [...container.querySelectorAll('[role="alert"]')].map((node) => node.textContent ?? "");
+    expect(alerts.some((text) => text.includes("급등 제외 필터"))).toBe(true);
+  });
+
+  it("빠진 것이 없으면 아무 말도 얹지 않는다 — 기본값이 그것이다", () => {
+    const { container } = render(<RunReportView report={report()} />);
+    expect(container.textContent ?? "").not.toContain("하나만 돌립니다");
+  });
+});
