@@ -189,15 +189,27 @@ GitHub 의 되살리기로 복구된다. **없는 것을 없다고 적는 것까
 git show origin/main:scripts/reject_push_to_main.py >/dev/null && echo "P1 있음"
 git show origin/main:scripts/audit_main_landing.py  >/dev/null && echo "P2 있음"
 
-# ② 탐지 대체 (CodeQL·secret scanning) 가 main 에 있는가
-git show origin/main:scripts/judge_codeql_sarif.py  >/dev/null && echo "CodeQL 대체 있음"
-git show origin/main:scripts/install_gitleaks.sh    >/dev/null && echo "히스토리 스캔 있음"
+# ② 탐지 대체 (CodeQL·secret scanning) 가 main 에 있는가 — 여섯을 다 본다
+for f in scripts/judge_codeql_sarif.py .codeql-baseline.json \
+         scripts/scan_push_for_secrets.sh scripts/verify_gitleaks_ignore.py \
+         .gitleaksignore scripts/install_gitleaks.sh; do
+  git show "origin/main:$f" >/dev/null 2>&1 && echo "있음 $f" || echo "없음 $f  ← 이 층 없이 전환하게 된다"
+done
 
 # ③ 이 클론의 훅이 실제로 걸려 있는가 (설치한 클론에만 산다)
 ls "$(git rev-parse --git-path hooks)"/pre-commit "$(git rev-parse --git-path hooks)"/pre-push
+
+# ④ 되돌릴 때 필요한 ruleset 정의를 **지금** 받아 둔다 — 전환 뒤에는 403 이라 못 받는다
+gh api repos/Danwoo/trading-lab/rulesets --jq '.[0].id' \
+  | xargs -I{} gh api repos/Danwoo/trading-lab/rulesets/{} > ~/main-protection.json
+test -s ~/main-protection.json && echo "ruleset 정의 받아 둠"
 ```
 
-셋 다 나와야 넘어간다. 하나라도 없으면 **그 층 없이 전환하는 것**이다.
+넷 다 나와야 넘어간다. 하나라도 없으면 **그 층 없이 전환하는 것**이다.
+
+②의 여섯은 각각 다른 것을 받는다 — 앞의 둘이 CodeQL(판정부 + 켤 때의 출발선), 가운데 셋이
+secret scanning(push 구간 스캔 · 히스토리 예외의 지문 검증 · 예외 목록), 마지막이 히스토리
+전수 스캔이다. 종전 점검은 여섯 중 둘만 보고 「대체 있음」이라 적었다.
 
 ### 전환 — 네 걸음
 
@@ -235,13 +247,9 @@ gh api repos/Danwoo/trading-lab/rulesets --jq '.[].name'   # `main protection` �
 
 **ruleset 이 삭제가 아니라 비활성이라 즉시 복원된다는 것은 가정이다** — 전환 직후 3번에서
 403 을 확인했다면, 되돌린 뒤 이 명령이 `main protection` 을 다시 내는지까지 봐야 그 가정이
-확인된다. 안 나오면 ruleset 을 손으로 다시 만들어야 하므로, **전환 전에 현재 ruleset 정의를
-받아 둔다**:
-
-```bash
-gh api repos/Danwoo/trading-lab/rulesets --jq '.[0].id' \
-  | xargs -I{} gh api repos/Danwoo/trading-lab/rulesets/{} > /tmp/main-protection.json
-```
+확인된다. 안 나오면 ruleset 을 손으로 다시 만들어야 하는데, 그 정의는 **전환 전 점검 ④**
+에서 이미 받아 뒀다(`~/main-protection.json`). 전환 뒤에는 그 API 가 403 이라 받을 수 없으니,
+그 걸음을 건너뛰었다면 되돌리기 전에 되돌려 놓고 받아야 한다.
 
 ### 전환 뒤에도 남는 구멍
 
