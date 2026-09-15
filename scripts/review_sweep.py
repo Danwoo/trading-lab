@@ -56,6 +56,11 @@ failure annotation** 에 붙지 run 결론에 안 붙는다. 그래서 이 판�
 
 arm 판정 입력(`arm_input`)을 못 모았으면 `rearm` 을 내지 않는다 — 모르는 것은 통과가 아니다.
 
+**입력은 판정부가 요구하는 전부여야 한다.** 일부만 모으면 판정부는 그 축을 「없음」으로 읽고
+늘 같은 쪽으로 기운다 — 실측(2026-09-15 리뷰 지적): `author: human` 라벨 입력 셋
+(`pr_labels`·`human_label_events`·`actor_permissions`)을 빠뜨렸더니, 사람이 연 PR 은 라벨이
+실제로 붙어 있어도 **영영 `rearm` 이 안 났고 사유는 「라벨 없음」이라는 거짓**이었다.
+
 ## 신뢰 경계
 
 에이전트가 이 판정부를 부를 때는 **`git show origin/main:scripts/review_sweep.py` 로 꺼내
@@ -297,6 +302,54 @@ def _paginated(rc: int, raw: str):
     return parse_comments(rc, raw)
 
 
+#: 저자 미상 차단의 탈출구 라벨 — 계약은 `review_record` 의 상수 블록에 있고 판정은
+#: `judge_human_label` 이 한다. 여기는 배관이다.
+HUMAN_LABEL = "author: human"
+
+
+def _human_label_trail(repo: str, number: int, labels: list[str]):
+    """`author: human` 라벨의 부착 이력과 부착자 권한 — 라벨이 없으면 `(None, None)`.
+
+    **없으면 안 모은다**가 아니라 **없으면 `None` 이다**. 판정부는 `None` 을 「이력을 못
+    읽었다」로 읽어 차단을 열지 않는다 (fail-closed). 조회가 실패했을 때도 같은 값이라,
+    「안 붙었다」와 「못 읽었다」가 판정에서 같은 쪽으로 접힌다 — 여는 쪽이 아니다.
+    """
+    if HUMAN_LABEL not in labels:
+        return None, None
+
+    events = _paginated(
+        *_gh(
+            [
+                "api",
+                f"repos/{repo}/issues/{number}/timeline",
+                "--paginate",
+                "--jq",
+                '[.[] | select((.event == "labeled" or .event == "unlabeled")'
+                f' and (.label.name? == "{HUMAN_LABEL}"))'
+                " | {event, label: .label.name, actor_login: (.actor.login // null),"
+                " actor_type: (.actor.type // null), created_at: (.created_at // null)}]",
+            ]
+        )
+    )
+    if events is None:
+        return None, None
+
+    permissions: dict[str, str] = {}
+    logins = sorted(
+        {
+            event.get("actor_login")
+            for event in events
+            if isinstance(event, dict) and event.get("event") == "labeled" and event.get("actor_login")
+        }
+    )
+    for login in logins:
+        rc, raw = _gh(["api", f"repos/{repo}/collaborators/{login}/permission", "--jq", ".permission"])
+        permission = raw.strip()
+        if rc == 0 and permission:
+            permissions[login] = permission
+    return events, permissions
+
+
 def arm_input(repo: str, item: dict, comments: list, marker: dict) -> dict | None:
     """`review_record.decide_arm` 의 입력을 모은다 — 하나라도 못 읽으면 `None` (fail-closed).
 
@@ -352,6 +405,9 @@ def arm_input(repo: str, item: dict, comments: list, marker: dict) -> dict | Non
         except json.JSONDecodeError:
             refs.append({"number": ref, "lookup_failed": True})
 
+    labels = [label["name"] for label in item.get("labels") or []]
+    events, permissions = _human_label_trail(repo, number, labels)
+
     author = item.get("author") or {}
     return {
         "head_sha": head,
@@ -368,6 +424,9 @@ def arm_input(repo: str, item: dict, comments: list, marker: dict) -> dict | Non
         "issue_refs": refs,
         "dropped_refs": scan["dropped"],
         "commit_author_emails": [e for e in emails if isinstance(e, str) and e],
+        "pr_labels": labels,
+        "human_label_events": events,
+        "actor_permissions": permissions,
     }
 
 
