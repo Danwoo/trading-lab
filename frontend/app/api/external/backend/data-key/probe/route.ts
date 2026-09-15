@@ -18,7 +18,10 @@ const postHandler = async (req: NextRequest, session: any) => {
       data: await req.json(),
     });
 
-    return createSuccessResponse(result, operation);
+    // **확인은 등록이 아니다.** operation 을 넘기면 POST 표의 성공 문구(「등록이 완료되었습니다」)와
+    // 201 이 붙어, 키가 틀렸다고 답한 확인(`ok:false`)까지 「저장됐다」로 읽힌다 (#445 B-17).
+    // 만든 것이 없으므로 200 으로, 붙일 말이 없으므로 결과만 그대로 돌려준다.
+    return createSuccessResponse(result);
   } catch (error) {
     return createErrorResponse(error, operation);
   }

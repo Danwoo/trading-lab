@@ -19,7 +19,14 @@ export function DataKeyRow({ row, canWrite, onSaved }: { row: DataKeyStatus; can
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
 
   const busy = outcome.kind === "busy";
-  const canSubmit = value.trim().length > 0 && !busy;
+  const typed = value.trim().length > 0;
+  const canSubmit = typed && !busy;
+  // **「설정됨」과 「유효함」은 다르다** (#445 B-16·F30). 저장된 키는 값을 다시 칠 수 없어
+  // 종전에는 확인 버튼이 영영 잠겨 있었다 — 통하는지 알 길이 없었다. 빈 값으로 확인을 부르면
+  // 서버가 저장된 것을 쓴다. 값을 쳤으면 그 값이 이긴다(저장 전 확인은 종전 그대로).
+  const canProbe = (typed || row.filled) && !busy;
+  // 저장된 것을 쓸 때만 그렇게 말한다 — 저장된 키가 없는 행까지 그 문구를 쓰면 거짓이다.
+  const probesStored = !typed && row.filled;
 
   /** 확인·저장이 같은 실패 처리를 쓴다 — 사유를 삼키지 않는다. */
   const run = async (what: "probe" | "save") => {
@@ -73,11 +80,12 @@ export function DataKeyRow({ row, canWrite, onSaved }: { row: DataKeyStatus; can
           />
           <button
             type="button"
-            disabled={!canSubmit}
+            disabled={!canProbe}
             onClick={() => void run("probe")}
+            title={probesStored ? "저장된 키로 확인합니다" : "친 값으로 확인합니다"}
             className="min-h-touch-min rounded-control border border-line px-2 text-2xs text-ink disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
           >
-            연결 확인
+            {probesStored ? "저장된 키 확인" : "연결 확인"}
           </button>
           <button
             type="button"
