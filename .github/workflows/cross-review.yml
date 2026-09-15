@@ -869,13 +869,24 @@ jobs:
           #        Error: [provider.api_error] 403 You've reached your usage limit for this billing cycle. Your quota will be refreshed
           #      in the next cycle. To continue now, purchase extra usage or upgrade your plan: ...
           #     TUI 는 403 뒤에도 살아 있다(status=running) — 그래서 폴링만으로는 못 잡는다.
+          #   kimi 0.36.1 `kimi -p`  exit 1 / stderr (2026-09-15 실측 — **문구가 바뀌었다**):
+          #     error: failed to run prompt: provider.auth_error: 403 You've reached your weekly
+          #     (7-day) usage limit. Your quota will reset when the current 7-day window ends. ...
+          #     ⚠ 종전 패턴 `you'?ve (reached|hit) your usage limit` 은 **이 문장을 놓친다** —
+          #     `your` 와 `usage limit` 사이에 `weekly (7-day) ` 가 끼었다. 그래서 사전 프로브가
+          #     한도를 확증하지 못하고, 소진된 리뷰어에 **상한 전부를 태웠다**(실측: PR #501
+          #     리뷰 40분 중 kimi 32분 — 실제로 판정을 낸 claude 는 6분 29초였다).
+          #     문구는 또 바뀐다. `scripts/test_rate_limit_phrases.py` 가 이 패턴을 여기서 읽어
+          #     기록된 원문들에 대 본다 — 벤더가 말을 바꾸면 그 그물이 먼저 빨개진다.
           #   아포스트로피는 ASCII 0x27 실측(hexdump) — 유니코드 U+2019 아님.
           #   대조군(한도 아님 → 미매치 실측): codex "Not inside a trusted directory ..." / 정상 exit 0.
           #
           # **stderr 만 본다** — stdout 은 모델이 쓴 본문이고 PR diff 인용이 들어간다.
           is_rate_limited() {
             [ "$1" -ne 0 ] || return 1   # 성공 종료(exit 0)는 한도가 아니다
-            grep -qiE "you'?ve (reached|hit) your usage limit|usage limit for this billing cycle" "$2"
+            # `your` 와 `usage limit` 사이에 벤더가 수식어를 끼운다 — 그 자리를 비워 둔다.
+            # 마침표를 못 넘게 해(`[^.]*`) 문장을 건너뛰며 엉뚱하게 걸리지 않는다.
+            grep -qiE "you'?ve (reached|hit) your [^.]*usage limit|usage limit for this billing cycle|quota will (be refreshed|reset)" "$2"
           }
           # 일시적 실패 — 재시도할 가치가 있는 것. 종료 코드가 1순위 근거다:
           #   124=timeout(1) · 137=SIGKILL · 143=SIGTERM · 125=timeout 자체 실패

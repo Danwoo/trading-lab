@@ -1062,6 +1062,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_review_sweep.py
 
+      # 리뷰어 한도 판별 문구가 **지금 벤더가 쓰는 말**을 잡는가 — 이 판별이 조용히 낡으면
+      # 사전 프로브가 소진된 리뷰어를 못 걸러 리뷰 상한(수십 분)을 통째로 태운다 (실측: 40분
+      # 중 33분). 문구는 벤더가 바꾼다.
+      - name: 리뷰어 한도 문구 판정 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_rate_limit_phrases.py
+
       # 부트스트랩의 「직접 채워야 하는 키」 판정 (#407 F23) — 비워 두는 것이 정답인 키를
       # 채우라고 시키면 경로를 짐작해 넣어 오히려 틀린다. `.env.example` 주석 표식이 갈림이다.
       - name: 부트스트랩 수동 키 판정 검사
