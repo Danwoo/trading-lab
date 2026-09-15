@@ -498,6 +498,44 @@ describe("RunReportView", () => {
   });
 });
 
+// #400 — 머리줄이 요청 구간만 적어, 적재본이 짧아 실제로는 그 일부만 훑은 실행이
+// 「3년을 검증했다」로 읽혔다. 아래의 모든 숫자가 그 짧은 구간의 값인데도.
+describe("머리줄이 요청 구간과 실제로 훑은 구간을 나란히 적는다", () => {
+  const head = () => screen.getByText(/시도 #/).textContent ?? "";
+
+  it("요청 구간에 「요청」이 붙는다 — 두 구간을 가려 읽을 수 있게", () => {
+    render(<RunReportView report={report()} />);
+    expect(head()).toContain("요청 2026-01-02 ~ 2026-03-31");
+  });
+
+  it("실제로 훑은 구간과 봉 수를 함께 적는다", () => {
+    render(<RunReportView report={report()} />);
+    expect(head()).toContain("데이터 2026-01-02 ~ 2026-01-03 (2봉)");
+  });
+
+  it("적재본이 짧으면 그 사실이 머리줄에서 드러난다 — 이슈의 실측 그대로", () => {
+    render(
+      <RunReportView
+        report={report({
+          run: { ...report().run, period_from: "2023-08-26", period_to: "2026-08-25" },
+          equity: [
+            { dt: "2025-08-25", equity: 1000000, cash: 1000000, position_count: 0, gross_exposure: 0 },
+            { dt: "2026-08-21", equity: 1255700, cash: 1255700, position_count: 0, gross_exposure: 0 },
+          ],
+        })}
+      />,
+    );
+    expect(head()).toContain("요청 2023-08-26 ~ 2026-08-25");
+    expect(head()).toContain("데이터 2025-08-25 ~ 2026-08-21 (2봉)");
+  });
+
+  it("곡선이 비면 구간을 지어내지 않는다", () => {
+    render(<RunReportView report={report({ equity: [] })} />);
+    expect(head()).toContain("훑은 봉 없음");
+    expect(head()).not.toContain("데이터 ");
+  });
+});
+
 // #401 — 리포트 머리가 「ma_pullback」만 말하고, 그 봇에 실린 다른 전략은 화면 어디에도 없었다.
 describe("리포트가 빼고 돈 전략을 말한다", () => {
   const NOTICE =

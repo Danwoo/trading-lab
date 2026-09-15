@@ -13,6 +13,7 @@ import type {
 } from "@/schemas/backtest/backtest";
 import { cn } from "@/components/shared/ui/primitives/cn";
 import { redactReason } from "@/utils/common/errors/redactReason";
+import { coversRequest, scannedRange } from "@/lib/bench/scannedRange";
 
 /**
  * 원 단위 정수로 반올림 — 0.5 는 0 에서 먼 쪽으로(−4,123.5 → −4,124). `Math.round` 는 음수의
@@ -409,6 +410,9 @@ export function RunReportView({
   omittedNotice?: string | null;
 }) {
   const run = report.run;
+  // 요청한 구간과 **실제로 훑은 구간**은 다를 수 있다 — 적재본이 짧으면 엔진은 있는 만큼만
+  // 훑는다. 그 차이를 안 적으면 아래의 모든 숫자가 무엇의 몫인지 읽는 사람이 모른다 (#400).
+  const scanned = scannedRange(report.equity);
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -417,7 +421,14 @@ export function RunReportView({
         {Object.entries(run.params)
           .map(([key, value]) => `${key}=${String(value)}`)
           .join(" · ")}{" "}
-        · {run.period_from} ~ {run.period_to}
+        · 요청 {run.period_from} ~ {run.period_to} ·{" "}
+        {scanned === null ? (
+          <span className="text-ink-muted">훑은 봉 없음</span>
+        ) : (
+          <span className={coversRequest(scanned, run.period_from, run.period_to) ? undefined : "text-ink"}>
+            데이터 {scanned.from} ~ {scanned.to} ({scanned.bars}봉)
+          </span>
+        )}
       </p>
 
       {omittedNotice && (
