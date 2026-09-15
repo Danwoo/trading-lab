@@ -36,12 +36,25 @@ failure annotation** 에 붙지 run 결론에 안 붙는다. 그래서 이 판�
                   (`frozen=true` 면 잡 annotation 에서 동결 서명을 봤다는 뜻)
   · `escalate`  — 같은 조건인데 `run_attempt` 가 상한 이상 — 사람에게 넘긴다
   · `relabel`   — 마커는 있는데 판정 라벨이 그 판정과 어긋난다
-  · `rearm`     — 마커가 `merge_ok` 인데 자동 머지가 안 걸려 있다
+  · `rearm`     — 마커가 `merge_ok` 이고 **arm 판정부도 arm 이라 하는데** 자동 머지가
+                  안 걸려 있다 (잡이 죽어 arm 스텝에 못 닿은 자리)
   · `none`      — 할 일 없음. 입력 결손도 여기로 접는다 (fail-closed — 지어내지 않는다)
 
 **판정 마커를 읽는 것은 `review_record.find_marker` 다.** 저자 필터(OWNER·MEMBER·COLLABORATOR
 + 이 레포 봇)와 40자 sha 동등 비교가 거기 한 곳에 있고, 이 스크립트는 그것을 그대로 쓴다 —
 위조 마커 방어가 두 벌이 되면 갈린다.
+
+**자동 머지 여부도 같은 이유로 `review_record.decide_arm` 이 판정한다.** 종전에는 이 파일이
+「마커가 merge_ok 인데 arm 이 없다 → 다시 arm 하라」고만 했는데, arm 의 진짜 조건은 그것이
+아니다 — 위험도·**봇 PR 의 major 상승**·현재 head 에 대한 봇 승인·자기리뷰 배제를
+`decide_arm` 이 함께 본다.
+
+실측(2026-09-15, PR #492 — dependabot 의 nodemailer 9.1.1 → 10.0.3): 마커는 `merge_ok` 이고
+워크플로의 arm 스텝은 **major 상승이라 사람 경로**로 정확히 보냈는데, 이 파일은 같은 PR 에
+`rearm` 을 내고 있었다. 그 처분을 손으로 따르면 **사람 대기열을 건너뛰고 major 가 자동
+머지**된다. 판정이 두 벌이면 느슨한 쪽이 이긴다.
+
+arm 판정 입력(`arm_input`)을 못 모았으면 `rearm` 을 내지 않는다 — 모르는 것은 통과가 아니다.
 
 ## 신뢰 경계
 
@@ -195,10 +208,25 @@ def decide_pr(pr) -> dict:
         }
 
     if verdict == "merge_ok" and not pr.get("auto_merge"):
+        arm_input = pr.get("arm_input")
+        if arm_input is None:
+            return {
+                **base,
+                "reason": "판정은 merge_ok 인데 arm 판정 입력을 못 모았다 — rearm 을 내지 않는다 (fail-closed)",
+            }
+        decision = review_record.decide_arm(arm_input)
+        if not decision.get("arm"):
+            why = decision.get("reason") or decision.get("block") or "사유 미상"
+            return {
+                **base,
+                "risk": decision.get("risk"),
+                "reason": f"자동 머지를 판정부가 거부했다 — {why}. 사람 차례다",
+            }
         return {
             **base,
             "kind": "rearm",
-            "reason": "마커가 merge_ok 인데 자동 머지가 안 걸려 있다 — arm 을 다시 시도한다",
+            "risk": decision.get("risk"),
+            "reason": "판정부도 arm 이라 하는데 자동 머지가 안 걸려 있다 — arm 이 유실됐다",
         }
     return {**base, "reason": f"처분 없음 (판정 {verdict})"}
 
@@ -264,6 +292,85 @@ def parse_json_list(rc: int, raw: str):
     return parsed if isinstance(parsed, list) else None
 
 
+def _paginated(rc: int, raw: str):
+    """`gh api --paginate --jq '[...]'` 의 여러 페이지를 한 목록으로 — 실패는 `None`."""
+    return parse_comments(rc, raw)
+
+
+def arm_input(repo: str, item: dict, comments: list, marker: dict) -> dict | None:
+    """`review_record.decide_arm` 의 입력을 모은다 — 하나라도 못 읽으면 `None` (fail-closed).
+
+    워크플로의 arm 스텝이 같은 것을 모은다. **판정은 한 벌이고 수집만 두 벌이다** — 수집이
+    어긋나면 입력이 모자라 arm 이 거부되므로(안전한 방향), 느슨해지는 쪽으로는 갈리지 않는다.
+    """
+    number, head = item["number"], item["headRefOid"]
+
+    reviews = _paginated(
+        *_gh(
+            [
+                "api",
+                f"repos/{repo}/pulls/{number}/reviews",
+                "--paginate",
+                "--jq",
+                "[.[] | {user_login: .user.login, state, commit_id}]",
+            ]
+        )
+    )
+    if reviews is None:
+        return None
+
+    emails = _paginated(
+        *_gh(
+            [
+                "api",
+                f"repos/{repo}/pulls/{number}/commits",
+                "--paginate",
+                "--jq",
+                "[.[] | .commit.author.email]",
+            ]
+        )
+    )
+    if emails is None:
+        return None
+
+    scan = review_record.scan_refs(item.get("body") or "")
+    refs = []
+    for ref in scan["refs"]:
+        rc, raw = _gh(
+            [
+                "api",
+                f"repos/{repo}/issues/{ref}",
+                "--jq",
+                "{number, is_pr: (.pull_request != null), labels: [.labels[].name]}",
+            ]
+        )
+        if rc != 0:
+            refs.append({"number": ref, "lookup_failed": True})
+            continue
+        try:
+            refs.append(json.loads(raw))
+        except json.JSONDecodeError:
+            refs.append({"number": ref, "lookup_failed": True})
+
+    author = item.get("author") or {}
+    return {
+        "head_sha": head,
+        "marker_sha": marker["sha"],
+        "marker_model": marker.get("model"),
+        "marker_tier": marker.get("tier"),
+        "verdict": marker["verdict"],
+        "manual": marker.get("manual", True),
+        "reviews": reviews,
+        "pr_author_login": author.get("login"),
+        "pr_author_is_bot": author.get("is_bot", False),
+        "pr_title": item.get("title"),
+        "head_ref": item.get("headRefName"),
+        "issue_refs": refs,
+        "dropped_refs": scan["dropped"],
+        "commit_author_emails": [e for e in emails if isinstance(e, str) and e],
+    }
+
+
 def collect(repo: str) -> dict:
     """열린 PR 과 그 부속을 모은다 — **조회 실패는 `None` 으로 남긴다** (fail-closed).
 
@@ -279,7 +386,7 @@ def collect(repo: str) -> dict:
             "--state",
             "open",
             "--json",
-            "number,headRefOid,isDraft,labels,autoMergeRequest",
+            "number,headRefOid,isDraft,labels,autoMergeRequest,title,body,author,headRefName",
         ]
     )
     items = parse_json_list(rc, listing)
@@ -337,6 +444,15 @@ def collect(repo: str) -> dict:
                     )
                 )
             run["jobs"] = jobs or []
+        # arm 입력은 판정이 필요한 PR 에서만 모은다 — 호출을 아끼는 것이고, 판정은 `plan` 이 한다.
+        # 마커를 못 읽으면 입력도 없고, 없으면 `rearm` 이 안 난다 (fail-closed).
+        marker = review_record.find_marker(comments, head) if comments is not None else None
+        needs_arm = (
+            marker is not None
+            and marker.get("verdict") == "merge_ok"
+            and item.get("autoMergeRequest") is None
+            and not item["isDraft"]
+        )
         prs.append(
             {
                 "number": number,
@@ -347,6 +463,7 @@ def collect(repo: str) -> dict:
                 "labels": [label["name"] for label in item.get("labels") or []],
                 "comments": comments,
                 "review_runs": runs,
+                "arm_input": arm_input(repo, item, comments, marker) if needs_arm else None,
             }
         )
     return {"prs": prs}
