@@ -1,5 +1,11 @@
 from pydantic import BaseModel, ConfigDict, Field
-from schemas.common_schema import MONEY_MAX, CommonEntity, Money, TrimmedBaseModel
+from schemas.common_schema import (
+    MONEY_MAX,
+    CommonEntity,
+    Money,
+    TrimmedBaseModel,
+    without_input_bounds,
+)
 
 
 class Watchlist(TrimmedBaseModel):
@@ -44,7 +50,11 @@ class Watchlist(TrimmedBaseModel):
     )
 
 
-class WatchlistOut(Watchlist, CommonEntity):
+# 출력은 저장된 것을 그대로 낸다 — 상·하한은 입력에서만 건다.
+WatchlistStored = without_input_bounds(Watchlist, "WatchlistStored")
+
+
+class WatchlistOut(WatchlistStored, CommonEntity):
     ticker: str
 
 

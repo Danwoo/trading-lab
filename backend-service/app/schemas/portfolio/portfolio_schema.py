@@ -1,5 +1,12 @@
 from pydantic import BaseModel, ConfigDict, Field
-from schemas.common_schema import MONEY_MAX, QUANTITY_MAX, CommonEntity, Money, TrimmedBaseModel
+from schemas.common_schema import (
+    MONEY_MAX,
+    QUANTITY_MAX,
+    CommonEntity,
+    Money,
+    TrimmedBaseModel,
+    without_input_bounds,
+)
 
 
 # ── Portfolio (master) ─────────────────────────────────────────────────
@@ -18,7 +25,11 @@ class Portfolio(TrimmedBaseModel):
     description: str | None = Field(None, max_length=1000, description="설명 — 1000자까지. 비워도 됩니다.")
 
 
-class PortfolioOut(Portfolio, CommonEntity):
+# 출력은 저장된 것을 그대로 낸다 — 상·하한은 입력에서만 건다.
+PortfolioStored = without_input_bounds(Portfolio, "PortfolioStored")
+
+
+class PortfolioOut(PortfolioStored, CommonEntity):
     portfolio_id: str
 
 
@@ -60,7 +71,10 @@ class Holding(TrimmedBaseModel):
     description: str | None = Field(None, max_length=1000, description="설명 — 1000자까지. 비워도 됩니다.")
 
 
-class HoldingOut(Holding, CommonEntity):
+HoldingStored = without_input_bounds(Holding, "HoldingStored")
+
+
+class HoldingOut(HoldingStored, CommonEntity):
     portfolio_id: str
     ticker: str
     portfolio_nm: str | None = None

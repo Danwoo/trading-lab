@@ -2,7 +2,7 @@ from typing import Literal
 
 from apscheduler.triggers.cron import CronTrigger
 from pydantic import BaseModel, Field, field_validator
-from schemas.common_schema import CommonEntity, TrimmedBaseModel
+from schemas.common_schema import CommonEntity, TrimmedBaseModel, without_input_bounds
 
 
 class Scheduler(TrimmedBaseModel):
@@ -47,7 +47,11 @@ class DayOfWeekValidatedIn(BaseModel):
         return v
 
 
-class SchedulerOut(Scheduler, CommonEntity):
+# 출력은 저장된 것을 그대로 낸다 — 위 `DayOfWeekValidatedIn` 과 같은 이유로, 상·하한도 입력에서만 건다.
+SchedulerStored = without_input_bounds(Scheduler, "SchedulerStored")
+
+
+class SchedulerOut(SchedulerStored, CommonEntity):
     scheduler_id: str
 
 

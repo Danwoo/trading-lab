@@ -1,7 +1,8 @@
 from decimal import Decimal, InvalidOperation
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, Field, field_validator
+from annotated_types import Ge, Gt, Le, Lt
+from pydantic import AfterValidator, BaseModel, Field, create_model, field_validator
 
 # 저장 컬럼이 정하는 한계 — 스키마가 이 선을 넘겨보내면 DB 에서 500 으로 터진다.
 QUANTITY_MAX = 2_147_483_647  # integer
@@ -30,6 +31,35 @@ def _reject_subunit(v: float | None) -> float | None:
 
 
 Money = Annotated[float, AfterValidator(_reject_subunit)]
+
+
+# 상·하한은 **들어오는 값**을 막는 규칙이다. 출력 모델이 같은 베이스로 그것을 물려받으면,
+# 규칙이 생기기 전에 저장된 행을 읽는 순간 응답 검증에서 터진다.
+_INPUT_BOUNDS = (Ge, Gt, Le, Lt)
+
+
+def without_input_bounds(model: type[BaseModel], name: str) -> type[BaseModel]:
+    """상·하한을 뗀 출력용 베이스를 만든다.
+
+    목록은 한 행만 상한을 넘겨도 통째로 500 이 되어 멀쩡한 나머지까지 안 보인다. 이미
+    저장된 값은 사용자가 화면에서 보고 고쳐야 하므로, 읽기는 있는 그대로 낸다.
+
+    자릿수·길이 규칙은 떼지 않는다 — 이 값들이 사는 컬럼이 그 규칙보다 좁거나 같아서
+    저장된 값을 거부할 수 없다. 컬럼보다 좁은 것은 상·하한뿐이다.
+    """
+    fields: dict[str, Any] = {}
+    for field_name, info in model.model_fields.items():
+        kept = [m for m in info.metadata if not isinstance(m, _INPUT_BOUNDS)]
+        annotation = Annotated[tuple([info.annotation, *kept])] if kept else info.annotation
+        options: dict[str, Any] = {"description": info.description, "examples": info.examples}
+        if info.default_factory is not None:
+            options["default_factory"] = info.default_factory
+        else:
+            options["default"] = info.default
+        fields[field_name] = (annotation, Field(**options))
+    relaxed = create_model(name, __base__=model.__bases__, **fields)
+    relaxed.__doc__ = f"{model.__name__} 에서 상·하한을 뗀 출력용 베이스 — 저장된 것을 그대로 낸다."
+    return relaxed
 
 
 # 공통 엔티티 타입

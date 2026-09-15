@@ -15,6 +15,7 @@
 ## 대상
 
 `app/schemas/**` 의 `*In` 모델 전부(요청 바디 경계). 상속 필드도 포함된다.
+`Money | None` 같이 `Annotated` 로 감싼 칸도 숫자로 읽는다 — 판독은 `schema_survey` 가 쥔다.
 검사한 모델·필드 수가 0이면 실패한다 — 「볼 것이 없었다」와 「위반이 없었다」는 다르다.
 
     uv run python tests/test_numeric_inputs_are_bounded.py
@@ -22,16 +23,9 @@
 
 from __future__ import annotations
 
-import importlib
-import sys
-from pathlib import Path
-
-BACKEND = Path(__file__).resolve().parents[1]
-APP = BACKEND / "app"
-sys.path.insert(0, str(APP))
-
-from annotated_types import Le, Lt  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+from annotated_types import Le, Lt
+from pydantic import BaseModel
+from schema_survey import is_numeric, models_named
 
 #: 이 칸들은 상한이 뜻으로 정해지지 않는다 — 이유를 적고 면제한다. 비어 있어야 정상이다.
 EXEMPT: dict[str, str] = {}
@@ -39,25 +33,7 @@ EXEMPT: dict[str, str] = {}
 
 def request_models() -> list[type[BaseModel]]:
     """`app/schemas/**` 에 선언된 `*In` 모델 전부."""
-    found: dict[str, type[BaseModel]] = {}
-    for path in sorted(APP.glob("schemas/**/*.py")):
-        if path.name == "__init__.py":
-            continue
-        module_name = ".".join(path.relative_to(APP).with_suffix("").parts)
-        module = importlib.import_module(module_name)
-        for name in dir(module):
-            obj = getattr(module, name)
-            if isinstance(obj, type) and issubclass(obj, BaseModel) and name.endswith("In"):
-                found[f"{module_name}.{name}"] = obj
-    return [found[k] for k in sorted(found)]
-
-
-def is_numeric(annotation) -> bool:
-    """`int`/`float` 또는 그 Optional — 문자열·리터럴·컨테이너는 아니다."""
-    args = getattr(annotation, "__args__", None)
-    if args:
-        return any(a in (int, float) for a in args)
-    return annotation in (int, float)
+    return models_named("In")
 
 
 def has_upper_bound(field) -> bool:

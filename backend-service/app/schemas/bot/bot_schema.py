@@ -9,6 +9,7 @@ from schemas.common_schema import (
     CommonEntity,
     Money,
     TrimmedBaseModel,
+    without_input_bounds,
 )
 
 CombineRule = Literal["AND", "OR", "SCORE"]
@@ -115,7 +116,11 @@ class Bot(TrimmedBaseModel):
     )
 
 
-class BotOut(Bot, CommonEntity):
+# 출력은 저장된 것을 그대로 낸다 — 상·하한은 입력에서만 건다.
+BotStored = without_input_bounds(Bot, "BotStored")
+
+
+class BotOut(BotStored, CommonEntity):
     bot_id: int
     bot_nm: str
 
