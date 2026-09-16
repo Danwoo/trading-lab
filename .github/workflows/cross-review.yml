@@ -832,6 +832,15 @@ jobs:
           # 준비 타임아웃으로 끝나는데 그 메시지는 원인을 안 가리키므로 미리 드러낸다.
           # 스텝을 죽이지는 않는다 — 실패 분류·확정 코멘트는 아래 정규화가 내야 한다.
           [ -s "$TERM_STATE" ] || echo "::warning::[orca] 준비·접수 판정부(ctx/terminal_state.py)가 번들에 없다 — 리뷰는 준비 실패로 끝난다"
+          # 번들된 판정부는 **base 커밋(또는 기본 브랜치) 발**이다 — 이 워크플로는 head 판본으로
+          # 도는데 판정부는 아니다. 그래서 「워크플로는 새 인자를 넘기는데 판정부는 모르는」 창이
+          # 반드시 한 번 열린다: 판정부를 고치는 PR 자신이다. 모르는 판본에 `--agent` 를 넘기면
+          # 사용법 오류(2)가 되어 준비 판정이 영영 거짓이 되고, 그 PR 은 **자기 리뷰를 못 받는다**
+          # (위 번들 조립 스텝의 ⚠ 주석이 가리키는 바로 그 함정이다).
+          TERM_STATE_HAS_AGENT=no
+          grep -q "_split_agent" "$TERM_STATE" 2>/dev/null && TERM_STATE_HAS_AGENT=yes
+          [ "$TERM_STATE_HAS_AGENT" = yes ] \
+            || echo "::notice::[orca] 번들된 판정부가 --agent 를 모른다 — 줄 맨 앞 캐럿만 본다(codex 상자는 못 잡는다)"
           # 체인 처분·집계 판정부. 없으면 후보 실패의 **분류**를 못 하므로 처분은 「계속」으로
           # 접고(조기 종결을 되살리지 않는다), 집계는 분류를 포기하되 판정 산출 여부는 살린다
           # — 각 호출부 주석 참조.
@@ -1096,10 +1105,18 @@ jobs:
           # ⚠ 읽기와 판정을 **한 파이프로 잇지 않는다.** 이 스텝은 `pipefail` 이 켜져 있어
           #   `orca-ide` 가 0 이 아닌 값으로 끝나면 판정이 참이어도 파이프 상태가 그 값이 된다.
           #   읽기 결과를 변수로 받아 판정의 종료코드만 그대로 내보낸다.
+          # 캐럿 규칙은 **에이전트별로 갈린다** — codex 의 입력 상자 글리프 `›` 는 줄 맨 앞이
+          # 아니라 앞 줄 꼬리에 붙어서 온다(Orca 터미널 API). 그래서 누구의 화면인지 판정부에
+          # 넘긴다. `SCREEN_AGENT` 를 안 주면 판정부는 줄 맨 앞 캐럿만 본다 — 모르는 자리에서
+          # 규칙을 넓히지 않는다(`scripts/terminal_state.py` 의 `INLINE_CARETS` 주석).
           screen_says() {   # $1=핸들 $2=ready|pending|accepted $3=needle → 0=참 · 1=거짓 · 2=화면 못 읽음
             local screen
+            local -a agent_args=()
+            if [ "${TERM_STATE_HAS_AGENT:-no}" = yes ] && [ -n "${SCREEN_AGENT:-}" ]; then
+              agent_args=(--agent "$SCREEN_AGENT")
+            fi
             screen=$(orca-ide terminal read --terminal "$1" --limit "$TERM_READ_LINES" $ORCA_ENV --json 2>/dev/null) || true
-            printf '%s' "$screen" | python3 "$TERM_STATE" "$2" ${3:+"$3"}
+            printf '%s' "$screen" | python3 "$TERM_STATE" "${agent_args[@]}" "$2" ${3:+"$3"}
           }
           # 핸들이 살아 있는가 — 화면 내용이 아니라 **핸들의 유효성**만 본다 (교체 판단용).
           terminal_ready() {
@@ -1429,6 +1446,8 @@ jobs:
               fi
             fi
             # ── TUI 준비 (프라이머 1회 + 버퍼 성장 확인) ──────────────────────────────────
+            # 어느 에이전트의 화면을 보는지 판정부에 알린다 — 캐럿 규칙이 그것으로 갈린다.
+            SCREEN_AGENT="$m"
             # 비대화(`-p`) 경로는 입력 상자가 **없다** — 기다릴 것도 보낼 것도 없다.
             if [ "$PROMPT_MODE" = yes ]; then
               echo "[orca/${m}] 비대화 모드로 띄웠다 — TUI 준비 대기·지시 전달을 건너뛴다 (오더는 파일로 이미 줬다)"
