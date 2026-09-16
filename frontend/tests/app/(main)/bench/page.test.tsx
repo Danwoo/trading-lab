@@ -26,6 +26,8 @@ import { selectIngestRunList } from "@/services/terminal/ingestService";
 import type { IngestRunOut } from "@/schemas/terminal/ingest";
 import { FRESHNESS_TONE } from "@/components/features/Bench/QuoteFreshnessBanner";
 import type { QuoteFreshnessKind } from "@/hooks/bench/useQuoteFreshness";
+import { useContextStore } from "@/stores/terminal/contextStore";
+import { coverageKey, useCoverageStore } from "@/stores/terminal/coverageStore";
 
 vi.mock("@/services/bot/botService", () => ({ selectBotList: vi.fn(), selectBot: vi.fn() }));
 vi.mock("@/services/terminal/ingestService", () => ({ selectIngestRunList: vi.fn() }));
@@ -56,6 +58,16 @@ function succeededRun(periodTo: string): IngestRunOut {
   };
 }
 
+/**
+ * 배지가 읽는 값을 세운다 — **적재본 캔들의 마지막 거래일**이다 (#402).
+ * 종전 테스트는 `period_to`(요청 기간의 끝)를 먹였는데, 그것이 비면 배지가 적재 **실행 시각**을
+ * 집어 일요일 날짜를 「덮는 마지막 날」이라고 말했다. 이제 그 폴백이 없다.
+ */
+function givenCoverage(tradeDate: string, symbol = { market: "NASDAQ", ticker: "AAPL" }) {
+  useContextStore.setState({ symbol } as never);
+  useCoverageStore.setState({ lastTradeDate: { [coverageKey(symbol.market, symbol.ticker)]: tradeDate } });
+}
+
 /** 적재 이력·봇 목록을 이 상태로 세운다 */
 function givenBackend(options: { runs?: IngestRunOut[] | null; bots?: unknown[] | null }) {
   vi.mocked(selectIngestRunList).mockResolvedValue(
@@ -73,6 +85,8 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date(`${TODAY}T12:00:00`));
   useBenchSelectionStore.setState({ selection: null });
+  useContextStore.setState({ symbol: null } as never);
+  useCoverageStore.setState({ lastTradeDate: {} });
   useProductPanelStore.setState({ openPanelId: null, expanded: false, focusRailItemId: null });
   givenBackend({});
 });
@@ -194,6 +208,7 @@ describe("첫 진입 — 봇 0개 · 거래 0건 · 적재 미실행 (§21.4)", 
 describe("낡은 적재본 — 조용히 굴리지 않는다 (§21.5)", () => {
   it("하루 낡으면 상단 배지에 「하루 낡음」이 뜬다", async () => {
     givenBackend({ runs: [succeededRun("2026-08-14")] });
+    givenCoverage("2026-08-14");
     render(<BenchPage />);
 
     const banner = screen.getByRole("region", { name: "시세 신선도" });
@@ -203,6 +218,7 @@ describe("낡은 적재본 — 조용히 굴리지 않는다 (§21.5)", () => {
 
   it("영향 범위가 오류 문구보다 **먼저** 온다", async () => {
     givenBackend({ runs: [succeededRun("2026-08-06")] });
+    givenCoverage("2026-08-06");
     render(<BenchPage />);
 
     const banner = screen.getByRole("region", { name: "시세 신선도" });
@@ -217,6 +233,7 @@ describe("낡은 적재본 — 조용히 굴리지 않는다 (§21.5)", () => {
 
   it("오늘 적재본이면 낡음 문구가 없다 — 경고를 남발하지 않는다", async () => {
     givenBackend({ runs: [succeededRun(TODAY)] });
+    givenCoverage(TODAY);
     render(<BenchPage />);
 
     const banner = screen.getByRole("region", { name: "시세 신선도" });
@@ -535,13 +552,19 @@ const FRESHNESS_COLOR_CASES: {
 }[] = [
   {
     kind: "fresh",
-    arrange: () => givenBackend({ runs: [succeededRun(TODAY)] }),
+    arrange: () => {
+      givenBackend({ runs: [succeededRun(TODAY)] });
+      givenCoverage(TODAY);
+    },
     expected: null,
     settle: "오늘 적재본입니다",
   },
   {
     kind: "stale",
-    arrange: () => givenBackend({ runs: [succeededRun("2026-08-14")] }),
+    arrange: () => {
+      givenBackend({ runs: [succeededRun("2026-08-14")] });
+      givenCoverage("2026-08-14");
+    },
     expected: "text-caution",
     settle: "하루 낡음",
   },
@@ -570,13 +593,15 @@ describe("#285 상태 → 색 토큰", () => {
     // 표는 `Record<QuoteFreshnessKind, …>` 라 갈래를 늘리면 타입이 먼저 막고, 채워 넣더라도
     // 이 건수가 어긋나 빨개진다. 0건이면 실패다.
     const kinds = Object.keys(FRESHNESS_TONE);
-    expect(kinds.length).toBe(6);
+    // #402 로 「어느 종목인지 안 정했다」(`no-symbol`)가 늘었다 — 배지가 종목별로 답하기 때문이다.
+    expect(kinds.length).toBe(7);
 
     // 사다리는 「얼마나 비었나」가 아니라 **「무엇이 잘못됐나」**로 오른다.
     expect(FRESHNESS_TONE).toEqual({
       checking: "quiet",
       fresh: "quiet",
       "never-run": "quiet",
+      "no-symbol": "quiet",
       stale: "caution",
       "never-succeeded": "alert",
       unreadable: "alert",
@@ -645,6 +670,7 @@ describe("#285 상태 → 색 토큰", () => {
 
   it("배지의 「하루 낡음」도 오류색이 아니다", async () => {
     givenBackend({ runs: [succeededRun("2026-08-14")] });
+    givenCoverage("2026-08-14");
     render(<BenchPage />);
 
     const banner = screen.getByRole("region", { name: "시세 신선도" });

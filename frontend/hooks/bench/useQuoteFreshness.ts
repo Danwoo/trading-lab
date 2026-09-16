@@ -2,8 +2,9 @@
 
 import { useMemo } from "react";
 import { useIngestRuns } from "@/hooks/terminal/useIngestRuns";
+import { useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
+import { coverageKey, useLoadedCoverage } from "@/stores/terminal/coverageStore";
 import { describeStaleness, type StalenessNote } from "@/lib/terminal/staleness";
-import type { IngestRunOut } from "@/schemas/terminal/ingest";
 import type { Provenance } from "@/types/terminal/provenance";
 import { getApiErrorMessage } from "@/utils/common/errors/apierrors";
 import { redactReason } from "@/utils/common/errors/redactReason";
@@ -27,22 +28,19 @@ export type QuoteFreshnessKind =
   /** 적재를 돌렸는데 마지막 시도가 실패했고, 성공한 적재본이 하나도 없다 */
   | "never-succeeded"
   /** 적재 이력 자체를 못 읽었다 — 신선도를 판정할 근거가 없다 */
-  | "unreadable";
+  | "unreadable"
+  /** 어느 종목의 신선도인지 정해지지 않았다 — 종목을 고르면 그 종목으로 답한다 */
+  | "no-symbol";
 
 export interface QuoteFreshness {
   kind: QuoteFreshnessKind;
-  /** 배지가 그대로 쓰는 출처. `loaded` 의 `asOf` 는 적재본이 덮는 마지막 날이다 */
+  /** 배지가 그대로 쓰는 출처. `loaded` 의 `asOf` 는 **적재본 캔들의 마지막 거래일**이다 (#402) */
   provenance: Provenance;
   staleness: StalenessNote | null;
   /** 지금 큐에 있거나 돌고 있는 캔들 적재가 있나 — 「없음」과 「받는 중」은 다르다 */
   running: boolean;
   /** 마지막 시도가 남긴 사유. 화면은 이것을 **영향 범위 뒤에** 놓는다(§21.5) */
   failedReason: string | null;
-}
-
-/** 적재본이 덮는 마지막 날 — 기간이 있으면 그것이 답이고, 없으면 실행 시각으로 대신한다. */
-function coverageOf(run: IngestRunOut): string | null {
-  return run.period_to ?? run.finished_dt ?? run.started_dt ?? run.reg_dt;
 }
 
 /**
@@ -57,6 +55,9 @@ function coverageOf(run: IngestRunOut): string | null {
  */
 export function useQuoteFreshness(): QuoteFreshness {
   const runs = useIngestRuns(0, true);
+  // 「덮는 마지막 날」은 **적재본의 캔들**이 답한다 — 적재 실행 시각이 아니다 (#402).
+  const symbol = useTerminalSymbol();
+  const coverage = useLoadedCoverage(symbol === null ? null : coverageKey(symbol.market, symbol.ticker));
 
   return useMemo<QuoteFreshness>(() => {
     // `placeholder` 는 「아직 아무것도 안 물어봤다」(훅의 초기 상태)이거나 「엔드포인트가 아직
@@ -115,14 +116,38 @@ export function useQuoteFreshness(): QuoteFreshness {
       };
     }
 
-    const asOf = coverageOf(succeeded);
-    const staleness = describeStaleness(asOf, Date.now());
+    // 성공한 적재가 있어도 **어느 종목의 신선도인지**가 정해져야 답할 수 있다.
+    if (symbol === null) {
+      return {
+        kind: "no-symbol",
+        provenance: {
+          kind: "unavailable",
+          reason: "종목을 고르면 그 종목 적재본이 얼마나 낡았는지 말합니다",
+          because: "not-chosen",
+        },
+        staleness: null,
+        running,
+        failedReason: null,
+      };
+    }
+    // 그 종목의 캔들을 아직 안 읽었다 — 모르는 것을 최신으로도 낡음으로도 그리지 않는다.
+    if (coverage === null) {
+      return {
+        kind: "checking",
+        provenance: { kind: "unavailable", reason: "이 종목 적재본을 확인하고 있습니다", because: "checking" },
+        staleness: null,
+        running,
+        failedReason: null,
+      };
+    }
+
+    const staleness = describeStaleness(coverage, Date.now());
     return {
       kind: staleness ? "stale" : "fresh",
-      provenance: { kind: "loaded", source: "시세", asOf },
+      provenance: { kind: "loaded", source: "시세", asOf: coverage },
       staleness,
       running,
       failedReason: candleRuns[0].status === "failed" ? redactReason(candleRuns[0].failed_reason) : null,
     };
-  }, [runs.data, runs.isLoading, runs.error, runs.provenance]);
+  }, [runs.data, runs.isLoading, runs.error, runs.provenance, symbol, coverage]);
 }
