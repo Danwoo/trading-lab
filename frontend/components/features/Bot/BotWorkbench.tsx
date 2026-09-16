@@ -23,6 +23,7 @@ import { WriteAccessNotice } from "@/components/shared/Feedback/WriteAccessNotic
 import { useWriteAccess } from "@/hooks/shared/useWriteAccess";
 import type { StrategyForm } from "@/schemas/bot/bot";
 import { BotRunHistory } from "@/components/features/Bot/BotRunHistory";
+import { blockingSaveReason } from "@/lib/bot/saveGuard";
 
 interface Props {
   /** 없으면 새 봇, 있으면 저장된 봇을 열어 고친다. */
@@ -58,6 +59,12 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
   const [strategyForms, setStrategyForms] = useState<StrategyForm[]>([]);
   const [catalogErrors, setCatalogErrors] = useState<{ source: string; message: string }[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * 「이 화면은 전략을 하나만 다룬다」 — 열자마자 보이는 안내. **`loadError` 와 한 자리를 쓰면
+   * 안 된다**: 첫 전략의 파일이 사라진 봇에서는 `missing_reason` 이 그 자리를 덮어, 화면에
+   * 없는 문구를 「이미 있다」고 여기게 된다 (리뷰 지적).
+   */
+  const [multiStrategyNotice, setMultiStrategyNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -67,6 +74,11 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
    * 그 칸을 다시 손대거나 전략을 바꾸면 지운다(옛 오류가 새 값 위에 남으면 그것도 거짓이다).
    */
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  /**
+   * 칸을 짚을 수 없는 저장 실패 — 폼 머리에 남는다. 토스트는 알리는 자리이지 남는 자리가
+   * 아니다: 1.6초 뒤 화면에 실패했다는 흔적이 없었다 (#453 F1).
+   */
+  const [saveError, setSaveError] = useState<string | null>(null);
   const writeAccess = useWriteAccess();
 
   useEffect(() => {
@@ -91,7 +103,7 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
           setLoadedStrategyCount(bot.strategies.length);
           if (bot.strategies.length > 1) {
             // 누른 뒤에 막는 것보다 열자마자 보이는 것이 낫다 — 무엇을 못 하는지 먼저 안다.
-            setLoadError(
+            setMultiStrategyNotice(
               `이 봇에는 전략이 ${bot.strategies.length}개 실려 있는데 이 화면은 하나만 다룹니다. ` +
                 "여기서 저장하면 나머지가 지워지므로 저장을 막아 뒀습니다.",
             );
@@ -121,6 +133,13 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
 
   const handleDraftChange = useCallback((field: keyof BotDraft, value: unknown) => {
     setDraft((prev) => ({ ...prev, [field]: value }));
+    // **그 칸을 다시 손대면 그 칸의 오류는 지운다** — 남겨 두면 이름을 이미 채웠는데도 화면이
+    // 「비어 있다」고 말한다. 사라지는 흔적보다 나쁜 것이 **틀린 흔적**이다.
+    setFieldErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const { [field]: _cleared, ...rest } = prev;
+      return rest;
+    });
   }, []);
 
   const handleStrategyChange = useCallback(
@@ -128,6 +147,8 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
       const form = strategyForms.find((candidate) => candidate.key === key);
       if (form) setStrategy(newStrategyDraft(form));
       setFieldErrors({});
+      // 폼 머리 배너의 사유는 전략 쪽(미선택·다전략)이다 — 전략을 고쳤으면 그 말은 낡았다.
+      setSaveError(null);
     },
     [strategyForms],
   );
@@ -180,22 +201,22 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
   );
 
   const handleSave = async () => {
-    if (draft.bot_nm.trim() === "") {
-      showToast("봇 이름을 적어주세요.", "warning");
+    // 판정은 한 곳(`blockingSaveReason`)이고, 여기서는 **알리고 남긴다**.
+    const blocked = blockingSaveReason(draft, strategy !== null, loadedStrategyCount);
+    if (blocked !== null) {
+      setFieldErrors(blocked.field === null ? {} : { [blocked.field]: blocked.message });
+      // 이미 화면에 있는 말은 다시 얹지 않는다 — 토스트로 「지금 막혔다」만 알린다.
+      // **추측하지 않고 지금 떠 있는 문구와 맞대 본다** — 어느 사유가 그 자리를 차지했는지는
+      // 이 컴포넌트만 안다. 문구가 갈리면 배너가 한 번 더 뜰 뿐이라 안전한 방향으로 틀린다.
+      const onScreen = [loadError, multiStrategyNotice];
+      setSaveError(blocked.field === null && !onScreen.includes(blocked.message) ? blocked.message : null);
+      showToast(blocked.message, "warning");
       return;
     }
-    if (strategy === null) {
-      showToast("전략을 하나 고르면 저장할 수 있습니다.", "warning");
-      return;
-    }
-    if (loadedStrategyCount > 1) {
-      showToast(
-        `이 봇에는 전략이 ${loadedStrategyCount}개 실려 있는데 이 화면은 하나만 다룹니다. ` +
-          "여기서 저장하면 나머지가 지워지므로 막았습니다.",
-        "warning",
-      );
-      return;
-    }
+    // 위 판정이 이미 막았다 — 타입에게도 그 사실을 말해 준다(판정을 두 번 하지 않는다).
+    if (strategy === null) return;
+    setFieldErrors({});
+    setSaveError(null);
     setIsSaving(true);
     try {
       const payload = toCreatePayload({ ...draft, bot_nm: draft.bot_nm.trim() }, [strategy]);
@@ -208,6 +229,8 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
       const form = strategyForms.find((candidate) => candidate.key === strategy.strategyKey);
       const name = fieldNameFromServerError(message, form?.fields ?? []);
       setFieldErrors(name === null ? {} : { [name]: message });
+      // 칸을 못 짚은 서버 오류도 남는다 — 종전에는 토스트가 사라지면 아무것도 안 남았다.
+      setSaveError(name === null ? message : null);
       showToast(message, "error");
     } finally {
       setIsSaving(false);
@@ -274,6 +297,12 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
 
       {botId !== undefined && <BotRunHistory botId={botId} />}
 
+      {multiStrategyNotice && (
+        <p role="status" className="break-keep border border-caution p-2 text-sm text-ink">
+          {multiStrategyNotice}
+        </p>
+      )}
+
       {loadError && (
         <p role="status" className="border border-line px-3 py-2 text-sm text-ink">
           {loadError}
@@ -305,6 +334,7 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
             onStrategyChange={handleStrategyChange}
             onParamChange={handleParamChange}
             fieldErrors={fieldErrors}
+            formError={saveError}
           />
         </div>
       )}

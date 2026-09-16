@@ -103,3 +103,26 @@ describe("F18 서버가 짚은 칸에 오류가 남는다", () => {
     expect(document.querySelectorAll("[aria-invalid='true']").length).toBe(0);
   });
 });
+
+// #453 F1 리뷰 지적 — 이름 빈칸 오류를 `fieldErrors` 에 새로 실으면서 **지우는 경로를
+// 안 넓혔다.** 이름을 이미 채웠는데도 칸이 「비어 있다」고 계속 말했다. 사라지는 흔적보다
+// 나쁜 것이 **틀린 흔적**이다 — 이 파일이 위에서 이미 세운 원칙이다.
+describe("화면이 스스로 고친 것을 계속 틀렸다고 말하지 않는다", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("이름을 비운 채 저장한 뒤 이름을 채우면 그 칸의 오류가 지워진다", async () => {
+    await openNewBotForm();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    const name = screen.getByLabelText("이름");
+    await waitFor(() => expect(name.getAttribute("aria-invalid")).toBe("true"));
+
+    await user.type(name, "내 봇");
+    await waitFor(() => expect(name.getAttribute("aria-invalid")).toBeNull());
+    expect(screen.queryByText("봇 이름을 적어주세요.")).toBeNull();
+  });
+});
