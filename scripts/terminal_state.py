@@ -54,6 +54,9 @@ CLI (bash 호출부용 — `orca-ide terminal read --json` 출력을 stdin 으�
     ... | python3 scripts/terminal_state.py pending "<needle>"
     ... | python3 scripts/terminal_state.py accepted "<needle>"
 
+`--agent <이름>` 을 주면 그 에이전트의 줄-중간 캐럿까지 본다 (codex 의 `›`). 안 주면
+줄 맨 앞 캐럿만 본다 — 누구의 화면인지 모르는 자리에서 규칙을 넓히지 않는다.
+
 종료코드 0=참 · 1=거짓 · 2=입력을 읽을 수 없음(호출부는 거짓과 구분해 다룬다).
 """
 
@@ -62,10 +65,26 @@ from __future__ import annotations
 import json
 import sys
 
-# 캐럿 문자 — claude 는 `❯`, kimi 는 `>`. 둘 다 뒤에 공백이 오거나 줄이 거기서 끝난다.
+# 캐럿 문자 — claude 는 `❯`, kimi 는 `>`. 둘 다 **줄 맨 앞**에 오고, 뒤에 공백이 오거나
+# 줄이 거기서 끝난다.
 CARET_CHARS = ("❯", ">")
 # kimi 는 캐럿 줄을 상자 세로선으로 감싼다. 왼쪽 테두리를 벗겨야 캐럿이 드러난다.
 BOX_LEFT_BORDER = "│"
+
+# 줄 **중간**에 오는 캐럿 — 그 에이전트를 아는 호출부만 연다.
+#
+# codex 의 입력 상자 글리프는 `›`(U+203A)인데, Orca 터미널 API 는 그것을 바로 앞 경고 줄
+# **꼬리에 붙여서** 준다(사람 터미널에서는 따로 보인다). 「줄 맨 앞」 규칙으로는 영영 안
+# 잡히므로 codex 홉이 매번 `TUI 준비 실패(60s)` 로 죽었다.
+#
+# **이 규칙을 전 에이전트에 열지 않는다.** `›` 는 이 레포의 실제 문자열에도 있다
+# (`시스템관리 › 권한관리` 같은 경로 표기, `DataTablePager` 의 단독 `›`) — 열어 두면 그런 줄이
+# 입력 상자로 오인된다. 종전에 그렇게 짰다가 리뷰가 차단급으로 잡았다. 그래서 **누구의
+# 화면인지 아는 자리에서만** 연다.
+#
+# codex 화면 안에도 `›` 를 담은 줄이 섞일 수 있지만, 캐럿 줄은 **마지막** 것을 고르고
+# (`caret_index`) 터미널 버퍼의 tail 은 커서에서 끝나므로 입력 상자가 언제나 그 아래다.
+INLINE_CARETS = {"codex": ("›",)}
 
 
 def _strip_box(line: str) -> str:
@@ -76,8 +95,19 @@ def _strip_box(line: str) -> str:
     return stripped
 
 
-def is_caret_line(line: str) -> bool:
-    """입력 캐럿으로 시작하는 줄인가.
+def _has_inline_caret(line: str, caret: str) -> bool:
+    """줄 어디에 있든 캐럿 + 공백(또는 줄 끝)인가 — 앞에 무엇이 붙어 와도 본다."""
+    index = line.find(caret)
+    while index != -1:
+        rest = line[index + len(caret) :]
+        if rest == "" or rest[:1].isspace():
+            return True
+        index = line.find(caret, index + 1)
+    return False
+
+
+def is_caret_line(line: str, agent: str | None = None) -> bool:
+    """입력 캐럿이 있는 줄인가. `agent` 를 주면 그 에이전트의 줄-중간 캐럿까지 본다.
 
     캐럿 뒤 공백은 **아무 공백류나** 허용한다. claude 는 입력 상자에서 `❯` 뒤에 U+00A0
     (non-breaking space)을 쓰고 트랜스크립트 되울림에서는 보통 공백을 쓴다 — 보통 공백만
@@ -89,13 +119,13 @@ def is_caret_line(line: str) -> bool:
             return True
         if body.startswith(caret) and body[len(caret) :][:1].isspace():
             return True
-    return False
+    return any(_has_inline_caret(line, caret) for caret in INLINE_CARETS.get(agent or "", ()))
 
 
-def caret_index(lines: list[str]) -> int | None:
+def caret_index(lines: list[str], agent: str | None = None) -> int | None:
     """입력 상자의 캐럿 줄 인덱스 — **마지막** 캐럿 줄. 없으면 None."""
     for i in range(len(lines) - 1, -1, -1):
-        if is_caret_line(lines[i]):
+        if is_caret_line(lines[i], agent):
             return i
     return None
 
@@ -105,22 +135,22 @@ def _normalize(text: str) -> str:
     return " ".join(text.split())
 
 
-def agent_ready(lines: list[str]) -> bool:
+def agent_ready(lines: list[str], agent: str | None = None) -> bool:
     """TUI 가 입력 상자를 그렸는가 = 입력을 받을 수 있는가."""
-    return caret_index(lines) is not None
+    return caret_index(lines, agent) is not None
 
 
-def input_pending(lines: list[str], needle: str) -> bool:
+def input_pending(lines: list[str], needle: str, agent: str | None = None) -> bool:
     """보낸 텍스트가 입력 상자에 **미제출로** 남아 있는가."""
-    i = caret_index(lines)
+    i = caret_index(lines, agent)
     if i is None:
         return False
     return _normalize(needle) in _normalize(lines[i])
 
 
-def prompt_accepted(lines: list[str], needle: str) -> bool:
+def prompt_accepted(lines: list[str], needle: str, agent: str | None = None) -> bool:
     """보낸 텍스트가 제출됐는가 — 상자가 보이고, 그 안에 더는 없다."""
-    i = caret_index(lines)
+    i = caret_index(lines, agent)
     if i is None:
         return False
     return _normalize(needle) not in _normalize(lines[i])
@@ -140,12 +170,33 @@ def tail_lines(payload: str) -> list[str] | None:
     return tail
 
 
+def _split_agent(argv: list[str]) -> tuple[list[str], str | None]:
+    """`--agent <이름>` 을 어디에 적어도 떼어 낸다 — 나머지는 위치 인자 그대로."""
+    rest: list[str] = []
+    agent: str | None = None
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if token == "--agent" and index + 1 < len(argv):
+            agent = argv[index + 1]
+            index += 2
+            continue
+        if token.startswith("--agent="):
+            agent = token[len("--agent=") :]
+            index += 1
+            continue
+        rest.append(token)
+        index += 1
+    return rest, agent
+
+
 def main(argv: list[str]) -> int:
-    mode = argv[1] if len(argv) > 1 else ""
-    needle = argv[2] if len(argv) > 2 else ""
+    positional, agent = _split_agent(argv[1:])
+    mode = positional[0] if positional else ""
+    needle = positional[1] if len(positional) > 1 else ""
     if mode not in ("ready", "pending", "accepted") or (mode != "ready" and not needle):
         print(
-            "usage: terminal_state.py ready|pending <needle>|accepted <needle> < terminal-read.json",
+            "usage: terminal_state.py [--agent <이름>] ready|pending <needle>|accepted <needle> < terminal-read.json",
             file=sys.stderr,
         )
         return 2
@@ -156,11 +207,11 @@ def main(argv: list[str]) -> int:
         return 2
 
     if mode == "ready":
-        verdict = agent_ready(lines)
+        verdict = agent_ready(lines, agent)
     elif mode == "pending":
-        verdict = input_pending(lines, needle)
+        verdict = input_pending(lines, needle, agent)
     else:
-        verdict = prompt_accepted(lines, needle)
+        verdict = prompt_accepted(lines, needle, agent)
     return 0 if verdict else 1
 
 

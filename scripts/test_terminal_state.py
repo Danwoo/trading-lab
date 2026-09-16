@@ -29,17 +29,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import terminal_state as ts  # noqa: E402
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "terminal_screens.json"
+WORKFLOW = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "cross-review.yml"
+JUDGE_SOURCE = Path(__file__).resolve().parent / "terminal_state.py"
+# 워크플로가 「이 판정부가 `--agent` 를 아는가」를 판별하는 표식. 판정부에서 이 이름이 사라지면
+# 워크플로는 영영 「모르는 판본」으로 읽고, codex 상자는 **아무 소리 없이** 다시 안 잡힌다.
+AGENT_FLAG_PROBE = "_split_agent"
 
 # 하한 — 화면이나 수열이 사라지면 조용히 초록이 되지 않는다.
-MIN_SCREENS = 11
+MIN_SCREENS = 13
 MIN_SEQUENCES = 3
-# 두 에이전트 **양쪽**에서 판정이 서는지가 이 task 의 불변식이다. 한쪽 화면이 통째로
+# 에이전트 **전부**에서 판정이 서는지가 이 task 의 불변식이다. 한쪽 화면이 통째로
 # 빠지면 "claude 만 고치고 kimi 를 깨뜨렸다"가 초록으로 지나간다.
-MIN_PER_AGENT = {"claude": 5, "kimi": 5}
+MIN_PER_AGENT = {"claude": 5, "kimi": 5, "codex": 2}
 
 MODES = ("ready", "pending", "accepted")
+# **화면마다 그 화면의 에이전트로 판정한다.** 캐럿 규칙이 에이전트별로 갈려 있어서
+# (codex 의 `›` 는 줄 중간에 온다), 전부 기본값으로 판정하면 그 갈래가 안 돌고 지나간다.
 CHECK = {
-    "ready": lambda tail, needle: ts.agent_ready(tail),
+    "ready": lambda tail, needle, agent: ts.agent_ready(tail, agent),
     "pending": ts.input_pending,
     "accepted": ts.prompt_accepted,
 }
@@ -53,9 +60,9 @@ def old_signal_fires(base: int, samples: list[int]) -> bool:
 def check_screens(screens: list[dict]) -> list[str]:
     failures: list[str] = []
     for screen in screens:
-        tail, needle = screen["tail"], screen["needle"]
+        tail, needle, agent = screen["tail"], screen["needle"], screen["agent"]
         for mode in MODES:
-            got = CHECK[mode](tail, needle)
+            got = CHECK[mode](tail, needle, agent)
             want = screen["expect"][mode]
             if got is not want:
                 failures.append(
@@ -70,8 +77,85 @@ def check_call_order_contract(screens: list[dict]) -> list[str]:
     return [
         f"{s['name']}: pending 과 accepted 가 동시에 참이다 — 판정이 서로를 배제하지 못한다"
         for s in screens
-        if ts.input_pending(s["tail"], s["needle"]) and ts.prompt_accepted(s["tail"], s["needle"])
+        if ts.input_pending(s["tail"], s["needle"], s["agent"])
+        and ts.prompt_accepted(s["tail"], s["needle"], s["agent"])
     ]
+
+
+# 줄 중간 캐럿을 열어도 삼키면 안 되는 실제 문자열 — 이 레포 화면·컴포넌트에 있는 것들이다.
+# 종전에 이 규칙을 전 에이전트에 열었다가 리뷰가 차단급으로 잡은 자리다.
+NOT_A_BOX = (
+    "시스템관리 › 권한관리",
+    "  ›",
+    "돌파 › 체결 › 청산",
+)
+
+
+def check_inline_caret_is_scoped(screens: list[dict]) -> list[str]:
+    """줄 중간 캐럿은 **그 에이전트에게만** 열려 있는가.
+
+    이 규칙이 전 에이전트로 새면 `시스템관리 › 권한관리` 같은 줄이 입력 상자로 읽히고,
+    준비·접수·제출 판정이 한꺼번에 틀어진다. 그래서 두 방향을 다 본다 —
+    ㉠ 에이전트를 안 주면 codex 상자도 안 잡힌다(규칙이 기본값으로 새지 않았다)
+    ㉡ claude·kimi 로는 `›` 줄이 상자가 아니다
+
+    **codex 에서는 그 줄들도 캐럿 줄로 읽힌다 — 그것이 이 규칙의 한계다.** 여기서 그 사실을
+    단언으로 박아 둔다: 지워서 숨기지 않고, 규칙이 조용히 넓어지거나 좁아지면 빨개지게 한다.
+    안전은 모양이 아니라 **자리**가 준다 — `caret_index` 는 **마지막** 캐럿 줄을 고르고,
+    터미널 tail 은 커서에서 끝나므로 입력 상자가 언제나 그 아래다.
+    """
+    failures: list[str] = []
+    for screen in screens:
+        if screen["agent"] != "codex":
+            continue
+        if ts.agent_ready(screen["tail"]):
+            failures.append(f"{screen['name']}: 에이전트 없이도 상자로 읽혔다 — 줄 중간 캐럿이 기본값으로 샜다")
+    for line in NOT_A_BOX:
+        for agent in (None, "claude", "kimi"):
+            if ts.is_caret_line(line, agent):
+                failures.append(f"{line!r}: {agent or '기본값'} 에서 캐럿 줄로 읽혔다 — 레포 문자열을 상자로 오인한다")
+        if not ts.is_caret_line(line, "codex"):
+            failures.append(
+                f"{line!r}: codex 에서 캐럿 줄이 아니게 됐다 — 규칙이 좁아졌다면 상자도 못 잡는지 함께 확인하라"
+            )
+    return failures
+
+
+def check_workflow_wiring() -> list[str]:
+    """워크플로가 **에이전트를 실제로 넘기는가**, 그리고 그 배선이 조용히 죽지 않는가.
+
+    판정만 고치고 호출부를 안 고치면 codex 는 종전대로 죽는다. 반대로 호출부만 앞서 가면
+    번들된 옛 판정부가 사용법 오류(2)를 내 **그 PR 자신이 리뷰를 못 받는다** — 판정부는
+    head 가 아니라 **base 커밋**에서 번들되기 때문이다.
+
+    그래서 셋을 본다:
+      ① 후보 모델을 `SCREEN_AGENT` 로 넘긴다
+      ② 판정부가 그 인자를 아는 판본일 때만 넘긴다(호환 가드)
+      ③ **가드가 찾는 표식이 판정부에 실재한다** — 이 줄이 이 그물의 몫이다. 표식 이름이
+         바뀌면 가드는 말없이 「모른다」로 떨어지고, 아무것도 빨개지지 않은 채 기능만 사라진다.
+    """
+    if not WORKFLOW.is_file():
+        return [f"워크플로를 찾지 못했습니다: {WORKFLOW}"]
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    judge = JUDGE_SOURCE.read_text(encoding="utf-8")
+
+    failures: list[str] = []
+    if 'SCREEN_AGENT="$m"' not in workflow:
+        failures.append("cross-review.yml 이 후보 모델을 SCREEN_AGENT 로 넘기지 않는다 — 판정이 에이전트를 모른다")
+    if "--agent" not in workflow:
+        failures.append("cross-review.yml 이 판정부에 --agent 를 넘기지 않는다 — 에이전트별 캐럿 규칙이 안 돈다")
+    if "TERM_STATE_HAS_AGENT" not in workflow:
+        failures.append(
+            "cross-review.yml 에 판정부 판본 호환 가드가 없다 — 옛 판정부에 --agent 를 넘기면 그 PR 이 리뷰를 못 받는다"
+        )
+    if AGENT_FLAG_PROBE not in workflow:
+        failures.append(f"호환 가드가 {AGENT_FLAG_PROBE!r} 로 판별하지 않는다 — 이 그물이 지키는 표식과 어긋났다")
+    if AGENT_FLAG_PROBE not in judge:
+        failures.append(
+            f"판정부에 {AGENT_FLAG_PROBE!r} 가 없다 — 워크플로의 호환 가드가 영영 「모르는 판본」으로 읽어"
+            " codex 상자 판정이 조용히 죽는다"
+        )
+    return failures
 
 
 def check_differential(sequences: list[dict], screens: list[dict]) -> list[str]:
@@ -93,7 +177,7 @@ def check_differential(sequences: list[dict], screens: list[dict]) -> list[str]:
     # 종전 신호가 죽은 그 화면들에서 새 판정은 서야 한다. 안 그러면 교체의 의미가 없다.
     for screen in screens:
         if screen["agent"] == "claude" and screen["expect"]["ready"]:
-            if not ts.agent_ready(screen["tail"]):
+            if not ts.agent_ready(screen["tail"], screen["agent"]):
                 failures.append(f"{screen['name']}: 새 준비 판정이 claude 화면에서 안 선다")
     return failures
 
@@ -128,6 +212,8 @@ def main() -> int:
 
     failures += check_screens(screens)
     failures += check_call_order_contract(screens)
+    failures += check_inline_caret_is_scoped(screens)
+    failures += check_workflow_wiring()
     failures += check_differential(sequences, screens)
 
     print()
