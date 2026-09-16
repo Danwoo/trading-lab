@@ -24,6 +24,8 @@ export const FRESHNESS_TONE: Record<QuoteFreshnessKind, ImpactTone> = {
   fresh: "quiet",
   stale: "caution",
   "never-run": "quiet",
+  // 「어느 종목인지 안 정했다」는 아직 시작을 안 한 것과 같은 결이다 — 경고가 아니다.
+  "no-symbol": "quiet",
   "never-succeeded": "alert",
   unreadable: "alert",
 };
