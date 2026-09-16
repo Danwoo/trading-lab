@@ -80,11 +80,13 @@ LOCAL_DB_CREDENTIALS = {"USER": "fintech", "PASSWORD": "fintech"}
 LOCAL_DB_ENDPOINT = {"HOST": "localhost", "PORT": "5442", "NAME": "fintech"}
 DB_KEY_RE = re.compile(r"^[A-Z0-9_]+_SQL_DB_(?P<part>USER|PASSWORD|HOST|PORT|NAME)$")
 
-# 로컬 SFTP (process-compose 의 atmoz-sftp-server) — DB 자격증명과 같은 성격이다: 그 컨테이너
+# 로컬 SFTP (컨테이너 `atmoz-sftp-server`) — DB 자격증명과 같은 성격이다: 그 컨테이너
 # 안에서만 사는 개발용 값이라 외부 서비스 자격증명이 아니다. 종전에는 `CHANGE_ME` 로 남아,
 # **서버가 떠 있어도 인증만 실패**했다 — 화면은 업로드가 안 되는 이유를 말하지 않는다 (#436 F28).
-# 이 값의 SoT 는 process-compose.yaml 의 `sftp` 명령에 실린 사용자 지정(`admin:admin:::upload`)
-# 이고, scripts/test_sftp_local_lockstep.py 가 두 자리를 대조한다.
+# 이 값의 SoT 는 `platform/sftp/compose.yaml` 의 사용자 지정(`admin:admin:::upload`) 하나다 —
+# process-compose 의 `sftp` 프로세스는 그 파일을 **부르기만** 하고 정의를 옮겨 적지 않는다
+# (staging+ 도 같은 파일이 만드는 external 네트워크에 붙는다).
+# scripts/test_sftp_local_lockstep.py 가 그 파일과 여기, 그리고 `.env.example` 을 대조한다.
 LOCAL_SFTP_CREDENTIALS = {"SFTP_USERNAME": "admin", "SFTP_PASSWORD": "admin"}
 
 ASSIGN_RE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)=(?P<rest>.*)$")
