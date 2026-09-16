@@ -338,15 +338,21 @@ push 가 먼저 돌면 같은 컬럼을 `USING` 없이 SafeCast 로 바꿔 뜻�
 
 ### 업로드 경로 전제 — SFTP (리서치 문서 업로드 E2E)
 
-파일 업로드는 통합 앱의 file 모듈이 SFTP 로 실물을 저장하므로 SFTP 서버가 전제다:
+파일 업로드는 통합 앱의 file 모듈이 SFTP 로 실물을 저장하므로 SFTP 서버가 전제다. **`process-compose up`
+이 이것도 띄운다** — `sftp` 프로세스가 `platform/sftp/compose.yaml`(atmoz-sftp, `:2022`, 계정
+`admin`/`admin`)을 그대로 부른다. 스택을 안 쓰고 이것만 띄우려면 같은 파일을 직접 부르면 된다:
 
 ```bash
-docker compose -f platform/sftp/compose.yaml up -d     # atmoz-sftp, :2022, 계정 admin/admin
+docker compose -f platform/sftp/compose.yaml up -d
 ```
 
-`backend-service/app/.env.development` 의 `SFTP_USERNAME`/`SFTP_PASSWORD` 를 `admin`/`admin` 으로 채운다 —
-부트스트랩은 외부 자격증명이라 채우지 않는다. `SFTP_HOST`(localhost)·`SFTP_PORT`(2022)·
-`SFTP_BASE_PATH`(/upload)는 `.env.example` 기본값이 compose 와 맞다.
+자격증명도 부트스트랩이 채운다 — `SFTP_USERNAME`/`SFTP_PASSWORD` 는 그 컨테이너 안에서만 사는
+개발용 값이라 DB 의 `fintech`/`fintech` 와 같은 성격이다. `SFTP_HOST`(localhost)·`SFTP_PORT`(2022)·
+`SFTP_BASE_PATH`(/upload)도 `.env.example` 기본값이 compose 와 맞다. 세 자리가 어긋나면 서버는
+떠 있는데 인증만 실패하므로 `scripts/test_sftp_local_lockstep.py` 가 대조한다.
+
+> 종전에는 이 절의 명령을 **손으로 먼저 쳐야** 했고 자격증명은 `CHANGE_ME` 로 남았다. 그래서
+> 문서대로 스택만 띄운 사람에게는 파일 기능이 처음부터 없는 기능으로 보였다 (#436 F28).
 
 ### doc-search 워크스페이스 벡터 DB — 같은 `fintech` DB
 

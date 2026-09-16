@@ -5,7 +5,7 @@
 `frontend/env.ts` 의 필수 필드(`JWT_SECRET`·`*_SQL_DB_*`·`DATABASE_URL` …) 검증에서 즉시 죽는다.
 이 스크립트가 그 "최초 1회 복사"를 대신한다.
 
-채워 넣는 값 3종 (판단 근거 포함 — 나머지는 손대지 않고 끝에 목록으로 보고):
+채워 넣는 값 4종 (판단 근거 포함 — 나머지는 손대지 않고 끝에 목록으로 보고):
   (1) `JWT_SECRET` — **전 파일 동일값**. frontend 가 이 키로 서명한 JWT 를 backend·MCP 서비스가
       같은 키로 검증하고 서비스 간 토큰도 같은 키를 쓴다(auth lockstep). 한 곳만 달라도 401 이
       되므로 한 번 생성해 전 파일에 같은 값을 넣는다.
@@ -15,9 +15,12 @@
   (3) `*_SQL_DB_USER`/`*_SQL_DB_PASSWORD` — 로컬 Postgres(process-compose 의 `fintech-pg` 컨테이너)
       자격증명 `fintech`/`fintech`. host·port·db 는 `.env.example` 이 이미 `localhost:5442/fintech`
       라 그대로 둔다(어긋나면 값을 바꾸지 않고 경고만 — 사람이 판단할 문제).
+  (4) `SFTP_USERNAME`/`SFTP_PASSWORD` — 로컬 SFTP(process-compose 의 `atmoz-sftp-server` 컨테이너)
+      자격증명 `admin`/`admin`. (3) 과 같은 성격이다 — 그 컨테이너 안에서만 사는 값이라 외부
+      서비스 자격증명이 아니다. host·port·base path 는 `.env.example` 이 이미 맞아 그대로 둔다.
 
 "값이 없는 자리"는 `CHANGE_ME` 와 **빈 값**(`KEY=`) 둘 다다 — 위 3종에 해당하면 채우고, 나머지
-(LLM·DART·Tavily API 키·SMTP·SFTP … 외부 서비스 자격증명)는 자동 생성이 불가능하므로 그대로 두고
+(LLM·DART·Tavily API 키·SMTP … 외부 서비스 자격증명)는 자동 생성이 불가능하므로 그대로 두고
 끝에 "직접 채워야 하는 키" 목록으로 출력한다. 값이 없어도 필수 필드 "존재" 검증은 통과하므로
 서비스는 뜬다 — 그 기능을 실제로 쓸 때만 채우면 된다.
 
@@ -76,6 +79,13 @@ SECRET_BYTES = 48
 LOCAL_DB_CREDENTIALS = {"USER": "fintech", "PASSWORD": "fintech"}
 LOCAL_DB_ENDPOINT = {"HOST": "localhost", "PORT": "5442", "NAME": "fintech"}
 DB_KEY_RE = re.compile(r"^[A-Z0-9_]+_SQL_DB_(?P<part>USER|PASSWORD|HOST|PORT|NAME)$")
+
+# 로컬 SFTP (process-compose 의 atmoz-sftp-server) — DB 자격증명과 같은 성격이다: 그 컨테이너
+# 안에서만 사는 개발용 값이라 외부 서비스 자격증명이 아니다. 종전에는 `CHANGE_ME` 로 남아,
+# **서버가 떠 있어도 인증만 실패**했다 — 화면은 업로드가 안 되는 이유를 말하지 않는다 (#436 F28).
+# 이 값의 SoT 는 process-compose.yaml 의 `sftp` 명령에 실린 사용자 지정(`admin:admin:::upload`)
+# 이고, scripts/test_sftp_local_lockstep.py 가 두 자리를 대조한다.
+LOCAL_SFTP_CREDENTIALS = {"SFTP_USERNAME": "admin", "SFTP_PASSWORD": "admin"}
 
 ASSIGN_RE = re.compile(r"^(?P<key>[A-Za-z_][A-Za-z0-9_]*)=(?P<rest>.*)$")
 
@@ -142,6 +152,8 @@ def resolve_managed_value(key: str, shared: dict[str, str], per_file: dict[str, 
     db = DB_KEY_RE.match(key)
     if db:
         return LOCAL_DB_CREDENTIALS.get(db["part"])
+    if key in LOCAL_SFTP_CREDENTIALS:
+        return LOCAL_SFTP_CREDENTIALS[key]
     return None
 
 

@@ -7,7 +7,7 @@
 | `nginx/` | 엣지 리버스 프록시 (`nginx:stable`) | `/` → `web:3000` 라우팅. 파일 업로드 경로만 `client_max_body_size 2g` + 900s timeout + `proxy_request_buffering off` (공시 PDF·리서치 첨부 등 대용량 업로드 스트리밍). 공통 프록시 헤더·WebSocket 업그레이드 맵은 `config/conf.d/*.conf` 분리 | 루트 `compose.staging.yaml`/`compose.prod.yaml` 의 `fullstack-nginx` (`1080:80`) 가 빌드. `web` healthy 후 기동 |
 | `litellm/` | 자체 호스팅 LLM 게이트웨이 (LiteLLM `v1.87.1` + SGLang) | OpenAI 호환 단일 엔드포인트(`:4000`)로 LLM(`Qwen3.6-27B`, 멀티모달) 단일 모델 라우팅. 멀티에이전트·single-agent 의 유일한 LLM 소스. 3단 가드레일(`custom_guardrail.py`): canary 주입(pre) → 고민감 PII 마스킹(pre, 주민·카드·계좌 — 전화·이메일·사업자·우편은 통과) → 출력 안전성(post, 시스템 프롬프트 누설 차단 + `korcen` 욕설 마스킹, 스트리밍 hold-back). `model-downloader` 가 HF 모델 선다운로드 → `sglang-llm` (2-GPU TP, FP8 KV cache) → `litellm` 순서 의존 | 자체 `compose.yaml` 로 **독립 기동**(GPU 노드). 루트 compose 와 분리 — 앱 서비스는 `OPENAI_API_KEY`/`base_url` 로 `:4000` 만 바라봄 |
 | `victorialogs/` | 중앙 로그 저장소 (`victoria-logs:v1.50.0`) | 전 서비스 구조화 로그 수집(`:9428`). `victorialogs` named network + volume 로 영속 | 자체 `compose.yaml` 로 **선기동**(`external` 네트워크 제공). 루트 compose 의 모든 앱 서비스가 `VICTORIALOGS_URL=http://victorialogs:9428` 로 push |
-| `sftp/` | 파일 저장 백엔드 (`atmoz/sftp:debian`) | 통합 앱 file 모듈의 SFTP 업로드/다운로드 타깃(`2022:22`). 개발용 자격증명 `admin:admin`(`CHANGE_ME` 교체 대상) | 자체 `compose.yaml` 로 **선기동**(`sftp` external 네트워크). 통합 앱만 접근, 다른 모듈은 `FileService` 주입 경유 |
+| `sftp/` | 파일 저장 백엔드 (`atmoz/sftp:debian`) | 통합 앱 file 모듈의 SFTP 업로드/다운로드 타깃(`2022:22`). 개발용 자격증명 `admin:admin` — `scripts/bootstrap_local_env.py` 가 `.env.development` 에 그대로 채운다(그 컨테이너 안에서만 사는 값) | **dev 는 `process-compose.yaml` 의 `sftp` 프로세스가 이 `compose.yaml` 을 그대로 부른다**(정의는 여기 하나뿐). staging+ 는 종전대로 **선기동**(`sftp` external 네트워크). 통합 앱만 접근, 다른 모듈은 `FileService` 주입 경유 |
 
 ## dev vs staging+ 배선
 
