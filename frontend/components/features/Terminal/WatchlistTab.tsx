@@ -90,7 +90,7 @@ export function WatchlistTab({ activeTicker, onSelect }: WatchlistTabProps) {
         <button
           type="button"
           onClick={() => setIsSearchOpen(true)}
-          className="ml-auto rounded-control border border-line px-2 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+          className="ml-auto rounded-control border border-line px-2 py-1 text-2xs text-ink hover:border-line-strong"
         >
           종목 추가
         </button>

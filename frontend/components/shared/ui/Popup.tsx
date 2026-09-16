@@ -228,19 +228,16 @@ export function Popup({
           안에는 버튼이 들어온다(MessagePopup 의 확인/취소).
           포커스를 받는 스크롤 영역은 보조기술에 이름과 역할이 있어야 하므로 `role="region"` +
           `aria-label` 을 함께 단다(이름 없는 region 은 노출되지 않는다).
-          포커스 링은 `focus-visible:` 로만 그린다 — 마우스 클릭에는 안 뜨고 Tab 으로 왔을 때만
-          떠서, 키보드 사용자가 지금 어디에 있는지 잃지 않는다(`FormModal` 은 `outline-none`
-          으로 링을 통째로 지웠는데 그러면 그 단서가 사라진다).
+          포커스 링은 `globals.css` 의 `:focus-visible` 정본이 그린다 — 마우스 클릭에는 안 뜨고
+          Tab 으로 왔을 때만 떠서, 키보드 사용자가 지금 어디에 있는지 잃지 않는다. 여기서
+          따로 그리거나 지우지 않는다(#443 F36).
         */}
         <div
           ref={scrollAreaRef}
           tabIndex={0}
           role="region"
           aria-label={title || "팝업"}
-          className={
-            "min-h-0 flex-1 overflow-auto p-4 " +
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/40"
-          }
+          className="min-h-0 flex-1 overflow-auto p-4"
         >
           {contentRender ? contentRender() : children}
         </div>

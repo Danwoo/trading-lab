@@ -44,7 +44,7 @@ const PATHS = [
  * 폭을 고정하지 않는다 — 자리가 있으면 나란히, 좁아지면 쌓인다.
  */
 const CARD_CLASS =
-  "min-w-0 flex-1 rounded-control border border-line bg-bg-raised px-3 py-2 text-left transition-colors hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted";
+  "min-w-0 flex-1 rounded-control border border-line bg-bg-raised px-3 py-2 text-left transition-colors hover:border-line-strong";
 
 export function BenchPaths() {
   const openPanel = useProductPanelStore((s) => s.open);

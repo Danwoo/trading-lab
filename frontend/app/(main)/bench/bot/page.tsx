@@ -9,10 +9,7 @@ export default function Page() {
           <h1 className="text-lg font-medium text-ink">내 봇</h1>
           <p className="mt-1 text-sm text-ink-muted">만든 봇과 지금 상태입니다.</p>
         </div>
-        <Link
-          href="/bench/bot/new"
-          className="border border-line px-3 py-1.5 text-sm text-ink hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
-        >
+        <Link href="/bench/bot/new" className="border border-line px-3 py-1.5 text-sm text-ink hover:bg-bg-raised">
           봇 만들기
         </Link>
       </header>

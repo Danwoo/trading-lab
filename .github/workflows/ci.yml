@@ -1191,6 +1191,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/verify_non_text_token_usage.py
 
+      # 포커스 표시를 그리는 자리 (#443 F36) — 정본은 globals.css 의 `:focus-visible` 한 자리인데
+      # 컴포넌트가 `focus:outline-none` 을 얹으면 **명시도로 그것을 덮어** 표시를 지우고, 대신
+      # 남는 `ring-*` 은 자리마다 색·굵기가 달라 「어디에 있는지 눈으로 쫓기 어렵다」가 된다.
+      # 지우는 쪽과 대신 그리는 쪽이 늘 짝으로 들어오므로 둘 다 없는 상태를 잠근다. 검사 0건이면 실패.
+      - name: 포커스 표시 단일 출처 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/verify_focus_indicator_single_source.py
+
       # 프록시 라우트 ↔ 서비스 소비자 (#2) — `frontend/app/api/external/**` 를 스스로 순회해
       # 대상을 찾는 stdlib 스캔이라 이 잡의 클래스다. 경로 필터가 있는 워크플로에 두면 이
       # 그물이 존재해야 할 바로 그 PR 클래스(고아 라우트 추가·소비자 삭제·체커만 수정)에서

@@ -278,11 +278,27 @@
 
   /* 포커스는 ring 이 아니라 outline — 레이아웃을 밀지 않으면서 한 속성으로 두 모드·모든
      컴포넌트에 같은 규칙을 건다. 선택(실선 2px)·활성(실선 1.5px)과 색이 같으므로 점선으로
-     가른다. overflow 조상 안에서 잘리는 것은 offset 부호(-2px)로 따로 막는다 — 그 자리는
-     PanelFrame·DataTable 이라 #73 S3 소관이다. */
+     가른다. overflow 조상 안에서 잘리는 것은 아래 규칙이 offset 부호로 막는다. */
   :focus-visible {
     outline: var(--focus-width) dashed rgb(var(--ink-strong));
     outline-offset: var(--focus-offset);
+  }
+
+  /* 바깥으로 그린 outline 은 **조상의 `overflow`** 에 잘린다 — 그리는 기법이 아니라 그 자리가
+     원인이라 `ring` 으로 바꿔도 같다. 그래서 자르는 구역 안에서는 안쪽으로 그린다(디자인 시스템
+     「클리핑은 offset 부호로 따로 막는다」).
+
+     **구역을 컴포넌트마다 지정하지 않고 자르는 유틸리티 자체에 건다.** 손으로 지정하면
+     두더지잡기가 된다 — 실측(2026-09-16 브라우저 전수): `/bench` 의 레일 버튼 8개가 46px 폭
+     `overflow` 안에 있어 좌우가 잘렸고, 관리자 화면에서도 1건이 나왔다. 그 목록을 손으로
+     관리하면 새 화면이 들어올 때마다 같은 결함이 다시 난다.
+
+     자르는 조상이 하나라도 있으면 안쪽으로 그린다 — 가장자리에서 멀어도 같은 모양이라
+     한 방식이라는 이 이슈의 요구(#443 F36)와도 맞다. */
+  :is(.overflow-hidden, .overflow-clip, .overflow-auto, .overflow-scroll) :focus-visible,
+  :is(.overflow-x-hidden, .overflow-x-clip, .overflow-x-auto, .overflow-x-scroll) :focus-visible,
+  :is(.overflow-y-hidden, .overflow-y-clip, .overflow-y-auto, .overflow-y-scroll) :focus-visible {
+    outline-offset: calc(-1 * var(--focus-offset));
   }
 }
 

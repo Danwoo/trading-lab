@@ -76,14 +76,14 @@ export function DataKeyRow({ row, canWrite, onSaved }: { row: DataKeyStatus; can
             placeholder={row.filled ? "새 값으로 바꾸려면 입력" : "값을 넣으세요"}
             aria-label={`${row.source} ${row.setting}`}
             autoComplete="off"
-            className="min-h-touch-min min-w-0 flex-1 border border-line bg-bg-base px-2 py-1 font-mono text-2xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            className="min-h-touch-min min-w-0 flex-1 border border-line bg-bg-base px-2 py-1 font-mono text-2xs text-ink"
           />
           <button
             type="button"
             disabled={!canProbe}
             onClick={() => void run("probe")}
             title={probesStored ? "저장된 키로 확인합니다" : "친 값으로 확인합니다"}
-            className="min-h-touch-min rounded-control border border-line px-2 text-2xs text-ink disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            className="min-h-touch-min rounded-control border border-line px-2 text-2xs text-ink disabled:opacity-50"
           >
             {probesStored ? "저장된 키 확인" : "연결 확인"}
           </button>
@@ -91,7 +91,7 @@ export function DataKeyRow({ row, canWrite, onSaved }: { row: DataKeyStatus; can
             type="button"
             disabled={!canSubmit}
             onClick={() => void run("save")}
-            className="min-h-touch-min rounded-control border border-line-strong px-2 text-2xs text-ink-strong disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            className="min-h-touch-min rounded-control border border-line-strong px-2 text-2xs text-ink-strong disabled:opacity-50"
           >
             저장
           </button>

@@ -27,8 +27,8 @@ export function SplitPane({ orientation = "horizontal", initialSizes, minSizes, 
             <Separator
               className={
                 orientation === "horizontal"
-                  ? "w-1 shrink-0 cursor-col-resize bg-gray-200 hover:bg-blue-300 focus-visible:bg-blue-400 focus-visible:outline-none"
-                  : "h-1 shrink-0 cursor-row-resize bg-gray-200 hover:bg-blue-300 focus-visible:bg-blue-400 focus-visible:outline-none"
+                  ? "w-1 shrink-0 cursor-col-resize bg-gray-200 hover:bg-blue-300 focus-visible:bg-blue-400"
+                  : "h-1 shrink-0 cursor-row-resize bg-gray-200 hover:bg-blue-300 focus-visible:bg-blue-400"
               }
             />
           )}

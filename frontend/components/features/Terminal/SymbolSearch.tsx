@@ -112,13 +112,13 @@ export function SymbolSearch({ onAdded, onClose }: SymbolSearchProps) {
           placeholder="종목명 또는 코드"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          className="min-h-touch-min min-w-0 flex-1 rounded-control border border-line bg-bg-base px-2 py-1 text-ink placeholder:text-ink-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+          className="min-h-touch-min min-w-0 flex-1 rounded-control border border-line bg-bg-base px-2 py-1 text-ink placeholder:text-ink-muted"
         />
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="flex-shrink-0 rounded-control border border-line px-2 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            className="flex-shrink-0 rounded-control border border-line px-2 py-1 text-2xs text-ink hover:border-line-strong"
           >
             닫기
           </button>
@@ -198,7 +198,7 @@ function SearchBody({
               disabled={addingTicker !== null || !canAdd}
               title={deniedHint}
               onClick={() => onPick(instrument)}
-              className="flex w-full items-center justify-between gap-2 border-l-2 border-transparent px-2 py-1.5 text-left hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
+              className="flex w-full items-center justify-between gap-2 border-l-2 border-transparent px-2 py-1.5 text-left hover:bg-bg-raised disabled:opacity-50"
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-ink">{instrument.issuer_nm}</span>

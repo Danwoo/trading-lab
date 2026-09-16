@@ -206,7 +206,7 @@ function Capabilities({ rows, loading }: { rows: MarketCapability[] | null; load
             </p>
             <Link
               href={SETTINGS_PATH}
-              className="inline-flex min-h-touch-min items-center rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+              className="inline-flex min-h-touch-min items-center rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong"
             >
               설정에서 키 넣기
             </Link>
@@ -476,7 +476,7 @@ export function IngestConsole() {
             aria-label="받을 주기"
             value={barKind}
             onChange={(event) => setBarKind(event.target.value as DataKind)}
-            className="min-h-touch-min rounded-control border border-line bg-bg-base px-2 py-1 text-2xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            className="min-h-touch-min rounded-control border border-line bg-bg-base px-2 py-1 text-2xs text-ink"
           >
             <option value="daily_bar">일봉</option>
             <option value="minute_bar">분봉</option>
@@ -486,7 +486,7 @@ export function IngestConsole() {
             onClick={() => start(barKind)}
             disabled={buttonState.disabled}
             title={writeAccess.deniedHint}
-            className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
+            className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong disabled:opacity-50"
           >
             {buttonState.label}
           </button>
@@ -514,7 +514,7 @@ export function IngestConsole() {
               aria-label="종목 목록을 받을 시장"
               value={chosenMarket}
               onChange={(event) => setMasterMarket(event.target.value)}
-              className="min-h-touch-min rounded-control border border-line bg-bg-base px-2 py-1 text-2xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+              className="min-h-touch-min rounded-control border border-line bg-bg-base px-2 py-1 text-2xs text-ink"
             >
               {masters.map((row) => (
                 <option key={row.market} value={row.market}>
@@ -527,7 +527,7 @@ export function IngestConsole() {
               onClick={startMaster}
               disabled={busy || writeAccess.isDenied}
               title={writeAccess.deniedHint}
-              className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-50"
+              className="rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong disabled:opacity-50"
             >
               {writeAccess.isDenied
                 ? "종목 목록 받기가 막혀 있습니다"
