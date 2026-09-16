@@ -45,6 +45,37 @@ processes:
       restart: "on_failure"
       max_restarts: 3
 
+  # 파일 저장소 (SFTP) — 통합 앱 `file` 모듈이 업로드/다운로드하는 대상.
+  # 종전에는 `docker compose -f platform/sftp/compose.yaml up -d` 를 **손으로** 먼저 쳐야 했고,
+  # 그 사실은 `platform/README.md` 한 줄과 인프라 문서 한 절에만 있었다. 그래서 문서대로
+  # `process-compose up` 만 한 사람에게는 파일 기능이 **처음부터 없는 기능**으로 보였다 (#436 F28).
+  #
+  # **정의를 여기 옮겨 적지 않고 그 compose 파일을 그대로 부른다.** 같은 컨테이너를 두 곳에
+  # 적으면 ㉠ 자격증명·포트가 따로 움직이고 ㉡ staging+ 가 쓰는 external 네트워크 이름이
+  # 갈라지며 ㉢ 이미 그 compose 로 띄워 둔 컨테이너와 이름이 부딪힌다. `up` 은 멱등이라
+  # 이미 떠 있으면 그대로 붙고, 없으면 만든다.
+  #
+  # 자격증명 `admin`/`admin` 은 **그 컨테이너 안에서만 사는 개발용 값**이다 — postgres 의
+  # `fintech`/`fintech` 와 같은 성격이라 `scripts/bootstrap_local_env.py` 가 `.env.development`
+  # 에 같은 값을 채운다. compose 파일과 그 스크립트가 어긋나면 서버는 뜨는데 인증만 실패해
+  # 원인이 안 보이므로, `scripts/test_sftp_local_lockstep.py` 가 세 자리를 대조한다.
+  #
+  # readiness_probe 를 두지 않는다 — 여기에 의존하는 프로세스가 없어서, 프로브는 화면의 색만
+  # 바꾸고 아무 순서도 만들지 않는다. `backend` 를 여기에 의존시키지도 않는다: SFTP 가 없어도
+  # 나머지 API 는 멀쩡히 서야 하고, 파일 기능만 「왜 막혔나」를 말하면 된다(capability 모듈의 몫).
+  sftp:
+    command: |
+      bash -c 'if ! command -v docker >/dev/null 2>&1; then
+        echo "sftp: docker 를 찾지 못했다. 이 프로세스는 platform/sftp/compose.yaml 을 띄운다." >&2
+        echo "  도커 없이 파일 기능을 쓰는 경로는 없다 — 파일 업로드/다운로드만 막히고" >&2
+        echo "  나머지 서비스는 그대로 뜬다." >&2
+        exit 1
+      fi
+      exec docker compose -f platform/sftp/compose.yaml up'
+    availability:
+      restart: "on_failure"
+      max_restarts: 3
+
   # 스키마 적재 (일회성) — postgres healthy 후. DB 는 `fintech` 하나이고 소유를 스키마로 가른다:
   # 파이썬 서비스 alembic 이 `public` 에, frontend Prisma 가 `frontend` 스키마에 자기 소유
   # 14 테이블(tn_user·ba_session·tc_code …)을 만든다. 스키마를 가른 이유는 `prisma db push` 가

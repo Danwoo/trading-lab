@@ -1075,6 +1075,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 scripts/test_reclaim_dead_container.py
 
+      # 로컬 SFTP 의 세 자리 lockstep (#436 F28) — 컨테이너가 만드는 계정·포트·디렉터리와,
+      # 부트스트랩이 `.env.development` 에 써 넣는 값과, `.env.example` 의 좌표가 같은 말을
+      # 하는가. 어긋나면 **서버는 떠 있는데 인증만 실패**해, 화면에서는 「기능이 없는 것」과
+      # 구별되지 않는다. 도커 없이 파일만 대조한다.
+      - name: 로컬 SFTP 좌표 lockstep 검사
+        if: ${{ !cancelled() }}
+        run: python3 scripts/test_sftp_local_lockstep.py
+
       # 부트스트랩의 「직접 채워야 하는 키」 판정 (#407 F23) — 비워 두는 것이 정답인 키를
       # 채우라고 시키면 경로를 짐작해 넣어 오히려 틀린다. `.env.example` 주석 표식이 갈림이다.
       - name: 부트스트랩 수동 키 판정 검사
