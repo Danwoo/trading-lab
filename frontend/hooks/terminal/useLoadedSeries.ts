@@ -7,6 +7,7 @@ import { selectCandles } from "@/services/terminal/marketService";
 import type { Candle } from "@/services/terminal/marketService";
 import { useTerminalInterval, useTerminalRange, useTerminalSymbol } from "@/hooks/terminal/useTerminalContext";
 import { barSignalKey, useIngestRevision } from "@/stores/terminal/ingestSignalStore";
+import { coverageKey, lastTradeDateOf, useCoverageStore } from "@/stores/terminal/coverageStore";
 import type { PanelData } from "@/types/terminal/provenance";
 
 /**
@@ -66,6 +67,10 @@ export function useLoadedSeries(): PanelData<Candle[]> {
           error: null,
           provenance: { kind: "loaded", source: result.source, asOf: result.asOf },
         });
+        // 적재본이 **실제로 덮는 마지막 거래일**을 알린다 — 배지가 그것을 읽는다 (#402).
+        // 읽는 자리를 늘리지 않는 이유는 `coverageStore` 머리 주석에 있다(같은 group 을 두
+        // 소비자가 쓰면 한쪽의 정리가 다른 쪽 요청을 취소한다).
+        useCoverageStore.getState().publish(coverageKey(symbol.market, symbol.ticker), lastTradeDateOf(result.items));
       })
       .catch((error: unknown) => {
         if (cancelled) return;
