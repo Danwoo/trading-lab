@@ -139,7 +139,7 @@ export function ConversationPanel({ session, streaming, statusText, onSend, onAb
           <textarea
             id="research-chat-input"
             ref={inputRef}
-            className="w-full resize-none bg-transparent px-3 pb-1 pt-3 text-sm focus:outline-none"
+            className="w-full resize-none bg-transparent px-3 pb-1 pt-3 text-sm"
             placeholder="예: 업로드한 리서치 보고서의 리스크 요인 정리해줘"
             rows={2}
             value={input}

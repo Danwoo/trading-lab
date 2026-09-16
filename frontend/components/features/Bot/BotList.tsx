@@ -86,7 +86,7 @@ export function BotList() {
           {/* 지우기는 링크 **밖**에 선다 — 링크 안에 버튼을 넣으면 어느 쪽이 눌린 것인지가 모호해진다. */}
           <Link
             href={`/bench/bot/${bot.bot_id}`}
-            className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1 py-2 hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1 py-2 hover:bg-bg-raised"
           >
             <span className="text-sm text-ink">{bot.bot_nm}</span>
             <span className="font-mono text-2xs text-ink-muted">
@@ -100,7 +100,7 @@ export function BotList() {
             disabled={deletingId === bot.bot_id || !writeAccess.canWrite}
             title={writeAccess.deniedHint}
             onClick={() => void handleDelete(bot)}
-            className="shrink-0 px-2 py-2 text-2xs text-ink-muted underline underline-offset-2 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:text-ink-muted"
+            className="shrink-0 px-2 py-2 text-2xs text-ink-muted underline underline-offset-2 hover:text-ink disabled:text-ink-muted"
           >
             삭제
           </button>

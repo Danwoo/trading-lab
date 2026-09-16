@@ -72,7 +72,7 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
       aria-labelledby={headingId}
       onKeyDown={handleKeyDown}
       className={cn(
-        "flex h-full min-w-0 flex-col border-l border-line bg-bg-panel focus:outline-none",
+        "flex h-full min-w-0 flex-col border-l border-line bg-bg-panel",
         "absolute inset-0 z-20 lg:static lg:w-shell-panel-compact lg:flex-none",
         panelWidthClass(expanded),
       )}
@@ -97,7 +97,7 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
               ICON_HIT_AREA_BOX,
               // 표시 여부는 구간이 가른다(§21.6) — `hidden` 을 `xl:inline-flex` 가 덮는다.
               // `-my-px` 는 24 짜리 표적이 머리 줄을 밀어 늘리지 않게 한다.
-              "-my-px hidden rounded text-ink-muted hover:bg-bg-raised hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted xl:inline-flex",
+              "-my-px hidden rounded text-ink-muted hover:bg-bg-raised hover:text-ink xl:inline-flex",
             )}
           >
             <Icon name={expanded ? "arrowright" : "arrowleft"} size={14} />
@@ -108,10 +108,7 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
           type="button"
           aria-label={`${item.label} 패널 닫기`}
           onClick={onClose}
-          className={cn(
-            ICON_HIT_AREA,
-            "-my-px rounded text-ink-muted hover:bg-bg-raised hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
-          )}
+          className={cn(ICON_HIT_AREA, "-my-px rounded text-ink-muted hover:bg-bg-raised hover:text-ink")}
         >
           <Icon name="close" size={14} />
         </button>
@@ -125,11 +122,7 @@ export function ProductPanel({ item, expanded, onToggleExpanded, onClose, id, ch
             <span className="text-ink">{selection.label}</span>
             {selection.origin === "board" ? " 로 좁혀져 있습니다" : " 을 보드가 표시하고 있습니다"}
           </span>
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="flex-none rounded px-1 underline hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
-          >
+          <button type="button" onClick={clearSelection} className="flex-none rounded px-1 underline hover:text-ink">
             전체 보기
           </button>
         </div>

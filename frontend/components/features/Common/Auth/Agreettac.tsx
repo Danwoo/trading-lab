@@ -29,7 +29,7 @@ function AgreeCheck({ id, checked, onChange }: { id: string; checked: boolean; o
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 accent-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+        className="h-4 w-4 accent-white"
       />
       동의합니다
     </label>
@@ -170,7 +170,7 @@ export const Agreettac: FC<Props> = () => {
               </li>
 
               <li className="flex-auto">
-                <div className="flex items-center pr-2 leading-[1.3rem] no-underline before:mr-2 before:h-px before:w-full before:flex-1 before:bg-[#e0e0e0] before:content-[''] focus:outline-none dark:before:bg-neutral-600 dark:after:bg-neutral-600 dark:hover:bg-[#3b3b3b] pointer-events-none select-none">
+                <div className="flex items-center pr-2 leading-[1.3rem] no-underline before:mr-2 before:h-px before:w-full before:flex-1 before:bg-[#e0e0e0] before:content-[''] dark:before:bg-neutral-600 dark:after:bg-neutral-600 dark:hover:bg-[#3b3b3b] pointer-events-none select-none">
                   <span className="text-[#192850] my-6 mr-2 flex h-[1.938rem] w-[1.938rem] items-center justify-center rounded-full bg-[#DFE1E8] text-sm font-medium ">
                     2
                   </span>
@@ -181,7 +181,7 @@ export const Agreettac: FC<Props> = () => {
               </li>
 
               <li className="flex-auto">
-                <div className="flex items-center pr-2 leading-[1.3rem] no-underline before:mr-2 before:h-px before:w-full before:flex-1 before:bg-[#e0e0e0] before:content-[''] focus:outline-none dark:before:bg-neutral-600 dark:after:bg-neutral-600 dark:hover:bg-[#3b3b3b] pointer-events-none select-none">
+                <div className="flex items-center pr-2 leading-[1.3rem] no-underline before:mr-2 before:h-px before:w-full before:flex-1 before:bg-[#e0e0e0] before:content-[''] dark:before:bg-neutral-600 dark:after:bg-neutral-600 dark:hover:bg-[#3b3b3b] pointer-events-none select-none">
                   <span className="text-[#192850] my-6 mr-2 flex h-[1.938rem] w-[1.938rem] items-center justify-center rounded-full bg-[#DFE1E8] text-sm font-medium ">
                     3
                   </span>

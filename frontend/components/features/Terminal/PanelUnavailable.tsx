@@ -11,8 +11,7 @@ type UnavailableAction =
   | { label: string; href: string; onClick?: never }
   | { label: string; onClick: () => void; href?: never };
 
-const ACTION_CLASS =
-  "rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted";
+const ACTION_CLASS = "rounded-control border border-line px-2.5 py-1 text-2xs text-ink hover:border-line-strong";
 
 /**
  * `unavailable` 일 때 패널 본문 대신 렌더된다 — 빈 껍데기가 아니라 이유를 설명한다 (FR-021).

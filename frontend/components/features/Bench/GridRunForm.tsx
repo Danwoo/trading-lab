@@ -177,7 +177,7 @@ export function GridRunForm({
           type="submit"
           disabled={isRunning || !writeAccess.canWrite}
           title={writeAccess.deniedHint}
-          className="rounded-control border border-btn-line bg-gradient-to-b from-btn-from to-btn-to px-3 py-1.5 text-sm font-ui text-ink disabled:opacity-45 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-muted"
+          className="rounded-control border border-btn-line bg-gradient-to-b from-btn-from to-btn-to px-3 py-1.5 text-sm font-ui text-ink disabled:opacity-45"
         >
           {isRunning ? "돌리는 중…" : "격자 실행"}
         </button>

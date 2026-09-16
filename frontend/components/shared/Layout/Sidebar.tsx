@@ -104,7 +104,6 @@ export function Sidebar({ isDrawerOpen, children }: Props) {
               style={{ paddingLeft: 8 + depth * 14 }}
               className={cn(
                 "flex w-full items-center rounded px-2 py-1.5 text-left text-[15px] transition-colors",
-                "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/40",
                 isSelected ? "bg-blue-500 text-white hover:bg-blue-600" : "text-gray-900 hover:bg-gray-200",
               )}
             >

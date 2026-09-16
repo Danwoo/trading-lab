@@ -351,7 +351,6 @@ export function SelectMenu({
               // 검색이 없으면 목록 자체가 포커스를 받는다(위 onOpenAutoFocus 의 대체 대상).
               if (node && open && !canSearch) node.focus();
             }}
-            className="focus:outline-none"
           >
             {visibleItems.length === 0 && <li className="px-3 py-2 text-ink-muted">{noDataText}</li>}
             {visibleItems.map((item, index) => {
@@ -370,9 +369,10 @@ export function SelectMenu({
                   onClick={() => commit(itemValue)}
                   className={cn(
                     "flex cursor-pointer items-center gap-2 px-3 py-1.5",
-                    // 목록이 `focus:outline-none` 으로 정본 outline 을 눌러 두므로, 키보드 위치는
-                    // **이 표시 하나뿐**이다. 바탕만으로는 `--bg-raised` on `--bg-panel` 1.09:1 이라
-                    // 눈에 안 띈다 — 비텍스트 3:1 을 넘는 선(`--ink-muted`)을 함께 두른다.
+                    // 포커스는 목록(`ul`)에 있고 정본 outline 이 거기 그려진다 — 목록 **안의**
+                    // 어느 항목이 활성인지는 이 표시가 말한다. 바탕만으로는 `--bg-raised` on
+                    // `--bg-panel` 1.09:1 이라 눈에 안 띈다 — 비텍스트 3:1 을 넘는 선
+                    // (`--ink-muted`)을 함께 두른다. 포커스(점선)와 축이 달라 겹쳐도 구분된다.
                     index === activeIndex ? "bg-bg-raised ring-1 ring-inset ring-ink-muted" : "",
                     isSelected ? "font-medium text-ink-strong" : "text-ink",
                   )}

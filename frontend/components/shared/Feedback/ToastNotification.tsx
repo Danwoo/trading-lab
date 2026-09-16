@@ -66,7 +66,7 @@ export function ToastNotification() {
         type="button"
         onClick={dismissCurrent}
         aria-label="알림 닫기"
-        className={`${ICON_HIT_AREA} flex-shrink-0 rounded text-base leading-none ${style.text} opacity-60 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1`}
+        className={`${ICON_HIT_AREA} flex-shrink-0 rounded text-base leading-none ${style.text} opacity-60 transition-opacity hover:opacity-100 focus:opacity-100`}
       >
         <span aria-hidden="true">×</span>
       </button>

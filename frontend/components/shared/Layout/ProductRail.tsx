@@ -116,7 +116,6 @@ export function ProductRail({ openPanelId, onTogglePanel, panelRegionId, focusIt
             // Tailwind 가 그것을 색 유틸리티 중 마지막에 내보내 뒤에 오는 조건부 색을 전부 덮는다
             // (같은 명시도 → 소스 순서 승). 그렇게 두면 활성·열림 테두리가 코드엔 있고 화면엔 없다.
             "relative flex h-touch-rail-target w-touch-rail-target items-center justify-center rounded-lg border transition-colors",
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
             isActive && "border-line-strong bg-bg-raised text-ink",
             isOpen && "border-ink-strong bg-bg-raised text-ink-strong",
             !isActive && !isOpen && "border-transparent text-ink-muted hover:bg-bg-raised hover:text-ink",

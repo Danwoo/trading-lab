@@ -42,7 +42,7 @@ export function MenuUnreadableScreen() {
         type="button"
         onClick={retry}
         disabled={retrying}
-        className="mt-2 border border-line px-3 py-1.5 text-sm text-ink hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted disabled:opacity-60"
+        className="mt-2 border border-line px-3 py-1.5 text-sm text-ink hover:bg-bg-raised disabled:opacity-60"
       >
         {retrying ? "다시 읽는 중…" : "다시 시도"}
       </button>

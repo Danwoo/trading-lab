@@ -237,10 +237,7 @@ export function Popup({
           tabIndex={0}
           role="region"
           aria-label={title || "팝업"}
-          className={
-            "min-h-0 flex-1 overflow-auto p-4 " +
-            "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/40"
-          }
+          className="min-h-0 flex-1 overflow-auto p-4"
         >
           {contentRender ? contentRender() : children}
         </div>

@@ -28,14 +28,11 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
         <button
           type="button"
           onClick={reset}
-          className="border border-line px-3 py-1.5 text-sm text-ink hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+          className="border border-line px-3 py-1.5 text-sm text-ink hover:bg-bg-raised"
         >
           다시 그리기
         </button>
-        <a
-          href="/bench"
-          className="border border-line px-3 py-1.5 text-sm text-ink hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
-        >
+        <a href="/bench" className="border border-line px-3 py-1.5 text-sm text-ink hover:bg-bg-raised">
           실험대로 가기
         </a>
       </div>

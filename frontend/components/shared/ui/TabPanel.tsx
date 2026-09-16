@@ -70,7 +70,6 @@ export function TabPanel({ items, children, defaultTab, onSelectionChanged, clas
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1 border-none px-3 py-2 text-sm",
                   "bg-gray-200 text-gray-700 hover:bg-gray-100",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/40",
                   "data-[state=active]:bg-white data-[state=active]:font-medium data-[state=active]:text-gray-900",
                   "disabled:cursor-not-allowed disabled:bg-gray-100 disabled:opacity-60",
                 )}

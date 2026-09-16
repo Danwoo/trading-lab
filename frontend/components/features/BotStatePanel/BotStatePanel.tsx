@@ -64,7 +64,7 @@ export default function BotStatePanel({ instanceId }: PanelProps) {
         <li key={bot.bot_id}>
           <Link
             href={`/bench/bot/${bot.bot_id}`}
-            className="flex items-baseline justify-between gap-2 px-3 py-2 hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+            className="flex items-baseline justify-between gap-2 px-3 py-2 hover:bg-bg-raised"
           >
             <span className="min-w-0 truncate text-ink">{bot.bot_nm}</span>
             <span className="flex-shrink-0 text-ink-muted">

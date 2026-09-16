@@ -140,7 +140,6 @@ export function GlobalTabs() {
                 onKeyDown={(e) => handleKeyDown(e, index)}
                 className={cn(
                   "flex w-[130px] min-w-[130px] cursor-pointer items-center gap-1 border-b-2 px-2.5 py-1 text-sm",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/40",
                   isActive
                     ? "border-blue-500 bg-white text-gray-900"
                     : "border-transparent text-gray-600 hover:bg-white/50 hover:border-gray-400",

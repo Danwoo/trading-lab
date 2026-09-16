@@ -59,7 +59,7 @@ export function TerminalContainer() {
     <button
       type="button"
       onClick={resetPanels}
-      className="border border-line px-2 py-1 font-mono text-xs text-ink hover:bg-bg-raised focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted"
+      className="border border-line px-2 py-1 font-mono text-xs text-ink hover:bg-bg-raised"
     >
       기본 패널 되살리기
     </button>

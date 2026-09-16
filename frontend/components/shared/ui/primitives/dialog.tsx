@@ -280,7 +280,6 @@ function DialogContent({
           "z-50 flex flex-col rounded border border-gray-200 bg-white text-ink shadow-lg",
           "motion-safe:data-[state=open]:animate-dialog-scale-in",
           "motion-safe:data-[state=closed]:animate-dialog-scale-out",
-          "focus:outline-none",
           className,
         )}
         // 커널 소유 키는 호출부 style 에서 **지우고**, 커널 값을 뒤에 얹는다 — 두 규칙 다
@@ -302,11 +301,7 @@ function DialogContent({
           // — 실제로 그렇게 만들었다가 잡은 결함(#341 오더).
           <DialogPrimitive.Close
             aria-label="닫기"
-            className={cn(
-              "absolute right-3 top-3 rounded p-1 text-gray-400",
-              "hover:bg-gray-100 hover:text-gray-600",
-              "focus:outline-none focus:ring-2 focus:ring-blue-500/40",
-            )}
+            className={cn("absolute right-3 top-3 rounded p-1 text-gray-400", "hover:bg-gray-100 hover:text-gray-600")}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

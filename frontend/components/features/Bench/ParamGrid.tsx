@@ -162,7 +162,6 @@ function Cell({
         className={cn(
           "min-h-[26px] w-full min-w-0 break-keep rounded-badge px-1 py-0.5 text-2xs tabular-nums",
           failed ? "text-danger" : "text-ink-muted",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
           selected ? "border-2 border-ink-strong" : failed ? "border border-line" : "border border-dashed border-line",
         )}
       >
@@ -199,7 +198,6 @@ function Cell({
       style={{ backgroundColor: `rgb(var(${channel}) / ${alpha.toFixed(2)})` }}
       className={cn(
         "min-h-[26px] w-full min-w-0 rounded-badge px-1 py-0.5 text-2xs tabular-nums text-ink",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
         selected ? "border-2 border-ink-strong" : "border border-line",
       )}
     >
@@ -259,7 +257,6 @@ export function ParamGrid({ grid, selectedRunId, onSelect }: Props) {
             aria-pressed={key === shading}
             className={cn(
               "rounded-badge px-1.5 py-0.5 text-2xs",
-              "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ink-muted",
               key === shading
                 ? "border border-ink-strong text-ink-strong"
                 : "border border-line text-ink-muted hover:border-line-strong",
