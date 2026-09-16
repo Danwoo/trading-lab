@@ -4,11 +4,6 @@ import type { BotDraft } from "@/components/features/Bot/botFormModel";
 export interface SaveBlock {
   field: string | null;
   message: string;
-  /**
-   * 이 말이 **이미 화면에 있는가.** 다전략 봇은 열자마자 같은 문장이 뜨므로(`loadError`),
-   * 저장할 때 또 얹으면 한 자리가 같은 말을 두 번 한다 — 이 레포가 이름 붙인 결함이다(B-20).
-   */
-  alreadyShown?: boolean;
 }
 
 /**
@@ -34,11 +29,11 @@ export function blockingSaveReason(
   if (loadedStrategyCount > 1) {
     return {
       field: null,
-      // 문장을 `loadError` 와 맞춘다 — 두 자리가 다른 말을 하면 같은 사실이 둘로 읽힌다.
+      // 문구를 열자마자 뜨는 안내와 **한 글자까지 맞춘다** — 화면이 그 둘을 문자열로 맞대
+      // 「이미 있는 말인가」를 판정한다. 갈리면 배너가 한 번 더 뜰 뿐이라 안전한 방향이다.
       message:
         `이 봇에는 전략이 ${loadedStrategyCount}개 실려 있는데 이 화면은 하나만 다룹니다. ` +
         "여기서 저장하면 나머지가 지워지므로 저장을 막아 뒀습니다.",
-      alreadyShown: true,
     };
   }
   return null;

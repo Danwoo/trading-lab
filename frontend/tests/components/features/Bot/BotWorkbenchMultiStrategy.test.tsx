@@ -46,7 +46,12 @@ function strategyOf(key: string, order: number) {
   };
 }
 
-function givenBot(strategyKeys: string[]) {
+/** 전략 파일이 사라진 상태 — 스키마가 보장하는 정상 입력이다 (`form: null` + `missing_reason`). */
+function missingStrategyOf(key: string, order: number) {
+  return { ...strategyOf(key, order), form: null, missing_reason: `전략 파일을 찾지 못했습니다: ${key}.py` };
+}
+
+function givenBot(strategyKeys: string[], first?: ReturnType<typeof missingStrategyOf>) {
   vi.mocked(selectStrategyCatalog).mockResolvedValue({ items: [FORM], errors: [] } as never);
   vi.mocked(selectBot).mockResolvedValue({
     bot_id: 7,
@@ -58,7 +63,7 @@ function givenBot(strategyKeys: string[]) {
     reg_id: "lead",
     mod_dt: "2026-08-01T09:00:00",
     mod_id: "lead",
-    strategies: strategyKeys.map(strategyOf),
+    strategies: strategyKeys.map(strategyOf).map((st, i) => (i === 0 && first ? first : st)),
   } as never);
 }
 
@@ -105,7 +110,12 @@ describe("다전략 봇을 이 화면이 부수지 않는다", () => {
 // #453 F1 리뷰 지적의 이웃 — 저장 실패를 폼 안에 남기게 하면서 **다전략 문구를 두 번 말할**
 // 뻔했다. 그 문장은 열자마자 이미 떠 있다(`loadError`).
 describe("같은 말을 두 번 하지 않는다", () => {
-  it("다전략 봇에서 저장을 눌러도 그 문장은 화면에 하나뿐이다", async () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("토스트가 사라진 뒤에도 그 문장은 화면에 하나뿐이다", async () => {
     givenBot(["pullback", "breakout"]);
 
     render(<BotWorkbench botId={7} />);
@@ -113,6 +123,38 @@ describe("같은 말을 두 번 하지 않는다", () => {
 
     await userEvent.setup().click(screen.getByRole("button", { name: "저장" }));
 
-    await waitFor(() => expect(screen.getAllByText(/전략이 2개 실려 있는데/)).toHaveLength(1));
+    await waitFor(() => expect(screen.getAllByText(/전략이 2개 실려 있는데/)).toHaveLength(1), { timeout: 4000 });
+  });
+});
+
+// 리뷰가 짚은 조합 — **첫 전략의 파일이 사라진 다전략 봇**. 종전엔 `missing_reason` 이
+// 다전략 안내를 덮어써, 「이미 화면에 있다」는 가정이 거짓이 되고 저장이 왜 막혔는지가
+// 1.6초 토스트에만 남았다. 두 사유를 각자 자리에 둬 서로 덮지 않게 했다.
+describe("사유가 서로를 덮지 않는다", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("첫 전략 파일이 사라져도 다전략 안내가 그대로 남는다", async () => {
+    givenBot(["pullback", "breakout"], missingStrategyOf("pullback", 0));
+
+    render(<BotWorkbench botId={7} />);
+
+    expect(await screen.findByText(/전략이 2개 실려 있는데/)).toBeTruthy();
+    expect(screen.getByText(/전략 파일을 찾지 못했습니다/)).toBeTruthy();
+  });
+
+  // 토스트도 같은 문장을 들고 있으므로 **토스트가 사라진 뒤에** 센다 — 그 전에 세면
+  // 「배너가 생겼는지」가 아니라 「토스트가 아직 떠 있는지」를 재게 된다.
+  it("토스트가 사라진 뒤에도 다전략 문장은 화면에 하나뿐이다", async () => {
+    givenBot(["pullback", "breakout"], missingStrategyOf("pullback", 0));
+
+    render(<BotWorkbench botId={7} />);
+    await screen.findByText(/전략이 2개 실려 있는데/);
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(screen.getAllByText(/전략이 2개 실려 있는데/)).toHaveLength(1), { timeout: 4000 });
   });
 });

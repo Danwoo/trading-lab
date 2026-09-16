@@ -59,6 +59,12 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
   const [strategyForms, setStrategyForms] = useState<StrategyForm[]>([]);
   const [catalogErrors, setCatalogErrors] = useState<{ source: string; message: string }[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * 「이 화면은 전략을 하나만 다룬다」 — 열자마자 보이는 안내. **`loadError` 와 한 자리를 쓰면
+   * 안 된다**: 첫 전략의 파일이 사라진 봇에서는 `missing_reason` 이 그 자리를 덮어, 화면에
+   * 없는 문구를 「이미 있다」고 여기게 된다 (리뷰 지적).
+   */
+  const [multiStrategyNotice, setMultiStrategyNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -97,7 +103,7 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
           setLoadedStrategyCount(bot.strategies.length);
           if (bot.strategies.length > 1) {
             // 누른 뒤에 막는 것보다 열자마자 보이는 것이 낫다 — 무엇을 못 하는지 먼저 안다.
-            setLoadError(
+            setMultiStrategyNotice(
               `이 봇에는 전략이 ${bot.strategies.length}개 실려 있는데 이 화면은 하나만 다룹니다. ` +
                 "여기서 저장하면 나머지가 지워지므로 저장을 막아 뒀습니다.",
             );
@@ -200,7 +206,10 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
     if (blocked !== null) {
       setFieldErrors(blocked.field === null ? {} : { [blocked.field]: blocked.message });
       // 이미 화면에 있는 말은 다시 얹지 않는다 — 토스트로 「지금 막혔다」만 알린다.
-      setSaveError(blocked.field === null && !blocked.alreadyShown ? blocked.message : null);
+      // **추측하지 않고 지금 떠 있는 문구와 맞대 본다** — 어느 사유가 그 자리를 차지했는지는
+      // 이 컴포넌트만 안다. 문구가 갈리면 배너가 한 번 더 뜰 뿐이라 안전한 방향으로 틀린다.
+      const onScreen = [loadError, multiStrategyNotice];
+      setSaveError(blocked.field === null && !onScreen.includes(blocked.message) ? blocked.message : null);
       showToast(blocked.message, "warning");
       return;
     }
@@ -287,6 +296,12 @@ export function BotWorkbench({ botId, inPanel = false }: Props) {
       {writeAccess.isDenied && <WriteAccessNotice halted={["봇 저장", "봇 삭제"]} />}
 
       {botId !== undefined && <BotRunHistory botId={botId} />}
+
+      {multiStrategyNotice && (
+        <p role="status" className="break-keep border border-caution p-2 text-sm text-ink">
+          {multiStrategyNotice}
+        </p>
+      )}
 
       {loadError && (
         <p role="status" className="border border-line px-3 py-2 text-sm text-ink">

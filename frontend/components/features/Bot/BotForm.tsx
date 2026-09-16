@@ -26,8 +26,8 @@ interface Props {
   onStrategyChange: (key: string) => void;
   onParamChange: (name: string, value: unknown) => void;
   /**
-   * 서버가 칸을 짚어 돌려보낸 오류 — 칸 이름 → 문장. 토스트는 사라지지만 이건 칸에 남는다.
-   * 지금은 전략 파라미터 칸만 대상이다(백엔드가 라벨을 짚는 오류가 그것뿐이다).
+   * 칸을 짚어 남기는 오류 — 서버가 짚어 돌려보낸 것과 **화면이 저장 전에 잡은 것**
+   * (`blockingSaveReason` 의 `bot_nm`) 둘 다 여기 온다. 그 칸을 다시 손대면 지운다.
    */
   fieldErrors?: Record<string, string>;
   /**
