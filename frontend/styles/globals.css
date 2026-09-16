@@ -278,8 +278,7 @@
 
   /* 포커스는 ring 이 아니라 outline — 레이아웃을 밀지 않으면서 한 속성으로 두 모드·모든
      컴포넌트에 같은 규칙을 건다. 선택(실선 2px)·활성(실선 1.5px)과 색이 같으므로 점선으로
-     가른다. overflow 조상 안에서 잘리는 것은 offset 부호(-2px)로 따로 막는다 — 그 자리는
-     PanelFrame·DataTable 이라 #73 S3 소관이다. */
+     가른다. overflow 조상 안에서 잘리는 것은 아래 규칙이 offset 부호로 막는다. */
   :focus-visible {
     outline: var(--focus-width) dashed rgb(var(--ink-strong));
     outline-offset: var(--focus-offset);

@@ -88,10 +88,10 @@ export function FormModal({
     >
       <div className="h-full flex flex-col">
         {buttonsPosition === "top" && renderButtons("top")}
-        <div
-          tabIndex={0}
-          className={`flex-1 overflow-auto outline-none [&>*:last-child]:mb-0 ${contentClassName || ""}`}
-        >
+        {/* 스크롤 영역이 포커스를 받는다(`tabIndex={0}`) — 그러니 표시를 지우지 않는다.
+            `outline-none` 은 Tailwind 에서 `outline: 2px solid transparent` 라, 링을 없애는
+            대신 **투명한 링**으로 정본을 덮어 키보드 위치를 안 보이게 만든다(#443 F36). */}
+        <div tabIndex={0} className={`flex-1 overflow-auto [&>*:last-child]:mb-0 ${contentClassName || ""}`}>
           {children}
         </div>
         {buttonsPosition === "bottom" && renderButtons("bottom")}
